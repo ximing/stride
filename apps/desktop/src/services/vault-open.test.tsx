@@ -99,4 +99,38 @@ describe('vault open and new', () => {
     host.remove()
     vault.cancelPending()
   })
+
+  it('clones the sample vault in the memory fixture without the directory picker', async () => {
+    useMemoryFixture()
+    const picker = vi.fn()
+    vi.stubGlobal('showDirectoryPicker', picker)
+    register(VaultService)
+    register(GitService)
+    register(SettingsService)
+    register(ChatService)
+    register(UpdateService)
+    const vault = resolve(VaultService)
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    await act(async () => {
+      root.render(<App />)
+    })
+
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('[data-testid="clone-sample"]')!.click()
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, 0))
+    })
+
+    expect(picker).not.toHaveBeenCalled()
+    expect(vault.phase).toBe('ready')
+    expect(vault.error).toBe('')
+    const types = [...host.querySelectorAll<HTMLElement>('[data-testid="type-link"]')].map((node) => node.dataset.type)
+    expect(types).toEqual(['Note', 'Project', 'Person'])
+    expect(noteTitles(host)).toEqual(['Ada Lovelace', 'Sample project', 'Welcome'])
+
+    root.unmount()
+    host.remove()
+    vault.cancelPending()
+  })
 })

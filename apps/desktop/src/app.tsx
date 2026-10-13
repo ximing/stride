@@ -39,22 +39,18 @@ const Chooser = observer(function Chooser() {
         className="chooser-form"
         onSubmit={(event) => {
           event.preventDefault()
-          void vault.openFromDraft()
         }}
       >
-        <label>
-          <span>Vault folder</span>
-          <input
-            data-testid="vault-path"
-            value={vault.pathDraft}
-            onChange={(event) => vault.setPathDraft(event.target.value)}
-            placeholder="/path/to/vault"
-          />
-        </label>
+        <p className="chooser-lead">Welcome. Start an empty vault, open a folder, or clone the sample notes.</p>
         <div className="chooser-actions">
-          <button className="primary" type="submit" data-testid="open-vault">Open vault</button>
           <button className="primary" type="button" data-testid="new-vault" onClick={() => void vault.createNewVault()}>
             New vault
+          </button>
+          <button className="primary" type="button" data-testid="open-vault" onClick={() => void vault.openFromDraft()}>
+            Open vault
+          </button>
+          <button className="primary" type="button" data-testid="clone-sample" onClick={() => void vault.cloneSampleVault()}>
+            Clone sample
           </button>
         </div>
         {vault.error && <p className="error">{vault.error}</p>}

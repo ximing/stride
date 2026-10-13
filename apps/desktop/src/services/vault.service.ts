@@ -21,6 +21,7 @@ import {
 } from '@stride/platform'
 import { EmbeddingClient } from '../../../../packages/core/src/embeddings'
 import { noteIndex, searchNotes, type NoteIndex } from '../../../../packages/core/src/search'
+import { writeSampleNotes } from '../../../../packages/core/src/sample'
 import { initializeVault } from '../../../../packages/core/src/seed'
 import { readRenameFromHeading, writeRenameFromHeading } from '../../../../packages/core/src/vault-config'
 import { createVaultNote, nextSlugId, notePath, openVault, saveNote } from '../../../../packages/core/src/vault'
@@ -173,6 +174,20 @@ export class VaultService extends Service {
         ? new MemoryFileSystem('memory-vault')
         : await pickVaultBackend()
       await initializeVault(backend, HOME_DIR)
+      await this.openBackend(backend)
+    } catch (error) {
+      this.error = errorText(error)
+    }
+  }
+
+  async cloneSampleVault() {
+    this.error = ''
+    try {
+      const backend = isMemoryFixture()
+        ? new MemoryFileSystem('memory-vault')
+        : await pickVaultBackend()
+      await initializeVault(backend, HOME_DIR)
+      await writeSampleNotes(backend)
       await this.openBackend(backend)
     } catch (error) {
       this.error = errorText(error)
