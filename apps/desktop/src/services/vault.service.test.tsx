@@ -5,7 +5,7 @@ import { MemoryFileSystem, PlatformError } from '@stride/platform'
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { readNoteFile } from '../../../../packages/core/src/vault'
+import { notePath, readNoteFile } from '../../../../packages/core/src/vault'
 import { App, Rail } from '../app'
 import { ChatService, GitService, SettingsService, UpdateService } from './panels.service'
 import { VAULT_REGISTRY_KEY, VaultService } from './vault.service'
@@ -583,5 +583,48 @@ describe('VaultService', () => {
     root.unmount()
     host.remove()
     vault.advanceInbox = true
+  })
+
+  it('hides an archived note from visible lists without clearing the selection', async () => {
+    useMemoryFixture()
+    register(VaultService)
+    const vault = resolve(VaultService)
+    await vault.openFromDraft()
+    await vault.createNote()
+    const firstId = vault.active?.id ?? ''
+    await vault.createNote()
+    const currentId = vault.active?.id ?? ''
+    expect(vault.visibleNotes.map((note) => note.id)).toEqual([currentId, firstId])
+    expect(vault.inboxCount).toBe(2)
+
+    vault.updateBooleanProperty('archived', true)
+    expect(vault.visibleNotes.map((note) => note.id)).not.toContain(currentId)
+    expect(vault.visibleNotes.map((note) => note.id)).toEqual([firstId])
+    expect(vault.inboxCount).toBe(1)
+    expect(vault.activeId).toBe(currentId)
+
+    vault.updateBooleanProperty('archived', false)
+    expect(vault.visibleNotes.map((note) => note.id)).toContain(currentId)
+    expect(vault.visibleNotes.map((note) => note.id)).toEqual([currentId, firstId])
+    expect(vault.inboxCount).toBe(2)
+    vault.cancelPending()
+  })
+
+  it('deletes the active note file and drops it from the vault', async () => {
+    useMemoryFixture()
+    register(VaultService)
+    const vault = resolve(VaultService)
+    await vault.openFromDraft()
+    await vault.createNote()
+    const keptId = vault.active?.id ?? ''
+    await vault.createNote()
+    const id = vault.active?.id ?? ''
+    expect(await vault.fs!.stat(notePath(id))).not.toBeNull()
+
+    await vault.deleteActiveNote()
+    expect(await vault.fs!.stat(notePath(id))).toBeNull()
+    expect(vault.notes.some((note) => note.id === id)).toBe(false)
+    expect(vault.notes.some((note) => note.id === keptId)).toBe(true)
+    vault.cancelPending()
   })
 })

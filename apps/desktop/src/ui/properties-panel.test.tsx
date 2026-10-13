@@ -3,7 +3,9 @@ import type { StrideNote } from '@stride/core/note'
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it } from 'vitest'
-import { readNoteFile } from '../../../../packages/core/src/vault'
+import { notePath, readNoteFile } from '../../../../packages/core/src/vault'
+import { App } from '../app'
+import { ChatService, GitService, SettingsService, UpdateService } from '../services/panels.service'
 import { VaultService } from '../services/vault.service'
 import { PropertiesPanel } from './properties-panel'
 
@@ -242,6 +244,70 @@ describe('PropertiesPanel', () => {
       expect(host.querySelector('[data-testid="relation-link"]')).toBeNull()
       expect(host.querySelector('[data-target=""]')).toBeNull()
       expect(vault.activeId).toBe('note-a')
+    } finally {
+      vault.cancelPending()
+      await act(async () => {
+        root.unmount()
+      })
+      host.remove()
+    }
+  })
+
+  it('archives the active note out of the list and deletes it after confirmation', async () => {
+    useMemoryFixture()
+    register(VaultService)
+    register(GitService)
+    register(SettingsService)
+    register(ChatService)
+    register(UpdateService)
+    const vault = resolve(VaultService)
+    await vault.openFromDraft()
+    await vault.createNote()
+    const keptId = vault.active?.id ?? ''
+    vault.updateTitle('Kept note')
+    await vault.createNote()
+    const id = vault.active?.id ?? ''
+    vault.updateTitle('Archived note')
+    vault.renameFromHeading = false
+    vault.cancelPending()
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    try {
+      await act(async () => {
+        root.render(<App />)
+      })
+      const linkText = () => [...host.querySelectorAll('[data-testid="note-link"]')].map((node) => node.textContent ?? '')
+      expect(linkText()).toContain('Archived note')
+      expect(host.querySelector<HTMLInputElement>('[data-testid="note-title"]')?.value).toBe('Archived note')
+
+      await act(async () => {
+        host.querySelector<HTMLButtonElement>('[data-testid="archive-note"]')!.click()
+      })
+      expect(linkText()).not.toContain('Archived note')
+      expect(linkText()).toContain('Kept note')
+      expect(host.querySelector<HTMLInputElement>('[data-testid="note-title"]')?.value).toBe('Archived note')
+      vault.cancelPending()
+
+      await act(async () => {
+        host.querySelector<HTMLButtonElement>('[data-testid="delete-note"]')!.click()
+      })
+      await act(async () => {
+        document.querySelector<HTMLButtonElement>('[data-testid="cancel-delete"]')!.click()
+      })
+      expect(await vault.fs!.stat(notePath(id))).not.toBeNull()
+      expect(await vault.fs!.stat(notePath(keptId))).not.toBeNull()
+
+      await act(async () => {
+        host.querySelector<HTMLButtonElement>('[data-testid="delete-note"]')!.click()
+      })
+      await act(async () => {
+        document.querySelector<HTMLButtonElement>('[data-testid="confirm-delete"]')!.click()
+        await new Promise((resolvePromise) => setTimeout(resolvePromise, 0))
+      })
+      expect(await vault.fs!.stat(notePath(id))).toBeNull()
+      expect(vault.notes.some((note) => note.id === id)).toBe(false)
     } finally {
       vault.cancelPending()
       await act(async () => {

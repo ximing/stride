@@ -1,7 +1,9 @@
 import { observer, useService } from '@rabjs/react'
 import { relationsOf, resolveNote, type NoteRelations } from '@stride/core/graph'
-import { bodyWikilinks, isHiddenProperty, propertyKind, type StrideNote } from '@stride/core/note'
+import { bodyWikilinks, isArchived, isHiddenProperty, propertyKind, type StrideNote } from '@stride/core/note'
+import { useState } from 'react'
 import { VaultService } from '../services/vault.service'
+import { Modal, ModalClose, ModalContent } from './modal'
 
 function unresolvedRelations(
   note: StrideNote,
@@ -28,6 +30,7 @@ function unresolvedRelations(
 export const PropertiesPanel = observer(function PropertiesPanel() {
   const vault = useService(VaultService)
   const note = vault.active
+  const [deleteOpen, setDeleteOpen] = useState(false)
   if (!note) return <p className="empty-note">Select a note.</p>
   const graph = vault.graph
   const relations = relationsOf(graph, note.id)
@@ -35,6 +38,31 @@ export const PropertiesPanel = observer(function PropertiesPanel() {
   const fields = Object.keys(note.properties).filter((field) => !isHiddenProperty(field))
   return (
     <div>
+      <button
+        type="button"
+        data-testid="archive-note"
+        onClick={() => vault.updateBooleanProperty('archived', !isArchived(note))}
+      >
+        {isArchived(note) ? 'Unarchive' : 'Archive'}
+      </button>
+      <button type="button" data-testid="delete-note" onClick={() => setDeleteOpen(true)}>
+        Delete
+      </button>
+      <Modal open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <ModalContent title="Delete note" description="Delete this note permanently? This cannot be undone.">
+          <button
+            type="button"
+            data-testid="confirm-delete"
+            onClick={() => {
+              void vault.deleteActiveNote()
+              setDeleteOpen(false)
+            }}
+          >
+            Delete
+          </button>
+          <ModalClose data-testid="cancel-delete">Cancel</ModalClose>
+        </ModalContent>
+      </Modal>
       <h2>Properties</h2>
       <label className="field">
         <span>Type</span>

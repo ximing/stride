@@ -6,6 +6,7 @@ import {
   firstH1Text,
   formatProperty,
   headingText,
+  isArchived,
   isHiddenProperty,
   noteForSave,
   parseFiniteNumber,
@@ -183,6 +184,15 @@ describe('note codec', () => {
     expect(parseFiniteNumber('true')).toBeUndefined()
     expect(formatProperty(false)).toBe('false')
     expect(formatProperty(0)).toBe('0')
+  })
+
+  it('treats true and the string true as archived', () => {
+    const properties = (archived?: unknown) => (archived === undefined ? {} : { archived })
+    expect(isArchived({ properties: properties(true) })).toBe(true)
+    expect(isArchived({ properties: properties('true') })).toBe(true)
+    expect(isArchived({ properties: properties(false) })).toBe(false)
+    expect(isArchived({ properties: properties() })).toBe(false)
+    expect(isArchived({ properties: properties('false') })).toBe(false)
   })
 
   it('refuses a note id that escapes the vault', async () => {

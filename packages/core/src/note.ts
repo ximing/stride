@@ -251,6 +251,11 @@ export function isHiddenProperty(key: string): boolean {
   return key.startsWith('_')
 }
 
+export function isArchived(note: { properties: Record<string, NoteProperty | unknown> }): boolean {
+  const value = note.properties.archived
+  return value === true || value === 'true'
+}
+
 export function propertyKind(value: NoteProperty | undefined): PropertyKind {
   if (typeof value === 'number') return 'number'
   if (typeof value === 'boolean') return 'boolean'

@@ -4,6 +4,7 @@ import {
   applyBody,
   applyTitle,
   formatProperty,
+  isArchived,
   isPlaceholderTitle,
   noteForSave,
   parseFiniteNumber,
@@ -224,7 +225,7 @@ export class VaultService extends Service {
   get typeInstances(): StrideNote[] {
     const active = this.active
     if (!active || !isTypeDocument(active)) return []
-    return this.notes.filter((note) => note.id !== active.id && note.type === active.title)
+    return this.notes.filter((note) => note.id !== active.id && note.type === active.title && !isArchived(note))
   }
 
   toggleTypeCollapsed(title: string) {
@@ -236,7 +237,7 @@ export class VaultService extends Service {
   }
 
   get inboxCount(): number {
-    return this.graph.inbox.filter((note) => !isTypeDocument(note)).length
+    return this.graph.inbox.filter((note) => !isTypeDocument(note) && !isArchived(note)).length
   }
 
   get currentVaultLabel(): string {
@@ -245,7 +246,7 @@ export class VaultService extends Service {
   }
 
   get visibleNotes(): StrideNote[] {
-    const listed = (notes: StrideNote[]) => notes.filter((note) => !isTypeDocument(note))
+    const listed = (notes: StrideNote[]) => notes.filter((note) => !isTypeDocument(note) && !isArchived(note))
     if (this.searchHits.length && this.searchQuery.trim()) {
       const ids = new Set(this.searchHits.map((hit) => hit.id))
       return listed(this.notes.filter((note) => ids.has(note.id)))
@@ -896,5 +897,21 @@ export class VaultService extends Service {
     this.propertyChecked = false
     this.numberDrafts = {}
     this.listDrafts = {}
+  }
+
+  async deleteActiveNote() {
+    const current = this.active
+    const fs = this.fs
+    if (!current || !fs) return
+    try {
+      await fs.remove(notePath(current.id))
+      await this.index?.remove([current.id])
+      this.notes = this.notes.filter((note) => note.id !== current.id)
+      this.activeId = this.visibleNotes[0]?.id ?? ''
+      this.docEpoch += 1
+      this.resetPropertyEditor()
+    } catch (error) {
+      this.error = errorText(error)
+    }
   }
 }
