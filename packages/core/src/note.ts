@@ -1,0 +1,188 @@
+export const NOTE_EXT = '.stride.json'
+export const NOTE_FORMAT = 'tiptap'
+
+export interface TipTapMark {
+  type: string
+  attrs?: Record<string, unknown>
+}
+
+export interface TipTapNode {
+  type: string
+  attrs?: Record<string, unknown>
+  text?: string
+  marks?: TipTapMark[]
+  content?: TipTapNode[]
+}
+
+export type NoteProperty = string | string[]
+
+export interface StrideNote {
+  id: string
+  title: string
+  type: string
+  properties: Record<string, NoteProperty>
+  doc: TipTapNode
+}
+
+export interface NoteFile {
+  format: typeof NOTE_FORMAT
+  title: string
+  type: string
+  properties: Record<string, NoteProperty>
+  doc: TipTapNode
+}
+
+export function emptyDoc(_title: string): TipTapNode {
+  return {
+    type: 'doc',
+    content: [{ type: 'paragraph' }],
+  }
+}
+
+export function createNote(id: string, title: string, type = 'note'): StrideNote {
+  return {
+    id,
+    title,
+    type,
+    properties: {},
+    doc: emptyDoc(title),
+  }
+}
+
+export function serializeNote(note: StrideNote): string {
+  const file: NoteFile = {
+    format: NOTE_FORMAT,
+    title: note.title,
+    type: note.type || 'note',
+    properties: note.properties,
+    doc: note.doc,
+  }
+  return `${JSON.stringify(file, null, 2)}\n`
+}
+
+export function parseNote(raw: string, id: string): StrideNote {
+  const trimmed = raw.trim()
+  if (trimmed.startsWith('---')) {
+    throw new Error(`Refusing to open ${id}: notes are TipTap JSON, not Markdown frontmatter`)
+  }
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(trimmed)
+  } catch {
+    throw new Error(`Note ${id} is not TipTap JSON`)
+  }
+  if (!parsed || typeof parsed !== 'object') {
+    throw new Error(`Note ${id} is not a TipTap document`)
+  }
+  const file = parsed as Partial<NoteFile>
+  if (file.format !== NOTE_FORMAT || !file.doc || file.doc.type !== 'doc') {
+    throw new Error(`Note ${id} is not a TipTap document`)
+  }
+  return {
+    id,
+    title: typeof file.title === 'string' && file.title.trim() ? file.title : id,
+    type: typeof file.type === 'string' && file.type.trim() ? file.type : 'note',
+    properties: file.properties && typeof file.properties === 'object' ? file.properties : {},
+    doc: file.doc,
+  }
+}
+
+export function plainText(doc: TipTapNode): string {
+  const parts: string[] = []
+  const walk = (node: TipTapNode | undefined) => {
+    if (!node) return
+    if (node.type === 'text' && node.text) parts.push(node.text)
+    if (node.type === 'wikilink') {
+      const target = node.attrs?.target
+      if (typeof target === 'string' && target) parts.push(target)
+    }
+    node.content?.forEach(walk)
+  }
+  walk(doc)
+  return parts.join(' ').replace(/\s+/g, ' ').trim()
+}
+
+export function findMark(doc: TipTapNode, mark: string): { text: string } | undefined {
+  let found: { text: string } | undefined
+  const walk = (node: TipTapNode | undefined) => {
+    if (!node || found) return
+    if (node.marks?.some((item) => item.type === mark) && node.text) {
+      found = { text: node.text }
+      return
+    }
+    node.content?.forEach(walk)
+  }
+  walk(doc)
+  return found
+}
+
+export function headingText(doc: TipTapNode): string {
+  let text = ''
+  const walk = (node: TipTapNode | undefined) => {
+    if (!node || text) return
+    if (node.type === 'heading') {
+      text = plainText(node)
+      return
+    }
+    node.content?.forEach(walk)
+  }
+  walk(doc)
+  return text
+}
+
+export function slugTitle(title: string): string {
+  const slug = title
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9\u4e00-\u9fff]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+  return slug || 'note'
+}
+
+export function noteFileName(id: string): string {
+  return `${id}${NOTE_EXT}`
+}
+
+export function isNoteFileName(name: string): boolean {
+  return name.endsWith(NOTE_EXT) && !name.startsWith('.')
+}
+
+const WIKILINK = /\[\[[^\]]+\]\]/g
+
+export function wikilinkTargets(value: unknown): string[] {
+  if (typeof value === 'string') {
+    const found = value.match(WIKILINK)
+    return found ? found.map((token) => token.slice(2, -2).trim()).filter(Boolean) : []
+  }
+  if (Array.isArray(value)) return value.flatMap((item) => wikilinkTargets(item))
+  return []
+}
+
+export function bodyWikilinks(doc: TipTapNode): string[] {
+  const targets: string[] = []
+  const walk = (node: TipTapNode | undefined) => {
+    if (!node) return
+    if (node.type === 'wikilink' && typeof node.attrs?.target === 'string') {
+      const target = node.attrs.target.trim()
+      if (target) targets.push(target)
+    }
+    if (node.type === 'text' && node.text) targets.push(...wikilinkTargets(node.text))
+    node.content?.forEach(walk)
+  }
+  walk(doc)
+  return targets
+}
+
+export function parsePropertyInput(raw: string): NoteProperty {
+  if (raw.trim() === '') return ''
+  const links = raw.match(/\[\[[^\]]+\]\]/g)
+  if (!links) return raw
+  const remainder = raw.replace(/\[\[[^\]]+\]\]/g, '').replace(/[\s,]+/g, '')
+  if (remainder.length > 0) return raw
+  return links
+}
+
+export function formatProperty(value: NoteProperty | undefined): string {
+  if (value === undefined) return ''
+  return Array.isArray(value) ? value.join(' ') : value
+}

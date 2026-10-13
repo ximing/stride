@@ -1,0 +1,10 @@
+node_modules
+dist
+dist-ssr
+target
+.DS_Store
+*.log
+.vite
+playwright-report
+test-results
+.stride

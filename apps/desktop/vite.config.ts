@@ -1,0 +1,25 @@
+import react from '@vitejs/plugin-react'
+import { defineConfig } from 'vite'
+
+const apiPort = process.env.STRIDE_API_PORT || '1421'
+
+export default defineConfig({
+  plugins: [react()],
+  server: {
+    host: '127.0.0.1',
+    port: 1420,
+    strictPort: true,
+    proxy: {
+      '/api': `http://127.0.0.1:${apiPort}`,
+    },
+  },
+  preview: {
+    host: '127.0.0.1',
+    port: 1420,
+    strictPort: true,
+    proxy: {
+      '/api': `http://127.0.0.1:${apiPort}`,
+    },
+  },
+  clearScreen: false,
+})

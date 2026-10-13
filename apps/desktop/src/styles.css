@@ -1,0 +1,259 @@
+:root {
+  color-scheme: light;
+  --ink: #1c1712;
+  --muted: #6d6256;
+  --paper: #f3ecdf;
+  --paper-2: #e7dccb;
+  --rail: #241e18;
+  --rail-ink: #f6efe4;
+  --line: #d9cbb8;
+  --seal: #b64024;
+  --moss: #2f6b4f;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
+  margin: 0;
+}
+
+button, input, textarea {
+  font: inherit;
+}
+
+button {
+  background: transparent;
+  color: inherit;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+  cursor: pointer;
+}
+
+button:hover { border-color: var(--ink); }
+
+.shell {
+  min-height: 100vh;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background:
+    radial-gradient(1200px 400px at 10% -10%, #f7f1e6, transparent 50%),
+    var(--paper);
+  color: var(--ink);
+}
+
+.chooser {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  min-height: 100vh;
+}
+
+.chooser-copy, .chooser-form {
+  padding: 8vh 7vw;
+}
+
+.chooser-copy {
+  background: var(--rail);
+  color: var(--rail-ink);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.eyebrow {
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  color: #e7b199;
+}
+
+.chooser h1, .note-title, .panel h2 {
+  font-family: "Iowan Old Style", Palatino, Georgia, serif;
+  font-weight: 500;
+}
+
+.chooser h1 {
+  font-size: 4.5rem;
+  line-height: 0.9;
+  margin: 0.4rem 0 1rem;
+}
+
+.chooser-form {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.8rem;
+}
+
+.chooser-form label, .field span, .panel label span {
+  display: block;
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 0.3rem;
+}
+
+input, textarea {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: inherit;
+  padding: 0.55rem 0;
+}
+
+textarea {
+  min-height: 8rem;
+  resize: vertical;
+}
+
+.primary {
+  background: var(--seal);
+  color: white;
+  border-color: var(--seal);
+  align-self: flex-start;
+}
+
+.error { color: var(--seal); }
+
+.topbar, .update-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.7rem 1rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.wordmark {
+  font-family: "Iowan Old Style", Palatino, Georgia, serif;
+  font-size: 1.4rem;
+  margin-right: auto;
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 16rem;
+}
+
+.search-mode {
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.wikilink-draft {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.wikilink-draft input {
+  width: 12rem;
+}
+
+.workspace {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 260px 1fr 320px;
+}
+
+.rail, .stage, .panel {
+  min-height: 0;
+  overflow: auto;
+}
+
+.rail {
+  background: var(--rail);
+  color: var(--rail-ink);
+  padding: 1rem;
+}
+
+.rail button {
+  border-color: transparent;
+  color: inherit;
+  width: 100%;
+  text-align: left;
+  border-radius: 8px;
+}
+
+.rail button.active, .rail button:hover {
+  background: #3a3128;
+}
+
+.group-label {
+  margin: 1rem 0 0.3rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #b7aa9b;
+}
+
+.stage { padding: 1.2rem 1.6rem 2rem; }
+
+.note-title {
+  font-size: 2.4rem;
+  width: 100%;
+  border: none;
+  background: transparent;
+}
+
+.editor .ProseMirror {
+  min-height: 50vh;
+  outline: none;
+  font-family: "Iowan Old Style", Palatino, Georgia, serif;
+  font-size: 1.15rem;
+  line-height: 1.55;
+}
+
+.editor-tools { display: flex; gap: 0.4rem; margin-bottom: 0.8rem; }
+
+.wikilink {
+  color: var(--moss);
+  border-bottom: 1px dashed var(--moss);
+}
+
+.panel {
+  border-left: 1px solid var(--line);
+  padding: 1rem;
+  background: rgba(255, 252, 247, 0.7);
+}
+
+.field { margin-bottom: 0.8rem; }
+
+.meta, .history, .diff {
+  white-space: pre-wrap;
+  font-family: "IBM Plex Mono", ui-monospace, monospace;
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.progress {
+  flex: 1;
+  height: 6px;
+  background: var(--paper-2);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.progress span {
+  display: block;
+  height: 100%;
+  background: var(--moss);
+}
+
+.update-banner { background: #f7e7dc; }
+
+.empty-note {
+  margin-top: 20vh;
+  color: var(--muted);
+}
