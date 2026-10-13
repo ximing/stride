@@ -125,9 +125,16 @@ export function buildGraph(notes: StrideNote[]): VaultGraph {
         relations.get(resolved.id)?.backlinks.push({ sourceId: note.id, via: field.field })
       }
     }
+    // Body wikilinks are outgoing in the inspector. They do not count toward inbox.
     for (const target of bodyWikilinks(note.doc)) {
       const resolved = resolveNote(notes, target)
       if (!resolved || resolved.id === note.id) continue
+      addShown(note.id, {
+        field: 'body',
+        targetId: resolved.id,
+        label: resolved.title,
+        derived: false,
+      })
       const backlinks = relations.get(resolved.id)?.backlinks
       if (!backlinks) continue
       if (!backlinks.some((link) => link.sourceId === note.id && link.via === 'body')) {

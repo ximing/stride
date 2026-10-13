@@ -1,7 +1,29 @@
 import { observer, useService } from '@rabjs/react'
-import { relationsOf } from '@stride/core/graph'
-import { isHiddenProperty, propertyKind } from '@stride/core/note'
+import { relationsOf, resolveNote, type NoteRelations } from '@stride/core/graph'
+import { bodyWikilinks, isHiddenProperty, propertyKind, type StrideNote } from '@stride/core/note'
 import { VaultService } from '../services/vault.service'
+
+function unresolvedRelations(
+  note: StrideNote,
+  notes: StrideNote[],
+  outgoing: NoteRelations['outgoing'],
+): { key: string; field: string; label: string }[] {
+  const rows: { key: string; field: string; label: string }[] = []
+  const seen = new Set<string>()
+  const push = (field: string, label: string) => {
+    const key = `${field}\0${label}`
+    if (seen.has(key)) return
+    seen.add(key)
+    rows.push({ key, field, label })
+  }
+  for (const link of outgoing) {
+    if (!link.resolvedId) push(link.field, link.target)
+  }
+  for (const target of bodyWikilinks(note.doc)) {
+    if (!resolveNote(notes, target)) push('body', target)
+  }
+  return rows
+}
 
 export const PropertiesPanel = observer(function PropertiesPanel() {
   const vault = useService(VaultService)
@@ -9,6 +31,7 @@ export const PropertiesPanel = observer(function PropertiesPanel() {
   if (!note) return <p className="empty-note">Select a note.</p>
   const graph = vault.graph
   const relations = relationsOf(graph, note.id)
+  const unresolved = unresolvedRelations(note, graph.notes, relations.outgoing)
   const fields = Object.keys(note.properties).filter((field) => !isHiddenProperty(field))
   return (
     <div>
@@ -120,16 +143,47 @@ export const PropertiesPanel = observer(function PropertiesPanel() {
         <button type="submit" data-testid="add-property">Add field</button>
       </form>
       <h2>Relationships</h2>
-      {relations.shown.length === 0 && <p className="meta">No relationships yet.</p>}
-      {relations.shown.map((link) => (
-        <p key={`${link.field}-${link.targetId}-${link.derived}`} className="meta">
-          {link.derived ? `${link.field} (derived)` : link.field}: {link.label}
+      {relations.shown.length === 0 && unresolved.length === 0 && <p className="meta">No relationships yet.</p>}
+      {relations.shown.map((link) => {
+        const label = `${link.derived ? `${link.field} (derived)` : link.field}: ${link.label}`
+        if (!link.targetId) {
+          return (
+            <p key={`${link.field}-${link.label}-${link.derived}`} className="meta">
+              {label}
+            </p>
+          )
+        }
+        return (
+          <button
+            key={`${link.field}-${link.targetId}-${link.derived}`}
+            type="button"
+            className="meta relation-row"
+            data-testid="relation-link"
+            data-target={link.targetId}
+            onClick={() => vault.select(link.targetId)}
+          >
+            {label}
+          </button>
+        )
+      })}
+      {unresolved.map((link) => (
+        <p key={link.key} className="meta">
+          {link.field}: {link.label}
         </p>
       ))}
       <h2>Backlinks</h2>
       {relations.backlinks.length === 0 && <p className="meta">No backlinks.</p>}
       {relations.backlinks.map((link) => (
-        <button key={`${link.sourceId}-${link.via}`} type="button" onClick={() => vault.select(link.sourceId)}>
+        <button
+          key={`${link.sourceId}-${link.via}`}
+          type="button"
+          className="meta relation-row"
+          data-testid="backlink"
+          data-source={link.sourceId}
+          onClick={() => {
+            if (link.sourceId) vault.select(link.sourceId)
+          }}
+        >
           {graph.byId.get(link.sourceId)?.title} · {link.via}
         </button>
       ))}

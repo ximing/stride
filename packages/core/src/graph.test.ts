@@ -68,8 +68,10 @@ describe('relationships and inbox', () => {
 
     const child = relationsOf(graph, 'child')
     expect(child.shown.some((link) => link.field === 'belongs_to' && link.targetId === 'parent')).toBe(true)
+    expect(child.shown.some((link) => link.field === 'body' && link.targetId === 'parent' && !link.derived)).toBe(true)
     expect(child.shown.some((link) => link.field === 'related_to' && link.targetId === 'peer')).toBe(true)
     expect(child.shown.some((link) => link.field === 'supports' && link.targetId === 'peer' && !link.derived)).toBe(true)
+    expect(parent.backlinks.some((link) => link.sourceId === 'child' && link.via === 'body')).toBe(true)
 
     const peer = relationsOf(graph, 'peer')
     expect(peer.shown.some((link) => link.field === 'related_to' && link.targetId === 'child')).toBe(true)
@@ -91,5 +93,31 @@ describe('relationships and inbox', () => {
     expect(groups.get('project')?.map((note) => note.id)).toEqual(['parent'])
     expect(groups.get('note')?.map((note) => note.id)).toEqual(['child'])
     expect([...groups.keys()]).not.toContain('stride-graph-folder')
+  })
+
+  it('lists a body wikilink on the source and leaves inbox based on properties', () => {
+    const notes = [
+      {
+        id: 'loose',
+        title: 'Loose',
+        type: 'note',
+        properties: {},
+        doc: doc('see ', ['Parent', 'Ghost']),
+      },
+      {
+        id: 'parent',
+        title: 'Parent',
+        type: 'project',
+        properties: {},
+        doc: doc('parent body'),
+      },
+    ]
+    const graph = buildGraph(notes)
+    expect(relationsOf(graph, 'loose').shown).toEqual([
+      { field: 'body', targetId: 'parent', label: 'Parent', derived: false },
+    ])
+    expect(relationsOf(graph, 'parent').shown).toEqual([])
+    expect(relationsOf(graph, 'parent').backlinks).toEqual([{ sourceId: 'loose', via: 'body' }])
+    expect(graph.inbox.map((note) => note.id).sort()).toEqual(['loose', 'parent'])
   })
 })

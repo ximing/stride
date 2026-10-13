@@ -1,10 +1,29 @@
 import { register, resolve } from '@rabjs/react'
+import type { StrideNote } from '@stride/core/note'
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it } from 'vitest'
 import { readNoteFile } from '../../../../packages/core/src/vault'
 import { VaultService } from '../services/vault.service'
 import { PropertiesPanel } from './properties-panel'
+
+function linkedNote(id: string, title: string, properties: StrideNote['properties'], targets: string[]): StrideNote {
+  return {
+    id,
+    title,
+    type: 'note',
+    properties,
+    doc: {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: targets.map((target) => ({ type: 'wikilink', attrs: { target } })),
+        },
+      ],
+    },
+  }
+}
 
 function useMemoryFixture() {
   window.history.replaceState(null, '', '/?fixture=memory')
@@ -143,6 +162,86 @@ describe('PropertiesPanel', () => {
       const raw = JSON.parse(await vault.fs!.readText(`${id}.stride.json`)) as { properties: Record<string, unknown> }
       expect(raw.properties.label).toBe('solo')
       expect(raw.properties.tags).toEqual(['solo'])
+    } finally {
+      vault.cancelPending()
+      await act(async () => {
+        root.unmount()
+      })
+      host.remove()
+    }
+  })
+
+  it('navigates body links and property backlinks between two notes', async () => {
+    register(VaultService)
+    const vault = resolve(VaultService)
+    vault.fs = null
+    vault.notes = [
+      linkedNote('note-a', 'Note A', {}, ['Note B']),
+      linkedNote('note-b', 'Note B', { related_to: '[[Note A]]' }, []),
+    ]
+    vault.activeId = 'note-a'
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    try {
+      await act(async () => {
+        root.render(<PropertiesPanel />)
+      })
+      const toB = host.querySelector<HTMLButtonElement>('[data-testid="relation-link"][data-target="note-b"]')
+      const backToB = host.querySelector<HTMLButtonElement>('[data-testid="backlink"][data-source="note-b"]')
+      expect(toB).not.toBeNull()
+      expect(toB?.textContent).toContain('body')
+      expect(backToB).not.toBeNull()
+      await act(async () => {
+        toB!.click()
+      })
+      expect(vault.activeId).toBe('note-b')
+
+      const toA = host.querySelector<HTMLButtonElement>('[data-testid="relation-link"][data-target="note-a"]')
+      const backToA = host.querySelector<HTMLButtonElement>('[data-testid="backlink"][data-source="note-a"]')
+      expect(toA).not.toBeNull()
+      expect(toA?.textContent).toContain('related_to')
+      expect(backToA).not.toBeNull()
+      await act(async () => {
+        backToA!.click()
+      })
+      expect(vault.activeId).toBe('note-a')
+
+      await act(async () => {
+        host.querySelector<HTMLButtonElement>('[data-testid="backlink"][data-source="note-b"]')!.click()
+      })
+      expect(vault.activeId).toBe('note-b')
+      await act(async () => {
+        host.querySelector<HTMLButtonElement>('[data-testid="relation-link"][data-target="note-a"]')!.click()
+      })
+      expect(vault.activeId).toBe('note-a')
+    } finally {
+      vault.cancelPending()
+      await act(async () => {
+        root.unmount()
+      })
+      host.remove()
+    }
+  })
+
+  it('shows unresolved wikilinks as text and does not select an empty id', async () => {
+    register(VaultService)
+    const vault = resolve(VaultService)
+    vault.fs = null
+    vault.notes = [linkedNote('note-a', 'Note A', { related_to: '[[Missing person]]' }, ['Ghost'])]
+    vault.activeId = 'note-a'
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    try {
+      await act(async () => {
+        root.render(<PropertiesPanel />)
+      })
+      expect(host.textContent).toContain('Missing person')
+      expect(host.textContent).toContain('Ghost')
+      expect(host.querySelector('[data-testid="relation-link"]')).toBeNull()
+      expect(host.querySelector('[data-target=""]')).toBeNull()
+      expect(vault.activeId).toBe('note-a')
     } finally {
       vault.cancelPending()
       await act(async () => {
