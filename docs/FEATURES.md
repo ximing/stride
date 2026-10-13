@@ -23,7 +23,7 @@
 |---|---|---|---|
 | 1.1 | 打开 vault | 系统目录选择器（Tauri dialog）/ 浏览器 File System Access API 选目录 | P0 |
 | 1.2 | 新建 vault | 指定目录初始化：写 `.stride/vault.json` 标记 + 种子类型文档 | P0 |
-| 1.3 | 多 vault 注册表 | `vaults.json`：label/path/color/icon/最近打开；启动恢复上次 vault | P1 |
+| 1.3 | 多 vault 注册表 | 浏览器：localStorage `stride:vaults`（id/label/color/icon/lastOpened）+ IndexedDB 目录句柄；Tauri：同一份元数据，label 为目录路径。启动恢复上次 vault。没有应用数据目录，所以浏览器侧不写 `vaults.json` 文件 | P1 |
 | 1.4 | vault 切换器 | 状态栏/侧边栏切换 | P1 |
 | 1.5 | Onboarding 欢迎页 | 三选一：新建空 vault / 打开已有文件夹 / 克隆示例库 | P1 |
 | 1.6 | 文件监听 | 外部改动自动 reload（Tauri notify；浏览器模式下手动刷新按钮） | P2 |
