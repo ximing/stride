@@ -43,7 +43,7 @@
 | T1.2 ✅ 2026-10-13 | vault 注册表（浏览器 localStorage `stride:vaults` + IndexedDB 句柄；Tauri 用目录路径作 label）+ 启动恢复上次 vault + 状态栏切换器 | T1.1 | 重启恢复现场 |
 | T1.3 ✅ 2026-10-13 | Onboarding 欢迎页（新建/打开/克隆示例三选一） | T1.1 | 首次启动进入欢迎页 |
 | T1.4 ✅ 2026-10-13 | 笔记模型完善：H1 即标题、写 H1 自动重命名文件（可关）、`untitled-*` 命名 | T0.2 | 单测 + UI 验证 |
-| T1.5 | Type 系统 UI：侧边栏类型分组（icon/color/折叠/可见性）、类型文档 Instances 列表、新建笔记应用 template | T1.4 | 建类型 → 建实例 → 分组正确 |
+| T1.5 ✅ 2026-10-13 | Type 系统 UI：侧边栏类型分组（icon/color/折叠/可见性）、类型文档 Instances 列表、新建笔记应用 template | T1.4 | 建类型 → 建实例 → 分组正确 |
 | T1.6 ✅ 2026-10-13 | 属性面板：properties 编辑（string/number/bool/list）、`_` 系统属性隐藏、wikilink 值识别为关系 | T1.4 | 属性编辑即时保存 |
 | T1.7 | Backlinks/关系/Inspector 右侧面板 | T1.6 | 双链互相可见、点击导航 |
 | T1.8 | Inbox 视图 + 整理后自动前进 | T1.7 | 无出链笔记进入 Inbox |
