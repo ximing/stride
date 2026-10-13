@@ -1,14 +1,14 @@
 import { observer, register, resolve, useService } from '@rabjs/react'
 import { relationsOf, buildGraph } from '@stride/core/graph'
 import { plainText, type StrideNote } from '@stride/core/note'
-import { PlatformError } from '@stride/platform'
+import { MemoryFileSystem, PlatformError } from '@stride/platform'
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readNoteFile } from '../../../../packages/core/src/vault'
 import { App } from '../app'
 import { ChatService, GitService, SettingsService, UpdateService } from './panels.service'
-import { VaultService } from './vault.service'
+import { VAULT_REGISTRY_KEY, VaultService } from './vault.service'
 
 function sample(id: string, title: string): StrideNote {
   return {
@@ -27,6 +27,7 @@ function useMemoryFixture() {
 describe('VaultService', () => {
   afterEach(() => {
     window.history.replaceState(null, '', '/')
+    localStorage.removeItem(VAULT_REGISTRY_KEY)
     vi.useRealTimers()
     vi.unstubAllGlobals()
   })
@@ -234,5 +235,140 @@ describe('VaultService', () => {
     expect(host.querySelector('[data-testid="search-mode"]')).not.toBeNull()
     root.unmount()
     host.remove()
+  })
+
+  it('upserts a vault id and refreshes lastOpened without duplicating it', () => {
+    window.history.replaceState(null, '', '/')
+    localStorage.removeItem(VAULT_REGISTRY_KEY)
+    register(VaultService)
+    const vault = resolve(VaultService)
+    vault.upsertVault({ id: 'v1', label: 'Notes', color: '', icon: '', lastOpened: '2026-01-01T00:00:00.000Z' })
+    vault.upsertVault({
+      id: 'v1',
+      label: 'Notes renamed',
+      color: '#b64024',
+      icon: 'folder',
+      lastOpened: '2026-02-01T00:00:00.000Z',
+    })
+    vault.upsertVault({ id: 'v2', label: 'Other', color: '', icon: '', lastOpened: '2026-03-01T00:00:00.000Z' })
+    expect(vault.vaults.map((entry) => entry.id)).toEqual(['v1', 'v2'])
+    expect(vault.vaults[0]).toEqual({
+      id: 'v1',
+      label: 'Notes renamed',
+      color: '#b64024',
+      icon: 'folder',
+      lastOpened: '2026-02-01T00:00:00.000Z',
+    })
+    expect(JSON.parse(localStorage.getItem(VAULT_REGISTRY_KEY) ?? 'null')).toEqual(vault.vaults)
+  })
+
+  it('records two memory vaults and updates one entry when the same root opens again', async () => {
+    useMemoryFixture()
+    const picker = vi.fn()
+    vi.stubGlobal('showDirectoryPicker', picker)
+    register(VaultService)
+    const vault = resolve(VaultService)
+    await vault.openFromDraft()
+    const id = vault.activeVaultId
+    const opened = vault.vaults[0]?.lastOpened ?? ''
+    const root = vault.fs
+    await vault.openFromDraft()
+    expect(picker).not.toHaveBeenCalled()
+    expect(vault.fs).toBe(root)
+    expect(vault.vaults).toHaveLength(1)
+    expect(vault.activeVaultId).toBe(id)
+    expect(vault.vaults[0]?.lastOpened > opened).toBe(true)
+    await vault.createNewVault()
+    expect(vault.vaults).toHaveLength(2)
+    expect(new Set(vault.vaults.map((entry) => entry.id)).size).toBe(2)
+    expect(vault.vaults.every((entry) => entry.label === 'memory-vault')).toBe(true)
+    expect(localStorage.getItem(VAULT_REGISTRY_KEY)).toBeNull()
+    vault.cancelPending()
+  })
+
+  it('stays on the chooser when no vault is registered', async () => {
+    window.history.replaceState(null, '', '/')
+    localStorage.removeItem(VAULT_REGISTRY_KEY)
+    const picker = vi.fn()
+    vi.stubGlobal('showDirectoryPicker', picker)
+    register(VaultService)
+    const vault = resolve(VaultService)
+    await vault.restoreOpened()
+    expect(vault.phase).toBe('chooser')
+    expect(picker).not.toHaveBeenCalled()
+  })
+
+  it('keeps the current vault when a stored handle is missing', async () => {
+    window.history.replaceState(null, '', '/')
+    localStorage.removeItem(VAULT_REGISTRY_KEY)
+    const picker = vi.fn()
+    vi.stubGlobal('showDirectoryPicker', picker)
+    Reflect.deleteProperty(globalThis, 'indexedDB')
+    register(VaultService)
+    const vault = resolve(VaultService)
+    const current = new MemoryFileSystem('current')
+    vault.fs = current
+    vault.phase = 'ready'
+    vault.vaultPath = 'stay-put'
+    vault.activeId = 'keep-me'
+    vault.upsertVault({ id: 'current', label: 'Current', color: '', icon: '', lastOpened: '2026-01-01T00:00:00.000Z' })
+    vault.upsertVault({ id: 'missing', label: 'Missing', color: '', icon: '', lastOpened: '2026-01-02T00:00:00.000Z' })
+    vault.activeVaultId = 'current'
+    await vault.switchVault('missing')
+    expect(picker).not.toHaveBeenCalled()
+    expect(vault.phase).toBe('ready')
+    expect(vault.activeVaultId).toBe('current')
+    expect(vault.vaultPath).toBe('stay-put')
+    expect(vault.activeId).toBe('keep-me')
+    expect(vault.fs?.rootLabel).toBe('current')
+    expect(vault.error).toBe('The directory handle for this vault is missing.')
+    expect(vault.vaults).toHaveLength(2)
+  })
+
+  it('lists recorded memory vaults in the header switcher', async () => {
+    useMemoryFixture()
+    const picker = vi.fn()
+    vi.stubGlobal('showDirectoryPicker', picker)
+    register(VaultService)
+    register(GitService)
+    register(SettingsService)
+    register(ChatService)
+    register(UpdateService)
+    const vault = resolve(VaultService)
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    await act(async () => {
+      root.render(<App />)
+    })
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('[data-testid="open-vault"]')!.click()
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, 0))
+    })
+    await act(async () => {
+      await vault.createNewVault()
+    })
+    expect(vault.vaults).toHaveLength(2)
+    expect(host.querySelector('[data-testid="vault-switcher"]')?.textContent).toBe('memory-vault')
+    expect(host.querySelector('[data-testid="type-link"]')).not.toBeNull()
+
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('[data-testid="vault-switcher"]')!.click()
+    })
+    const options = [...host.querySelectorAll<HTMLButtonElement>('[data-testid="vault-option"]')]
+    expect(options.map((node) => node.dataset.vaultId)).toEqual(vault.vaults.map((entry) => entry.id))
+    const firstId = vault.vaults[0]?.id ?? ''
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>(`[data-vault-id="${firstId}"]`)!.click()
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, 0))
+    })
+    expect(picker).not.toHaveBeenCalled()
+    expect(vault.activeVaultId).toBe(firstId)
+    expect(vault.vaults).toHaveLength(2)
+    expect(host.querySelector('[data-testid="type-link"]')).toBeNull()
+    expect(host.querySelector('[data-testid="vault-switcher"]')?.textContent).toBe('memory-vault')
+    root.unmount()
+    host.remove()
+    vault.cancelPending()
   })
 })

@@ -15,7 +15,13 @@ import {
   type StrideNote,
   type TipTapNode,
 } from '@stride/core/note'
-import { pickVaultDirectory, restoreVaultDirectory } from '@stride/fs-web'
+import {
+  BrowserFileSystem,
+  pickVaultDirectory,
+  readVaultHandleById,
+  restoreVaultById,
+  writeVaultHandleById,
+} from '@stride/fs-web'
 import {
   MemoryFileSystem,
   memorySearchOpener,
@@ -34,6 +40,16 @@ const COLLAPSED_TYPES_KEY = 'stride:collapsed-types'
 
 // The browser has no home directory. openVault only uses this to reject broad personal roots.
 const HOME_DIR = '/Users/stride'
+
+export const VAULT_REGISTRY_KEY = 'stride:vaults'
+
+export interface VaultRecord {
+  id: string
+  label: string
+  color: string
+  icon: string
+  lastOpened: string
+}
 
 // Text mode passes a null embedding. This throws if searchNotes starts calling embed anyway.
 class TextOnlyEmbeddingClient extends EmbeddingClient {
@@ -86,6 +102,28 @@ function hasTauriInternals(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 }
 
+function createVaultId(): string {
+  const randomUUID = globalThis.crypto?.randomUUID
+  if (typeof randomUUID === 'function') return randomUUID.call(globalThis.crypto)
+  return `vault-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+}
+
+function isVaultRecord(value: unknown): value is VaultRecord {
+  if (!value || typeof value !== 'object') return false
+  const record = value as Partial<VaultRecord>
+  return typeof record.id === 'string' && record.id !== ''
+    && typeof record.label === 'string'
+    && typeof record.color === 'string'
+    && typeof record.icon === 'string'
+    && typeof record.lastOpened === 'string'
+}
+
+async function sameDirectory(left: FileSystemDirectoryHandle, right: FileSystemDirectoryHandle): Promise<boolean> {
+  if (left === right) return true
+  if (typeof left.isSameEntry !== 'function') return false
+  return left.isSameEntry(right)
+}
+
 async function pickVaultBackend(): Promise<FileSystemBackend> {
   if (!hasTauriInternals()) return pickVaultDirectory()
   const dialog = await import('@tauri-apps/plugin-dialog')
@@ -118,6 +156,8 @@ export class VaultService extends Service {
   propertyChecked = false
   collapsedTypes: string[] = readCollapsedTypes()
   fs: FileSystemBackend | null = null
+  vaults: VaultRecord[] = []
+  activeVaultId = ''
   private index: NoteIndex | null = null
   private docTimer: ReturnType<typeof setTimeout> | null = null
   private pendingId = ''
@@ -125,6 +165,10 @@ export class VaultService extends Service {
   private numberDrafts: Record<string, string> = {}
   private listDrafts: Record<string, string> = {}
   private saveGeneration = 0
+  private registryReady = false
+  private memoryRoot: MemoryFileSystem | null = null
+  private readonly backends = new Map<string, FileSystemBackend>()
+  private readonly idsByBackend = new Map<FileSystemBackend, string>()
 
   setPathDraft(value: string) {
     this.pathDraft = value
@@ -179,6 +223,11 @@ export class VaultService extends Service {
     return this.graph.inbox.filter((note) => !isTypeDocument(note)).length
   }
 
+  get currentVaultLabel(): string {
+    const entry = this.vaults.find((item) => item.id === this.activeVaultId)
+    return entry?.label || this.fs?.rootLabel || ''
+  }
+
   get visibleNotes(): StrideNote[] {
     const listed = (notes: StrideNote[]) => notes.filter((note) => !isTypeDocument(note))
     if (this.searchHits.length && this.searchQuery.trim()) {
@@ -192,8 +241,16 @@ export class VaultService extends Service {
 
   async restoreOpened() {
     if (isMemoryFixture()) return
+    this.ensureRegistry()
+    const last = this.latestRecord()
+    if (!last) return
     try {
-      const restored = await restoreVaultDirectory()
+      if (hasTauriInternals()) {
+        const { TauriFileSystem } = await import('@stride/fs-tauri')
+        await this.openBackend(new TauriFileSystem(last.label))
+        return
+      }
+      const restored = await restoreVaultById(last.id)
       if (!restored) return
       await this.openBackend(restored)
     } catch (error) {
@@ -204,9 +261,7 @@ export class VaultService extends Service {
   async openFromDraft() {
     this.error = ''
     try {
-      const backend = isMemoryFixture()
-        ? new MemoryFileSystem('memory-vault')
-        : await pickVaultBackend()
+      const backend = isMemoryFixture() ? this.memoryFixtureRoot() : await pickVaultBackend()
       await this.openBackend(backend)
     } catch (error) {
       this.error = errorText(error)
@@ -235,6 +290,68 @@ export class VaultService extends Service {
       await initializeVault(backend, HOME_DIR)
       await writeSampleNotes(backend)
       await this.openBackend(backend)
+    } catch (error) {
+      this.error = errorText(error)
+    }
+  }
+
+  upsertVault(entry: VaultRecord) {
+    if (!entry.id) return
+    this.ensureRegistry()
+    const index = this.vaults.findIndex((item) => item.id === entry.id)
+    if (index === -1) {
+      this.vaults = [...this.vaults, entry]
+    } else {
+      const next = this.vaults.slice()
+      next[index] = { ...next[index], ...entry }
+      this.vaults = next
+    }
+    this.persistRegistry()
+  }
+
+  async switchVault(id: string) {
+    this.ensureRegistry()
+    const entry = this.vaults.find((item) => item.id === id)
+    if (!entry) {
+      this.error = 'That vault is not in the registry.'
+      return
+    }
+    if (id === this.activeVaultId && this.phase === 'ready' && this.fs) return
+    const cached = this.backends.get(id)
+    if (cached) {
+      try {
+        await this.commitHeadingRename()
+        await this.openBackend(cached)
+        this.error = ''
+      } catch (error) {
+        this.error = errorText(error)
+      }
+      return
+    }
+    if (isMemoryFixture()) {
+      this.error = 'That vault is not available.'
+      return
+    }
+    if (hasTauriInternals()) {
+      try {
+        const { TauriFileSystem } = await import('@stride/fs-tauri')
+        await this.commitHeadingRename()
+        await this.openBackend(new TauriFileSystem(entry.label))
+        this.error = ''
+      } catch (error) {
+        this.error = errorText(error)
+      }
+      return
+    }
+    try {
+      const restored = await restoreVaultById(id)
+      if (!restored) {
+        this.error = 'The directory handle for this vault is missing.'
+        return
+      }
+      await this.commitHeadingRename()
+      await this.openBackend(restored)
+      this.error = ''
     } catch (error) {
       this.error = errorText(error)
     }
@@ -574,6 +691,95 @@ export class VaultService extends Service {
     this.renameFromHeading = await readRenameFromHeading(backend)
     this.resetPropertyEditor()
     this.phase = 'ready'
+    await this.rememberVault(backend)
+  }
+
+  private memoryFixtureRoot(): MemoryFileSystem {
+    this.memoryRoot ??= new MemoryFileSystem('memory-vault')
+    return this.memoryRoot
+  }
+
+  private ensureRegistry() {
+    if (this.registryReady) return
+    this.registryReady = true
+    if (isMemoryFixture()) return
+    if (typeof localStorage === 'undefined') return
+    const raw = localStorage.getItem(VAULT_REGISTRY_KEY)
+    if (!raw) return
+    try {
+      const parsed: unknown = JSON.parse(raw)
+      if (!Array.isArray(parsed)) return
+      this.vaults = parsed.filter(isVaultRecord)
+    } catch {
+      this.vaults = []
+    }
+  }
+
+  private persistRegistry() {
+    if (isMemoryFixture()) return
+    if (typeof localStorage === 'undefined') return
+    localStorage.setItem(VAULT_REGISTRY_KEY, JSON.stringify(this.vaults))
+  }
+
+  private latestRecord(): VaultRecord | null {
+    let latest: VaultRecord | null = null
+    for (const entry of this.vaults) {
+      if (!latest || entry.lastOpened >= latest.lastOpened) latest = entry
+    }
+    return latest
+  }
+
+  private openedStamp(): string {
+    let stamp = new Date().toISOString()
+    for (const entry of this.vaults) {
+      if (stamp > entry.lastOpened) continue
+      const parsed = Date.parse(entry.lastOpened)
+      stamp = new Date((Number.isFinite(parsed) ? parsed : Date.now()) + 1).toISOString()
+    }
+    return stamp
+  }
+
+  private async rememberVault(backend: FileSystemBackend) {
+    this.ensureRegistry()
+    const id = await this.idFor(backend)
+    const previous = this.vaults.find((entry) => entry.id === id)
+    this.upsertVault({
+      id,
+      label: backend.rootLabel,
+      color: previous?.color ?? '',
+      icon: previous?.icon ?? '',
+      lastOpened: this.openedStamp(),
+    })
+    this.backends.set(id, backend)
+    this.idsByBackend.set(backend, id)
+    this.activeVaultId = id
+    if (isMemoryFixture() || !(backend instanceof BrowserFileSystem)) return
+    await writeVaultHandleById(id, backend.directoryHandle)
+  }
+
+  private async idFor(backend: FileSystemBackend): Promise<string> {
+    const known = this.idsByBackend.get(backend)
+    if (known) return known
+    if (backend instanceof BrowserFileSystem) {
+      const handle = backend.directoryHandle
+      for (const entry of this.vaults) {
+        const cached = this.backends.get(entry.id)
+        if (cached instanceof BrowserFileSystem) {
+          if (await sameDirectory(cached.directoryHandle, handle)) return entry.id
+          continue
+        }
+        const stored = await readVaultHandleById(entry.id)
+        if (stored && await sameDirectory(stored, handle)) return entry.id
+      }
+    } else if (hasTauriInternals()) {
+      const existing = this.vaults.find((entry) => {
+        const cached = this.backends.get(entry.id)
+        if (cached) return cached.rootLabel === backend.rootLabel
+        return entry.label === backend.rootLabel
+      })
+      if (existing) return existing.id
+    }
+    return createVaultId()
   }
 
   private async searchOpener(): Promise<SearchBackendOpener> {

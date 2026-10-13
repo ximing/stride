@@ -8,6 +8,7 @@ import { Star } from '@phosphor-icons/react/Star'
 import { Tag } from '@phosphor-icons/react/Tag'
 import { User } from '@phosphor-icons/react/User'
 import { observer, useService } from '@rabjs/react'
+import { useState } from 'react'
 import type { StrideNote } from '@stride/core/note'
 import { typeSidebarLabel } from '../../../packages/core/src/types'
 import { NoteEditor } from './editor'
@@ -285,6 +286,43 @@ const SettingsPanel = observer(function SettingsPanel() {
   )
 })
 
+const VaultSwitcher = observer(function VaultSwitcher() {
+  const vault = useService(VaultService)
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="vault-switcher">
+      <button
+        type="button"
+        data-testid="vault-switcher"
+        aria-expanded={open}
+        onClick={() => setOpen((value) => !value)}
+      >
+        {vault.currentVaultLabel}
+      </button>
+      {open && (
+        <div className="vault-switcher-list" role="listbox">
+          {vault.vaults.map((entry) => (
+            <button
+              key={entry.id}
+              type="button"
+              role="option"
+              data-testid="vault-option"
+              data-vault-id={entry.id}
+              className={entry.id === vault.activeVaultId ? 'active' : ''}
+              onClick={() => {
+                setOpen(false)
+                void vault.switchVault(entry.id)
+              }}
+            >
+              {entry.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+})
+
 const Workspace = observer(function Workspace() {
   const vault = useService(VaultService)
   const note = vault.active
@@ -292,7 +330,10 @@ const Workspace = observer(function Workspace() {
     <div className="shell" data-testid="vault-surface">
       <UpdateBanner />
       <header className="topbar">
-        <div className="wordmark">Stride</div>
+        <div className="brand">
+          <div className="wordmark">Stride</div>
+          <VaultSwitcher />
+        </div>
         <form className="search" onSubmit={(event) => { event.preventDefault(); void vault.runSearch() }}>
           <input data-testid="vault-search" value={vault.searchQuery} onChange={(event) => { vault.searchQuery = event.target.value }} placeholder="Search the vault" />
           <button type="submit" data-testid="run-search">Search</button>

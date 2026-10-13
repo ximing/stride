@@ -9,7 +9,7 @@ import {
 } from '@stride/platform'
 import { isDomError, wrapIo } from './error.ts'
 import './fs-access.ts'
-import { readVaultHandle, writeVaultHandle } from './idb.ts'
+import { readVaultHandle, readVaultHandleById, writeVaultHandle } from './idb.ts'
 
 interface DirectoryPicker {
   showDirectoryPicker?: (options?: { mode?: 'read' | 'readwrite' }) => Promise<FileSystemDirectoryHandle>
@@ -42,6 +42,17 @@ export async function restoreVaultDirectory(): Promise<BrowserFileSystem | null>
   if (!fileSystemAccessSupported()) return null
   const handle = await readVaultHandle()
   if (!handle) return null
+  return openGrantedDirectory(handle)
+}
+
+export async function restoreVaultById(id: string): Promise<BrowserFileSystem | null> {
+  if (!fileSystemAccessSupported()) return null
+  const handle = await readVaultHandleById(id)
+  if (!handle) return null
+  return openGrantedDirectory(handle)
+}
+
+async function openGrantedDirectory(handle: FileSystemDirectoryHandle): Promise<BrowserFileSystem | null> {
   let state: PermissionState
   try {
     state = await handle.queryPermission({ mode: 'readwrite' })
@@ -60,11 +71,13 @@ export async function restoreVaultDirectory(): Promise<BrowserFileSystem | null>
 }
 
 export class BrowserFileSystem implements FileSystemBackend {
+  readonly directoryHandle: FileSystemDirectoryHandle
   readonly rootLabel: string
   readonly capabilities: FileSystemCapabilities = { watch: false }
 
   constructor(private readonly root: FileSystemDirectoryHandle) {
     if (root.kind !== 'directory') throw new PlatformError('io', 'Vault root must be a directory')
+    this.directoryHandle = root
     this.rootLabel = root.name
   }
 

@@ -1,6 +1,6 @@
 import { PlatformError, type SecretsStore } from '@stride/platform'
 
-// Own database: @stride/fs-web opens `stride` at version 1 for `fs-handles`.
+// Own database: @stride/fs-web opens `stride` for directory handles.
 // Sharing that name would skip creating `secrets` or make the older open fail.
 const DB_NAME = 'stride-secrets'
 const DB_VERSION = 1

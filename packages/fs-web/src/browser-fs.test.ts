@@ -4,7 +4,10 @@ import {
   BrowserFileSystem,
   fileSystemAccessSupported,
   pickVaultDirectory,
+  readVaultHandleById,
+  restoreVaultById,
   restoreVaultDirectory,
+  writeVaultHandleById,
 } from './index.ts'
 
 type MemNode = MemDir | MemFile
@@ -142,6 +145,18 @@ interface IdbLog {
 
 let idbLog: IdbLog = { opens: [], stores: [], puts: [], gets: [] }
 
+type IdbDatabaseRecord = { version: number; stores: Map<string, Map<IDBValidKey, unknown>> }
+
+let databases = new Map<string, IdbDatabaseRecord>()
+
+function seedDatabase(name: string, version: number, stores: Record<string, Record<string, unknown>>): void {
+  const mapped: IdbDatabaseRecord = { version, stores: new Map() }
+  for (const [storeName, values] of Object.entries(stores)) {
+    mapped.stores.set(storeName, new Map(Object.entries(values)))
+  }
+  databases.set(name, mapped)
+}
+
 function createRoot(name = 'vault'): MemDir {
   return new MemDir(name)
 }
@@ -159,7 +174,7 @@ function setPicker(picker: ((options?: { mode?: string }) => Promise<FileSystemD
 }
 
 function installIdb(log: IdbLog): void {
-  const databases = new Map<string, { version: number; stores: Map<string, Map<IDBValidKey, unknown>> }>()
+  databases = new Map()
   const event = { preventDefault() {} } as Event
 
   const indexedDB = {
@@ -450,10 +465,10 @@ describe('vault directory picker', () => {
     expect(root.requestCalls).toBe(0)
     expect(root.lastQuery).toEqual({ mode: 'readwrite' })
     expect(idbLog.opens).toEqual([
-      { name: 'stride', version: 1 },
-      { name: 'stride', version: 1 },
+      { name: 'stride', version: 2 },
+      { name: 'stride', version: 2 },
     ])
-    expect(idbLog.stores).toEqual(['fs-handles'])
+    expect(idbLog.stores).toEqual(['fs-handles', 'vault-handles'])
     expect(idbLog.puts).toEqual(['vault-directory'])
     expect(idbLog.gets).toEqual(['vault-directory'])
   })
@@ -513,6 +528,39 @@ describe('vault directory picker', () => {
     expect(picked).toBeInstanceOf(BrowserFileSystem)
     expect(picked.rootLabel).toBe('vault')
     expect(idbLog.puts).toEqual(['vault-directory'])
+  })
+
+  it('reads a vault-directory handle stored before the version bump', async () => {
+    const root = createRoot('legacy')
+    seedDatabase('stride', 1, { 'fs-handles': { 'vault-directory': root } })
+    setPicker(async () => {
+      throw new Error('picker should not run')
+    })
+    const restored = await restoreVaultDirectory()
+    expect(restored?.rootLabel).toBe('legacy')
+    expect(idbLog.opens).toEqual([{ name: 'stride', version: 2 }])
+    expect(idbLog.gets).toEqual(['vault-directory'])
+    expect(idbLog.puts).toEqual([])
+    const record = databases.get('stride')
+    expect(record?.version).toBe(2)
+    expect(record?.stores.get('fs-handles')?.get('vault-directory')).toBe(root)
+    expect(record?.stores.has('vault-handles')).toBe(true)
+  })
+
+  it('stores a handle per vault id and keeps the last opened vault-directory handle', async () => {
+    const older = createRoot('older')
+    const newer = createRoot('newer')
+    setPicker(async () => {
+      throw new Error('picker should not run')
+    })
+    await writeVaultHandleById('vault-a', older as unknown as FileSystemDirectoryHandle)
+    await writeVaultHandleById('vault-b', newer as unknown as FileSystemDirectoryHandle)
+    expect(await readVaultHandleById('vault-a')).toBe(older)
+    expect(await readVaultHandleById('vault-b')).toBe(newer)
+    expect((await restoreVaultById('vault-a'))?.rootLabel).toBe('older')
+    const restored = await restoreVaultDirectory()
+    expect(restored?.rootLabel).toBe('newer')
+    expect(idbLog.puts).toEqual(['vault-a', 'vault-directory', 'vault-b', 'vault-directory'])
   })
 
   it('throws unsupported when showDirectoryPicker is absent', async () => {
