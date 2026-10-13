@@ -179,6 +179,8 @@ export class VaultService extends Service {
   private docTimer: ReturnType<typeof setTimeout> | null = null
   private pendingId = ''
   private renaming = false
+  private titleBaseline = new Map<string, string>()
+  private leaveQueue: StrideNote[] = []
   private numberDrafts: Record<string, string> = {}
   private listDrafts: Record<string, string> = {}
   private saveGeneration = 0
@@ -201,7 +203,8 @@ export class VaultService extends Service {
 
   select(id: string) {
     if (id === this.activeId) return
-    void this.commitHeadingRename()
+    const leaving = this.active
+    void this.commitHeadingRename(leaving)
     this.activeId = id
     this.resetPropertyEditor()
   }
@@ -444,6 +447,9 @@ export class VaultService extends Service {
     const current = this.active
     if (!current) return
     const next = applyBody(current.title, body)
+    if (next.title !== current.title && !this.titleBaseline.has(current.id)) {
+      this.titleBaseline.set(current.id, current.title)
+    }
     this.replace({ ...current, title: next.title, doc: next.doc })
     if (next.lifted) this.docEpoch += 1
     this.schedule(current.id)
@@ -452,6 +458,7 @@ export class VaultService extends Service {
   updateTitle(title: string) {
     const current = this.active
     if (!current) return
+    if (!this.titleBaseline.has(current.id)) this.titleBaseline.set(current.id, current.title)
     this.replace({ ...current, title, doc: applyTitle(current.doc, title) })
     this.schedule(current.id)
   }
@@ -476,11 +483,21 @@ export class VaultService extends Service {
     }
   }
 
-  async commitHeadingRename() {
-    if (this.renaming) return
-    const leaving = this.active
+  retargetTitleBaseline(fromId: string, toId: string) {
+    if (fromId === toId || !this.titleBaseline.has(fromId)) return
+    const previous = this.titleBaseline.get(fromId)
+    this.titleBaseline.delete(fromId)
+    if (previous !== undefined) this.titleBaseline.set(toId, previous)
+  }
+
+  async commitHeadingRename(explicit?: StrideNote | null) {
+    const leaving = explicit === undefined ? this.active : explicit
     const fs = this.fs
     if (!leaving || !fs) return
+    if (this.renaming) {
+      this.leaveQueue.push(leaving)
+      return
+    }
     const fromId = leaving.id
     this.renaming = true
     try {
@@ -494,10 +511,11 @@ export class VaultService extends Service {
       if (!this.renameFromHeading) return
       const fresh = this.notes.find((note) => note.id === fromId)
       if (!fresh || isPlaceholderTitle(fresh.title)) return
+      const previous = this.titleBaseline.get(fromId) ?? diskTitle
       let nextId: string | undefined
-      if (diskTitle && !isPlaceholderTitle(diskTitle) && diskTitle !== fresh.title) {
+      if (previous && !isPlaceholderTitle(previous) && previous !== fresh.title) {
         nextId = await nextSlugId(fs, fresh.title, fresh.id)
-        await rewriteVaultLinks(fs, { fromTitle: diskTitle, toTitle: fresh.title, fromId, toId: nextId })
+        await rewriteVaultLinks(fs, { fromTitle: previous, toTitle: fresh.title, fromId, toId: nextId })
         const files = await listNoteFiles(fs)
         const disk = new Map<string, StrideNote>()
         for (const file of files) {
@@ -508,19 +526,24 @@ export class VaultService extends Service {
         this.docEpoch += 1
       }
       if (nextId === undefined) nextId = await nextSlugId(fs, fresh.title, fresh.id)
-      if (nextId === fresh.id) return
-      await fs.rename(notePath(fromId), notePath(nextId))
-      const latest = this.notes.find((note) => note.id === fromId) ?? fresh
-      const renamed: StrideNote = { ...latest, id: nextId }
-      this.notes = this.notes.map((note) => (note.id === fromId ? renamed : note))
-      if (this.activeId === fromId) this.activeId = nextId
-      if (this.pendingId === fromId) this.pendingId = nextId
-      await this.index?.remove([fromId])
-      await this.upsertIndexed(renamed)
+      if (nextId !== fresh.id) {
+        await fs.rename(notePath(fromId), notePath(nextId))
+        const latest = this.notes.find((note) => note.id === fromId) ?? fresh
+        const renamed: StrideNote = { ...latest, id: nextId }
+        this.notes = this.notes.map((note) => (note.id === fromId ? renamed : note))
+        if (this.activeId === fromId) this.activeId = nextId
+        if (this.pendingId === fromId) this.pendingId = nextId
+        await this.index?.remove([fromId])
+        await this.upsertIndexed(renamed)
+      }
+      this.titleBaseline.delete(fromId)
+      this.titleBaseline.delete(nextId)
     } catch (error) {
       this.error = errorText(error)
     } finally {
       this.renaming = false
+      const next = this.leaveQueue.shift()
+      if (next) await this.commitHeadingRename(next)
     }
   }
 

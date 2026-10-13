@@ -52,6 +52,10 @@ export class FolderService extends Service {
       await renameFolderOnDisk(fs, from, to)
       const nextId = (id: string) =>
         id === from || id.startsWith(`${from}/`) ? to + id.slice(from.length) : id
+      for (const note of this.vault.notes) {
+        const id = nextId(note.id)
+        if (id !== note.id) this.vault.retargetTitleBaseline(note.id, id)
+      }
       this.vault.notes = this.vault.notes.map((note) => {
         const id = nextId(note.id)
         return id === note.id ? note : { ...note, id }
@@ -90,6 +94,7 @@ export class FolderService extends Service {
       if (toId !== fromId) {
         this.vault.notes = this.vault.notes.map((note) => (note.id === fromId ? { ...note, id: toId } : note))
         if (this.vault.activeId === fromId) this.vault.activeId = toId
+        this.vault.retargetTitleBaseline(fromId, toId)
       }
       this.vault.docEpoch += 1
       this.vault.error = ''

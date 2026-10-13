@@ -285,6 +285,89 @@ describe('VaultService', () => {
     expect(wikilinkTarget(linked?.doc ?? { type: 'doc' })).toBe('Old Title')
   })
 
+  it('rewrites wikilinks after autosave already stored the new title', async () => {
+    useMemoryFixture()
+    register(VaultService)
+    register(FolderService)
+    const vault = resolve(VaultService)
+    await vault.openFromDraft()
+    await vault.createNote()
+    vault.updateTitle('Old Title')
+    await vault.commitHeadingRename()
+    expect(vault.error).toBe('')
+    expect(vault.active?.id).toBe('old-title')
+
+    await vault.createNote()
+    const linkerId = vault.active?.id ?? ''
+    vault.updateDoc({
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'wikilink', attrs: { target: 'Old Title' } }],
+        },
+      ],
+    })
+    vault.notes = vault.notes.map((note) =>
+      note.id === linkerId ? { ...note, properties: { ...note.properties, related_to: '[[Old Title]]' } } : note,
+    )
+    await vault.flush()
+
+    vault.activeId = 'old-title'
+    vault.updateTitle('New Title')
+    await vault.flush()
+    const stored = await readNoteFile(vault.fs!, 'old-title.stride.json', 'old-title')
+    expect(stored.title).toBe('New Title')
+    await vault.commitHeadingRename()
+    expect(vault.error).toBe('')
+    expect(vault.active?.id).toBe('new-title')
+    const linked = vault.notes.find((note) => note.id === linkerId)
+    expect(linked?.properties.related_to).toBe('[[New Title]]')
+    expect(wikilinkTarget(linked?.doc ?? { type: 'doc' })).toBe('New Title')
+  })
+
+  it('keeps the title baseline across a folder move', async () => {
+    useMemoryFixture()
+    register(VaultService)
+    register(FolderService)
+    const vault = resolve(VaultService)
+    await vault.openFromDraft()
+    await vault.createNote()
+    vault.updateTitle('Old Title')
+    await vault.commitHeadingRename()
+    expect(vault.error).toBe('')
+    expect(vault.active?.id).toBe('old-title')
+
+    await vault.createNote()
+    const linkerId = vault.active?.id ?? ''
+    vault.updateDoc({
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'wikilink', attrs: { target: 'Old Title' } }],
+        },
+      ],
+    })
+    vault.notes = vault.notes.map((note) =>
+      note.id === linkerId ? { ...note, properties: { ...note.properties, related_to: '[[Old Title]]' } } : note,
+    )
+    await vault.flush()
+
+    vault.activeId = 'old-title'
+    vault.updateTitle('New Title')
+    await vault.flush()
+    const folders = resolve(FolderService)
+    await folders.createFolder('box')
+    await folders.moveNote('old-title', 'box')
+    await vault.commitHeadingRename()
+    expect(vault.error).toBe('')
+    expect(vault.active?.id).toBe('new-title')
+    const linked = vault.notes.find((note) => note.id === linkerId)
+    expect(linked?.properties.related_to).toBe('[[New Title]]')
+    expect(wikilinkTarget(linked?.doc ?? { type: 'doc' })).toBe('New Title')
+  })
+
   it('keeps a cancelled directory picker on the chooser', async () => {
     window.history.replaceState(null, '', '/')
     vi.stubGlobal('showDirectoryPicker', vi.fn(async () => {
