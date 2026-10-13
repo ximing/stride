@@ -1,5 +1,4 @@
-import fs from 'node:fs'
-import path from 'node:path'
+import type { FileSystemBackend } from '@stride/platform'
 
 export interface ReleaseAsset {
   name: string
@@ -55,7 +54,25 @@ export function selectUpdate(releases: GithubRelease[], current: string): Select
   return { version: chosen.tag_name, assetName: asset.name, assetUrl: asset.browser_download_url }
 }
 
+function concatBytes(chunks: Uint8Array[]): Uint8Array {
+  const total = chunks.reduce((sum, chunk) => sum + chunk.byteLength, 0)
+  const out = new Uint8Array(total)
+  let offset = 0
+  for (const chunk of chunks) {
+    out.set(chunk, offset)
+    offset += chunk.byteLength
+  }
+  return out
+}
+
+function hostPath(root: string, rel: string): string {
+  if (!rel) return root
+  const base = root.endsWith('/') ? root.slice(0, -1) : root
+  return `${base}/${rel}`
+}
+
 export async function downloadAsset(
+  fs: FileSystemBackend,
   url: string,
   dest: string,
   onEvent: (event: DownloadEvent) => void,
@@ -71,24 +88,27 @@ export async function downloadAsset(
     const step = await reader.read()
     if (step.done) break
     if (step.value) {
-      chunks.push(step.value)
+      chunks.push(step.value.slice())
       onEvent({ event: 'Progress', data: { chunkLength: step.value.byteLength } })
     }
   }
-  fs.mkdirSync(path.dirname(dest), { recursive: true })
-  fs.writeFileSync(dest, Buffer.concat(chunks))
+  await fs.writeBytes(dest, concatBytes(chunks))
   onEvent({ event: 'Finished' })
 }
 
-export function installReleaseAsset(downloadedTo: string, installPath: string): void {
-  if (!downloadedTo || !fs.existsSync(downloadedTo)) throw new Error('Downloaded update is missing')
-  const bytes = fs.readFileSync(downloadedTo)
-  if (bytes.length === 0) throw new Error('Downloaded update is empty')
-  fs.mkdirSync(path.dirname(installPath), { recursive: true })
+export async function installReleaseAsset(
+  fs: FileSystemBackend,
+  downloadedTo: string,
+  installPath: string,
+): Promise<void> {
+  if (!downloadedTo) throw new Error('Downloaded update is missing')
+  const stat = await fs.stat(downloadedTo)
+  if (!stat || stat.kind !== 'file') throw new Error('Downloaded update is missing')
+  const bytes = await fs.readBytes(downloadedTo)
+  if (bytes.byteLength === 0) throw new Error('Downloaded update is empty')
   const staged = `${installPath}.next`
-  fs.writeFileSync(staged, bytes)
-  fs.chmodSync(staged, 0o755)
-  fs.renameSync(staged, installPath)
+  await fs.writeBytes(staged, bytes)
+  await fs.rename(staged, installPath)
 }
 
 export class UpdateController {
@@ -100,31 +120,32 @@ export class UpdateController {
   events: DownloadEvent[] = []
   readonly installPath: string
 
+  // `marker.file` and `marker.installPath` are root-relative paths on `fs`.
   constructor(
+    private fs: FileSystemBackend,
     private currentVersion: string,
     private fetchImpl: typeof fetch,
     private relaunchImpl: (installPath: string) => void | Promise<void>,
     private marker: { file: string; installPath: string },
   ) {
-    this.installPath = marker.installPath
-    if (!this.installPath) throw new Error('Update install path is required')
+    this.installPath = hostPath(fs.rootLabel, marker.installPath)
+    if (!marker.installPath) throw new Error('Update install path is required')
   }
 
-  markerValue(): string {
-    if (!fs.existsSync(this.marker.file)) return this.currentVersion
-    return fs.readFileSync(this.marker.file, 'utf8').trim() || this.currentVersion
+  async markerValue(): Promise<string> {
+    if (!(await this.fs.stat(this.marker.file))) return this.currentVersion
+    return (await this.fs.readText(this.marker.file)).trim() || this.currentVersion
   }
 
-  private writeMarker(version: string) {
-    fs.mkdirSync(path.dirname(this.marker.file), { recursive: true })
-    fs.writeFileSync(this.marker.file, `${version}\n`)
+  private async writeMarker(version: string) {
+    await this.fs.writeText(this.marker.file, `${version}\n`)
   }
 
   async check(releases: GithubRelease[] | string): Promise<SelectedUpdate | null> {
     const list = typeof releases === 'string'
       ? (await (await this.fetchImpl(releases)).json()) as GithubRelease[]
       : releases
-    const installed = this.markerValue()
+    const installed = await this.markerValue()
     this.selected = selectUpdate(list, installed)
     this.phase = this.selected ? 'available' : 'idle'
     this.progress = 0
@@ -139,7 +160,7 @@ export class UpdateController {
     this.progress = 0
     let total = 0
     let got = 0
-    await downloadAsset(url, dest, (event) => {
+    await downloadAsset(this.fs, url, dest, (event) => {
       this.events.push(event)
       if (event.event === 'Started') total = event.data.contentLength ?? 0
       if (event.event === 'Progress') {
@@ -161,21 +182,18 @@ export class UpdateController {
 
   async confirm(): Promise<void> {
     if (this.phase !== 'ready' || !this.selected) throw new Error('Update is not ready')
-    const previous = this.markerValue()
+    const previous = await this.markerValue()
     const next = this.selected.version
-    const previousBytes = fs.existsSync(this.installPath) ? fs.readFileSync(this.installPath) : null
-    installReleaseAsset(this.downloadedTo, this.installPath)
-    this.writeMarker(next)
+    const previousStat = await this.fs.stat(this.marker.installPath)
+    const previousBytes = previousStat?.kind === 'file' ? await this.fs.readBytes(this.marker.installPath) : null
+    await installReleaseAsset(this.fs, this.downloadedTo, this.marker.installPath)
+    await this.writeMarker(next)
     try {
       await this.relaunchImpl(this.installPath)
     } catch (error) {
-      this.writeMarker(previous)
-      if (previousBytes) {
-        fs.writeFileSync(this.installPath, previousBytes)
-        fs.chmodSync(this.installPath, 0o755)
-      } else {
-        fs.rmSync(this.installPath, { force: true })
-      }
+      await this.writeMarker(previous)
+      if (previousBytes) await this.fs.writeBytes(this.marker.installPath, previousBytes)
+      else await this.fs.remove(this.marker.installPath)
       throw error
     }
     this.relaunchCount += 1

@@ -2,12 +2,15 @@ import { spawn } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
+import { NodeFileSystem, NodeGitBackend, NodeSecretsStore, openVaneSearch } from '@stride/platform-node'
 import { exitCurrentProcess } from './handoff.ts'
 import {
   APP_VERSION,
   EmbeddingClient,
   UpdateController,
   createVaultNote,
+  defaultSettings,
+  defaultSettingsPath,
   gitAddRemote,
   gitCommit,
   gitDiff,
@@ -20,8 +23,8 @@ import {
   listNoteFiles,
   loadNotes,
   noteIdFromPath,
+  noteIndex,
   notePath,
-  openNoteIndex,
   openVault,
   plainText,
   publicSettings,
@@ -53,20 +56,33 @@ export class Desk {
   settings: AppSettings
   updater: UpdateController
   private readonly settingsFile: string
+  private readonly settingsName: string
   private readonly markerFile: string
+  private readonly configRoot: string
+  private readonly configFs: NodeFileSystem
+  private readonly secrets = new NodeSecretsStore()
+  private readonly git = new NodeGitBackend()
+  private readonly homeDir = os.homedir()
+  private vaultFs: NodeFileSystem | null = null
   private readonly handoff: AppHandoff
+  private readonly ready: Promise<void>
 
   constructor(settingsFile?: string, hooks?: { handoff?: AppHandoff }) {
-    this.settingsFile = settingsFile || ''
-    this.settings = readSettings(settingsFile)
-    const home = path.join(os.homedir(), '.stride')
-    this.markerFile = path.join(path.dirname(settingsFile || path.join(home, 'settings.json')), 'version-marker.txt')
-    this.installPath = path.join(path.dirname(this.markerFile), 'app', 'stride')
+    const requested = settingsFile || defaultSettingsPath(os.homedir(), process.env.STRIDE_SETTINGS_PATH || '')
+    const location = path.resolve(requested)
+    this.settingsFile = location
+    this.settingsName = path.basename(location)
+    this.configRoot = path.dirname(location)
+    this.configFs = new NodeFileSystem(this.configRoot)
+    this.settings = defaultSettings()
+    this.markerFile = path.join(this.configRoot, 'version-marker.txt')
+    this.installPath = path.join(this.configRoot, 'app', 'stride')
     this.handoff = hooks?.handoff ?? (() => exitCurrentProcess())
-    this.updater = new UpdateController(APP_VERSION, fetch, (installed) => this.launchInstalled(installed), {
-      file: this.markerFile,
-      installPath: this.installPath,
+    this.updater = new UpdateController(this.configFs, APP_VERSION, fetch, (installed) => this.launchInstalled(installed), {
+      file: 'version-marker.txt',
+      installPath: 'app/stride',
     })
+    this.ready = this.loadSettings()
   }
 
   readonly installPath: string
@@ -75,8 +91,21 @@ export class Desk {
 
   private embeddingClient = new EmbeddingClient()
 
+  whenReady(): Promise<void> {
+    return this.ready
+  }
+
+  private loadSettings(): Promise<void> {
+    return readSettings(this.configFs, this.settingsName, this.secrets).then((settings) => {
+      this.settings = settings
+    })
+  }
+
   async open(vaultPath: string): Promise<{ path: string; broad: boolean; dedicated: boolean; notes: StrideNote[] }> {
-    const opened = openVault(vaultPath)
+    await this.ready
+    const backend = new NodeFileSystem(path.resolve(vaultPath))
+    const opened = await openVault(backend, this.homeDir)
+    this.vaultFs = backend
     this.vaultPath = opened.path
     this.notes = opened.notes
     this.chat = []
@@ -93,29 +122,32 @@ export class Desk {
     }
   }
 
-  create(title?: string): StrideNote {
+  async create(title?: string): Promise<StrideNote> {
+    await this.ready
     this.requireVault()
-    const note = createVaultNote(this.vaultPath, title?.trim() || 'Untitled')
-    this.notes = loadNotes(this.vaultPath)
+    const note = await createVaultNote(this.vaultBackend(), title?.trim() || 'Untitled')
+    this.notes = await loadNotes(this.vaultBackend())
     void this.upsertOne(note)
     return note
   }
 
-  save(note: StrideNote): StrideNote {
+  async save(note: StrideNote): Promise<StrideNote> {
+    await this.ready
     this.requireVault()
-    const saved = saveNote(this.vaultPath, note)
-    this.notes = loadNotes(this.vaultPath)
+    const saved = await saveNote(this.vaultBackend(), note)
+    this.notes = await loadNotes(this.vaultBackend())
     void this.upsertOne(saved)
     return saved
   }
 
-  read(id: string): StrideNote {
+  async read(id: string): Promise<StrideNote> {
+    await this.ready
     this.requireVault()
-    const file = notePath(this.vaultPath, id)
-    return readNoteFile(file, id)
+    return readNoteFile(this.vaultBackend(), notePath(id), id)
   }
 
   async search(query: string) {
+    await this.ready
     if (!this.index) return { mode: 'text' as const, hits: [] as { id: string; score: number }[], error: this.searchError }
     const embedding = this.settings.embedding.apiKey ? this.settings.embedding : null
     const ranked = await searchNotes(this.index, query, embedding, this.embeddingClient)
@@ -123,64 +155,75 @@ export class Desk {
   }
 
   async gitInit() {
+    await this.ready
     this.requireVault()
-    await initGit(this.vaultPath)
-    return gitStatus(this.vaultPath)
+    await initGit(this.vaultBackend(), this.git, this.homeDir)
+    return gitStatus(this.vaultBackend(), this.git)
   }
 
-  gitStatus() {
+  async gitStatus() {
+    await this.ready
     this.requireVault()
-    return gitStatus(this.vaultPath)
+    return gitStatus(this.vaultBackend(), this.git)
   }
 
-  gitDiff(id?: string) {
+  async gitDiff(id?: string) {
+    await this.ready
     this.requireVault()
-    return gitDiff(this.vaultPath, id ? this.noteRel(id) : undefined)
+    return gitDiff(this.vaultBackend(), this.git, id ? this.noteRel(id) : undefined)
   }
 
-  gitCommit(message: string) {
+  async gitCommit(message: string) {
+    await this.ready
     this.requireVault()
-    return gitCommit(this.vaultPath, message)
+    return gitCommit(this.vaultBackend(), this.git, message)
   }
 
-  gitHistory(id?: string) {
+  async gitHistory(id?: string) {
+    await this.ready
     this.requireVault()
-    return gitHistory(this.vaultPath, id ? this.noteRel(id) : undefined)
+    return gitHistory(this.vaultBackend(), this.git, id ? this.noteRel(id) : undefined)
   }
 
   async gitPull() {
+    await this.ready
     this.requireVault()
-    const result = await gitPull(this.vaultPath)
-    this.reloadNotes()
+    const result = await gitPull(this.vaultBackend(), this.git)
+    await this.reloadNotes()
     return { ...result, notes: this.notes }
   }
 
-  gitPush() {
+  async gitPush() {
+    await this.ready
     this.requireVault()
-    return gitPush(this.vaultPath)
+    return gitPush(this.vaultBackend(), this.git)
   }
 
-  gitRemote(url: string) {
+  async gitRemote(url: string) {
+    await this.ready
     this.requireVault()
-    return gitAddRemote(this.vaultPath, url)
+    return gitAddRemote(this.vaultBackend(), this.git, url)
   }
 
   async gitResolve(id: string, side: 'ours' | 'theirs') {
+    await this.ready
     this.requireVault()
-    await gitResolve(this.vaultPath, this.noteRel(id), side)
-    this.reloadNotes()
+    await gitResolve(this.vaultBackend(), this.git, this.noteRel(id), side)
+    await this.reloadNotes()
     return { notes: this.notes }
   }
 
-  settingsPublic() {
+  async settingsPublic() {
+    await this.ready
     return publicSettings(this.settings)
   }
 
-  saveSettings(incoming: {
+  async saveSettings(incoming: {
     embedding?: { endpoint?: string; model?: string; apiKey?: string; dim?: number }
     llm?: { provider?: string; model?: string; baseUrl?: string; apiKey?: string }
     releasesUrl?: string
   }) {
+    await this.ready
     const current = this.settings
     const next: AppSettings = {
       embedding: {
@@ -197,13 +240,14 @@ export class Desk {
       },
       releasesUrl: incoming.releasesUrl ?? current.releasesUrl,
     }
-    writeSettings(next, this.settingsFile || undefined)
+    await writeSettings(this.configFs, this.settingsName, next, this.secrets)
     this.settings = next
     if (this.vaultPath) void this.reindexAll()
     return publicSettings(next)
   }
 
   async chatTurn(message: string, activeId?: string) {
+    await this.ready
     this.requireVault()
     if (!this.settings.llm.apiKey || !this.settings.llm.baseUrl || !this.settings.llm.model) {
       throw new Error('Add a model provider, base URL, model, and key in Settings')
@@ -214,13 +258,13 @@ export class Desk {
       userText: message,
       tools: vaultTools({
         activeNoteId: activeId,
-        readNote: (id) => plainText(this.read(id).doc),
+        readNote: async (id) => plainText((await this.read(id)).doc),
         searchVault: async (query) => {
           const ranked = await this.search(query)
           return ranked.hits.map((hit) => hit.id).join('\n')
         },
-        writeNote: (id, text) => {
-          const note = this.read(id)
+        writeNote: async (id, text) => {
+          const note = await this.read(id)
           note.doc = {
             type: 'doc',
             content: [
@@ -228,7 +272,7 @@ export class Desk {
               { type: 'paragraph', content: [{ type: 'text', text }] },
             ],
           }
-          this.save(note)
+          await this.save(note)
           return plainText(note.doc)
         },
       }),
@@ -238,32 +282,36 @@ export class Desk {
   }
 
   async checkUpdates() {
+    await this.ready
     if (!this.settings.releasesUrl) throw new Error('Set a GitHub releases URL in Settings')
     const selected = await this.updater.check(this.settings.releasesUrl)
-    return { phase: this.updater.phase, progress: this.updater.progress, selected, version: this.updater.markerValue() }
+    return { phase: this.updater.phase, progress: this.updater.progress, selected, version: await this.updater.markerValue() }
   }
 
   async downloadUpdate() {
+    await this.ready
     if (!this.updater.selected) throw new Error('No update is available')
-    const dest = path.join(path.dirname(this.markerFile), 'updates', this.updater.selected.assetName)
+    const dest = `updates/${this.updater.selected.assetName}`
     await this.updater.download(dest)
     return this.updateState()
   }
 
-  dismissUpdate() {
-    const version = this.updater.markerValue()
+  async dismissUpdate() {
+    await this.ready
+    const version = await this.updater.markerValue()
     this.updater.dismiss()
-    return { ...this.updateState(), version }
+    return { ...(await this.updateState()), version }
   }
 
   async confirmUpdate() {
+    await this.ready
     try {
       await this.updater.confirm()
     } catch (error) {
       if (this.updater.phase === 'ready') this.updater.phase = 'available'
       throw error
     }
-    return { ...this.updateState(), restartRequested: this.restartRequested }
+    return { ...(await this.updateState()), restartRequested: this.restartRequested }
   }
 
   private launchInstalled(installed: string): Promise<void> {
@@ -272,6 +320,7 @@ export class Desk {
       try {
         // ENOEXEC is thrown inside spawn(), before this call returns. A listener
         // attached afterwards never sees it, and an uncaught throw kills the API.
+        fs.chmodSync(installed, 0o755)
         child = spawn(installed, [], { detached: true, stdio: 'ignore' })
       } catch (error) {
         reject(error instanceof Error ? error : new Error(String(error)))
@@ -327,36 +376,42 @@ export class Desk {
     })
   }
 
-  updateState() {
+  async updateState() {
+    await this.ready
     return {
       phase: this.updater.phase,
       progress: this.updater.progress,
       selected: this.updater.selected,
-      version: this.updater.markerValue(),
-      downloadedTo: this.updater.downloadedTo,
+      version: await this.updater.markerValue(),
+      downloadedTo: this.updater.downloadedTo ? path.join(this.configRoot, this.updater.downloadedTo) : '',
     }
   }
 
   private requireVault() {
-    if (!this.vaultPath) throw new Error('Open a vault folder first')
+    if (!this.vaultPath || !this.vaultFs) throw new Error('Open a vault folder first')
+  }
+
+  private vaultBackend(): NodeFileSystem {
+    this.requireVault()
+    return this.vaultFs!
   }
 
   private noteRel(id: string): string {
-    return path.relative(this.vaultPath, notePath(this.vaultPath, id))
+    return notePath(id)
   }
 
-  private reloadNotes() {
+  private async reloadNotes() {
     try {
-      this.notes = loadNotes(this.vaultPath)
+      this.notes = await loadNotes(this.vaultBackend())
       return
     } catch {
       // A conflicted note is not TipTap JSON. Keep the last copy of that file.
     }
     const parsed: StrideNote[] = []
-    for (const file of listNoteFiles(this.vaultPath)) {
-      const id = noteIdFromPath(this.vaultPath, file)
+    for (const file of await listNoteFiles(this.vaultBackend())) {
+      const id = noteIdFromPath(file)
       try {
-        parsed.push(readNoteFile(file, id))
+        parsed.push(await readNoteFile(this.vaultBackend(), file, id))
       } catch {
         const previous = this.notes.find((note) => note.id === id)
         if (previous) parsed.push(previous)
@@ -386,15 +441,17 @@ export class Desk {
           embedding: { ...this.settings.embedding, dim: fromVector },
         }
       }
-      const dir = path.join(this.vaultPath, '.stride', 'vane')
-      const dimFile = path.join(this.vaultPath, '.stride', 'vane-dim')
-      const previous = fs.existsSync(dimFile) ? Number(fs.readFileSync(dimFile, 'utf8')) : 0
-      if (previous && previous !== dim && fs.existsSync(dir)) {
-        fs.rmSync(dir, { recursive: true, force: true })
+      const dirRel = '.stride/vane'
+      const dimRel = '.stride/vane-dim'
+      const dimStat = await this.vaultBackend().stat(dimRel)
+      const previous = dimStat ? Number(await this.vaultBackend().readText(dimRel)) : 0
+      if (previous && previous !== dim && (await this.vaultBackend().stat(dirRel))) {
+        await this.vaultBackend().remove(dirRel)
       }
-      fs.mkdirSync(dir, { recursive: true })
-      this.index = await openNoteIndex(dir, dim)
-      fs.writeFileSync(dimFile, `${dim}\n`)
+      await this.vaultBackend().mkdir(dirRel)
+      const dir = path.join(this.vaultPath, '.stride', 'vane')
+      this.index = noteIndex(await openVaneSearch(dir, dim), dim)
+      await this.vaultBackend().writeText(dimRel, `${dim}\n`)
       if (docs.length) {
         await this.index.upsert(docs.map((doc, i) => ({ ...doc, vector: vectors?.[i] })))
       }

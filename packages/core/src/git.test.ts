@@ -1,110 +1,76 @@
-import fs from 'node:fs'
-import os from 'node:os'
-import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
-import {
-  gitAddRemote,
-  gitClone,
-  gitCommit,
-  gitDiff,
-  gitHistory,
-  gitInitBare,
-  gitPull,
-  gitPush,
-  gitResolve,
-  gitStatus,
-  initGit,
-} from './git.ts'
+import { describe, expect, it } from 'vitest'
+import { MemoryFileSystem, unavailableGit, type GitBackend } from '@stride/platform'
 import { DEDICATED_ERROR, isBroadPersonalRoot } from './roots.ts'
-import { createVaultNote, isDedicatedVault, markDedicatedVault, saveNote } from './vault.ts'
+import { gitCommit, gitResolve, gitStatus, initGit } from './git.ts'
+import { markDedicatedVault } from './vault.ts'
 
-const dirs: string[] = []
-
-function tempDir(): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stride-git-'))
-  dirs.push(dir)
-  return dir
+function fakeGit(): GitBackend & { calls: string[] } {
+  const calls: string[] = []
+  return {
+    calls,
+    available: true,
+    init: (repo) => {
+      calls.push(`init ${repo}`)
+      return Promise.resolve()
+    },
+    status: (repo) => {
+      calls.push(`status ${repo}`)
+      return Promise.resolve({ repo: true, porcelain: '', clean: true })
+    },
+    diff: () => Promise.resolve(''),
+    commit: (_repo, message) => {
+      calls.push(`commit ${message}`)
+      return Promise.resolve(message)
+    },
+    history: () => Promise.resolve([]),
+    currentBranch: () => Promise.resolve('main'),
+    addRemote: () => Promise.resolve(),
+    push: () => Promise.resolve(''),
+    pull: () => Promise.resolve({ conflict: false, files: [], output: '' }),
+    unmerged: () => Promise.resolve([]),
+    resolve: () => {
+      calls.push('resolve')
+      return Promise.resolve()
+    },
+    clone: () => Promise.resolve(),
+  }
 }
 
-afterEach(() => {
-  for (const dir of dirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true })
-})
+describe('vault git policy', () => {
+  it('refuses a broad personal root unless the vault is marked dedicated', async () => {
+    const documents = new MemoryFileSystem('/tmp/Documents')
+    const git = fakeGit()
+    await expect(initGit(documents, git, '/Users/someone')).rejects.toThrow(DEDICATED_ERROR)
+    expect(git.calls).toEqual([])
+    expect(await documents.stat('.git')).toBeNull()
+    expect(isBroadPersonalRoot('/Users/someone', '/Users/someone')).toBe(true)
+    expect(isBroadPersonalRoot('/Users/someone/Desktop', '/Users/someone')).toBe(true)
+    expect(isBroadPersonalRoot('/Users/someone/Projects', '/Users/someone')).toBe(false)
 
-describe('vault git', () => {
-  it('refuses a broad personal root, then commits, diffs, and resolves a diverged pull', async () => {
-    const root = tempDir()
-    const documents = path.join(root, 'Documents')
-    fs.mkdirSync(documents)
-    fs.writeFileSync(path.join(documents, 'loose.txt'), 'not a vault')
-    await expect(initGit(documents)).rejects.toThrow(DEDICATED_ERROR)
-    expect(fs.existsSync(path.join(documents, '.git'))).toBe(false)
+    const downloads = new MemoryFileSystem('/tmp/Downloads')
+    await markDedicatedVault(downloads)
+    await initGit(downloads, git, '/Users/someone')
+    expect(git.calls).toEqual(['init /tmp/Downloads'])
+  })
 
-    expect(isBroadPersonalRoot(os.homedir(), os.homedir())).toBe(true)
-    if (!isDedicatedVault(os.homedir())) {
-      await expect(initGit(os.homedir())).rejects.toThrow(DEDICATED_ERROR)
-    }
+  it('does not init twice, rejects an empty message, and rejects a path escape', async () => {
+    const files = new MemoryFileSystem('/tmp/dedicated-vault')
+    const git = fakeGit()
+    await initGit(files, git, '/Users/someone')
+    await files.writeText('.git/HEAD', 'ref: refs/heads/main\n')
+    await initGit(files, git, '/Users/someone')
+    expect(git.calls).toEqual(['init /tmp/dedicated-vault'])
+    await expect(gitCommit(files, git, '   ')).rejects.toThrow(/empty/)
+    expect(git.calls).toEqual(['init /tmp/dedicated-vault'])
+    await expect(gitResolve(files, git, '../outside', 'ours')).rejects.toThrow(/escapes the vault/)
+    await gitResolve(files, git, 'status.stride.json', 'ours')
+    expect(git.calls).toContain('resolve')
+    const status = await gitStatus(new MemoryFileSystem('/tmp/empty-vault'), git)
+    expect(status).toEqual({ repo: false, porcelain: '', clean: true })
+  })
 
-    const marked = path.join(root, 'Downloads')
-    fs.mkdirSync(marked)
-    markDedicatedVault(marked)
-    await initGit(marked)
-    expect(fs.existsSync(path.join(marked, '.git'))).toBe(true)
-
-    const vault = path.join(root, 'dedicated-vault')
-    fs.mkdirSync(vault)
-    const note = createVaultNote(vault, 'Status')
-    note.doc = {
-      type: 'doc',
-      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'base' }] }],
-    }
-    saveNote(vault, note)
-    await initGit(vault)
-    await gitCommit(vault, 'Add status note')
-
-    note.doc = {
-      type: 'doc',
-      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'edited locally' }] }],
-    }
-    saveNote(vault, note)
-    const status = await gitStatus(vault)
-    expect(status.repo).toBe(true)
-    expect(status.porcelain).toContain('status.stride.json')
-    const diff = await gitDiff(vault, 'status.stride.json')
-    expect(diff).toContain('edited locally')
-    const history = await gitHistory(vault, 'status.stride.json')
-    expect(history.some((commit) => commit.subject === 'Add status note')).toBe(true)
-    await gitCommit(vault, 'Edit status note')
-
-    const bare = path.join(root, 'origin.git')
-    await gitInitBare(bare)
-    await gitAddRemote(vault, bare)
-    await gitPush(vault)
-
-    const other = path.join(root, 'other')
-    await gitClone(bare, other)
-    const rel = 'status.stride.json'
-    const oursFile = path.join(other, rel)
-    const theirsFile = path.join(vault, rel)
-    const oursNote = JSON.parse(fs.readFileSync(oursFile, 'utf8')) as {
-      doc: { content: { content: { text: string }[] }[] }
-    }
-    const theirsNote = JSON.parse(fs.readFileSync(theirsFile, 'utf8')) as typeof oursNote
-    oursNote.doc.content[0]!.content[0]!.text = 'SIDE_B'
-    theirsNote.doc.content[0]!.content[0]!.text = 'SIDE_A'
-    fs.writeFileSync(oursFile, `${JSON.stringify(oursNote, null, 2)}\n`)
-    fs.writeFileSync(theirsFile, `${JSON.stringify(theirsNote, null, 2)}\n`)
-    await gitCommit(other, 'Other side')
-    await gitCommit(vault, 'Vault side')
-    await gitPush(vault)
-
-    const pulled = await gitPull(other)
-    expect(pulled.conflict).toBe(true)
-    expect(pulled.files).toContain(rel)
-
-    await gitResolve(other, rel, 'ours')
-    const resolved = fs.readFileSync(oursFile, 'utf8')
-    expect(resolved).toContain('SIDE_B')
-    expect(resolved).not.toContain('SIDE_A')
-    expect(resolved).not.toContain('<<<<<<<')
+  it('propagates an unavailable git backend', async () => {
+    const files = new MemoryFileSystem('/tmp/vault')
+    await expect(initGit(files, unavailableGit(), '/Users/someone')).rejects.toThrow(/not available/i)
   })
 })

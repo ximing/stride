@@ -89,14 +89,14 @@ export function parseNote(raw: string, id: string): StrideNote {
 
 export function plainText(doc: TipTapNode): string {
   const parts: string[] = []
-  const walk = (node: TipTapNode | undefined) => {
-    if (!node) return
-    if (node.type === 'text' && node.text) parts.push(node.text)
-    if (node.type === 'wikilink') {
-      const target = node.attrs?.target
+  const walk = (current: TipTapNode | undefined) => {
+    if (!current) return
+    if (current.type === 'text' && current.text) parts.push(current.text)
+    if (current.type === 'wikilink') {
+      const target = current.attrs?.target
       if (typeof target === 'string' && target) parts.push(target)
     }
-    node.content?.forEach(walk)
+    current.content?.forEach(walk)
   }
   walk(doc)
   return parts.join(' ').replace(/\s+/g, ' ').trim()
@@ -104,13 +104,13 @@ export function plainText(doc: TipTapNode): string {
 
 export function findMark(doc: TipTapNode, mark: string): { text: string } | undefined {
   let found: { text: string } | undefined
-  const walk = (node: TipTapNode | undefined) => {
-    if (!node || found) return
-    if (node.marks?.some((item) => item.type === mark) && node.text) {
-      found = { text: node.text }
+  const walk = (current: TipTapNode | undefined) => {
+    if (!current || found) return
+    if (current.marks?.some((item) => item.type === mark) && current.text) {
+      found = { text: current.text }
       return
     }
-    node.content?.forEach(walk)
+    current.content?.forEach(walk)
   }
   walk(doc)
   return found
@@ -118,13 +118,13 @@ export function findMark(doc: TipTapNode, mark: string): { text: string } | unde
 
 export function headingText(doc: TipTapNode): string {
   let text = ''
-  const walk = (node: TipTapNode | undefined) => {
-    if (!node || text) return
-    if (node.type === 'heading') {
-      text = plainText(node)
+  const walk = (current: TipTapNode | undefined) => {
+    if (!current || text) return
+    if (current.type === 'heading') {
+      text = plainText(current)
       return
     }
-    node.content?.forEach(walk)
+    current.content?.forEach(walk)
   }
   walk(doc)
   return text
@@ -160,14 +160,14 @@ export function wikilinkTargets(value: unknown): string[] {
 
 export function bodyWikilinks(doc: TipTapNode): string[] {
   const targets: string[] = []
-  const walk = (node: TipTapNode | undefined) => {
-    if (!node) return
-    if (node.type === 'wikilink' && typeof node.attrs?.target === 'string') {
-      const target = node.attrs.target.trim()
+  const walk = (current: TipTapNode | undefined) => {
+    if (!current) return
+    if (current.type === 'wikilink' && typeof current.attrs?.target === 'string') {
+      const target = current.attrs.target.trim()
       if (target) targets.push(target)
     }
-    if (node.type === 'text' && node.text) targets.push(...wikilinkTargets(node.text))
-    node.content?.forEach(walk)
+    if (current.type === 'text' && current.text) targets.push(...wikilinkTargets(current.text))
+    current.content?.forEach(walk)
   }
   walk(doc)
   return targets

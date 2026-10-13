@@ -1,19 +1,17 @@
+// @vitest-environment node
 import http from 'node:http'
 import fs from 'node:fs'
-import os from 'node:os'
-import path from 'node:path'
 import { once } from 'node:events'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it } from 'vitest'
+import { MemoryFileSystem } from '@stride/platform'
 import { runVaultTurn, vaultTools } from './agent.ts'
-import { plainText, saveNote } from './index.ts'
+import { plainText, readNoteFile, saveNote } from './index.ts'
 
 const servers: http.Server[] = []
-const dirs: string[] = []
 
 afterEach(async () => {
   await Promise.all(servers.splice(0).map((server) => new Promise<void>((resolve) => server.close(() => resolve()))))
-  for (const dir of dirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true })
 })
 
 function sse(delta: unknown, finish: string | null): string {
@@ -71,9 +69,8 @@ describe('pi-agent vault turn', () => {
     if (!address || typeof address === 'string') throw new Error('no port')
     const baseUrl = `http://127.0.0.1:${address.port}/v1`
 
-    const vault = fs.mkdtempSync(path.join(os.tmpdir(), 'stride-agent-'))
-    dirs.push(vault)
-    const note = saveNote(vault, {
+    const files = new MemoryFileSystem('/tmp/stride-agent')
+    const note = await saveNote(files, {
       id: 'field-note',
       title: 'Field note',
       type: 'note',
@@ -85,10 +82,8 @@ describe('pi-agent vault turn', () => {
     })
     let readText = ''
     const tools = vaultTools({
-      readNote: (id) => {
-        const loaded = JSON.parse(fs.readFileSync(path.join(vault, `${id}.stride.json`), 'utf8')) as {
-          doc: typeof note.doc
-        }
+      readNote: async (id) => {
+        const loaded = await readNoteFile(files, `${id}.stride.json`, id)
         readText = plainText(loaded.doc)
         return readText
       },

@@ -12,7 +12,6 @@ import {
   gitAddRemote,
   gitClone,
   gitCommit,
-  gitInitBare,
   gitPush,
   initGit,
   plainText,
@@ -21,7 +20,15 @@ import {
   type AppSettings,
   type GithubRelease,
 } from '@stride/core'
+import { NodeFileSystem, NodeGitBackend, NodeSecretsStore, gitInitBare } from '@stride/platform-node'
 import { Desk } from './desk.ts'
+
+const git = new NodeGitBackend()
+const secrets = new NodeSecretsStore()
+
+function vaultOf(dir: string): NodeFileSystem {
+  return new NodeFileSystem(dir)
+}
 
 const dirs: string[] = []
 const servers: http.Server[] = []
@@ -33,12 +40,12 @@ function tempDir(): string {
   return dir
 }
 
-function blankSettings(file: string, embedding?: AppSettings['embedding']) {
-  writeSettings({
+async function blankSettings(file: string, embedding?: AppSettings['embedding']) {
+  await writeSettings(new NodeFileSystem(path.dirname(file)), path.basename(file), {
     embedding: embedding ?? { endpoint: '', model: '', apiKey: '', dim: 4 },
     llm: { provider: '', model: '', baseUrl: '', apiKey: '' },
     releasesUrl: '',
-  }, file)
+  }, secrets)
 }
 
 function vectorFor(text: string): number[] {
@@ -90,23 +97,23 @@ describe('Desk vault paths', () => {
     const root = tempDir()
     const vault = path.join(root, 'vault')
     fs.mkdirSync(vault)
-    const note = createVaultNote(vault, 'Status')
+    const note = await createVaultNote(vaultOf(vault), 'Status')
     note.doc = {
       type: 'doc',
       content: [{ type: 'paragraph', content: [{ type: 'text', text: 'base' }] }],
     }
-    saveNote(vault, note)
-    await initGit(vault)
-    await gitCommit(vault, 'Add status note')
+    await saveNote(vaultOf(vault), note)
+    await initGit(vaultOf(vault), git, os.homedir())
+    await gitCommit(vaultOf(vault), git, 'Add status note')
     const bare = path.join(root, 'origin.git')
     await gitInitBare(bare)
-    await gitAddRemote(vault, bare)
-    await gitPush(vault)
+    await gitAddRemote(vaultOf(vault), git, bare)
+    await gitPush(vaultOf(vault), git)
     const other = path.join(root, 'other')
-    await gitClone(bare, other)
+    await gitClone(git, bare, other)
 
     const settings = path.join(root, 'settings.json')
-    blankSettings(settings)
+    await blankSettings(settings)
     const desk = new Desk(settings)
     desks.push(desk)
     await desk.open(other)
@@ -122,9 +129,9 @@ describe('Desk vault paths', () => {
     theirsNote.doc.content[0]!.content[0]!.text = 'SIDE_A'
     fs.writeFileSync(oursFile, `${JSON.stringify(oursNote, null, 2)}\n`)
     fs.writeFileSync(theirsFile, `${JSON.stringify(theirsNote, null, 2)}\n`)
-    await gitCommit(other, 'Other side')
-    await gitCommit(vault, 'Vault side')
-    await gitPush(vault)
+    await gitCommit(vaultOf(other), git, 'Other side')
+    await gitCommit(vaultOf(vault), git, 'Vault side')
+    await gitPush(vaultOf(vault), git)
 
     const pulled = await desk.gitPull()
     expect(pulled.conflict).toBe(true)
@@ -136,7 +143,7 @@ describe('Desk vault paths', () => {
     expect(plainText(loaded!.doc)).not.toContain('SIDE_B')
     expect(plainText(desk.notes.find((item) => item.id === note.id)!.doc)).toContain('SIDE_A')
 
-    desk.save(loaded!)
+    await desk.save(loaded!)
     const disk = fs.readFileSync(oursFile, 'utf8')
     expect(disk).toContain('SIDE_A')
     expect(disk).not.toContain('SIDE_B')
@@ -147,18 +154,18 @@ describe('Desk vault paths', () => {
     const vault = path.join(root, 'vault')
     fs.mkdirSync(vault)
     const settings = path.join(root, 'settings.json')
-    blankSettings(settings)
+    await blankSettings(settings)
     const desk = new Desk(settings)
     desks.push(desk)
     await desk.open(vault)
     const outside = path.resolve(vault, '..', 'outside.stride.json')
-    expect(() => desk.save({
+    await expect(desk.save({
       id: '../outside',
       title: 'Escape',
       type: 'note',
       properties: {},
       doc: { type: 'doc', content: [{ type: 'paragraph' }] },
-    })).toThrow(/Invalid note id|escapes the vault/)
+    })).rejects.toThrow(/Invalid note id|escapes the vault/)
     await expect(desk.gitResolve('../outside', 'ours')).rejects.toThrow(/Invalid note id|escapes the vault/)
     expect(fs.existsSync(outside)).toBe(false)
   })
@@ -169,14 +176,14 @@ describe('Desk vault paths', () => {
     const root = tempDir()
     const vault = path.join(root, 'vault')
     fs.mkdirSync(vault)
-    saveNote(vault, {
+    await saveNote(vaultOf(vault), {
       id: 'alpha',
       title: 'Alpha',
       type: 'note',
       properties: {},
       doc: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'alpha-note xylophonequartz' }] }] },
     })
-    saveNote(vault, {
+    await saveNote(vaultOf(vault), {
       id: 'gamma',
       title: 'Gamma',
       type: 'note',
@@ -184,7 +191,7 @@ describe('Desk vault paths', () => {
       doc: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'gamma-note soup recipe' }] }] },
     })
     const settings = path.join(root, 'settings.json')
-    blankSettings(settings, { endpoint, model: 'fixture-embed', apiKey: key, dim: 4 })
+    await blankSettings(settings, { endpoint, model: 'fixture-embed', apiKey: key, dim: 4 })
     const desk = new Desk(settings)
     desks.push(desk)
     await desk.open(vault)
@@ -241,11 +248,11 @@ describe('Desk vault paths', () => {
 
       const settings = path.join(root, 'settings.json')
       const marker = path.join(root, 'version-marker.txt')
-      writeSettings({
+      await writeSettings(new NodeFileSystem(root), 'settings.json', {
         embedding: { endpoint: '', model: '', apiKey: '', dim: 4 },
         llm: { provider: '', model: '', baseUrl: '', apiKey: '' },
         releasesUrl: `http://127.0.0.1:${address.port}/releases`,
-      }, settings)
+      }, secrets)
       fs.writeFileSync(marker, `${APP_VERSION}\n`)
       const handoffs: string[] = []
       const desk = new Desk(settings, { handoff: () => { handoffs.push('quit') } })
@@ -266,7 +273,7 @@ describe('Desk vault paths', () => {
       expect(desk.restartRequested).toBe(false)
       expect(desk.updater.phase).toBe('available')
       expect(desk.updater.relaunchCount).toBe(0)
-      expect(desk.updater.markerValue()).toBe(APP_VERSION)
+      expect(await desk.updater.markerValue()).toBe(APP_VERSION)
       expect(fs.readFileSync(marker, 'utf8').trim()).toBe(APP_VERSION)
       expect(fs.existsSync(desk.installPath)).toBe(false)
 
@@ -283,7 +290,7 @@ describe('Desk vault paths', () => {
     const root = tempDir()
     const releasesUrl = await serveAsset(Buffer.from('#!/bin/sh\nexit 0\n'))
     const handoffs: string[] = []
-    const { desk, marker } = openUpdateDesk(root, releasesUrl, () => {
+    const { desk, marker } = await openUpdateDesk(root, releasesUrl, () => {
       handoffs.push('quit')
     })
     await desk.checkUpdates()
@@ -291,7 +298,7 @@ describe('Desk vault paths', () => {
     await expect(desk.confirmUpdate()).rejects.toThrow(/exited before it stayed running/)
     expect(handoffs).toEqual([])
     expect(desk.restartRequested).toBe(false)
-    expect(desk.updater.markerValue()).toBe(APP_VERSION)
+    expect(await desk.updater.markerValue()).toBe(APP_VERSION)
     expect(fs.readFileSync(marker, 'utf8').trim()).toBe(APP_VERSION)
     expect(fs.existsSync(desk.installPath)).toBe(false)
     const again = await desk.checkUpdates()
@@ -302,7 +309,7 @@ describe('Desk vault paths', () => {
     const root = tempDir()
     const releasesUrl = await serveAsset(Buffer.from('#!/bin/sh\necho $$ > "$(dirname "$0")/stride.pid"\nsleep 30\n'))
     let pid = 0
-    const { desk, marker } = openUpdateDesk(root, releasesUrl, () => {
+    const { desk, marker } = await openUpdateDesk(root, releasesUrl, () => {
       const pidFile = path.join(path.dirname(desk.installPath), 'stride.pid')
       pid = Number(fs.readFileSync(pidFile, 'utf8'))
       process.kill(pid, 0)
@@ -316,7 +323,7 @@ describe('Desk vault paths', () => {
       const result = await desk.confirmUpdate()
       expect(result.restartRequested).toBe(true)
       expect(pid).toBeGreaterThan(0)
-      expect(desk.updater.markerValue()).toBe('v0.2.0')
+      expect(await desk.updater.markerValue()).toBe('v0.2.0')
       expect(desk.updater.relaunchCount).toBe(1)
       process.kill(pid, 0)
     } finally {
@@ -328,14 +335,14 @@ describe('Desk vault paths', () => {
   }, 15000)
 })
 
-function openUpdateDesk(root: string, releasesUrl: string, handoff: () => void | Promise<void>) {
+async function openUpdateDesk(root: string, releasesUrl: string, handoff: () => void | Promise<void>) {
   const settings = path.join(root, 'settings.json')
   const marker = path.join(root, 'version-marker.txt')
-  writeSettings({
+  await writeSettings(new NodeFileSystem(root), 'settings.json', {
     embedding: { endpoint: '', model: '', apiKey: '', dim: 4 },
     llm: { provider: '', model: '', baseUrl: '', apiKey: '' },
     releasesUrl,
-  }, settings)
+  }, secrets)
   fs.writeFileSync(marker, `${APP_VERSION}\n`)
   const desk = new Desk(settings, { handoff })
   desks.push(desk)

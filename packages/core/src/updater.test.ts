@@ -1,30 +1,25 @@
 import http from 'node:http'
-import fs from 'node:fs'
-import os from 'node:os'
-import path from 'node:path'
 import { once } from 'node:events'
 import { afterEach, describe, expect, it } from 'vitest'
+import { MemoryFileSystem } from '@stride/platform'
 import { UpdateController, selectUpdate, type GithubRelease } from './updater.ts'
 import { APP_VERSION } from './version.ts'
 
-const dirs: string[] = []
 const servers: http.Server[] = []
 
-function tempDir(): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stride-update-'))
-  dirs.push(dir)
-  return dir
+function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
+  if (left.byteLength !== right.byteLength) return false
+  for (let i = 0; i < left.byteLength; i += 1) if (left[i] !== right[i]) return false
+  return true
 }
 
 afterEach(async () => {
   await Promise.all(servers.splice(0).map((server) => new Promise<void>((resolve) => server.close(() => resolve()))))
-  for (const dir of dirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true })
 })
 
 describe('github release updater', () => {
   it('downloads only a newer asset and relaunches after confirm', async () => {
-    const dir = tempDir()
-    const asset = Buffer.from('stride-update-bytes-v2')
+    const asset = new TextEncoder().encode('stride-update-bytes-v2')
     let assetUrl = ''
     const server = http.createServer((req, res) => {
       const url = new URL(req.url || '/', 'http://127.0.0.1')
@@ -69,15 +64,18 @@ describe('github release updater', () => {
     assetUrl = `http://127.0.0.1:${address.port}/stride-0.2.0.bin`
     const releasesUrl = `http://127.0.0.1:${address.port}/releases`
 
-    const marker = path.join(dir, 'version-marker.txt')
-    const installPath = path.join(dir, 'installed', 'stride')
-    fs.writeFileSync(marker, `${APP_VERSION}\n`)
+    const root = '/virtual/stride-update'
+    const files = new MemoryFileSystem(root)
+    const marker = 'version-marker.txt'
+    const installRel = 'installed/stride'
+    const installPath = `${root}/${installRel}`
+    await files.writeText(marker, `${APP_VERSION}\n`)
     let relaunchedAt = ''
-    const updater = new UpdateController(APP_VERSION, fetch, (installed) => {
+    const updater = new UpdateController(files, APP_VERSION, fetch, async (installed) => {
       relaunchedAt = installed
-      expect(fs.readFileSync(installed).equals(asset)).toBe(true)
-      expect(fs.readFileSync(marker, 'utf8').trim()).toBe('v0.2.0')
-    }, { file: marker, installPath })
+      expect(sameBytes(await files.readBytes(installRel), asset)).toBe(true)
+      expect((await files.readText(marker)).trim()).toBe('v0.2.0')
+    }, { file: marker, installPath: installRel })
 
     const selected = await updater.check(releasesUrl)
     expect(selected?.version).toBe('v0.2.0')
@@ -96,33 +94,33 @@ describe('github release updater', () => {
     )
     expect(same).toBeNull()
 
-    const dest = path.join(dir, 'stride-0.2.0.bin')
+    const dest = 'stride-0.2.0.bin'
     await updater.download(dest)
     expect(updater.events.map((event) => event.event)).toEqual(['Started', 'Progress', 'Finished'])
-    expect(fs.readFileSync(dest).equals(asset)).toBe(true)
+    expect(sameBytes(await files.readBytes(dest), asset)).toBe(true)
     expect(updater.phase).toBe('ready')
     expect(updater.progress).toBe(1)
     expect(relaunchedAt).toBe('')
-    expect(fs.readFileSync(marker, 'utf8').trim()).toBe(APP_VERSION)
-    expect(fs.existsSync(installPath)).toBe(false)
+    expect((await files.readText(marker)).trim()).toBe(APP_VERSION)
+    expect(await files.stat(installRel)).toBeNull()
 
-    const beforeDismiss = fs.readFileSync(marker, 'utf8')
+    const beforeDismiss = await files.readText(marker)
     updater.dismiss()
     expect(updater.phase).toBe('idle')
-    expect(fs.readFileSync(marker, 'utf8')).toBe(beforeDismiss)
+    expect(await files.readText(marker)).toBe(beforeDismiss)
     expect(relaunchedAt).toBe('')
 
     await updater.check(releasesUrl)
     await updater.download(dest)
-    fs.renameSync(dest, `${dest}.aside`)
+    await files.rename(dest, `${dest}.aside`)
     await expect(updater.confirm()).rejects.toThrow(/Downloaded update is missing/)
-    expect(fs.readFileSync(marker, 'utf8').trim()).toBe(APP_VERSION)
+    expect((await files.readText(marker)).trim()).toBe(APP_VERSION)
     expect(relaunchedAt).toBe('')
-    expect(fs.existsSync(installPath)).toBe(false)
-    fs.renameSync(`${dest}.aside`, dest)
+    expect(await files.stat(installRel)).toBeNull()
+    await files.rename(`${dest}.aside`, dest)
     await updater.confirm()
     expect(relaunchedAt).toBe(installPath)
-    expect(fs.readFileSync(installPath).equals(asset)).toBe(true)
-    expect(fs.readFileSync(marker, 'utf8').trim()).toBe('v0.2.0')
+    expect(sameBytes(await files.readBytes(installRel), asset)).toBe(true)
+    expect((await files.readText(marker)).trim()).toBe('v0.2.0')
   })
 })

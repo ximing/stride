@@ -6,6 +6,7 @@ const port = Number(process.env.STRIDE_API_PORT || 1421)
 const desk = new Desk(process.env.STRIDE_SETTINGS_PATH, {
   handoff: () => exitCurrentProcess(),
 })
+await desk.whenReady()
 
 function readBody(req: http.IncomingMessage): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -45,14 +46,14 @@ const server = http.createServer(async (req, res) => {
       return
     }
     if (route === 'POST /api/notes') {
-      send(res, 200, desk.create(typeof body.title === 'string' ? body.title : undefined))
+      send(res, 200, await desk.create(typeof body.title === 'string' ? body.title : undefined))
       return
     }
     if (req.method === 'PUT' && url.pathname.startsWith('/api/notes/')) {
       const id = decodeURIComponent(url.pathname.slice('/api/notes/'.length))
       const note = body.note as Parameters<Desk['save']>[0]
       note.id = id
-      send(res, 200, desk.save(note))
+      send(res, 200, await desk.save(note))
       return
     }
     if (route === 'POST /api/search') {
@@ -97,11 +98,11 @@ const server = http.createServer(async (req, res) => {
       return
     }
     if (route === 'GET /api/settings') {
-      send(res, 200, desk.settingsPublic())
+      send(res, 200, await desk.settingsPublic())
       return
     }
     if (route === 'PUT /api/settings') {
-      send(res, 200, desk.saveSettings(body as Parameters<Desk['saveSettings']>[0]))
+      send(res, 200, await desk.saveSettings(body as Parameters<Desk['saveSettings']>[0]))
       return
     }
     if (route === 'POST /api/chat') {
@@ -109,7 +110,7 @@ const server = http.createServer(async (req, res) => {
       return
     }
     if (route === 'GET /api/updates') {
-      send(res, 200, desk.updateState())
+      send(res, 200, await desk.updateState())
       return
     }
     if (route === 'POST /api/updates/check') {
@@ -121,7 +122,7 @@ const server = http.createServer(async (req, res) => {
       return
     }
     if (route === 'POST /api/updates/dismiss') {
-      send(res, 200, desk.dismissUpdate())
+      send(res, 200, await desk.dismissUpdate())
       return
     }
     if (route === 'POST /api/updates/confirm') {

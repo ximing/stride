@@ -1,115 +1,86 @@
-import http from 'node:http'
-import fs from 'node:fs'
-import os from 'node:os'
-import path from 'node:path'
-import { once } from 'node:events'
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
+import { MemoryFileSystem, MemorySearchBackend, MemorySecretsStore } from '@stride/platform'
 import { EmbeddingClient } from './embeddings.ts'
-import { openNoteIndex, searchNotes } from './search.ts'
-import { maskSecret, settingsContainRawKey, writeSettings, type AppSettings } from './settings.ts'
+import { noteIndex, searchNotes } from './search.ts'
+import {
+  defaultSettings,
+  defaultSettingsPath,
+  maskSecret,
+  publicSettings,
+  readSettings,
+  settingsContainRawKey,
+  writeSettings,
+  type AppSettings,
+} from './settings.ts'
 import { saveNote } from './vault.ts'
 
-const dirs: string[] = []
-const servers: http.Server[] = []
-
-function tempDir(): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stride-search-'))
-  dirs.push(dir)
-  return dir
-}
-
-function vectorFor(text: string): number[] {
-  if (text.includes('alpha-note')) return [1, 0, 0, 0]
-  if (text.includes('beta-note')) return [0, 1, 0, 0]
-  if (text.includes('gamma-note')) return [0, 0, 1, 0]
-  if (text.includes('nearest-alpha')) return [1, 0, 0, 0]
-  return [0, 0, 0, 1]
-}
-
-async function embeddingServer(expectedKey: string): Promise<string> {
-  const server = http.createServer((req, res) => {
-    const auth = req.headers.authorization || ''
-    if (auth !== `Bearer ${expectedKey}`) {
-      res.writeHead(401)
-      res.end('bad key')
-      return
-    }
-    const chunks: Buffer[] = []
-    req.on('data', (chunk) => chunks.push(chunk as Buffer))
-    req.on('end', () => {
-      const body = JSON.parse(Buffer.concat(chunks).toString('utf8')) as { input?: string[] }
-      const input = body.input ?? []
-      res.writeHead(200, { 'content-type': 'application/json' })
-      res.end(JSON.stringify({
-        data: input.map((text, index) => ({ index, embedding: vectorFor(text) })),
-      }))
-    })
-  })
-  servers.push(server)
-  server.listen(0, '127.0.0.1')
-  await once(server, 'listening')
-  const address = server.address()
-  if (!address || typeof address === 'string') throw new Error('no port')
-  return `http://127.0.0.1:${address.port}/v1`
-}
-
-afterEach(async () => {
-  await Promise.all(servers.splice(0).map((server) => new Promise<void>((resolve) => server.close(() => resolve()))))
-  for (const dir of dirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true })
-})
-
-describe('vane search', () => {
-  it('uses BM25 until an embedding key switches the query to hybrid', async () => {
-    const dir = tempDir()
-    const index = await openNoteIndex(path.join(dir, 'vane'), 4)
+describe('search notes', () => {
+  it('ranks text overlaps and switches to hybrid when an embedding key is set', async () => {
+    const backend = new MemorySearchBackend()
+    const index = noteIndex(backend, 4)
     const notes = [
       { id: 'alpha', text: 'alpha-note xylophonequartz' },
-      { id: 'beta', text: 'beta-note 本地优先笔记' },
+      { id: 'beta', text: 'beta-note local note' },
       { id: 'gamma', text: 'gamma-note soup recipe' },
     ]
     await index.upsert(notes)
-    const client = new EmbeddingClient(fetch)
+    const client = new EmbeddingClient(async () => {
+      throw new Error('text search must not embed')
+    })
     const english = await searchNotes(index, 'xylophonequartz', null, client)
     expect(client.calls).toBe(0)
     expect(english.mode).toBe('text')
     expect(english.hits.map((hit) => hit.id)).toEqual(['alpha'])
-
-    const cjk = await searchNotes(index, '笔记', null, client)
-    expect(client.calls).toBe(0)
-    expect(cjk.hits.map((hit) => hit.id)).toEqual(['beta'])
     expect(index.lastQuery?.mode).toBe('text')
 
-    const key = 'sk-stride-embed-test-key'
-    const endpoint = await embeddingServer(key)
-    const embedding = { endpoint, model: 'fixture-embed', apiKey: key, dim: 4 }
-    const embedClient = new EmbeddingClient(fetch)
-    const vectors = await embedClient.embed(notes.map((note) => note.text), embedding)
-    await index.upsert(notes.map((note, i) => ({ ...note, vector: vectors[i] })))
-    const hybrid = await searchNotes(index, 'nearest-alpha', embedding, embedClient)
+    const embedClient = new EmbeddingClient(async (_input, init) => {
+      const body = JSON.parse(String(init?.body)) as { input?: string[] }
+      const input = body.input ?? []
+      return new Response(JSON.stringify({
+        data: input.map((_text, index) => ({ index, embedding: [1, 0, 0, 0] })),
+      }), { status: 200, headers: { 'content-type': 'application/json' } })
+    })
+    const embedding = { endpoint: 'http://127.0.0.1/v1', model: 'fixture-embed', apiKey: 'sk-stride-embed-test-key', dim: 4 }
+    const hybrid = await searchNotes(index, 'xylophonequartz', embedding, embedClient)
+    expect(embedClient.calls).toBe(1)
     expect(hybrid.mode).toBe('hybrid')
     expect(index.lastQuery?.mode).toBe('hybrid')
+    expect(index.lastQuery?.vector).toEqual([1, 0, 0, 0])
     expect(hybrid.hits[0]?.id).toBe('alpha')
-    expect(notes.some((note) => note.text.includes('nearest-alpha'))).toBe(false)
     await index.close()
+  })
 
-    const settingsFile = path.join(dir, 'settings.json')
+  it('seals settings keys and does not write them into a note', async () => {
+    const files = new MemoryFileSystem('/virtual/settings')
+    const secrets = new MemorySecretsStore()
+    const key = 'sk-stride-embed-test-key'
     const settings: AppSettings = {
-      embedding,
-      llm: { provider: 'fixture', model: 'm', baseUrl: endpoint, apiKey: key },
+      embedding: { endpoint: 'http://127.0.0.1/v1', model: 'fixture-embed', apiKey: key, dim: 4 },
+      llm: { provider: 'fixture', model: 'm', baseUrl: 'http://127.0.0.1/v1', apiKey: key },
       releasesUrl: '',
     }
-    writeSettings(settings, settingsFile)
-    expect(settingsContainRawKey(settingsFile, key)).toBe(false)
+    await writeSettings(files, 'settings.json', settings, secrets)
+    expect(await settingsContainRawKey(files, 'settings.json', key)).toBe(false)
     expect(maskSecret(key)).toBe('••••-key')
-    const vault = path.join(dir, 'vault')
-    fs.mkdirSync(vault)
-    const note = saveNote(vault, {
+    const loaded = await readSettings(files, 'settings.json', secrets)
+    expect(loaded.embedding.apiKey).toBe(key)
+    expect(loaded.llm.apiKey).toBe(key)
+    expect(publicSettings(loaded).embedding.keyMask).toBe('••••-key')
+    expect(await secrets.seal('')).toBe('')
+    expect(await secrets.open('')).toBe('')
+    await writeSettings(files, 'empty.json', defaultSettings(), secrets)
+    expect((await readSettings(files, 'empty.json', secrets)).embedding.apiKey).toBe('')
+    expect(defaultSettingsPath('/Users/someone')).toBe('/Users/someone/.stride/settings.json')
+    expect(defaultSettingsPath('/Users/someone', '/tmp/custom.json')).toBe('/tmp/custom.json')
+
+    const vault = new MemoryFileSystem('/virtual/vault')
+    const note = await saveNote(vault, {
       id: 'alpha',
       title: 'Alpha',
       type: 'note',
       properties: {},
       doc: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'alpha-note' }] }] },
     })
-    expect(fs.readFileSync(path.join(vault, `${note.id}.stride.json`), 'utf8').includes(key)).toBe(false)
+    expect((await vault.readText(`${note.id}.stride.json`)).includes(key)).toBe(false)
   })
 })

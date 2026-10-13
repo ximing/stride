@@ -1,5 +1,4 @@
-import fs from 'node:fs'
-import path from 'node:path'
+import type { FileSystemBackend } from '@stride/platform'
 import {
   createNote,
   isNoteFileName,
@@ -10,9 +9,8 @@ import {
   type StrideNote,
 } from './note.ts'
 import { isBroadPersonalRoot } from './roots.ts'
-import os from 'node:os'
 
-export const VAULT_MARKER = path.join('.stride', 'vault.json')
+export const VAULT_MARKER = '.stride/vault.json'
 
 export interface OpenedVault {
   path: string
@@ -21,115 +19,117 @@ export interface OpenedVault {
   notes: StrideNote[]
 }
 
-export function markerPath(vaultPath: string): string {
-  return path.join(vaultPath, VAULT_MARKER)
+export function markerPath(vaultPath = ''): string {
+  if (!vaultPath) return VAULT_MARKER
+  const root = vaultPath.replace(/[\\/]+$/, '')
+  return `${root}/${VAULT_MARKER}`
 }
 
-export function isDedicatedVault(vaultPath: string): boolean {
-  const file = markerPath(vaultPath)
-  if (!fs.existsSync(file)) return false
+export async function isDedicatedVault(fs: FileSystemBackend): Promise<boolean> {
+  const stat = await fs.stat(VAULT_MARKER)
+  if (!stat || stat.kind !== 'file') return false
   try {
-    const parsed = JSON.parse(fs.readFileSync(file, 'utf8')) as { kind?: string }
+    const parsed = JSON.parse(await fs.readText(VAULT_MARKER)) as { kind?: string }
     return parsed.kind === 'stride-vault'
   } catch {
     return false
   }
 }
 
-export function markDedicatedVault(vaultPath: string): void {
-  const file = markerPath(vaultPath)
-  fs.mkdirSync(path.dirname(file), { recursive: true })
-  fs.writeFileSync(
-    file,
+export async function markDedicatedVault(fs: FileSystemBackend): Promise<void> {
+  await fs.writeText(
+    VAULT_MARKER,
     `${JSON.stringify({ kind: 'stride-vault', version: 1 }, null, 2)}\n`,
   )
-  const ignore = path.join(vaultPath, '.gitignore')
   const entry = '.stride/vane/'
-  const current = fs.existsSync(ignore) ? fs.readFileSync(ignore, 'utf8') : ''
+  const ignore = await fs.stat('.gitignore')
+  const current = ignore ? await fs.readText('.gitignore') : ''
   if (!current.split('\n').includes(entry)) {
-    fs.writeFileSync(ignore, `${current.trim() ? `${current.replace(/\n$/, '')}\n` : ''}${entry}\n`)
+    await fs.writeText('.gitignore', `${current.trim() ? `${current.replace(/\n$/, '')}\n` : ''}${entry}\n`)
   }
 }
 
-export function listNoteFiles(vaultPath: string): string[] {
-  if (!fs.existsSync(vaultPath)) return []
+export async function listNoteFiles(fs: FileSystemBackend): Promise<string[]> {
+  const root = await fs.stat('')
+  if (!root || root.kind !== 'directory') return []
   const found: string[] = []
-  const walk = (dir: string) => {
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+  const walk = async (dir: string): Promise<void> => {
+    const entries = await fs.list(dir)
+    for (const entry of entries) {
       if (entry.name === '.git' || entry.name === '.stride' || entry.name === 'node_modules') continue
-      const full = path.join(dir, entry.name)
-      if (entry.isDirectory()) walk(full)
-      else if (entry.isFile() && isNoteFileName(entry.name)) found.push(full)
+      const full = dir ? `${dir}/${entry.name}` : entry.name
+      if (entry.kind === 'directory') await walk(full)
+      else if (isNoteFileName(entry.name)) found.push(full)
     }
   }
-  walk(vaultPath)
+  await walk('')
   return found.sort()
 }
 
-export function noteIdFromPath(vaultPath: string, filePath: string): string {
-  const rel = path.relative(vaultPath, filePath)
-  return rel.slice(0, -'.stride.json'.length).split(path.sep).join('/')
+export function noteIdFromPath(filePath: string): string {
+  const normalized = filePath.replaceAll('\\', '/').replace(/^\/+/, '')
+  return normalized.endsWith('.stride.json')
+    ? normalized.slice(0, -'.stride.json'.length)
+    : normalized
 }
 
-export function readNoteFile(filePath: string, id?: string): StrideNote {
-  const raw = fs.readFileSync(filePath, 'utf8')
-  return parseNote(raw, id ?? path.basename(filePath, '.stride.json'))
+export async function readNoteFile(fs: FileSystemBackend, filePath: string, id?: string): Promise<StrideNote> {
+  const raw = await fs.readText(filePath)
+  const base = filePath.split('/').pop() ?? filePath
+  const fallback = base.endsWith('.stride.json') ? base.slice(0, -'.stride.json'.length) : base
+  return parseNote(raw, id ?? fallback)
 }
 
-export function writeNoteFile(filePath: string, note: StrideNote): void {
-  fs.mkdirSync(path.dirname(filePath), { recursive: true })
-  fs.writeFileSync(filePath, serializeNote(note))
+export async function writeNoteFile(fs: FileSystemBackend, filePath: string, note: StrideNote): Promise<void> {
+  await fs.writeText(filePath, serializeNote(note))
 }
 
-export function notePath(vaultPath: string, id: string): string {
+export function notePath(id: string): string {
   const trimmed = id.trim()
-  if (!trimmed || /[\0\\]/.test(trimmed) || path.isAbsolute(trimmed)) {
+  if (!trimmed || /[\0\\]/.test(trimmed) || trimmed.startsWith('/') || /^[A-Za-z]:/.test(trimmed)) {
     throw new Error('Invalid note id')
   }
   if (trimmed.split('/').some((part) => part === '' || part === '.' || part === '..')) {
     throw new Error('Invalid note id')
   }
-  const root = path.resolve(vaultPath)
-  const full = path.resolve(root, noteFileName(trimmed))
-  const relative = path.relative(root, full)
-  if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) {
-    throw new Error('Note path escapes the vault')
-  }
-  return full
+  return noteFileName(trimmed)
 }
 
-export function loadNotes(vaultPath: string): StrideNote[] {
-  return listNoteFiles(vaultPath).map((file) => readNoteFile(file, noteIdFromPath(vaultPath, file)))
+export async function loadNotes(fs: FileSystemBackend): Promise<StrideNote[]> {
+  const files = await listNoteFiles(fs)
+  const notes: StrideNote[] = []
+  for (const file of files) notes.push(await readNoteFile(fs, file, noteIdFromPath(file)))
+  return notes
 }
 
-export function openVault(vaultPath: string, homeDir = os.homedir()): OpenedVault {
-  const resolved = path.resolve(vaultPath)
-  if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) {
+export async function openVault(fs: FileSystemBackend, homeDir: string): Promise<OpenedVault> {
+  const stat = await fs.stat('')
+  if (!stat || stat.kind !== 'directory') {
     throw new Error('Choose an existing folder to open as a vault')
   }
-  const broad = isBroadPersonalRoot(resolved, homeDir)
-  if (!broad && !isDedicatedVault(resolved)) markDedicatedVault(resolved)
+  const broad = isBroadPersonalRoot(fs.rootLabel, homeDir)
+  if (!broad && !(await isDedicatedVault(fs))) await markDedicatedVault(fs)
   return {
-    path: resolved,
+    path: fs.rootLabel,
     broad,
-    dedicated: isDedicatedVault(resolved),
-    notes: loadNotes(resolved),
+    dedicated: await isDedicatedVault(fs),
+    notes: await loadNotes(fs),
   }
 }
 
-export function saveNote(vaultPath: string, note: StrideNote): StrideNote {
-  writeNoteFile(notePath(vaultPath, note.id), note)
-  return readNoteFile(notePath(vaultPath, note.id), note.id)
+export async function saveNote(fs: FileSystemBackend, note: StrideNote): Promise<StrideNote> {
+  const file = notePath(note.id)
+  await writeNoteFile(fs, file, note)
+  return readNoteFile(fs, file, note.id)
 }
 
-export function createVaultNote(vaultPath: string, title = 'Untitled'): StrideNote {
+export async function createVaultNote(fs: FileSystemBackend, title = 'Untitled'): Promise<StrideNote> {
   const base = slugTitle(title)
   let id = base
   let n = 2
-  while (fs.existsSync(notePath(vaultPath, id))) {
+  while (await fs.stat(notePath(id))) {
     id = `${base}-${n}`
     n += 1
   }
-  const note = createNote(id, title)
-  return saveNote(vaultPath, note)
+  return saveNote(fs, createNote(id, title))
 }

@@ -1,22 +1,8 @@
-import fs from 'node:fs'
-import os from 'node:os'
-import path from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { describe, expect, it } from 'vitest'
+import { MemoryFileSystem } from '@stride/platform'
 import { buildGraph, groupByType, relationsOf } from './graph.ts'
-import { loadNotes, saveNote } from './vault.ts'
 import type { TipTapNode } from './note.ts'
-
-const dirs: string[] = []
-
-function tempDir(): string {
-  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'stride-graph-'))
-  dirs.push(dir)
-  return dir
-}
-
-afterEach(() => {
-  for (const dir of dirs.splice(0)) fs.rmSync(dir, { recursive: true, force: true })
-})
+import { loadNotes, notePath, saveNote } from './vault.ts'
 
 function doc(text: string, links: string[] = []): TipTapNode {
   return {
@@ -34,30 +20,30 @@ function doc(text: string, links: string[] = []): TipTapNode {
 }
 
 describe('relationships and inbox', () => {
-  it('derives inverse has, symmetric related_to, custom links, backlinks, inbox, and type groups', () => {
-    const vault = tempDir()
-    saveNote(vault, {
+  it('derives inverse has, symmetric related_to, custom links, backlinks, inbox, and type groups', async () => {
+    const files = new MemoryFileSystem('/tmp/stride-graph-folder')
+    await saveNote(files, {
       id: 'parent',
       title: 'Parent',
       type: 'project',
       properties: {},
       doc: doc('parent body'),
     })
-    saveNote(vault, {
+    await saveNote(files, {
       id: 'child',
       title: 'Child',
       type: 'note',
       properties: { belongs_to: ['[[Parent]]'], supports: ['[[Peer]]'] },
       doc: doc('child mentions ', ['Parent']),
     })
-    saveNote(vault, {
+    await saveNote(files, {
       id: 'peer',
       title: 'Peer',
       type: 'note',
       properties: { related_to: ['[[Child]]'] },
       doc: doc('peer body'),
     })
-    saveNote(vault, {
+    await saveNote(files, {
       id: 'loose',
       title: 'Loose',
       type: 'note',
@@ -65,14 +51,15 @@ describe('relationships and inbox', () => {
       doc: doc('no links yet'),
     })
 
-    const notes = ['parent', 'child', 'peer', 'loose'].map((id) => {
-      const raw = fs.readFileSync(path.join(vault, `${id}.stride.json`), 'utf8')
+    const notes = ['parent', 'child', 'peer', 'loose'].map(async (id) => {
+      const raw = await files.readText(`${id}.stride.json`)
       return JSON.parse(raw) as { properties: Record<string, unknown> }
     })
-    expect(notes[0]?.properties.has).toBeUndefined()
-    expect(JSON.stringify(notes[0]?.properties)).not.toContain('Child')
+    const stored = await Promise.all(notes)
+    expect(stored[0]?.properties.has).toBeUndefined()
+    expect(JSON.stringify(stored[0]?.properties)).not.toContain('Child')
 
-    const loaded = loadNotes(vault)
+    const loaded = await loadNotes(files)
     const graph = buildGraph(loaded)
 
     const parent = relationsOf(graph, 'parent')
@@ -92,16 +79,17 @@ describe('relationships and inbox', () => {
 
     const linked = loaded.find((note) => note.id === 'loose')!
     linked.properties = { ...linked.properties, belongs_to: ['[[Parent]]'] }
-    saveNote(vault, linked)
-    const after = buildGraph(loadNotes(vault))
+    await saveNote(files, linked)
+    const after = buildGraph(await loadNotes(files))
     expect(after.inbox.map((note) => note.id)).not.toContain('loose')
     expect(after.inbox.map((note) => note.id)).toContain('parent')
 
     const sameFolder = loaded.filter((note) => note.id === 'parent' || note.id === 'child')
-    expect(path.dirname(path.join(vault, 'parent.stride.json'))).toBe(path.dirname(path.join(vault, 'child.stride.json')))
+    expect(notePath('parent')).toBe('parent.stride.json')
+    expect(notePath('child')).toBe('child.stride.json')
     const groups = groupByType(sameFolder)
     expect(groups.get('project')?.map((note) => note.id)).toEqual(['parent'])
     expect(groups.get('note')?.map((note) => note.id)).toEqual(['child'])
-    expect([...groups.keys()]).not.toContain(path.basename(vault))
+    expect([...groups.keys()]).not.toContain('stride-graph-folder')
   })
 })
