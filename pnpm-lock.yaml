@@ -150,6 +150,38 @@ importers:
         specifier: ^3.0.5
         version: 3.2.7(@types/node@22.20.5)(jsdom@26.1.0)(tsx@4.23.15)
 
+  packages/git-tauri:
+    dependencies:
+      '@stride/core':
+        specifier: workspace:*
+        version: link:../core
+      '@stride/platform':
+        specifier: workspace:*
+        version: link:../platform
+      '@tauri-apps/plugin-shell':
+        specifier: ^2.3.0
+        version: 2.5.0
+    devDependencies:
+      typescript:
+        specifier: ^5.8.2
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.5
+        version: 3.2.7(@types/node@22.20.5)(jsdom@26.1.0)(tsx@4.23.15)
+
+  packages/git-web:
+    dependencies:
+      '@stride/platform':
+        specifier: workspace:*
+        version: link:../platform
+    devDependencies:
+      typescript:
+        specifier: ^5.8.2
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.5
+        version: 3.2.7(@types/node@22.20.5)(jsdom@26.1.0)(tsx@4.23.15)
+
   packages/platform:
     devDependencies:
       typescript:
@@ -1415,6 +1447,9 @@ packages:
 
   '@tauri-apps/plugin-process@2.4.0':
     resolution: {integrity: sha512-GddrmsSLAYrLa/yTXlXK/YRDzUgYeeOnUXTbiyvJWkmI424RmDPD3FVLeqcon7rv6O6ZfhBilcrHWnSo7o6hIQ==}
+
+  '@tauri-apps/plugin-shell@2.5.0':
+    resolution: {integrity: sha512-FZ6RtcikCxJ35do1kfqi94Fknmc7DAK4mJxDRfNBInX24TQMsMLddM5i4XLqE8VvJ+Lg6EriiDcLs7JIfuFkWw==}
 
   '@tiptap/core@3.31.4':
     resolution: {integrity: sha512-cIVUQYBycighzsk6GbmCef8ZiEDVxoT5EuAe4xg2q9dNkDqCXVqI4YGr9aavCQEiAS4uHiRwqvcsPqJHipFDfg==}
@@ -3535,6 +3570,10 @@ snapshots:
       '@tauri-apps/api': 2.12.3
 
   '@tauri-apps/plugin-process@2.4.0':
+    dependencies:
+      '@tauri-apps/api': 2.12.3
+
+  '@tauri-apps/plugin-shell@2.5.0':
     dependencies:
       '@tauri-apps/api': 2.12.3
 

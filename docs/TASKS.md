@@ -29,7 +29,7 @@
 | T0.3 ✅ 2026-10-13 | BrowserFS：File System Access API 实现；目录句柄存 IndexedDB，启动时恢复授权（`queryPermission/requestPermission`）；不支持时优雅提示 | T0.1 | Chrome 中选目录后能列出/读写文件 |
 | T0.4 ✅ 2026-10-13 | TauriFS：plugin-fs 实现同一接口 | T0.1 | `pnpm tauri dev` 中读写 vault 正常 |
 | T0.5 ✅ 2026-10-13 | SearchBackend：接入 `@vane-rs/web`（WASM + OPFS/IDB 持久化），upsert/search/close；BM25-only 跑通 | T0.1 | 浏览器中建索引 + 搜索返回 snippet |
-| T0.6 | GitBackend：Tauri shell 实现（init/status/diff/commit/pull/push/remote/clone/resolve，迁移现有 `git.ts` 逻辑）；Browser 降级实现（git UI 显示不可用） | T0.1 | Tauri 下 git 全套单测通过（mock shell） |
+| T0.6 ✅ 2026-10-13 | GitBackend：Tauri shell 实现（init/status/diff/commit/pull/push/remote/clone/resolve，迁移现有 `git.ts` 逻辑）；Browser 降级实现（git UI 显示不可用） | T0.1 | Tauri 下 git 全套单测通过（mock shell） |
 | T0.7 | SecretsStore：Tauri keychain + 浏览器 AES seal（修复硬编码密钥问题：用机器随机密钥存 keychain/IDB） | T0.1 | key 写入/读取/掩码回显 |
 | T0.8 | Chrome dev 全链路：`pnpm dev` 纯浏览器跑通 打开vault→新建笔记→编辑保存→BM25 搜索 | T0.2-0.6 | 手工走查 + `/csi` 驱动验证 |
 | T0.9 ✅ 2026-10-13 | 设计系统基座：CSS 变量（light/dark）、基础组件（Button/Input/Menu/Modal/Tooltip/Toast/Popover）、Phosphor 图标、四栏布局骨架 | — | Storybook 或 `/dev/components` 预览页 |

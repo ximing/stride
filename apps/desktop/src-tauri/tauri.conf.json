@@ -26,6 +26,9 @@
   "plugins": {
     "fs": {
       "requireLiteralLeadingDot": false
+    },
+    "shell": {
+      "open": false
     }
   },
   "bundle": {

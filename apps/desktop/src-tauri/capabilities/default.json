@@ -7,6 +7,17 @@
     "core:default",
     "process:default",
     {
+      "identifier": "shell:allow-execute",
+      "allow": [
+        {
+          "name": "git",
+          "cmd": "git",
+          "args": true,
+          "sidecar": false
+        }
+      ]
+    },
+    {
       "identifier": "fs:allow-read-text-file",
       "allow": [{ "path": "**" }, { "path": "**/*" }]
     },
