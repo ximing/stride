@@ -1,6 +1,6 @@
 import { observer, register, resolve, useService } from '@rabjs/react'
 import { relationsOf, buildGraph } from '@stride/core/graph'
-import { plainText, type StrideNote } from '@stride/core/note'
+import { plainText, type StrideNote, type TipTapNode } from '@stride/core/note'
 import { MemoryFileSystem, PlatformError } from '@stride/platform'
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -22,6 +22,17 @@ function sample(id: string, title: string): StrideNote {
 
 function useMemoryFixture() {
   window.history.replaceState(null, '', '/?fixture=memory')
+}
+
+function wikilinkTarget(doc: TipTapNode): string | undefined {
+  let target: string | undefined
+  const walk = (node: TipTapNode | undefined) => {
+    if (!node || target) return
+    if (node.type === 'wikilink' && typeof node.attrs?.target === 'string') target = node.attrs.target
+    node.content?.forEach(walk)
+  }
+  walk(doc)
+  return target
 }
 
 describe('VaultService', () => {
@@ -190,6 +201,80 @@ describe('VaultService', () => {
     expect(marker.kind).toBe('stride-vault')
     expect(marker.version).toBe(1)
     expect(marker.renameFromHeading).toBe(false)
+  })
+
+  it('rewrites wikilinks when a real heading title changes', async () => {
+    useMemoryFixture()
+    register(VaultService)
+    const vault = resolve(VaultService)
+    await vault.openFromDraft()
+    await vault.createNote()
+    vault.updateTitle('Old Title')
+    await vault.commitHeadingRename()
+    expect(vault.error).toBe('')
+    expect(vault.active?.id).toBe('old-title')
+
+    await vault.createNote()
+    const linkerId = vault.active?.id ?? ''
+    vault.updateDoc({
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'wikilink', attrs: { target: 'Old Title' } }],
+        },
+      ],
+    })
+    vault.notes = vault.notes.map((note) =>
+      note.id === linkerId ? { ...note, properties: { ...note.properties, related_to: '[[Old Title]]' } } : note,
+    )
+    await vault.flush()
+
+    vault.activeId = 'old-title'
+    vault.updateTitle('New Title')
+    await vault.commitHeadingRename()
+    expect(vault.error).toBe('')
+    expect(vault.active?.id).toBe('new-title')
+    const linked = vault.notes.find((note) => note.id === linkerId)
+    expect(linked?.properties.related_to).toBe('[[New Title]]')
+    expect(wikilinkTarget(linked?.doc ?? { type: 'doc' })).toBe('New Title')
+  })
+
+  it('does not rewrite wikilinks when renameFromHeading is false', async () => {
+    useMemoryFixture()
+    register(VaultService)
+    const vault = resolve(VaultService)
+    await vault.openFromDraft()
+    await vault.createNote()
+    vault.updateTitle('Old Title')
+    await vault.commitHeadingRename()
+    expect(vault.active?.id).toBe('old-title')
+
+    await vault.createNote()
+    const linkerId = vault.active?.id ?? ''
+    vault.updateDoc({
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'wikilink', attrs: { target: 'Old Title' } }],
+        },
+      ],
+    })
+    vault.notes = vault.notes.map((note) =>
+      note.id === linkerId ? { ...note, properties: { ...note.properties, related_to: '[[Old Title]]' } } : note,
+    )
+    await vault.flush()
+
+    await vault.setRenameFromHeading(false)
+    vault.activeId = 'old-title'
+    vault.updateTitle('New Title')
+    await vault.commitHeadingRename()
+    expect(vault.error).toBe('')
+    expect(vault.active?.id).toBe('old-title')
+    const linked = vault.notes.find((note) => note.id === linkerId)
+    expect(linked?.properties.related_to).toBe('[[Old Title]]')
+    expect(wikilinkTarget(linked?.doc ?? { type: 'doc' })).toBe('Old Title')
   })
 
   it('keeps a cancelled directory picker on the chooser', async () => {

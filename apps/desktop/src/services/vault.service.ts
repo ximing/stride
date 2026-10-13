@@ -33,13 +33,23 @@ import { noteIndex, searchNotes, type NoteIndex } from '../../../../packages/cor
 import { writeSampleNotes } from '../../../../packages/core/src/sample'
 import { initializeVault } from '../../../../packages/core/src/seed'
 import { compareTypeDocuments, isTypeVisible, nextTypeOrder, templateBody } from '../../../../packages/core/src/types'
+import { recoverRename, rewriteVaultLinks } from '../../../../packages/core/src/rename-tx'
 import {
   readAdvanceInbox,
   readRenameFromHeading,
   writeAdvanceInbox,
   writeRenameFromHeading,
 } from '../../../../packages/core/src/vault-config'
-import { createVaultNote, nextSlugId, notePath, openVault, saveNote } from '../../../../packages/core/src/vault'
+import {
+  createVaultNote,
+  listNoteFiles,
+  nextSlugId,
+  noteIdFromPath,
+  notePath,
+  openVault,
+  readNoteFile,
+  saveNote,
+} from '../../../../packages/core/src/vault'
 
 const COLLAPSED_TYPES_KEY = 'stride:collapsed-types'
 
@@ -473,11 +483,30 @@ export class VaultService extends Service {
     const fromId = leaving.id
     this.renaming = true
     try {
+      let diskTitle = ''
+      try {
+        diskTitle = (await readNoteFile(fs, notePath(fromId))).title
+      } catch {
+        diskTitle = ''
+      }
       await this.flush()
       if (!this.renameFromHeading) return
       const fresh = this.notes.find((note) => note.id === fromId)
       if (!fresh || isPlaceholderTitle(fresh.title)) return
-      const nextId = await nextSlugId(fs, fresh.title, fresh.id)
+      let nextId: string | undefined
+      if (diskTitle && !isPlaceholderTitle(diskTitle) && diskTitle !== fresh.title) {
+        nextId = await nextSlugId(fs, fresh.title, fresh.id)
+        await rewriteVaultLinks(fs, { fromTitle: diskTitle, toTitle: fresh.title, fromId, toId: nextId })
+        const files = await listNoteFiles(fs)
+        const disk = new Map<string, StrideNote>()
+        for (const file of files) {
+          const note = await readNoteFile(fs, file, noteIdFromPath(file))
+          disk.set(note.id, note)
+        }
+        this.notes = this.notes.map((note) => disk.get(note.id) ?? note)
+        this.docEpoch += 1
+      }
+      if (nextId === undefined) nextId = await nextSlugId(fs, fresh.title, fresh.id)
       if (nextId === fresh.id) return
       await fs.rename(notePath(fromId), notePath(nextId))
       const latest = this.notes.find((note) => note.id === fromId) ?? fresh
@@ -686,6 +715,7 @@ export class VaultService extends Service {
   }
 
   private async openBackend(backend: FileSystemBackend) {
+    await recoverRename(backend)
     const opened = await openVault(backend, HOME_DIR)
     const opener = await this.searchOpener()
     const search = await opener.open({ vaultKey: backend.rootLabel, dim: 0 })

@@ -1,14 +1,29 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
-import {
-  normalizeRelativePath,
-  PlatformError,
-  type DirEntry,
-  type FileStat,
-  type FileSystemBackend,
-  type FileSystemCapabilities,
-  type WatchEvent,
-} from '@stride/platform'
+import { PlatformError } from '../../platform/src/error.ts'
+import type {
+  DirEntry,
+  FileStat,
+  FileSystemBackend,
+  FileSystemCapabilities,
+  WatchEvent,
+} from '../../platform/src/fs.ts'
+
+// Inlined so a strip-types child can import this file without parsing MemoryFileSystem.
+function normalizeRelativePath(input: string): string {
+  if (input.includes('\0')) throw new PlatformError('escape', 'Path contains NUL')
+  const slashed = input.replaceAll('\\', '/')
+  if (slashed.startsWith('/') || /^[A-Za-z]:/.test(slashed)) {
+    throw new PlatformError('escape', 'Path escapes the root')
+  }
+  const parts: string[] = []
+  for (const segment of slashed.split('/')) {
+    if (segment === '' || segment === '.') continue
+    if (segment === '..') throw new PlatformError('escape', 'Path escapes the root')
+    parts.push(segment)
+  }
+  return parts.join('/')
+}
 
 function errorCode(error: unknown): string {
   if (typeof error === 'object' && error && 'code' in error) return String((error as { code: unknown }).code)
