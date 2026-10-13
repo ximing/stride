@@ -47,7 +47,7 @@
 | T1.6 ✅ 2026-10-13 | 属性面板：properties 编辑（string/number/bool/list）、`_` 系统属性隐藏、wikilink 值识别为关系 | T1.4 | 属性编辑即时保存 |
 | T1.7 ✅ 2026-10-13 | Backlinks/关系/Inspector 右侧面板 | T1.6 | 双链互相可见、点击导航 |
 | T1.8 ✅ 2026-10-13 | Inbox 视图 + 整理后自动前进 | T1.7 | 无出链笔记进入 Inbox |
-| T1.9 | 重命名全局改写 wikilink（crash-safe 事务目录） | T1.7 | 重命名后所有引用更新；中途 kill 可恢复 |
+| T1.9 ✅ 2026-10-13 | 重命名全局改写 wikilink（crash-safe 事务目录） | T1.7 | 重命名后所有引用更新；中途 kill 可恢复 |
 | T1.10 | 文件夹树：内联 CRUD + 拖拽移动 | T1.1 | 拖拽移动后路径更新、链接不丢 |
 | T1.11 | Archive/删除（永久）+ 确认弹窗 | T1.4 | archived 默认隐藏 |
 
