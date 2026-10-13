@@ -32,7 +32,7 @@
 | T0.6 | GitBackend：Tauri shell 实现（init/status/diff/commit/pull/push/remote/clone/resolve，迁移现有 `git.ts` 逻辑）；Browser 降级实现（git UI 显示不可用） | T0.1 | Tauri 下 git 全套单测通过（mock shell） |
 | T0.7 | SecretsStore：Tauri keychain + 浏览器 AES seal（修复硬编码密钥问题：用机器随机密钥存 keychain/IDB） | T0.1 | key 写入/读取/掩码回显 |
 | T0.8 | Chrome dev 全链路：`pnpm dev` 纯浏览器跑通 打开vault→新建笔记→编辑保存→BM25 搜索 | T0.2-0.6 | 手工走查 + `/csi` 驱动验证 |
-| T0.9 | 设计系统基座：CSS 变量（light/dark）、基础组件（Button/Input/Menu/Modal/Tooltip/Toast/Popover）、Phosphor 图标、四栏布局骨架 | — | Storybook 或 `/dev/components` 预览页 |
+| T0.9 ✅ 2026-10-13 | 设计系统基座：CSS 变量（light/dark）、基础组件（Button/Input/Menu/Modal/Tooltip/Toast/Popover）、Phosphor 图标、四栏布局骨架 | — | Storybook 或 `/dev/components` 预览页 |
 | T0.10 | inspect daemon 适配 Chrome（保留现有实现，确认在浏览器模式可用）+ Playwright 浏览器 e2e 骨架 | T0.8 | 一条 e2e：开库→建笔记→断言无 console error |
 
 ## Phase 1 — Vault 与笔记模型

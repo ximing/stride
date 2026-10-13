@@ -6,20 +6,33 @@ import { ChatService, GitService, SettingsService, UpdateService } from './servi
 import { VaultService } from './services/vault.service'
 import './styles.css'
 
-register(VaultService)
-register(GitService)
-register(SettingsService)
-register(ChatService)
-register(UpdateService)
+const componentsPath = window.location.pathname
+const showComponents = componentsPath === '/dev/components' || componentsPath.startsWith('/dev/components/')
 
-void resolve(SettingsService).load()
+if (showComponents) {
+  void import('./dev/components-page').then(({ ComponentsPage }) => {
+    createRoot(document.getElementById('root')!).render(
+      <StrictMode>
+        <ComponentsPage />
+      </StrictMode>,
+    )
+  })
+} else {
+  register(VaultService)
+  register(GitService)
+  register(SettingsService)
+  register(ChatService)
+  register(UpdateService)
 
-if (import.meta.env.DEV) {
-  void import('./inspect-client').then((mod) => mod.startInspectClient()).catch(() => undefined)
+  void resolve(SettingsService).load()
+
+  if (import.meta.env.DEV) {
+    void import('./inspect-client').then((mod) => mod.startInspectClient()).catch(() => undefined)
+  }
+
+  createRoot(document.getElementById('root')!).render(
+    <StrictMode>
+      <App />
+    </StrictMode>,
+  )
 }
-
-createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <App />
-  </StrictMode>,
-)
