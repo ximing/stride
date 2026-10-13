@@ -27,7 +27,7 @@
 | T0.1 ✅ 2026-10-13 | 定义端口接口：`FileSystemBackend`（read/write/list/mkdir/rename/delete/stat/watch）、`GitBackend`、`SearchBackend`、`SecretsStore`、`UpdaterBackend` | — | 接口 + 类型包 `@stride/platform` 建立 |
 | T0.2 ✅ 2026-10-13 | core 浏览器化改造：note/vault/graph/git/settings/agent/updater 全部改为依赖注入端口，移除 `node:*` 顶层引用。临时包 `@stride/platform-node` 只给遗留 `server/` 注入，T8.5 随 server 删除 | T0.1 | `vitest`（jsdom 环境）全绿；`vite build` 不引入 node polyfill |
 | T0.3 | BrowserFS：File System Access API 实现；目录句柄存 IndexedDB，启动时恢复授权（`queryPermission/requestPermission`）；不支持时优雅提示 | T0.1 | Chrome 中选目录后能列出/读写文件 |
-| T0.4 | TauriFS：plugin-fs 实现同一接口 | T0.1 | `pnpm tauri dev` 中读写 vault 正常 |
+| T0.4 ✅ 2026-10-13 | TauriFS：plugin-fs 实现同一接口 | T0.1 | `pnpm tauri dev` 中读写 vault 正常 |
 | T0.5 | SearchBackend：接入 `@vane-rs/web`（WASM + OPFS/IDB 持久化），upsert/search/close；BM25-only 跑通 | T0.1 | 浏览器中建索引 + 搜索返回 snippet |
 | T0.6 | GitBackend：Tauri shell 实现（init/status/diff/commit/pull/push/remote/clone/resolve，迁移现有 `git.ts` 逻辑）；Browser 降级实现（git UI 显示不可用） | T0.1 | Tauri 下 git 全套单测通过（mock shell） |
 | T0.7 | SecretsStore：Tauri keychain + 浏览器 AES seal（修复硬编码密钥问题：用机器随机密钥存 keychain/IDB） | T0.1 | key 写入/读取/掩码回显 |
