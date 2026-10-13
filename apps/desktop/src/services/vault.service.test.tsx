@@ -6,7 +6,7 @@ import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readNoteFile } from '../../../../packages/core/src/vault'
-import { App } from '../app'
+import { App, Rail } from '../app'
 import { ChatService, GitService, SettingsService, UpdateService } from './panels.service'
 import { VAULT_REGISTRY_KEY, VaultService } from './vault.service'
 
@@ -370,5 +370,133 @@ describe('VaultService', () => {
     root.unmount()
     host.remove()
     vault.cancelPending()
+  })
+
+  it('advances to the next inbox note after an outgoing property link', async () => {
+    useMemoryFixture()
+    register(VaultService)
+    const vault = resolve(VaultService)
+    await vault.openFromDraft()
+    await vault.setRenameFromHeading(true)
+    expect(vault.advanceInbox).toBe(true)
+
+    const first = sample('first', 'First')
+    const second = sample('second', 'Second')
+    vault.notes = [first, second]
+    vault.setFilter('inbox')
+    vault.activeId = 'first'
+    expect(vault.graph.inbox.map((note) => note.id)).toEqual(['first', 'second'])
+
+    vault.updateProperty('related_to', '[[Second]]')
+    vault.cancelPending()
+    expect(vault.activeId).toBe('second')
+    expect(vault.graph.inbox.map((note) => note.id)).toEqual(['second'])
+
+    await vault.setAdvanceInbox(false)
+    const againFirst = sample('again-first', 'Again first')
+    const againSecond = sample('again-second', 'Again second')
+    vault.notes = [againFirst, againSecond]
+    vault.activeId = 'again-first'
+    vault.updateProperty('related_to', '[[Again second]]')
+    vault.cancelPending()
+    expect(vault.activeId).toBe('again-first')
+    expect(vault.graph.inbox.map((note) => note.id)).toEqual(['again-second'])
+
+    const marker = JSON.parse(await vault.fs!.readText('.stride/vault.json')) as {
+      kind?: string
+      version?: number
+      renameFromHeading?: boolean
+      advanceInbox?: boolean
+    }
+    expect(marker.kind).toBe('stride-vault')
+    expect(marker.version).toBe(1)
+    expect(marker.renameFromHeading).toBe(true)
+    expect(marker.advanceInbox).toBe(false)
+
+    await vault.openFromDraft()
+    expect(vault.advanceInbox).toBe(false)
+    expect(vault.renameFromHeading).toBe(true)
+    await vault.setAdvanceInbox(true)
+    vault.notes = [sample('alpha', 'Alpha'), sample('beta', 'Beta')]
+    vault.setFilter('inbox')
+    vault.activeId = 'alpha'
+    vault.updateListProperty('related_to', '[[Beta]]')
+    vault.cancelPending()
+    expect(vault.activeId).toBe('beta')
+    vault.setFilter('all')
+  })
+
+  it('does not leave the inbox or advance when only the type or body changes', async () => {
+    useMemoryFixture()
+    register(VaultService)
+    const vault = resolve(VaultService)
+    await vault.openFromDraft()
+    vault.notes = [sample('loose', 'Loose'), sample('other', 'Other')]
+    vault.setFilter('inbox')
+    vault.activeId = 'loose'
+    vault.advanceInbox = true
+
+    vault.updateType('project')
+    vault.cancelPending()
+    expect(vault.activeId).toBe('loose')
+    expect(vault.graph.inbox.map((note) => note.id)).toEqual(['loose', 'other'])
+
+    vault.updateDoc({
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'see [[Other]]' }] }],
+    })
+    vault.cancelPending()
+    expect(vault.activeId).toBe('loose')
+    expect(vault.graph.inbox.map((note) => note.id)).toEqual(['loose', 'other'])
+    vault.setFilter('all')
+  })
+
+  it('clears the selection instead of opening a type document', async () => {
+    useMemoryFixture()
+    register(VaultService)
+    const vault = resolve(VaultService)
+    await vault.openFromDraft()
+    const typeDoc: StrideNote = { ...sample('project-type', 'Project'), type: 'Type' }
+    vault.notes = [sample('loose', 'Loose'), typeDoc]
+    vault.setFilter('inbox')
+    vault.activeId = 'loose'
+    vault.advanceInbox = true
+    vault.updateProperty('related_to', '[[Project]]')
+    vault.cancelPending()
+    expect(vault.activeId).toBe('')
+    expect(vault.graph.inbox.map((note) => note.id)).toEqual(['project-type'])
+    vault.setFilter('all')
+  })
+
+  it('shows the advance checkbox only while the inbox filter is selected', async () => {
+    register(VaultService)
+    const vault = resolve(VaultService)
+    vault.setFilter('all')
+    vault.advanceInbox = true
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    await act(async () => {
+      root.render(<Rail />)
+    })
+    expect(host.querySelector('[data-testid="advance-inbox"]')).toBeNull()
+    await act(async () => {
+      vault.setFilter('inbox')
+    })
+    const box = host.querySelector<HTMLInputElement>('[data-testid="advance-inbox"]')
+    expect(box).not.toBeNull()
+    expect(box?.checked).toBe(true)
+    expect(host.textContent).toContain('Advance after organizing')
+    await act(async () => {
+      box?.click()
+    })
+    expect(vault.advanceInbox).toBe(false)
+    await act(async () => {
+      vault.setFilter('all')
+    })
+    expect(host.querySelector('[data-testid="advance-inbox"]')).toBeNull()
+    root.unmount()
+    host.remove()
+    vault.advanceInbox = true
   })
 })

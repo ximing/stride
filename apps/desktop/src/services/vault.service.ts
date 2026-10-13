@@ -1,5 +1,5 @@
 import { Service } from '@rabjs/react'
-import { buildGraph, type VaultGraph } from '@stride/core/graph'
+import { buildGraph, hasOutgoingRelationship, type VaultGraph } from '@stride/core/graph'
 import {
   applyBody,
   applyTitle,
@@ -33,7 +33,12 @@ import { noteIndex, searchNotes, type NoteIndex } from '../../../../packages/cor
 import { writeSampleNotes } from '../../../../packages/core/src/sample'
 import { initializeVault } from '../../../../packages/core/src/seed'
 import { compareTypeDocuments, isTypeVisible, nextTypeOrder, templateBody } from '../../../../packages/core/src/types'
-import { readRenameFromHeading, writeRenameFromHeading } from '../../../../packages/core/src/vault-config'
+import {
+  readAdvanceInbox,
+  readRenameFromHeading,
+  writeAdvanceInbox,
+  writeRenameFromHeading,
+} from '../../../../packages/core/src/vault-config'
 import { createVaultNote, nextSlugId, notePath, openVault, saveNote } from '../../../../packages/core/src/vault'
 
 const COLLAPSED_TYPES_KEY = 'stride:collapsed-types'
@@ -150,6 +155,7 @@ export class VaultService extends Service {
   panel: 'properties' | 'git' | 'chat' | 'settings' = 'properties'
   docEpoch = 0
   renameFromHeading = true
+  advanceInbox = true
   propertyName = ''
   propertyType: PropertyKind = 'string'
   propertyValue = ''
@@ -449,6 +455,16 @@ export class VaultService extends Service {
     }
   }
 
+  async setAdvanceInbox(enabled: boolean) {
+    this.advanceInbox = enabled
+    if (!this.fs) return
+    try {
+      await writeAdvanceInbox(this.fs, enabled)
+    } catch (error) {
+      this.error = errorText(error)
+    }
+  }
+
   async commitHeadingRename() {
     if (this.renaming) return
     const leaving = this.active
@@ -534,6 +550,7 @@ export class VaultService extends Service {
     this.clearFieldDraft(field)
     this.replace({ ...current, properties })
     this.schedule(current.id)
+    this.maybeAdvanceInbox(current)
   }
 
   updateListProperty(field: string, raw: string) {
@@ -689,6 +706,7 @@ export class VaultService extends Service {
     this.searchQuery = ''
     this.searchMode = ''
     this.renameFromHeading = await readRenameFromHeading(backend)
+    this.advanceInbox = await readAdvanceInbox(backend)
     this.resetPropertyEditor()
     this.phase = 'ready'
     await this.rememberVault(backend)
@@ -813,6 +831,19 @@ export class VaultService extends Service {
     if (!current) return
     this.replace({ ...current, properties: { ...current.properties, [field]: value } })
     this.schedule(current.id)
+    this.maybeAdvanceInbox(current)
+  }
+
+  // Property wikilinks are the only outgoing links that leave the inbox.
+  private maybeAdvanceInbox(before: StrideNote) {
+    if (this.listFilter !== 'inbox' || !this.advanceInbox) return
+    if (this.activeId !== before.id || hasOutgoingRelationship(before)) return
+    const after = this.notes.find((note) => note.id === before.id)
+    if (!after || !hasOutgoingRelationship(after)) return
+    const index = this.notes.findIndex((note) => note.id === before.id)
+    const next = this.notes.slice(index + 1).find((note) => !isTypeDocument(note) && !hasOutgoingRelationship(note))
+    this.activeId = next?.id ?? ''
+    this.resetPropertyEditor()
   }
 
   private clearFieldDraft(field: string) {

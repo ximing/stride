@@ -236,6 +236,23 @@ textarea {
   color: #b7aa9b;
 }
 
+.advance-inbox {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0.35rem 0 0.15rem;
+  padding: 0 0.35rem;
+  font-size: 0.82rem;
+  color: #d9cbb8;
+}
+
+.advance-inbox input {
+  width: auto;
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+
 .type-row {
   display: flex;
   align-items: center;

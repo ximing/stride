@@ -113,6 +113,17 @@ export const Rail = observer(function Rail() {
       <button type="button" className={vault.listFilter === 'inbox' ? 'active' : ''} onClick={() => vault.setFilter('inbox')}>
         Inbox ({vault.inboxCount})
       </button>
+      {vault.listFilter === 'inbox' && (
+        <label className="advance-inbox">
+          <input
+            type="checkbox"
+            data-testid="advance-inbox"
+            checked={vault.advanceInbox}
+            onChange={(event) => { void vault.setAdvanceInbox(event.target.checked) }}
+          />
+          Advance after organizing
+        </label>
+      )}
       <div className="group-label">Types</div>
       {typeDocs.map((note) => {
         const icon = typeIconKey(note)
