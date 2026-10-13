@@ -6,7 +6,10 @@ import {
   firstH1Text,
   formatProperty,
   headingText,
+  isHiddenProperty,
   noteForSave,
+  parseFiniteNumber,
+  parseListInput,
   parseNote,
   parsePropertyInput,
   plainText,
@@ -105,6 +108,81 @@ describe('note codec', () => {
     const graph = buildGraph([parent, child])
     expect(relationsOf(graph, 'child').shown.some((link) => link.field === 'belongs_to' && link.targetId === 'other-note')).toBe(true)
     expect(relationsOf(graph, 'other-note').shown.some((link) => link.field === 'has' && link.targetId === 'child' && link.derived)).toBe(true)
+  })
+
+  it('keeps number, boolean, and list values and drops nulls and objects', async () => {
+    const doc: TipTapNode = { type: 'doc', content: [{ type: 'paragraph' }] }
+    const files = vault('/tmp/stride-typed-props')
+    await saveNote(files, {
+      id: 'typed',
+      title: 'Typed',
+      type: 'note',
+      properties: {
+        count: 0,
+        done: false,
+        tags: ['alpha', '[[Other note]]'],
+        label: 'solo',
+      },
+      doc,
+    })
+    const stored = JSON.parse(await files.readText('typed.stride.json')) as { properties: Record<string, unknown> }
+    expect(stored.properties.count).toBe(0)
+    expect(typeof stored.properties.count).toBe('number')
+    expect(stored.properties.done).toBe(false)
+    expect(typeof stored.properties.done).toBe('boolean')
+    expect(stored.properties.tags).toEqual(['alpha', '[[Other note]]'])
+
+    const loaded = parseNote(JSON.stringify({
+      format: 'tiptap',
+      title: 'Typed',
+      type: 'note',
+      properties: {
+        count: 4,
+        done: true,
+        tags: ['a', 'b'],
+        label: '12',
+        nested: { no: true },
+        missing: null,
+        mixed: ['a', 1],
+        objectList: [{ name: 'x' }],
+      },
+      doc,
+    }), 'typed')
+    expect(loaded.properties).toEqual({
+      count: 4,
+      done: true,
+      tags: ['a', 'b'],
+      label: '12',
+    })
+    expect(parseNote(JSON.stringify({
+      format: 'tiptap',
+      title: 'Empty',
+      type: 'note',
+      properties: null,
+      doc,
+    }), 'empty').properties).toEqual({})
+
+    expect(isHiddenProperty('_icon')).toBe(true)
+    expect(isHiddenProperty('_color')).toBe(true)
+    expect(isHiddenProperty('_order')).toBe(true)
+    expect(isHiddenProperty('_sidebar_label')).toBe(true)
+    expect(isHiddenProperty('_secret')).toBe(true)
+    expect(isHiddenProperty('template')).toBe(false)
+    expect(isHiddenProperty('visible')).toBe(false)
+
+    expect(parsePropertyInput('solo')).toBe('solo')
+    expect(Array.isArray(parsePropertyInput('[['))).toBe(false)
+    expect(formatProperty(parsePropertyInput('[['))).toBe('[[')
+    expect(formatProperty(parsePropertyInput('[[Other'))).toBe('[[Other')
+    expect(parsePropertyInput('[[A]] [[B]]')).toEqual(['[[A]]', '[[B]]'])
+    expect(parseListInput('solo')).toEqual(['solo'])
+    expect(parseListInput('[[Other note]] plain')).toEqual(['[[Other note]]', 'plain'])
+    expect(parseFiniteNumber('12')).toBe(12)
+    expect(parseFiniteNumber('1.')).toBeUndefined()
+    expect(parseFiniteNumber('1e309')).toBeUndefined()
+    expect(parseFiniteNumber('true')).toBeUndefined()
+    expect(formatProperty(false)).toBe('false')
+    expect(formatProperty(0)).toBe('0')
   })
 
   it('refuses a note id that escapes the vault', async () => {

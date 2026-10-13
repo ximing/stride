@@ -14,7 +14,9 @@ export interface TipTapNode {
   content?: TipTapNode[]
 }
 
-export type NoteProperty = string | string[]
+export type NoteProperty = string | number | boolean | string[]
+
+export type PropertyKind = 'string' | 'number' | 'boolean' | 'list'
 
 export interface StrideNote {
   id: string
@@ -84,7 +86,7 @@ export function parseNote(raw: string, id: string): StrideNote {
     id,
     title: leading || storedTitle || id,
     type: typeof file.type === 'string' && file.type.trim() ? file.type : 'note',
-    properties: file.properties && typeof file.properties === 'object' ? file.properties : {},
+    properties: sanitizeProperties(file.properties),
     doc: file.doc,
   }
 }
@@ -245,6 +247,52 @@ export function bodyWikilinks(doc: TipTapNode): string[] {
   return targets
 }
 
+export function isHiddenProperty(key: string): boolean {
+  return key.startsWith('_')
+}
+
+export function propertyKind(value: NoteProperty | undefined): PropertyKind {
+  if (typeof value === 'number') return 'number'
+  if (typeof value === 'boolean') return 'boolean'
+  if (Array.isArray(value)) return 'list'
+  return 'string'
+}
+
+function asNoteProperty(value: unknown): NoteProperty | undefined {
+  if (typeof value === 'string' || typeof value === 'boolean') return value
+  if (typeof value === 'number') return Number.isFinite(value) ? value : undefined
+  if (Array.isArray(value) && value.every((item) => typeof item === 'string')) return value
+  return undefined
+}
+
+function sanitizeProperties(raw: unknown): Record<string, NoteProperty> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
+  const properties: Record<string, NoteProperty> = {}
+  for (const [key, value] of Object.entries(raw)) {
+    const property = asNoteProperty(value)
+    if (property !== undefined) properties[key] = property
+  }
+  return properties
+}
+
+const LIST_TOKEN = /\[\[[^\]]+\]\]|\S+/g
+
+export function parseListInput(raw: string): string[] {
+  return raw.match(LIST_TOKEN) ?? []
+}
+
+export function parseFiniteNumber(raw: string): number | undefined {
+  const trimmed = raw.trim()
+  if (!trimmed) return undefined
+  try {
+    const value: unknown = JSON.parse(trimmed)
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+  } catch {
+    return undefined
+  }
+  return undefined
+}
+
 export function parsePropertyInput(raw: string): NoteProperty {
   if (raw.trim() === '') return ''
   const links = raw.match(/\[\[[^\]]+\]\]/g)
@@ -256,5 +304,7 @@ export function parsePropertyInput(raw: string): NoteProperty {
 
 export function formatProperty(value: NoteProperty | undefined): string {
   if (value === undefined) return ''
-  return Array.isArray(value) ? value.join(' ') : value
+  if (Array.isArray(value)) return value.join(' ')
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  return value
 }

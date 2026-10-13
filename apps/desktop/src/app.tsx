@@ -1,9 +1,8 @@
 import { observer, useService } from '@rabjs/react'
-import { useState } from 'react'
-import { relationsOf } from '@stride/core/graph'
 import { NoteEditor } from './editor'
 import { ChatService, GitService, SettingsService, UpdateService } from './services/panels.service'
 import { VaultService } from './services/vault.service'
+import { PropertiesPanel } from './ui/properties-panel'
 
 export const UpdateBanner = observer(function UpdateBanner() {
   const updates = useService(UpdateService)
@@ -102,75 +101,6 @@ const Rail = observer(function Rail() {
         </button>
       ))}
     </aside>
-  )
-})
-
-const Properties = observer(function Properties() {
-  const vault = useService(VaultService)
-  const note = vault.active
-  if (!note) return <p className="empty-note">Select a note.</p>
-  const relations = relationsOf(vault.graph, note.id)
-  return (
-    <div>
-      <h2>Properties</h2>
-      <label className="field"><span>Type</span>
-        <input value={note.type} onChange={(event) => vault.updateType(event.target.value)} />
-      </label>
-      {['status', 'date', 'url', 'belongs_to', 'related_to'].map((field) => (
-        <label className="field" key={field}>
-          <span>{field}</span>
-          <input value={vault.propertyText(field)} onChange={(event) => vault.updateProperty(field, event.target.value)} />
-        </label>
-      ))}
-      <CustomProperty />
-      <h2>Relationships</h2>
-      {relations.shown.length === 0 && <p className="meta">No relationships yet.</p>}
-      {relations.shown.map((link) => (
-        <p key={`${link.field}-${link.targetId}-${link.derived}`} className="meta">
-          {link.derived ? `${link.field} (derived)` : link.field}: {link.label}
-        </p>
-      ))}
-      <h2>Backlinks</h2>
-      {relations.backlinks.length === 0 && <p className="meta">No backlinks.</p>}
-      {relations.backlinks.map((link) => (
-        <button key={`${link.sourceId}-${link.via}`} type="button" onClick={() => vault.select(link.sourceId)}>
-          {vault.graph.byId.get(link.sourceId)?.title} · {link.via}
-        </button>
-      ))}
-    </div>
-  )
-})
-
-const CustomProperty = observer(function CustomProperty() {
-  const vault = useService(VaultService)
-  const [name, setName] = useState('')
-  const [value, setValue] = useState('')
-  const known = new Set(['status', 'date', 'url', 'belongs_to', 'related_to'])
-  const extra = Object.keys(vault.active?.properties ?? {}).filter((field) => !known.has(field))
-  return (
-    <form
-      onSubmit={(event) => {
-        event.preventDefault()
-        if (!name.trim()) return
-        vault.updateProperty(name.trim(), value)
-        setName('')
-        setValue('')
-      }}
-    >
-      {extra.map((field) => (
-        <label className="field" key={field}>
-          <span>{field}</span>
-          <input value={vault.propertyText(field)} onChange={(event) => vault.updateProperty(field, event.target.value)} />
-        </label>
-      ))}
-      <label className="field"><span>Custom field</span>
-        <input value={name} onChange={(event) => setName(event.target.value)} placeholder="supports" />
-      </label>
-      <label className="field"><span>Value</span>
-        <input value={value} onChange={(event) => setValue(event.target.value)} placeholder="[[Other note]]" />
-      </label>
-      <button type="submit">Add field</button>
-    </form>
   )
 })
 
@@ -312,7 +242,7 @@ const Workspace = observer(function Workspace() {
           {vault.broad && <p className="meta">This folder is a broad personal root. Git init stays off unless it is already a dedicated vault.</p>}
         </main>
         <aside className="panel">
-          {vault.panel === 'properties' && <Properties />}
+          {vault.panel === 'properties' && <PropertiesPanel />}
           {vault.panel === 'git' && <GitPanel />}
           {vault.panel === 'chat' && <ChatPanel />}
           {vault.panel === 'settings' && <SettingsPanel />}

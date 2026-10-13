@@ -6,9 +6,12 @@ import {
   formatProperty,
   isPlaceholderTitle,
   noteForSave,
+  parseFiniteNumber,
+  parseListInput,
   parsePropertyInput,
   plainText,
   type NoteProperty,
+  type PropertyKind,
   type StrideNote,
   type TipTapNode,
 } from '@stride/core/note'
@@ -91,11 +94,18 @@ export class VaultService extends Service {
   panel: 'properties' | 'git' | 'chat' | 'settings' = 'properties'
   docEpoch = 0
   renameFromHeading = true
+  propertyName = ''
+  propertyType: PropertyKind = 'string'
+  propertyValue = ''
+  propertyChecked = false
   fs: FileSystemBackend | null = null
   private index: NoteIndex | null = null
   private docTimer: ReturnType<typeof setTimeout> | null = null
   private pendingId = ''
   private renaming = false
+  private numberDrafts: Record<string, string> = {}
+  private listDrafts: Record<string, string> = {}
+  private saveGeneration = 0
 
   setPathDraft(value: string) {
     this.pathDraft = value
@@ -113,6 +123,7 @@ export class VaultService extends Service {
     if (id === this.activeId) return
     void this.commitHeadingRename()
     this.activeId = id
+    this.resetPropertyEditor()
   }
 
   get active(): StrideNote | null {
@@ -272,6 +283,45 @@ export class VaultService extends Service {
     this.schedule(current.id)
   }
 
+  setPropertyName(value: string) {
+    this.propertyName = value
+  }
+
+  setPropertyType(value: string) {
+    if (value === 'string' || value === 'number' || value === 'boolean' || value === 'list') {
+      this.propertyType = value
+    }
+  }
+
+  setPropertyValue(value: string) {
+    this.propertyValue = value
+  }
+
+  setPropertyChecked(value: boolean) {
+    this.propertyChecked = value
+  }
+
+  addProperty() {
+    const field = this.propertyName.trim()
+    if (!field || !this.active) return
+    let next: NoteProperty | undefined
+    if (this.propertyType === 'boolean') next = this.propertyChecked
+    else if (this.propertyType === 'number') next = parseFiniteNumber(this.propertyValue)
+    else if (this.propertyType === 'list') {
+      const items = parseListInput(this.propertyValue)
+      if (items.length > 0) next = items
+    } else {
+      const parsed = parsePropertyInput(this.propertyValue)
+      if (parsed !== '' && !(Array.isArray(parsed) && parsed.length === 0)) next = parsed
+    }
+    if (next === undefined) return
+    this.clearFieldDraft(field)
+    this.writeProperty(field, next)
+    this.propertyName = ''
+    this.propertyValue = ''
+    this.propertyChecked = false
+  }
+
   updateProperty(field: string, raw: string) {
     const current = this.active
     if (!current) return
@@ -279,8 +329,85 @@ export class VaultService extends Service {
     const properties = { ...current.properties }
     if (value === '' || (Array.isArray(value) && value.length === 0)) delete properties[field]
     else properties[field] = value
+    this.clearFieldDraft(field)
     this.replace({ ...current, properties })
     this.schedule(current.id)
+  }
+
+  updateListProperty(field: string, raw: string) {
+    const items = parseListInput(raw)
+    if (items.length === 0) {
+      this.removeProperty(field)
+      return
+    }
+    this.listDrafts = { ...this.listDrafts, [field]: raw }
+    this.writeProperty(field, items)
+  }
+
+  updateNumberProperty(field: string, raw: string) {
+    if (raw.trim() === '') {
+      this.removeProperty(field)
+      return
+    }
+    this.numberDrafts = { ...this.numberDrafts, [field]: raw }
+    const parsed = parseFiniteNumber(raw)
+    if (parsed === undefined) return
+    this.writeProperty(field, parsed)
+  }
+
+  updateBooleanProperty(field: string, value: boolean) {
+    this.writeProperty(field, value)
+  }
+
+  removeProperty(field: string) {
+    const current = this.active
+    this.clearFieldDraft(field)
+    if (!current || !Object.hasOwn(current.properties, field)) return
+    const properties = { ...current.properties }
+    delete properties[field]
+    this.replace({ ...current, properties })
+    this.schedule(current.id)
+  }
+
+  commitListProperty(field: string) {
+    const raw = this.listDrafts[field]
+    if (raw !== undefined) {
+      this.clearFieldDraft(field)
+      const items = parseListInput(raw)
+      if (items.length === 0) this.removeProperty(field)
+      else this.writeProperty(field, items)
+    }
+    this.blurProperty()
+  }
+
+  commitNumberProperty(field: string) {
+    const raw = this.numberDrafts[field]
+    if (raw !== undefined) {
+      this.clearFieldDraft(field)
+      if (raw.trim() === '') this.removeProperty(field)
+      else {
+        const parsed = parseFiniteNumber(raw)
+        if (parsed !== undefined) this.writeProperty(field, parsed)
+      }
+    }
+    this.blurProperty()
+  }
+
+  blurProperty() {
+    void this.flush().catch((error: unknown) => {
+      this.error = errorText(error)
+    })
+  }
+
+  numberText(field: string): string {
+    if (Object.hasOwn(this.numberDrafts, field)) return this.numberDrafts[field] ?? ''
+    const value = this.active?.properties[field]
+    return typeof value === 'number' ? String(value) : ''
+  }
+
+  listText(field: string): string {
+    if (Object.hasOwn(this.listDrafts, field)) return this.listDrafts[field] ?? ''
+    return formatProperty(this.active?.properties[field])
   }
 
   propertyText(field: string): string {
@@ -309,6 +436,7 @@ export class VaultService extends Service {
     this.cancelPending()
     this.notes = notes
     this.docEpoch += 1
+    this.resetPropertyEditor()
     if (!notes.some((note) => note.id === this.activeId)) {
       this.activeId = notes[0]?.id ?? ''
     }
@@ -328,9 +456,12 @@ export class VaultService extends Service {
     const id = this.pendingId
     if (!id) return
     this.pendingId = ''
+    const generation = this.saveGeneration
     const note = this.notes.find((item) => item.id === id)
     if (!note || !this.fs) return
     const saved = await saveNote(this.fs, noteForSave(note))
+    // A newer edit landed while the file write was in flight.
+    if (generation !== this.saveGeneration) return
     this.replace(saved)
     await this.upsertIndexed(saved)
   }
@@ -356,6 +487,7 @@ export class VaultService extends Service {
     this.searchQuery = ''
     this.searchMode = ''
     this.renameFromHeading = await readRenameFromHeading(backend)
+    this.resetPropertyEditor()
     this.phase = 'ready'
   }
 
@@ -376,11 +508,41 @@ export class VaultService extends Service {
 
   private schedule(id: string) {
     this.pendingId = id
+    this.saveGeneration += 1
     if (this.docTimer) clearTimeout(this.docTimer)
     this.docTimer = setTimeout(() => {
       void this.flush().catch((error: unknown) => {
         this.error = errorText(error)
       })
     }, 350)
+  }
+
+  private writeProperty(field: string, value: NoteProperty) {
+    const current = this.active
+    if (!current) return
+    this.replace({ ...current, properties: { ...current.properties, [field]: value } })
+    this.schedule(current.id)
+  }
+
+  private clearFieldDraft(field: string) {
+    if (Object.hasOwn(this.numberDrafts, field)) {
+      const numberDrafts = { ...this.numberDrafts }
+      delete numberDrafts[field]
+      this.numberDrafts = numberDrafts
+    }
+    if (Object.hasOwn(this.listDrafts, field)) {
+      const listDrafts = { ...this.listDrafts }
+      delete listDrafts[field]
+      this.listDrafts = listDrafts
+    }
+  }
+
+  private resetPropertyEditor() {
+    this.propertyName = ''
+    this.propertyType = 'string'
+    this.propertyValue = ''
+    this.propertyChecked = false
+    this.numberDrafts = {}
+    this.listDrafts = {}
   }
 }
