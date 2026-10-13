@@ -154,7 +154,7 @@
 
 ## 里程碑建议
 
-- **M1（基座可用）**：Phase 0 + Phase 1 核心（T1.1-T1.7）→ Chrome 里可调试的笔记库
+- **M1（基座可用）**：Phase 0 + Phase 1（T1.1-T1.11）→ Chrome 里可调试的笔记库
 - **M2（编辑器与搜索）**：Phase 2 核心（T2.1-T2.9）+ Phase 3 → 日常可记录可检索
 - **M3（Agent 与 Git）**：Phase 4 核心（T4.1-T4.7）+ Phase 5 核心（T5.1-T5.6）→ 复刻 tolaria 主体体验
 - **M4（产品化）**：Phase 6-8 → UI 完备 + 可发布

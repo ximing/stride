@@ -40,9 +40,9 @@
 | 2.5 | Wikilink | `[[note]]` 内联原子节点；未解析目标点击即创建；路径后缀解析 | P0 |
 | 2.6 | Backlinks | Inspector 面板反链列表，点击导航 | P0 |
 | 2.7 | 关系字段 | 值为 wikilink 的属性自动识别为关系（belongs_to/related_to/has…），人性化显示 | P0 |
-| 2.8 | Inbox | 无类型/无出链笔记的派生集合；整理后自动前进下一条（可关） | P1 |
+| 2.8 | Inbox | 没有出站属性 wikilink 的笔记（类型不限，正文 wikilink 不算）。类型文档仍在图里，但不计入 Inbox 计数。整理是给当前笔记补上出站属性 wikilink，然后前进到更靠后的下一条，不回头；可关 | P1 |
 | 2.9 | Neighborhood 模式 | 选中实体笔记 → 列表变"邻域"：源笔记置顶 + 出链分组 + 反链分组，可 pivot | P2 |
-| 2.10 | 重命名/移动全局改写 | 重命名笔记时重写全库 wikilink（crash-safe 事务）；附件同理 | P1 |
+| 2.10 | 重命名/移动全局改写 | 重命名笔记标题时重写全库 wikilink（crash-safe 事务）。文件夹移动只改路径，不改写 wikilink。附件同理 | P1 |
 | 2.11 | Archive | `archived: true` 默认从列表隐藏；删除为永久删除 | P1 |
 | 2.12 | 图谱视图（可选） | 力导向关系图页面（tolaria 刻意不做，作为 Stride 增量能力） | P3 |
 
