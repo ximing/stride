@@ -6,6 +6,8 @@
   "permissions": [
     "core:default",
     "process:default",
+    "keyring:allow-get-password",
+    "keyring:allow-set-password",
     {
       "identifier": "shell:allow-execute",
       "allow": [

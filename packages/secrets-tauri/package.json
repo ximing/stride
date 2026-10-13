@@ -1,0 +1,21 @@
+{
+  "name": "@stride/secrets-tauri",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@stride/platform": "workspace:*",
+    "tauri-plugin-keyring-api": "^0.1.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.2",
+    "vitest": "^3.0.5"
+  }
+}
