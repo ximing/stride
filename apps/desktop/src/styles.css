@@ -89,6 +89,12 @@ button:hover { border-color: var(--ink); }
   gap: 0.8rem;
 }
 
+.chooser-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+
 .chooser-form label, .field span, .panel label span {
   display: block;
   font-size: 0.75rem;

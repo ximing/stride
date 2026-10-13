@@ -51,7 +51,12 @@ const Chooser = observer(function Chooser() {
             placeholder="/path/to/vault"
           />
         </label>
-        <button className="primary" type="submit" data-testid="open-vault">Open vault</button>
+        <div className="chooser-actions">
+          <button className="primary" type="submit" data-testid="open-vault">Open vault</button>
+          <button className="primary" type="button" data-testid="new-vault" onClick={() => void vault.createNewVault()}>
+            New vault
+          </button>
+        </div>
         {vault.error && <p className="error">{vault.error}</p>}
       </form>
     </section>
@@ -60,24 +65,43 @@ const Chooser = observer(function Chooser() {
 
 const Rail = observer(function Rail() {
   const vault = useService(VaultService)
-  const types = [...vault.graph.byType.keys()]
+  const typeDocs = vault.typeDocuments
+  const fallbackTypes = typeDocs.length === 0 ? [...vault.graph.byType.keys()] : []
   return (
     <aside className="rail">
       <button type="button" data-testid="new-note" className="primary" onClick={() => vault.createNote()}>New note</button>
       <div className="group-label">Views</div>
       <button type="button" className={vault.listFilter === 'all' ? 'active' : ''} onClick={() => vault.setFilter('all')}>All</button>
       <button type="button" className={vault.listFilter === 'inbox' ? 'active' : ''} onClick={() => vault.setFilter('inbox')}>
-        Inbox ({vault.graph.inbox.length})
+        Inbox ({vault.inboxCount})
       </button>
       <div className="group-label">Types</div>
-      {types.map((type) => (
+      {typeDocs.map((note) => (
+        <button
+          key={note.id}
+          type="button"
+          data-testid="type-link"
+          data-type={note.title}
+          className={vault.listFilter === note.title ? 'active' : ''}
+          onClick={() => vault.setFilter(note.title)}
+        >
+          {note.title}
+        </button>
+      ))}
+      {fallbackTypes.map((type) => (
         <button key={type} type="button" className={vault.listFilter === type ? 'active' : ''} onClick={() => vault.setFilter(type)}>
           {type}
         </button>
       ))}
       <div className="group-label">Notes</div>
       {vault.visibleNotes.map((note) => (
-        <button key={note.id} type="button" className={vault.activeId === note.id ? 'active' : ''} onClick={() => vault.select(note.id)}>
+        <button
+          key={note.id}
+          type="button"
+          data-testid="note-link"
+          className={vault.activeId === note.id ? 'active' : ''}
+          onClick={() => vault.select(note.id)}
+        >
           {note.title}
         </button>
       ))}

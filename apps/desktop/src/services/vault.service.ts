@@ -17,6 +17,7 @@ import {
 } from '@stride/platform'
 import { EmbeddingClient } from '../../../../packages/core/src/embeddings'
 import { noteIndex, searchNotes, type NoteIndex } from '../../../../packages/core/src/search'
+import { initializeVault } from '../../../../packages/core/src/seed'
 import { createVaultNote, openVault, saveNote } from '../../../../packages/core/src/vault'
 
 // The browser has no home directory. openVault only uses this to reject broad personal roots.
@@ -41,6 +42,32 @@ function errorText(error: unknown): string {
 
 function indexText(note: StrideNote): string {
   return `${note.title}\n${plainText(note.doc)}`
+}
+
+function isTypeDocument(note: StrideNote): boolean {
+  return note.type === 'Type'
+}
+
+function typeOrder(note: StrideNote): number {
+  const raw = note.properties._order
+  const text = Array.isArray(raw) ? raw[0] ?? '' : raw ?? ''
+  const value = Number(text)
+  return Number.isFinite(value) ? value : Number.POSITIVE_INFINITY
+}
+
+function hasTauriInternals(): boolean {
+  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+}
+
+async function pickVaultBackend(): Promise<FileSystemBackend> {
+  if (!hasTauriInternals()) return pickVaultDirectory()
+  const dialog = await import('@tauri-apps/plugin-dialog')
+  const selected = await dialog.open({ directory: true, multiple: false })
+  if (typeof selected !== 'string' || selected === '') {
+    throw new Error('The user aborted a request.')
+  }
+  const { TauriFileSystem } = await import('@stride/fs-tauri')
+  return new TauriFileSystem(selected)
 }
 
 export class VaultService extends Service {
@@ -86,14 +113,25 @@ export class VaultService extends Service {
     return buildGraph(this.notes)
   }
 
+  get typeDocuments(): StrideNote[] {
+    return this.notes
+      .filter((note) => isTypeDocument(note))
+      .sort((a, b) => typeOrder(a) - typeOrder(b) || a.title.localeCompare(b.title))
+  }
+
+  get inboxCount(): number {
+    return this.graph.inbox.filter((note) => !isTypeDocument(note)).length
+  }
+
   get visibleNotes(): StrideNote[] {
+    const listed = (notes: StrideNote[]) => notes.filter((note) => !isTypeDocument(note))
     if (this.searchHits.length && this.searchQuery.trim()) {
       const ids = new Set(this.searchHits.map((hit) => hit.id))
-      return this.notes.filter((note) => ids.has(note.id))
+      return listed(this.notes.filter((note) => ids.has(note.id)))
     }
-    if (this.listFilter === 'inbox') return this.graph.inbox
-    if (this.listFilter !== 'all') return this.graph.byType.get(this.listFilter) ?? []
-    return this.notes
+    if (this.listFilter === 'inbox') return listed(this.graph.inbox)
+    if (this.listFilter !== 'all') return listed(this.graph.byType.get(this.listFilter) ?? [])
+    return listed(this.notes)
   }
 
   async restoreOpened() {
@@ -112,7 +150,20 @@ export class VaultService extends Service {
     try {
       const backend = isMemoryFixture()
         ? new MemoryFileSystem('memory-vault')
-        : await pickVaultDirectory()
+        : await pickVaultBackend()
+      await this.openBackend(backend)
+    } catch (error) {
+      this.error = errorText(error)
+    }
+  }
+
+  async createNewVault() {
+    this.error = ''
+    try {
+      const backend = isMemoryFixture()
+        ? new MemoryFileSystem('memory-vault')
+        : await pickVaultBackend()
+      await initializeVault(backend, HOME_DIR)
       await this.openBackend(backend)
     } catch (error) {
       this.error = errorText(error)
@@ -235,7 +286,7 @@ export class VaultService extends Service {
     this.broad = opened.broad
     this.notes = opened.notes
     this.docEpoch += 1
-    this.activeId = opened.notes[0]?.id ?? ''
+    this.activeId = opened.notes.find((note) => !isTypeDocument(note))?.id ?? ''
     this.listFilter = 'all'
     this.searchHits = []
     this.searchQuery = ''
