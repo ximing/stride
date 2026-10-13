@@ -8,6 +8,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { notePath, readNoteFile } from '../../../../packages/core/src/vault'
 import { App, Rail } from '../app'
 import { ChatService, GitService, SettingsService, UpdateService } from './panels.service'
+import { FolderService } from './folder.service'
 import { VAULT_REGISTRY_KEY, VaultService } from './vault.service'
 
 function sample(id: string, title: string): StrideNote {
@@ -45,6 +46,7 @@ describe('VaultService', () => {
 
   it('re-renders an observer when the service changes', async () => {
     register(VaultService)
+    register(FolderService)
     const service = resolve(VaultService)
     const View = observer(function View() {
       const vault = useService(VaultService)
@@ -67,6 +69,7 @@ describe('VaultService', () => {
 
   it('keeps a spaced title and does not rewrite a partial wikilink', () => {
     register(VaultService)
+    register(FolderService)
     const vault = resolve(VaultService)
     const parent = sample('other-note', 'Other note')
     const child = sample('child', 'Child')
@@ -93,6 +96,7 @@ describe('VaultService', () => {
     const picker = vi.fn()
     vi.stubGlobal('showDirectoryPicker', picker)
     register(VaultService)
+    register(FolderService)
     register(GitService)
     const vault = resolve(VaultService)
     await vault.restoreOpened()
@@ -141,6 +145,7 @@ describe('VaultService', () => {
   it('renames on commitHeadingRename and keeps the new id searchable', async () => {
     useMemoryFixture()
     register(VaultService)
+    register(FolderService)
     const vault = resolve(VaultService)
     await vault.openFromDraft()
     await vault.createNote()
@@ -180,6 +185,7 @@ describe('VaultService', () => {
   it('leaves the untitled filename when renameFromHeading is false', async () => {
     useMemoryFixture()
     register(VaultService)
+    register(FolderService)
     const vault = resolve(VaultService)
     await vault.openFromDraft()
     await vault.createNote()
@@ -206,6 +212,7 @@ describe('VaultService', () => {
   it('rewrites wikilinks when a real heading title changes', async () => {
     useMemoryFixture()
     register(VaultService)
+    register(FolderService)
     const vault = resolve(VaultService)
     await vault.openFromDraft()
     await vault.createNote()
@@ -243,6 +250,7 @@ describe('VaultService', () => {
   it('does not rewrite wikilinks when renameFromHeading is false', async () => {
     useMemoryFixture()
     register(VaultService)
+    register(FolderService)
     const vault = resolve(VaultService)
     await vault.openFromDraft()
     await vault.createNote()
@@ -283,6 +291,7 @@ describe('VaultService', () => {
       throw new PlatformError('io', 'The user aborted a request.')
     }))
     register(VaultService)
+    register(FolderService)
     const vault = resolve(VaultService)
     await expect(vault.openFromDraft()).resolves.toBeUndefined()
     expect(vault.phase).toBe('chooser')
@@ -294,6 +303,7 @@ describe('VaultService', () => {
     const picker = vi.fn()
     vi.stubGlobal('showDirectoryPicker', picker)
     register(VaultService)
+    register(FolderService)
     register(GitService)
     register(SettingsService)
     register(ChatService)
@@ -326,6 +336,7 @@ describe('VaultService', () => {
     window.history.replaceState(null, '', '/')
     localStorage.removeItem(VAULT_REGISTRY_KEY)
     register(VaultService)
+    register(FolderService)
     const vault = resolve(VaultService)
     vault.upsertVault({ id: 'v1', label: 'Notes', color: '', icon: '', lastOpened: '2026-01-01T00:00:00.000Z' })
     vault.upsertVault({
@@ -352,6 +363,7 @@ describe('VaultService', () => {
     const picker = vi.fn()
     vi.stubGlobal('showDirectoryPicker', picker)
     register(VaultService)
+    register(FolderService)
     const vault = resolve(VaultService)
     await vault.openFromDraft()
     const id = vault.activeVaultId
@@ -377,6 +389,7 @@ describe('VaultService', () => {
     const picker = vi.fn()
     vi.stubGlobal('showDirectoryPicker', picker)
     register(VaultService)
+    register(FolderService)
     const vault = resolve(VaultService)
     await vault.restoreOpened()
     expect(vault.phase).toBe('chooser')
@@ -390,6 +403,7 @@ describe('VaultService', () => {
     vi.stubGlobal('showDirectoryPicker', picker)
     Reflect.deleteProperty(globalThis, 'indexedDB')
     register(VaultService)
+    register(FolderService)
     const vault = resolve(VaultService)
     const current = new MemoryFileSystem('current')
     vault.fs = current
@@ -415,6 +429,7 @@ describe('VaultService', () => {
     const picker = vi.fn()
     vi.stubGlobal('showDirectoryPicker', picker)
     register(VaultService)
+    register(FolderService)
     register(GitService)
     register(SettingsService)
     register(ChatService)
@@ -460,6 +475,7 @@ describe('VaultService', () => {
   it('advances to the next inbox note after an outgoing property link', async () => {
     useMemoryFixture()
     register(VaultService)
+    register(FolderService)
     const vault = resolve(VaultService)
     await vault.openFromDraft()
     await vault.setRenameFromHeading(true)
@@ -514,6 +530,7 @@ describe('VaultService', () => {
   it('does not leave the inbox or advance when only the type or body changes', async () => {
     useMemoryFixture()
     register(VaultService)
+    register(FolderService)
     const vault = resolve(VaultService)
     await vault.openFromDraft()
     vault.notes = [sample('loose', 'Loose'), sample('other', 'Other')]
@@ -539,6 +556,7 @@ describe('VaultService', () => {
   it('clears the selection instead of opening a type document', async () => {
     useMemoryFixture()
     register(VaultService)
+    register(FolderService)
     const vault = resolve(VaultService)
     await vault.openFromDraft()
     const typeDoc: StrideNote = { ...sample('project-type', 'Project'), type: 'Type' }
@@ -555,6 +573,7 @@ describe('VaultService', () => {
 
   it('shows the advance checkbox only while the inbox filter is selected', async () => {
     register(VaultService)
+    register(FolderService)
     const vault = resolve(VaultService)
     vault.setFilter('all')
     vault.advanceInbox = true

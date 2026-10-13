@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App } from '../app'
 import { ChatService, GitService, SettingsService, UpdateService } from './panels.service'
+import { FolderService } from './folder.service'
 import { VaultService } from './vault.service'
 
 function useMemoryFixture() {
@@ -25,6 +26,7 @@ describe('vault open and new', () => {
     const picker = vi.fn()
     vi.stubGlobal('showDirectoryPicker', picker)
     register(VaultService)
+    register(FolderService)
     register(GitService)
     register(SettingsService)
     register(ChatService)
@@ -66,6 +68,7 @@ describe('vault open and new', () => {
     const picker = vi.fn()
     vi.stubGlobal('showDirectoryPicker', picker)
     register(VaultService)
+    register(FolderService)
     register(GitService)
     register(SettingsService)
     register(ChatService)
@@ -105,6 +108,7 @@ describe('vault open and new', () => {
     const picker = vi.fn()
     vi.stubGlobal('showDirectoryPicker', picker)
     register(VaultService)
+    register(FolderService)
     register(GitService)
     register(SettingsService)
     register(ChatService)

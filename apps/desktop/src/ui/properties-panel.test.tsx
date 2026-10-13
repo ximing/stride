@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it } from 'vitest'
 import { notePath, readNoteFile } from '../../../../packages/core/src/vault'
 import { App } from '../app'
+import { FolderService } from '../services/folder.service'
 import { ChatService, GitService, SettingsService, UpdateService } from '../services/panels.service'
 import { VaultService } from '../services/vault.service'
 import { PropertiesPanel } from './properties-panel'
@@ -256,6 +257,7 @@ describe('PropertiesPanel', () => {
   it('archives the active note out of the list and deletes it after confirmation', async () => {
     useMemoryFixture()
     register(VaultService)
+    register(FolderService)
     register(GitService)
     register(SettingsService)
     register(ChatService)

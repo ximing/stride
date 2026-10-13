@@ -1,0 +1,101 @@
+import { Service } from '@rabjs/react'
+import {
+  createFolder as createFolderOnDisk,
+  deleteFolder as deleteFolderOnDisk,
+  listFolders,
+  moveNotePath,
+  renameFolder as renameFolderOnDisk,
+} from '../../../../packages/core/src/folders'
+import { VaultService } from './vault.service'
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
+export class FolderService extends Service {
+  folders: string[] = []
+
+  private get vault() {
+    return this.resolve(VaultService)
+  }
+
+  async loadFolders() {
+    const fs = this.vault.fs
+    if (!fs) {
+      this.folders = []
+      return
+    }
+    try {
+      this.folders = await listFolders(fs)
+    } catch (error) {
+      this.vault.error = errorText(error)
+    }
+  }
+
+  async createFolder(path: string) {
+    const fs = this.vault.fs
+    if (!fs) return
+    try {
+      await createFolderOnDisk(fs, path)
+      this.vault.error = ''
+      this.vault.docEpoch += 1
+      await this.loadFolders()
+    } catch (error) {
+      this.vault.error = errorText(error)
+    }
+  }
+
+  async renameFolder(from: string, to: string) {
+    const fs = this.vault.fs
+    if (!fs) return
+    try {
+      await renameFolderOnDisk(fs, from, to)
+      const nextId = (id: string) =>
+        id === from || id.startsWith(`${from}/`) ? to + id.slice(from.length) : id
+      this.vault.notes = this.vault.notes.map((note) => {
+        const id = nextId(note.id)
+        return id === note.id ? note : { ...note, id }
+      })
+      this.vault.activeId = nextId(this.vault.activeId)
+      this.vault.docEpoch += 1
+      this.vault.error = ''
+      await this.loadFolders()
+    } catch (error) {
+      this.vault.error = errorText(error)
+    }
+  }
+
+  async deleteFolder(path: string) {
+    const fs = this.vault.fs
+    if (!fs) return
+    try {
+      await deleteFolderOnDisk(
+        fs,
+        path,
+        this.vault.notes.map((note) => note.id),
+      )
+      this.vault.error = ''
+      this.vault.docEpoch += 1
+      await this.loadFolders()
+    } catch (error) {
+      this.vault.error = errorText(error)
+    }
+  }
+
+  async moveNote(fromId: string, destFolder: string) {
+    const fs = this.vault.fs
+    if (!fs) return
+    try {
+      const toId = await moveNotePath(fs, fromId, destFolder)
+      if (toId !== fromId) {
+        this.vault.notes = this.vault.notes.map((note) => (note.id === fromId ? { ...note, id: toId } : note))
+        if (this.vault.activeId === fromId) this.vault.activeId = toId
+      }
+      this.vault.docEpoch += 1
+      this.vault.error = ''
+      await this.loadFolders()
+    } catch (error) {
+      this.vault.error = errorText(error)
+    }
+  }
+}

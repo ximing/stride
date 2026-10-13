@@ -15,6 +15,7 @@ import { NoteEditor } from './editor'
 import { ChatService, GitService, SettingsService, UpdateService } from './services/panels.service'
 import { VaultService } from './services/vault.service'
 import { Mark } from './ui/icon'
+import { FolderTree } from './ui/folder-tree'
 import { PropertiesPanel } from './ui/properties-panel'
 
 const TYPE_ICONS: Record<string, Icon> = {
@@ -196,17 +197,7 @@ export const Rail = observer(function Rail() {
         </button>
       ))}
       <div className="group-label">Notes</div>
-      {vault.visibleNotes.map((note) => (
-        <button
-          key={note.id}
-          type="button"
-          data-testid="note-link"
-          className={vault.activeId === note.id ? 'active' : ''}
-          onClick={() => vault.select(note.id)}
-        >
-          {note.title}
-        </button>
-      ))}
+      <FolderTree />
     </aside>
   )
 })

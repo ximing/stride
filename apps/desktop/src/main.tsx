@@ -3,6 +3,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './app'
 import { ChatService, GitService, SettingsService, UpdateService } from './services/panels.service'
+import { FolderService } from './services/folder.service'
 import { VaultService } from './services/vault.service'
 import './styles.css'
 
@@ -19,6 +20,7 @@ if (showComponents) {
   })
 } else {
   register(VaultService)
+  register(FolderService)
   register(GitService)
   register(SettingsService)
   register(ChatService)

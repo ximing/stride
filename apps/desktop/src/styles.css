@@ -414,3 +414,53 @@ textarea {
   margin-top: 20vh;
   color: var(--muted);
 }
+
+.folder-tree {
+  color: var(--rail-ink);
+}
+
+.folder-create,
+.folder-row-main {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.folder-create {
+  flex-direction: column;
+  align-items: stretch;
+  margin: 0.35rem 0;
+}
+
+.folder-label {
+  flex: 1;
+  min-width: 0;
+  padding: 0.35rem 0.55rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-children {
+  margin-left: 0.85rem;
+}
+
+.folder-row {
+  margin-top: 0.15rem;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--rail-ink) 8%, var(--rail));
+}
+
+.rail .folder-row-main button,
+.rail .folder-create button {
+  width: auto;
+}
+
+.folder-tree input {
+  width: 100%;
+  color: var(--rail-ink);
+  background: var(--rail);
+  border: 1px solid color-mix(in srgb, var(--rail-ink) 35%, var(--rail));
+  border-radius: 8px;
+  padding: 0.35rem 0.55rem;
+}

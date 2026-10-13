@@ -5,6 +5,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { readNoteFile } from '../../../../packages/core/src/vault'
 import { Rail } from '../app'
+import { FolderService } from './folder.service'
 import { VaultService } from './vault.service'
 
 let root: Root | undefined
@@ -42,6 +43,7 @@ async function mountRail(): Promise<{ host: HTMLElement; vault: VaultService }> 
   useMemoryFixture()
   vi.stubGlobal('showDirectoryPicker', vi.fn())
   register(VaultService)
+  register(FolderService)
   const vault = resolve(VaultService)
   vault.collapsedTypes = []
   vault.cancelPending()
