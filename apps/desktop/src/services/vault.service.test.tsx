@@ -95,8 +95,9 @@ describe('VaultService', () => {
     expect(vault.fs).toBeTruthy()
 
     await vault.createNote()
-    expect(vault.active?.id).toBe('untitled')
+    expect(vault.active?.id).toMatch(/^untitled-[a-z0-9]{4}$/)
     expect(vault.active?.title).toBe('Untitled')
+    const id = vault.active?.id ?? ''
 
     vault.updateTitle('Field notes')
     vault.updateDoc({
@@ -105,22 +106,89 @@ describe('VaultService', () => {
     })
     await vi.advanceTimersByTimeAsync(350)
 
-    const saved = await readNoteFile(vault.fs!, 'untitled.stride.json', 'untitled')
+    const saved = await readNoteFile(vault.fs!, `${id}.stride.json`, id)
     expect(saved.title).toBe('Field notes')
     expect(plainText(saved.doc)).toContain('zephyrword')
+    expect(await vault.fs!.stat(`${id}.stride.json`)).not.toBeNull()
+    expect(await vault.fs!.stat('field-notes.stride.json')).toBeNull()
 
     vault.searchQuery = 'zephyrword'
     await vault.runSearch()
     expect(vault.error).toBe('')
     expect(vault.searchMode).toBe('text')
-    expect(vault.searchHits.some((hit) => hit.id === 'untitled')).toBe(true)
-    expect(vault.visibleNotes.map((note) => note.id)).toEqual(['untitled'])
+    expect(vault.searchHits.some((hit) => hit.id === id)).toBe(true)
+    expect(vault.visibleNotes.map((note) => note.id)).toEqual([id])
 
     vault.updateTitle('Flushed title')
     await resolve(GitService).commit()
-    const flushed = await readNoteFile(vault.fs!, 'untitled.stride.json', 'untitled')
+    const flushed = await readNoteFile(vault.fs!, `${id}.stride.json`, id)
     expect(flushed.title).toBe('Flushed title')
     expect(resolve(GitService).output).toBe('Git is not available in the browser')
+  })
+
+  it('renames on commitHeadingRename and keeps the new id searchable', async () => {
+    useMemoryFixture()
+    register(VaultService)
+    const vault = resolve(VaultService)
+    await vault.openFromDraft()
+    await vault.createNote()
+    const oldId = vault.active?.id ?? ''
+    expect(oldId).toMatch(/^untitled-[a-z0-9]{4}$/)
+    vault.updateTitle('Field notes')
+    vault.updateDoc({
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'zephyrword' }] }],
+    })
+    await vault.commitHeadingRename()
+    expect(vault.error).toBe('')
+    expect(vault.active?.id).toBe('field-notes')
+    expect(await vault.fs!.stat(`${oldId}.stride.json`)).toBeNull()
+    const saved = await readNoteFile(vault.fs!, 'field-notes.stride.json', 'field-notes')
+    expect(saved.title).toBe('Field notes')
+    expect(saved.doc.content?.[0]).toMatchObject({ type: 'heading', attrs: { level: 1 } })
+    expect(plainText(saved.doc.content?.[0] ?? { type: 'doc' })).toBe('Field notes')
+
+    await vault.createNote()
+    const secondId = vault.active?.id ?? ''
+    expect(secondId).toMatch(/^untitled-[a-z0-9]{4}$/)
+    vault.updateDoc({
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'secondquark' }] }],
+    })
+    await vault.flush()
+    vault.searchQuery = 'zephyrword'
+    await vault.runSearch()
+    expect(vault.searchHits.some((hit) => hit.id === 'field-notes')).toBe(true)
+    expect(vault.searchHits.some((hit) => hit.id === oldId)).toBe(false)
+    vault.searchQuery = 'secondquark'
+    await vault.runSearch()
+    expect(vault.searchHits.some((hit) => hit.id === secondId)).toBe(true)
+  })
+
+  it('leaves the untitled filename when renameFromHeading is false', async () => {
+    useMemoryFixture()
+    register(VaultService)
+    const vault = resolve(VaultService)
+    await vault.openFromDraft()
+    await vault.createNote()
+    const id = vault.active?.id ?? ''
+    await vault.setRenameFromHeading(false)
+    vault.updateTitle('Field notes')
+    await vault.commitHeadingRename()
+    expect(vault.active?.id).toBe(id)
+    expect(await vault.fs!.stat(`${id}.stride.json`)).not.toBeNull()
+    expect(await vault.fs!.stat('field-notes.stride.json')).toBeNull()
+    const saved = await readNoteFile(vault.fs!, `${id}.stride.json`, id)
+    expect(saved.title).toBe('Field notes')
+    expect(saved.doc.content?.[0]).toMatchObject({ type: 'heading', attrs: { level: 1 } })
+    const marker = JSON.parse(await vault.fs!.readText('.stride/vault.json')) as {
+      kind?: string
+      version?: number
+      renameFromHeading?: boolean
+    }
+    expect(marker.kind).toBe('stride-vault')
+    expect(marker.version).toBe(1)
+    expect(marker.renameFromHeading).toBe(false)
   })
 
   it('keeps a cancelled directory picker on the chooser', async () => {

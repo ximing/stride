@@ -13,6 +13,7 @@ export interface NoteIndex {
   dim: number
   lastQuery: SearchQuery | null
   upsert(docs: { id: string; text: string; vector?: number[] }[]): Promise<void>
+  remove(ids: string[]): Promise<void>
   search(query: SearchQuery): Promise<SearchHit[]>
   close(): Promise<void>
 }
@@ -23,6 +24,9 @@ export function noteIndex(backend: SearchBackend, dim: number): NoteIndex {
     lastQuery: null,
     upsert(docs) {
       return backend.upsert(docs)
+    },
+    remove(ids) {
+      return backend.remove(ids)
     },
     async search(query) {
       index.lastQuery = query

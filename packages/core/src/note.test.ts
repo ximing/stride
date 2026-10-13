@@ -1,8 +1,18 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MemoryFileSystem } from '@stride/platform'
 import { buildGraph, relationsOf } from './graph.ts'
-import { findMark, formatProperty, headingText, parsePropertyInput, plainText, type TipTapNode } from './note.ts'
-import { notePath, openVault, readNoteFile, saveNote } from './vault.ts'
+import {
+  findMark,
+  firstH1Text,
+  formatProperty,
+  headingText,
+  noteForSave,
+  parseNote,
+  parsePropertyInput,
+  plainText,
+  type TipTapNode,
+} from './note.ts'
+import { createVaultNote, nextSlugId, notePath, openVault, readNoteFile, saveNote } from './vault.ts'
 
 const filesystems: MemoryFileSystem[] = []
 
@@ -110,5 +120,117 @@ describe('note codec', () => {
     expect(await files.stat('outside.stride.json')).toBeNull()
     expect(notePath('inside')).toBe('inside.stride.json')
     await expect(files.stat('../outside.stride.json')).rejects.toThrow(/escape/i)
+  })
+
+  it('reads the first H1 and ignores earlier headings of other levels', () => {
+    const doc: TipTapNode = {
+      type: 'doc',
+      content: [
+        { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Not the title' }] },
+        { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'Real title' }] },
+        { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'Later' }] },
+      ],
+    }
+    expect(firstH1Text(doc)).toBe('Real title')
+    expect(headingText(doc)).toBe('Not the title')
+    expect(firstH1Text({
+      type: 'doc',
+      content: [{ type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Only a subhead' }] }],
+    })).toBe('')
+  })
+
+  it('lets a leading H1 win over a stale title and does not double an existing H1', () => {
+    const doc: TipTapNode = {
+      type: 'doc',
+      content: [
+        { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'Fresh' }] },
+        { type: 'paragraph', content: [{ type: 'text', text: 'body' }] },
+      ],
+    }
+    const raw = JSON.stringify({
+      format: 'tiptap',
+      title: 'Stale',
+      type: 'note',
+      properties: {},
+      doc,
+    })
+    expect(parseNote(raw, 'fresh').title).toBe('Fresh')
+    const kept = parseNote(JSON.stringify({
+      format: 'tiptap',
+      title: 'Kept',
+      type: 'note',
+      properties: {},
+      doc: {
+        type: 'doc',
+        content: [
+          { type: 'paragraph' },
+          { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text: 'Later' }] },
+        ],
+      },
+    }), 'kept')
+    expect(kept.title).toBe('Kept')
+    expect(firstH1Text(kept.doc)).toBe('Later')
+
+    const prepared = noteForSave({
+      id: 'round-trip',
+      title: 'Fresh',
+      type: 'note',
+      properties: {},
+      doc,
+    })
+    expect(prepared.doc.content?.filter((node) => node.type === 'heading')).toHaveLength(1)
+    expect(plainText(prepared.doc.content?.[0] ?? { type: 'doc' })).toBe('Fresh')
+    expect(prepared.doc.content?.[1]).toEqual(doc.content?.[1])
+  })
+
+  it('allocates untitled-xxxx, retries collisions, and keeps a real title slug', async () => {
+    const files = vault('/tmp/stride-untitled')
+    const scripted = [
+      [0, 0, 0, 0],
+      [1, 2, 3, 4],
+    ]
+    let call = 0
+    const spy = vi.spyOn(globalThis.crypto, 'getRandomValues').mockImplementation((array) => {
+      const view = new Uint8Array(array.buffer, array.byteOffset, array.byteLength)
+      const bytes = scripted[Math.min(call, scripted.length - 1)] ?? []
+      call += 1
+      for (let i = 0; i < view.length; i += 1) view[i] = bytes[i] ?? 0
+      return array
+    })
+    try {
+      await files.writeText('untitled-0000.stride.json', '{}\n')
+      const note = await createVaultNote(files)
+      expect(call).toBeGreaterThanOrEqual(2)
+      expect(note.id).toBe('untitled-1234')
+      expect(note.title).toBe('Untitled')
+      expect(note.doc.content?.some((node) => node.type === 'heading')).toBe(false)
+      expect(await files.stat('untitled-1234.stride.json')).not.toBeNull()
+    } finally {
+      spy.mockRestore()
+    }
+
+    const blank = await createVaultNote(files, ' ')
+    expect(blank.id).toMatch(/^untitled-[a-z0-9]{4}$/)
+    expect(blank.id).not.toBe('untitled-0000')
+    expect(blank.title).toBe('Untitled')
+    const alias = await createVaultNote(files, 'untitled')
+    expect(alias.id).toMatch(/^untitled-[a-z0-9]{4}$/)
+    expect(alias.title).toBe('Untitled')
+
+    const status = await createVaultNote(files, 'Status')
+    expect(status.id).toBe('status')
+  })
+
+  it('suffixes a rename when the slug is taken and skips the current file', async () => {
+    const files = vault('/tmp/stride-rename')
+    const status = await createVaultNote(files, 'Status')
+    expect(status.id).toBe('status')
+    expect(await nextSlugId(files, 'Status', status.id)).toBe('status')
+    const other = await createVaultNote(files, 'Other')
+    expect(await nextSlugId(files, 'Status', other.id)).toBe('status-2')
+    const second = await createVaultNote(files, 'Status')
+    expect(second.id).toBe('status-2')
+    expect(await nextSlugId(files, 'Status', 'status-2')).toBe('status-2')
+    expect(await nextSlugId(files, 'Status', 'fresh')).toBe('status-3')
   })
 })

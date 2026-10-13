@@ -2,6 +2,7 @@ import type { FileSystemBackend } from '@stride/platform'
 import {
   createNote,
   isNoteFileName,
+  isPlaceholderTitle,
   noteFileName,
   parseNote,
   serializeNote,
@@ -123,13 +124,31 @@ export async function saveNote(fs: FileSystemBackend, note: StrideNote): Promise
   return readNoteFile(fs, file, note.id)
 }
 
+function newUntitledId(): string {
+  const bytes = new Uint8Array(4)
+  globalThis.crypto.getRandomValues(bytes)
+  let suffix = ''
+  for (const byte of bytes) suffix += (byte % 36).toString(36)
+  return `untitled-${suffix}`
+}
+
 export async function createVaultNote(fs: FileSystemBackend, title = 'Untitled'): Promise<StrideNote> {
+  if (isPlaceholderTitle(title)) {
+    let id = newUntitledId()
+    while (await fs.stat(notePath(id))) id = newUntitledId()
+    return saveNote(fs, createNote(id, 'Untitled'))
+  }
+  const id = await nextSlugId(fs, title)
+  return saveNote(fs, createNote(id, title))
+}
+
+export async function nextSlugId(fs: FileSystemBackend, title: string, currentId = ''): Promise<string> {
   const base = slugTitle(title)
   let id = base
   let n = 2
-  while (await fs.stat(notePath(id))) {
+  while (id !== currentId && (await fs.stat(notePath(id)))) {
     id = `${base}-${n}`
     n += 1
   }
-  return saveNote(fs, createNote(id, title))
+  return id
 }

@@ -4,7 +4,7 @@ import { EditorContent, useEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import { useEffect, useState } from 'react'
 import { observer, useService } from '@rabjs/react'
-import type { TipTapNode } from '@stride/core/note'
+import { stripLeadingH1, type TipTapNode } from '@stride/core/note'
 import { VaultService } from './services/vault.service'
 
 const Wikilink = Node.create({
@@ -33,7 +33,7 @@ const NoteEditor = observer(function NoteEditor() {
       Wikilink,
       Placeholder.configure({ placeholder: 'Write in the vault…' }),
     ],
-    content: (note?.doc as object) || { type: 'doc', content: [{ type: 'paragraph' }] },
+    content: ((note ? stripLeadingH1(note.doc) : { type: 'doc', content: [{ type: 'paragraph' }] }) as object),
     onUpdate: ({ editor: current }) => {
       vault.updateDoc(current.getJSON() as TipTapNode)
     },
@@ -42,7 +42,7 @@ const NoteEditor = observer(function NoteEditor() {
   const docEpoch = vault.docEpoch
   useEffect(() => {
     if (!editor || !note) return
-    editor.commands.setContent(note.doc, { emitUpdate: false })
+    editor.commands.setContent(stripLeadingH1(note.doc), { emitUpdate: false })
   }, [editor, docEpoch, note?.id])
 
   const [linkDraft, setLinkDraft] = useState<string | null>(null)

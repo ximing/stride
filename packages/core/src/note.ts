@@ -78,9 +78,11 @@ export function parseNote(raw: string, id: string): StrideNote {
   if (file.format !== NOTE_FORMAT || !file.doc || file.doc.type !== 'doc') {
     throw new Error(`Note ${id} is not a TipTap document`)
   }
+  const storedTitle = typeof file.title === 'string' && file.title.trim() ? file.title : ''
+  const leading = leadingH1Text(file.doc)
   return {
     id,
-    title: typeof file.title === 'string' && file.title.trim() ? file.title : id,
+    title: leading || storedTitle || id,
     type: typeof file.type === 'string' && file.type.trim() ? file.type : 'note',
     properties: file.properties && typeof file.properties === 'object' ? file.properties : {},
     doc: file.doc,
@@ -128,6 +130,76 @@ export function headingText(doc: TipTapNode): string {
   }
   walk(doc)
   return text
+}
+
+export function isPlaceholderTitle(title: string): boolean {
+  const trimmed = title.trim()
+  return trimmed === '' || trimmed.toLowerCase() === 'untitled'
+}
+
+function isH1(node: TipTapNode | undefined): boolean {
+  return !!node && node.type === 'heading' && node.attrs?.level === 1
+}
+
+function leadingH1Text(doc: TipTapNode): string {
+  const first = doc.content?.[0]
+  if (!isH1(first)) return ''
+  return plainText(first)
+}
+
+export function firstH1Text(doc: TipTapNode): string {
+  let text = ''
+  const walk = (current: TipTapNode | undefined) => {
+    if (!current || text) return
+    if (current.type === 'heading' && current.attrs?.level === 1) {
+      text = plainText(current)
+      return
+    }
+    current.content?.forEach(walk)
+  }
+  walk(doc)
+  return text
+}
+
+function titleHeading(text: string): TipTapNode {
+  if (!text) return { type: 'heading', attrs: { level: 1 } }
+  return { type: 'heading', attrs: { level: 1 }, content: [{ type: 'text', text }] }
+}
+
+export function stripLeadingH1(doc: TipTapNode): TipTapNode {
+  const content = doc.content ?? []
+  if (!isH1(content[0])) return doc
+  const rest = content.slice(1)
+  return { type: 'doc', content: rest.length > 0 ? rest : [{ type: 'paragraph' }] }
+}
+
+export function composeNoteDoc(title: string, body: TipTapNode): TipTapNode {
+  const content = body.content ? [...body.content] : []
+  if (isPlaceholderTitle(title)) {
+    return { type: 'doc', content: content.length > 0 ? content : [{ type: 'paragraph' }] }
+  }
+  if (isH1(content[0]) && plainText(content[0]!) === title) return { type: 'doc', content }
+  return { type: 'doc', content: [titleHeading(title), ...content] }
+}
+
+export function applyTitle(doc: TipTapNode, title: string): TipTapNode {
+  return composeNoteDoc(title, stripLeadingH1(doc))
+}
+
+export function applyBody(title: string, body: TipTapNode): { title: string; doc: TipTapNode; lifted: boolean } {
+  const leading = body.content?.[0]
+  if (isH1(leading)) {
+    const lifted = plainText(leading)
+    if (lifted.trim()) {
+      return { title: lifted, doc: composeNoteDoc(lifted, stripLeadingH1(body)), lifted: true }
+    }
+  }
+  return { title, doc: composeNoteDoc(title, body), lifted: false }
+}
+
+export function noteForSave(note: StrideNote): StrideNote {
+  const title = isPlaceholderTitle(note.title) ? 'Untitled' : note.title
+  return { ...note, title, doc: composeNoteDoc(title, stripLeadingH1(note.doc)) }
 }
 
 export function slugTitle(title: string): string {

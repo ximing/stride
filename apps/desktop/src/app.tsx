@@ -291,7 +291,22 @@ const Workspace = observer(function Workspace() {
         <main className="stage">
           {note ? (
             <>
-              <input className="note-title" value={note.title} onChange={(event) => vault.updateTitle(event.target.value)} />
+              <input
+                className="note-title"
+                data-testid="note-title"
+                value={note.title}
+                onChange={(event) => vault.updateTitle(event.target.value)}
+                onBlur={() => { void vault.commitHeadingRename() }}
+              />
+              <label>
+                <input
+                  type="checkbox"
+                  data-testid="rename-from-heading"
+                  checked={vault.renameFromHeading}
+                  onChange={(event) => { void vault.setRenameFromHeading(event.target.checked) }}
+                />
+                Rename from heading
+              </label>
               <NoteEditor key={note.id} />
             </>
           ) : (
