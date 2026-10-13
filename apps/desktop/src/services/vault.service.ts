@@ -26,8 +26,11 @@ import { EmbeddingClient } from '../../../../packages/core/src/embeddings'
 import { noteIndex, searchNotes, type NoteIndex } from '../../../../packages/core/src/search'
 import { writeSampleNotes } from '../../../../packages/core/src/sample'
 import { initializeVault } from '../../../../packages/core/src/seed'
+import { compareTypeDocuments, isTypeVisible, nextTypeOrder, templateBody } from '../../../../packages/core/src/types'
 import { readRenameFromHeading, writeRenameFromHeading } from '../../../../packages/core/src/vault-config'
 import { createVaultNote, nextSlugId, notePath, openVault, saveNote } from '../../../../packages/core/src/vault'
+
+const COLLAPSED_TYPES_KEY = 'stride:collapsed-types'
 
 // The browser has no home directory. openVault only uses this to reject broad personal roots.
 const HOME_DIR = '/Users/stride'
@@ -57,11 +60,26 @@ function isTypeDocument(note: StrideNote): boolean {
   return note.type === 'Type'
 }
 
-function typeOrder(note: StrideNote): number {
-  const raw = note.properties._order
-  const text = Array.isArray(raw) ? raw[0] ?? '' : raw ?? ''
-  const value = Number(text)
-  return Number.isFinite(value) ? value : Number.POSITIVE_INFINITY
+function readCollapsedTypes(): string[] {
+  try {
+    if (typeof localStorage === 'undefined') return []
+    const raw = localStorage.getItem(COLLAPSED_TYPES_KEY)
+    if (!raw) return []
+    const parsed: unknown = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed.filter((item): item is string => typeof item === 'string')
+  } catch {
+    return []
+  }
+}
+
+function writeCollapsedTypes(titles: string[]) {
+  try {
+    if (typeof localStorage === 'undefined') return
+    localStorage.setItem(COLLAPSED_TYPES_KEY, JSON.stringify(titles))
+  } catch {
+    return
+  }
 }
 
 function hasTauriInternals(): boolean {
@@ -98,6 +116,7 @@ export class VaultService extends Service {
   propertyType: PropertyKind = 'string'
   propertyValue = ''
   propertyChecked = false
+  collapsedTypes: string[] = readCollapsedTypes()
   fs: FileSystemBackend | null = null
   private index: NoteIndex | null = null
   private docTimer: ReturnType<typeof setTimeout> | null = null
@@ -135,9 +154,25 @@ export class VaultService extends Service {
   }
 
   get typeDocuments(): StrideNote[] {
-    return this.notes
-      .filter((note) => isTypeDocument(note))
-      .sort((a, b) => typeOrder(a) - typeOrder(b) || a.title.localeCompare(b.title))
+    return this.notes.filter((note) => isTypeDocument(note)).sort(compareTypeDocuments)
+  }
+
+  get sidebarTypes(): StrideNote[] {
+    return this.typeDocuments.filter((note) => isTypeVisible(note))
+  }
+
+  get typeInstances(): StrideNote[] {
+    const active = this.active
+    if (!active || !isTypeDocument(active)) return []
+    return this.notes.filter((note) => note.id !== active.id && note.type === active.title)
+  }
+
+  toggleTypeCollapsed(title: string) {
+    const next = this.collapsedTypes.includes(title)
+      ? this.collapsedTypes.filter((item) => item !== title)
+      : [...this.collapsedTypes, title]
+    this.collapsedTypes = next
+    writeCollapsedTypes(next)
   }
 
   get inboxCount(): number {
@@ -216,6 +251,56 @@ export class VaultService extends Service {
       this.searchHits = []
       this.searchQuery = ''
       await this.upsertIndexed(note)
+    } catch (error) {
+      this.error = errorText(error)
+    }
+  }
+
+  async createType() {
+    this.error = ''
+    try {
+      if (!this.fs) throw new Error('Open a vault first')
+      const created = await createVaultNote(this.fs, 'Untitled')
+      const note = noteForSave({
+        ...created,
+        type: 'Type',
+        properties: {
+          _icon: 'note',
+          _color: 'gray',
+          visible: 'true',
+          _order: nextTypeOrder(this.notes),
+        },
+      })
+      const saved = await saveNote(this.fs, note)
+      this.notes = [saved, ...this.notes.filter((item) => item.id !== saved.id)]
+      this.activeId = saved.id
+      this.searchHits = []
+      this.searchQuery = ''
+      await this.upsertIndexed(saved)
+    } catch (error) {
+      this.error = errorText(error)
+    }
+  }
+
+  async createInstance(typeTitle: string) {
+    this.error = ''
+    try {
+      if (!this.fs) throw new Error('Open a vault first')
+      const typeDoc = this.notes.find((item) => isTypeDocument(item) && item.title === typeTitle)
+      const created = await createVaultNote(this.fs, 'Untitled')
+      const body = templateBody(typeDoc?.properties.template)
+      const note = noteForSave({
+        ...created,
+        type: typeTitle,
+        doc: body ?? created.doc,
+      })
+      const saved = await saveNote(this.fs, note)
+      this.notes = [saved, ...this.notes.filter((item) => item.id !== saved.id)]
+      this.activeId = saved.id
+      this.listFilter = typeTitle
+      this.searchHits = []
+      this.searchQuery = ''
+      await this.upsertIndexed(saved)
     } catch (error) {
       this.error = errorText(error)
     }

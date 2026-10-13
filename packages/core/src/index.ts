@@ -1,5 +1,6 @@
 export * from './version.ts'
 export * from './note.ts'
+export * from './types.ts'
 export * from './graph.ts'
 export * from './roots.ts'
 export * from './vault.ts'

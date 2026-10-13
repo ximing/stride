@@ -1,8 +1,49 @@
+import type { Icon } from '@phosphor-icons/react'
+import { Bookmark } from '@phosphor-icons/react/Bookmark'
+import { Briefcase } from '@phosphor-icons/react/Briefcase'
+import { Calendar } from '@phosphor-icons/react/Calendar'
+import { Folder } from '@phosphor-icons/react/Folder'
+import { Note } from '@phosphor-icons/react/Note'
+import { Star } from '@phosphor-icons/react/Star'
+import { Tag } from '@phosphor-icons/react/Tag'
+import { User } from '@phosphor-icons/react/User'
 import { observer, useService } from '@rabjs/react'
+import type { StrideNote } from '@stride/core/note'
+import { typeSidebarLabel } from '../../../packages/core/src/types'
 import { NoteEditor } from './editor'
 import { ChatService, GitService, SettingsService, UpdateService } from './services/panels.service'
 import { VaultService } from './services/vault.service'
+import { Mark } from './ui/icon'
 import { PropertiesPanel } from './ui/properties-panel'
+
+const TYPE_ICONS: Record<string, Icon> = {
+  note: Note,
+  briefcase: Briefcase,
+  user: User,
+  folder: Folder,
+  star: Star,
+  tag: Tag,
+  calendar: Calendar,
+  bookmark: Bookmark,
+}
+
+const TYPE_COLORS = new Set(['gray', 'blue', 'teal', 'green', 'orange', 'purple', 'red', 'pink', 'yellow'])
+
+function propertyText(value: StrideNote['properties'][string] | undefined): string {
+  if (typeof value === 'string') return value
+  if (Array.isArray(value)) return value[0] ?? ''
+  return ''
+}
+
+function typeIconKey(note: StrideNote): string {
+  const key = propertyText(note.properties._icon).trim().toLowerCase()
+  return key in TYPE_ICONS ? key : 'note'
+}
+
+function typeColorKey(note: StrideNote): string {
+  const key = propertyText(note.properties._color).trim().toLowerCase()
+  return TYPE_COLORS.has(key) ? key : 'gray'
+}
 
 export const UpdateBanner = observer(function UpdateBanner() {
   const updates = useService(UpdateService)
@@ -58,10 +99,11 @@ const Chooser = observer(function Chooser() {
   )
 })
 
-const Rail = observer(function Rail() {
+export const Rail = observer(function Rail() {
   const vault = useService(VaultService)
-  const typeDocs = vault.typeDocuments
-  const fallbackTypes = typeDocs.length === 0 ? [...vault.graph.byType.keys()] : []
+  const typeDocs = vault.sidebarTypes
+  const fallbackTypes = vault.typeDocuments.length === 0 ? [...vault.graph.byType.keys()] : []
+  const showInstances = vault.active?.type === 'Type'
   return (
     <aside className="rail">
       <button type="button" data-testid="new-note" className="primary" onClick={() => vault.createNote()}>New note</button>
@@ -71,18 +113,68 @@ const Rail = observer(function Rail() {
         Inbox ({vault.inboxCount})
       </button>
       <div className="group-label">Types</div>
-      {typeDocs.map((note) => (
-        <button
-          key={note.id}
-          type="button"
-          data-testid="type-link"
-          data-type={note.title}
-          className={vault.listFilter === note.title ? 'active' : ''}
-          onClick={() => vault.setFilter(note.title)}
-        >
-          {note.title}
-        </button>
-      ))}
+      {typeDocs.map((note) => {
+        const icon = typeIconKey(note)
+        const color = typeColorKey(note)
+        const collapsed = vault.collapsedTypes.includes(note.title)
+        return (
+          <div className="type-row" key={note.id}>
+            <button
+              type="button"
+              data-testid="type-link"
+              data-type={note.title}
+              data-icon={icon}
+              className={vault.listFilter === note.title ? 'active' : ''}
+              onClick={() => vault.setFilter(note.title)}
+            >
+              <span className={`type-dot type-dot-${color}`} />
+              <span className="type-icon"><Mark icon={TYPE_ICONS[icon] ?? Note} size={16} /></span>
+              <span className="type-label">{typeSidebarLabel(note)}</span>
+            </button>
+            {collapsed ? null : (
+              <button
+                type="button"
+                className="type-add"
+                data-testid="type-new-instance"
+                data-type={note.title}
+                aria-label={`New ${note.title}`}
+                onClick={() => vault.createInstance(note.title)}
+              >
+                +
+              </button>
+            )}
+            <button
+              type="button"
+              className="type-collapse"
+              data-testid="type-collapse"
+              data-type={note.title}
+              aria-expanded={!collapsed}
+              aria-label={collapsed ? `Expand ${note.title}` : `Collapse ${note.title}`}
+              onClick={() => vault.toggleTypeCollapsed(note.title)}
+            >
+              {collapsed ? '▸' : '▾'}
+            </button>
+          </div>
+        )
+      })}
+      <button type="button" data-testid="new-type" onClick={() => vault.createType()}>New type</button>
+      {showInstances && (
+        <div className="type-instances" data-testid="type-instances">
+          <div className="group-label">Instances</div>
+          {vault.typeInstances.length === 0 && <p>No instances yet.</p>}
+          {vault.typeInstances.map((note) => (
+            <button
+              key={note.id}
+              type="button"
+              data-testid="instance-link"
+              className={vault.activeId === note.id ? 'active' : ''}
+              onClick={() => vault.select(note.id)}
+            >
+              {note.title}
+            </button>
+          ))}
+        </div>
+      )}
       {fallbackTypes.map((type) => (
         <button key={type} type="button" className={vault.listFilter === type ? 'active' : ''} onClick={() => vault.setFilter(type)}>
           {type}

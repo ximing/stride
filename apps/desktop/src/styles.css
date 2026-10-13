@@ -211,6 +211,76 @@ textarea {
   color: #b7aa9b;
 }
 
+.type-row {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.rail .type-row button {
+  width: auto;
+}
+
+.rail .type-row button[data-testid="type-link"] {
+  order: 0;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.rail .type-row .type-collapse {
+  order: -1;
+  flex: none;
+  width: 1.75rem;
+  padding: 0.2rem 0;
+  text-align: center;
+}
+
+.rail .type-row .type-add {
+  order: 1;
+  flex: none;
+  width: 1.75rem;
+  padding: 0.2rem 0;
+  text-align: center;
+}
+
+.type-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.type-icon {
+  display: flex;
+  flex: none;
+}
+
+.type-dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 99px;
+  flex: none;
+  background: #b7aa9b;
+}
+
+.type-dot-gray { background: #b7aa9b; }
+.type-dot-blue { background: #7ea0c4; }
+.type-dot-teal { background: #6eaea4; }
+.type-dot-green { background: #8fbfa4; }
+.type-dot-orange { background: #d08a4c; }
+.type-dot-purple { background: #b39bc9; }
+.type-dot-red { background: #e7aea6; }
+.type-dot-pink { background: #e3a3b5; }
+.type-dot-yellow { background: #e0c27a; }
+
+.type-instances p {
+  color: #b7aa9b;
+  margin: 0.2rem 0 0.4rem;
+  font-size: 0.85rem;
+}
+
 .stage { padding: 1.2rem 1.6rem 2rem; }
 
 .note-title {
