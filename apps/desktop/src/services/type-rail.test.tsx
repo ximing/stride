@@ -187,6 +187,37 @@ describe('type rail', () => {
     expect(vault.error).toBe('')
   })
 
+  it('reopens the type document from the type row after another note is selected', async () => {
+    const { host, vault } = await mountRail()
+    await act(async () => {
+      await vault.createNewVault()
+      await vault.createNote()
+    })
+    const otherId = vault.activeId
+
+    await act(async () => {
+      vault.select('project')
+      vault.updateProperty('template', 'Bring a pencil.')
+    })
+    await click(host, '[data-testid="type-new-instance"][data-type="Project"]')
+    const instanceTitle = vault.active?.title ?? ''
+    expect(instanceTitle).not.toBe('')
+    expect(vault.activeId).not.toBe(otherId)
+
+    await act(async () => {
+      vault.select(otherId)
+    })
+    expect(vault.activeId).toBe(otherId)
+    expect(vault.active?.type).not.toBe('Type')
+    expect(host.querySelector('[data-testid="type-instances"]')).toBeNull()
+
+    await click(host, '[data-testid="type-link"][data-type="Project"]')
+    expect(vault.active?.id).toBe('project')
+    expect(vault.active?.type).toBe('Type')
+    expect(vault.listFilter).toBe('Project')
+    expect(host.querySelector('[data-testid="type-instances"]')?.textContent).toContain(instanceTitle)
+  })
+
   it('falls back to note.type groups when the vault has no type documents', async () => {
     const { host, vault } = await mountRail()
     await act(async () => {

@@ -126,7 +126,10 @@ export const Rail = observer(function Rail() {
               data-type={note.title}
               data-icon={icon}
               className={vault.listFilter === note.title ? 'active' : ''}
-              onClick={() => vault.setFilter(note.title)}
+              onClick={() => {
+                vault.setFilter(note.title)
+                vault.select(note.id)
+              }}
             >
               <span className={`type-dot type-dot-${color}`} />
               <span className="type-icon"><Mark icon={TYPE_ICONS[icon] ?? Note} size={16} /></span>
