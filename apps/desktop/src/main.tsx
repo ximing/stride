@@ -24,6 +24,7 @@ if (showComponents) {
   register(ChatService)
   register(UpdateService)
 
+  void resolve(VaultService).restoreOpened()
   void resolve(SettingsService).load()
 
   if (import.meta.env.DEV) {

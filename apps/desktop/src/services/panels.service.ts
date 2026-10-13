@@ -1,12 +1,20 @@
 import { Service } from '@rabjs/react'
-import { api, type PublicSettings, type UpdateView } from '../api'
+import { browserGitBackend } from '@stride/git-web'
 import { VaultService } from './vault.service'
+
+interface PublicSettings {
+  embedding: { endpoint: string; model: string; keyMask: string; dim: number }
+  llm: { provider: string; model: string; baseUrl: string; keyMask: string }
+  releasesUrl: string
+}
 
 const emptySettings = (): PublicSettings => ({
   embedding: { endpoint: '', model: '', keyMask: '', dim: 4 },
   llm: { provider: '', model: '', baseUrl: '', keyMask: '' },
   releasesUrl: '',
 })
+
+const GIT_BROWSER = 'Git is not available in the browser'
 
 export class GitService extends Service {
   status = ''
@@ -16,6 +24,12 @@ export class GitService extends Service {
   remote = ''
   output = ''
   conflicts: string[] = []
+  private readonly git = browserGitBackend()
+
+  constructor() {
+    super()
+    if (!this.git.available) this.output = GIT_BROWSER
+  }
 
   private get vault() {
     return this.resolve(VaultService)
@@ -29,75 +43,40 @@ export class GitService extends Service {
     this.remote = value
   }
 
+  private browserBlocked(): boolean {
+    if (this.git.available) return false
+    this.output = GIT_BROWSER
+    return true
+  }
+
   async refresh() {
-    try {
-      const status = await api.gitStatus()
-      this.status = status.repo ? status.porcelain || 'Clean' : 'Not a git repository'
-      const id = this.vault.activeId
-      this.diff = (await api.gitDiff(id || undefined)).diff
-      const history = await api.gitHistory(id || undefined)
-      this.history = history.history.map((commit) => `${commit.hash.slice(0, 7)} ${commit.subject}`).join('\n')
-    } catch (error) {
-      this.output = error instanceof Error ? error.message : String(error)
-    }
+    if (this.browserBlocked()) return
   }
 
   async init() {
-    try {
-      await api.gitInit()
-      this.output = 'Git repository initialized'
-      await this.refresh()
-    } catch (error) {
-      this.output = error instanceof Error ? error.message : String(error)
-    }
+    if (this.browserBlocked()) return
   }
 
   async commit() {
     try {
       await this.vault.flush()
-      const result = await api.gitCommit(this.message)
-      this.output = result.output
-      this.message = ''
-      await this.refresh()
     } catch (error) {
       this.output = error instanceof Error ? error.message : String(error)
+      return
     }
+    if (this.browserBlocked()) return
   }
 
   async pull() {
-    try {
-      this.vault.cancelPending()
-      const result = await api.gitPull()
-      this.vault.adopt(result.notes)
-      this.conflicts = result.files.map((file) => file.replace(/\.stride\.json$/, ''))
-      this.output = result.conflict ? `Conflict in ${result.files.join(', ')}` : result.output || 'Pulled'
-      await this.refresh()
-    } catch (error) {
-      this.output = error instanceof Error ? error.message : String(error)
-    }
+    if (this.browserBlocked()) return
   }
 
   async push() {
-    try {
-      if (this.remote.trim()) await api.gitRemote(this.remote.trim())
-      const result = await api.gitPush()
-      this.output = result.output || 'Pushed'
-    } catch (error) {
-      this.output = error instanceof Error ? error.message : String(error)
-    }
+    if (this.browserBlocked()) return
   }
 
-  async keepSide(id: string, side: 'ours' | 'theirs') {
-    try {
-      this.vault.cancelPending()
-      const result = await api.gitResolve(id, side)
-      this.vault.adopt(result.notes)
-      this.conflicts = this.conflicts.filter((item) => item !== id)
-      this.output = `Kept ${side} for ${id}`
-      await this.refresh()
-    } catch (error) {
-      this.output = error instanceof Error ? error.message : String(error)
-    }
+  async keepSide(_id: string, _side: 'ours' | 'theirs') {
+    if (this.browserBlocked()) return
   }
 }
 
@@ -106,25 +85,13 @@ export class ChatService extends Service {
   lines: { role: 'user' | 'assistant'; text: string }[] = []
   error = ''
 
-  private get vault() {
-    return this.resolve(VaultService)
-  }
-
   setDraft(value: string) {
     this.draft = value
   }
 
   async send() {
-    const message = this.draft.trim()
-    if (!message) return
-    this.draft = ''
-    this.error = ''
-    try {
-      const result = await api.chat(message, this.vault.activeId)
-      this.lines = result.history
-    } catch (error) {
-      this.error = error instanceof Error ? error.message : String(error)
-    }
+    if (!this.draft.trim()) return
+    this.error = 'Agent is not available in the browser'
   }
 }
 
@@ -146,30 +113,9 @@ export class SettingsService extends Service {
     this.form = { ...this.form, releasesUrl: value }
   }
 
-  async load() {
-    try {
-      this.form = await api.settings()
-      this.embeddingKey = this.form.embedding.keyMask
-      this.llmKey = this.form.llm.keyMask
-    } catch (error) {
-      this.notice = error instanceof Error ? error.message : String(error)
-    }
-  }
+  async load() {}
 
-  async save() {
-    try {
-      this.form = await api.saveSettings({
-        embedding: { ...this.form.embedding, apiKey: this.embeddingKey },
-        llm: { ...this.form.llm, apiKey: this.llmKey },
-        releasesUrl: this.form.releasesUrl,
-      })
-      this.embeddingKey = this.form.embedding.keyMask
-      this.llmKey = this.form.llm.keyMask
-      this.notice = 'Settings saved. Keys stay outside the vault.'
-    } catch (error) {
-      this.notice = error instanceof Error ? error.message : String(error)
-    }
-  }
+  async save() {}
 }
 
 export type UiHandoff = () => void | Promise<void>
@@ -192,62 +138,17 @@ export function resetUiHandoff() {
 }
 
 export class UpdateService extends Service {
-  phase: UpdateView['phase'] = 'idle'
+  phase: 'idle' | 'available' | 'downloading' | 'ready' = 'idle'
   progress = 0
   version = ''
   current = ''
   error = ''
-  private timer: ReturnType<typeof setInterval> | null = null
 
-  async check() {
-    this.error = ''
-    try {
-      const view = await api.checkUpdates()
-      this.apply(view)
-    } catch (error) {
-      this.error = error instanceof Error ? error.message : String(error)
-    }
-  }
+  async check() {}
 
-  async download() {
-    this.phase = 'downloading'
-    this.timer = setInterval(() => {
-      void api.updates().then((view) => this.apply(view)).catch(() => undefined)
-    }, 200)
-    try {
-      this.apply(await api.downloadUpdate())
-    } catch (error) {
-      this.error = error instanceof Error ? error.message : String(error)
-      this.phase = 'available'
-    } finally {
-      if (this.timer) clearInterval(this.timer)
-      this.timer = null
-    }
-  }
+  async download() {}
 
-  async dismiss() {
-    const before = this.current
-    const view = await api.dismissUpdate()
-    this.apply(view)
-    this.current = view.version || before
-  }
+  async dismiss() {}
 
-  async confirm() {
-    this.error = ''
-    try {
-      const view = await api.confirmUpdate()
-      this.apply(view)
-      if (view.restartRequested) await uiHandoff()
-    } catch (error) {
-      this.error = error instanceof Error ? error.message : String(error)
-      if (this.phase === 'ready') this.phase = 'available'
-    }
-  }
-
-  private apply(view: UpdateView) {
-    this.phase = view.phase
-    this.progress = view.progress
-    this.version = view.selected?.version || ''
-    this.current = view.version
-  }
+  async confirm() {}
 }

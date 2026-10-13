@@ -252,8 +252,8 @@ const Workspace = observer(function Workspace() {
       <header className="topbar">
         <div className="wordmark">Stride</div>
         <form className="search" onSubmit={(event) => { event.preventDefault(); void vault.runSearch() }}>
-          <input value={vault.searchQuery} onChange={(event) => { vault.searchQuery = event.target.value }} placeholder="Search the vault" />
-          <button type="submit">Search</button>
+          <input data-testid="vault-search" value={vault.searchQuery} onChange={(event) => { vault.searchQuery = event.target.value }} placeholder="Search the vault" />
+          <button type="submit" data-testid="run-search">Search</button>
           <button type="button" onClick={() => vault.clearSearch()}>Clear</button>
           <span className="search-mode" data-testid="search-mode">{vault.searchMode ? `Search mode ${vault.searchMode}` : ''}</span>
         </form>

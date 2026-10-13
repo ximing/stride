@@ -34,9 +34,21 @@ importers:
       '@stride/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@stride/fs-web':
+        specifier: workspace:*
+        version: link:../../packages/fs-web
+      '@stride/git-web':
+        specifier: workspace:*
+        version: link:../../packages/git-web
+      '@stride/platform':
+        specifier: workspace:*
+        version: link:../../packages/platform
       '@stride/platform-node':
         specifier: workspace:*
         version: link:../../packages/platform-node
+      '@stride/search-web':
+        specifier: workspace:*
+        version: link:../../packages/search-web
       '@tauri-apps/api':
         specifier: ^2.8.0
         version: 2.12.3

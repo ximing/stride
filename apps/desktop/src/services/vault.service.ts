@@ -1,7 +1,47 @@
 import { Service } from '@rabjs/react'
 import { buildGraph, type VaultGraph } from '@stride/core/graph'
-import { formatProperty, parsePropertyInput, type NoteProperty, type StrideNote, type TipTapNode } from '@stride/core/note'
-import { api } from '../api'
+import {
+  formatProperty,
+  parsePropertyInput,
+  plainText,
+  type NoteProperty,
+  type StrideNote,
+  type TipTapNode,
+} from '@stride/core/note'
+import { pickVaultDirectory, restoreVaultDirectory } from '@stride/fs-web'
+import {
+  MemoryFileSystem,
+  memorySearchOpener,
+  type FileSystemBackend,
+  type SearchBackendOpener,
+} from '@stride/platform'
+import { EmbeddingClient } from '../../../../packages/core/src/embeddings'
+import { noteIndex, searchNotes, type NoteIndex } from '../../../../packages/core/src/search'
+import { createVaultNote, openVault, saveNote } from '../../../../packages/core/src/vault'
+
+// The browser has no home directory. openVault only uses this to reject broad personal roots.
+const HOME_DIR = '/Users/stride'
+
+// Text mode passes a null embedding. This throws if searchNotes starts calling embed anyway.
+class TextOnlyEmbeddingClient extends EmbeddingClient {
+  override embed(): Promise<number[][]> {
+    throw new Error('text search must not embed')
+  }
+}
+
+const embeddingClient = new TextOnlyEmbeddingClient()
+
+function isMemoryFixture(): boolean {
+  return new URLSearchParams(window.location.search).get('fixture') === 'memory'
+}
+
+function errorText(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
+}
+
+function indexText(note: StrideNote): string {
+  return `${note.title}\n${plainText(note.doc)}`
+}
 
 export class VaultService extends Service {
   phase: 'chooser' | 'ready' = 'chooser'
@@ -17,6 +57,8 @@ export class VaultService extends Service {
   searchMode = ''
   panel: 'properties' | 'git' | 'chat' | 'settings' = 'properties'
   docEpoch = 0
+  fs: FileSystemBackend | null = null
+  private index: NoteIndex | null = null
   private docTimer: ReturnType<typeof setTimeout> | null = null
   private pendingId = ''
 
@@ -54,33 +96,42 @@ export class VaultService extends Service {
     return this.notes
   }
 
+  async restoreOpened() {
+    if (isMemoryFixture()) return
+    try {
+      const restored = await restoreVaultDirectory()
+      if (!restored) return
+      await this.openBackend(restored)
+    } catch (error) {
+      this.error = errorText(error)
+    }
+  }
+
   async openFromDraft() {
     this.error = ''
     try {
-      const opened = await api.openVault(this.pathDraft.trim())
-      this.vaultPath = opened.path
-      this.broad = opened.broad
-      this.notes = opened.notes
-      this.docEpoch += 1
-      this.activeId = opened.notes[0]?.id ?? ''
-      this.phase = 'ready'
-      this.listFilter = 'all'
+      const backend = isMemoryFixture()
+        ? new MemoryFileSystem('memory-vault')
+        : await pickVaultDirectory()
+      await this.openBackend(backend)
     } catch (error) {
-      this.error = error instanceof Error ? error.message : String(error)
+      this.error = errorText(error)
     }
   }
 
   async createNote() {
     this.error = ''
     try {
-      const note = await api.createNote('Untitled')
+      if (!this.fs) throw new Error('Open a vault first')
+      const note = await createVaultNote(this.fs, 'Untitled')
       this.notes = [note, ...this.notes.filter((item) => item.id !== note.id)]
       this.activeId = note.id
       this.listFilter = 'all'
       this.searchHits = []
       this.searchQuery = ''
+      await this.upsertIndexed(note)
     } catch (error) {
-      this.error = error instanceof Error ? error.message : String(error)
+      this.error = errorText(error)
     }
   }
 
@@ -124,11 +175,12 @@ export class VaultService extends Service {
   async runSearch() {
     this.error = ''
     try {
-      const result = await api.search(this.searchQuery)
+      if (!this.index) throw new Error('Open a vault first')
+      const result = await searchNotes(this.index, this.searchQuery, null, embeddingClient)
       this.searchMode = result.mode
       this.searchHits = result.hits
     } catch (error) {
-      this.error = error instanceof Error ? error.message : String(error)
+      this.error = errorText(error)
     }
   }
 
@@ -162,8 +214,44 @@ export class VaultService extends Service {
     if (!id) return
     this.pendingId = ''
     const note = this.notes.find((item) => item.id === id)
-    if (!note) return
-    await api.saveNote(note)
+    if (!note || !this.fs) return
+    const saved = await saveNote(this.fs, note)
+    this.replace(saved)
+    await this.upsertIndexed(saved)
+  }
+
+  private async openBackend(backend: FileSystemBackend) {
+    const opened = await openVault(backend, HOME_DIR)
+    const opener = await this.searchOpener()
+    const search = await opener.open({ vaultKey: backend.rootLabel, dim: 0 })
+    const index = noteIndex(search, 0)
+    if (opened.notes.length) {
+      await index.upsert(opened.notes.map((note) => ({ id: note.id, text: indexText(note) })))
+    }
+    await this.index?.close().catch(() => undefined)
+    this.index = index
+    this.fs = backend
+    this.vaultPath = opened.path
+    this.broad = opened.broad
+    this.notes = opened.notes
+    this.docEpoch += 1
+    this.activeId = opened.notes[0]?.id ?? ''
+    this.listFilter = 'all'
+    this.searchHits = []
+    this.searchQuery = ''
+    this.searchMode = ''
+    this.phase = 'ready'
+  }
+
+  private async searchOpener(): Promise<SearchBackendOpener> {
+    if (isMemoryFixture()) return memorySearchOpener()
+    const { vaneWebSearchOpener } = await import('@stride/search-web')
+    return vaneWebSearchOpener()
+  }
+
+  private async upsertIndexed(note: StrideNote) {
+    if (!this.index) return
+    await this.index.upsert([{ id: note.id, text: indexText(note) }])
   }
 
   private replace(note: StrideNote) {
@@ -175,7 +263,7 @@ export class VaultService extends Service {
     if (this.docTimer) clearTimeout(this.docTimer)
     this.docTimer = setTimeout(() => {
       void this.flush().catch((error: unknown) => {
-        this.error = error instanceof Error ? error.message : String(error)
+        this.error = errorText(error)
       })
     }, 350)
   }
