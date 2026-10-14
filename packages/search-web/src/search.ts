@@ -48,10 +48,20 @@ function dbPathForVault(vaultKey: string): string {
   return path
 }
 
+// 占位字段是因为 vane 拒绝纯 text schema；T3.5 配上真实 dim 时要重建 collection，不能把占位维度当成用户的 embedding 维度。
+const PLACEHOLDER_VECTOR_DIM = 1
+
+function vectorDim(dim: number): number {
+  return dim > 0 ? dim : PLACEHOLDER_VECTOR_DIM
+}
+
 function schemaFor(dim: number): Schema {
-  const fields: Schema['fields'] = [{ name: TEXT_FIELD, type: 'text' }]
-  if (dim > 0) fields.push({ name: 'vec', type: 'vector', dim, metric: 'cosine' })
-  return { fields }
+  return {
+    fields: [
+      { name: TEXT_FIELD, type: 'text' },
+      { name: 'vec', type: 'vector', dim: vectorDim(dim), metric: 'cosine' },
+    ],
+  }
 }
 
 function zeroVector(dim: number): number[] {
@@ -59,9 +69,10 @@ function zeroVector(dim: number): number[] {
 }
 
 function toDocs(docs: SearchDocument[], dim: number): Doc[] {
+  const width = vectorDim(dim)
   return docs.map((doc) => {
     const row: Doc = { id: doc.id, text: doc.text }
-    if (dim > 0) row.vector = doc.vector ?? zeroVector(dim)
+    row.vector = dim > 0 ? (doc.vector ?? zeroVector(width)) : zeroVector(width)
     return row
   })
 }

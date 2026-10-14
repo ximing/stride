@@ -203,7 +203,10 @@ describe('vane web search', () => {
     expect(hits[0]?.snippet).toContain(term)
     expect(memory.opened[0]?.name).toBe('notes')
     expect(memory.opened[0]?.tokenizer).toBe('jieba')
-    expect(memory.opened[0]?.schema.fields).toEqual([{ name: 'text', type: 'text' }])
+    expect(memory.opened[0]?.schema.fields).toEqual([
+      { name: 'text', type: 'text' },
+      { name: 'vec', type: 'vector', dim: 1, metric: 'cosine' },
+    ])
     expect(memory.opened[0]?.dbPath).toMatch(/^[A-Za-z0-9._-]+$/)
     expect(memory.opened[0]?.vfs).toBe('memory')
     const dict = memory.workerOpts[0]?.dictData
@@ -318,6 +321,18 @@ describe('vane web search', () => {
     expect(hits[0]?.snippet).toContain('xylophonequartz')
     expect(memory.queries.every((query) => query.mode === 'text')).toBe(true)
     expect(memory.queries.every((query) => query.vector === undefined)).toBe(true)
+  })
+
+  it('opens dim 0 with one placeholder vector field and still searches as text', async () => {
+    const memory = createMemoryVane()
+    const backend = await openBackend(openerFor(memory), 'vault-placeholder', 0)
+    await backend.upsert([{ id: 'alpha', text: 'alpha xylophonequartz' }])
+    const vectorFields = memory.opened[0]?.schema.fields.filter((field) => field.type === 'vector') ?? []
+    expect(vectorFields).toEqual([{ name: 'vec', type: 'vector', dim: 1, metric: 'cosine' }])
+    expect(memory.added[0]?.vector).toEqual([0])
+    const hits = await backend.search({ text: 'xylophonequartz', topK: 3, mode: 'text' })
+    expect(hits[0]?.id).toBe('alpha')
+    expect(memory.queries).toEqual([{ text: 'xylophonequartz', topK: 3, mode: 'text' }])
   })
 
   it('sends a zero vector when dim is set and the document has none', async () => {
