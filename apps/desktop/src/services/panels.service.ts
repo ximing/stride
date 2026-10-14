@@ -6,12 +6,15 @@ import {
   llmProxyBaseUrl,
   maskSecret,
   readSettings,
+  redactSecret,
+  resolveLlm,
   testLlmConnection,
   writeSettings,
   type AppSettings,
   type LlmConfig,
   type PublicLlmConfig,
 } from '@stride/core'
+import { appendAssistantDelta, playChatTurn, type ChatSession } from './chat-turn'
 import { browserGitBackend } from '@stride/git-web'
 import { MemoryFileSystem, type SecretsStore } from '@stride/platform'
 import { webSecretsStore } from '../../../../packages/secrets-web/src/index.ts'
@@ -97,16 +100,84 @@ export class GitService extends Service {
 
 export class ChatService extends Service {
   draft = ''
-  lines: { role: 'user' | 'assistant'; text: string }[] = []
   error = ''
+  running = false
+  sessions: ChatSession[] = [{ id: 'session-1', title: 'New', messages: [] }]
+  activeId = 'session-1'
+  private controller: AbortController | null = null
+
+  private get settings() {
+    return this.resolve(SettingsService)
+  }
 
   setDraft(value: string) {
     this.draft = value
   }
 
+  select(id: string) {
+    if (this.sessions.some((session) => session.id === id)) this.activeId = id
+  }
+
+  newSession() {
+    const id = `session-${crypto.randomUUID()}`
+    this.sessions.push({ id, title: 'New', messages: [] })
+    this.activeId = id
+  }
+
+  abort() {
+    this.controller?.abort()
+  }
+
   async send() {
-    if (!this.draft.trim()) return
-    this.error = 'Agent is not available in the browser'
+    const text = this.draft.trim()
+    if (!text || this.running) return
+    const runtime = this.settings.llmRuntime()
+    if (!runtime?.apiKey || !runtime.model || !runtime.baseUrl) {
+      this.error = 'Add a model provider, base URL, model, and key in Settings'
+      return
+    }
+    const session = this.sessions.find((item) => item.id === this.activeId)
+    if (!session) return
+    this.error = ''
+    this.draft = ''
+    if (session.title === 'New') session.title = text.slice(0, 32)
+    session.messages.push({ role: 'user', text, thinking: '' })
+    session.messages.push({ role: 'assistant', text: '', thinking: '' })
+    const sessionId = session.id
+    this.running = true
+    const controller = new AbortController()
+    this.controller = controller
+    try {
+      const config: LlmConfig = {
+        id: 'active',
+        name: runtime.provider,
+        provider: runtime.provider,
+        model: runtime.model,
+        baseUrl: this.settings.devLlmBaseUrl(runtime.baseUrl),
+        apiKey: runtime.apiKey,
+        isDefault: true,
+      }
+      const resolved = resolveLlm(config)
+      await playChatTurn({
+        model: resolved.model,
+        apiKey: resolved.apiKey,
+        systemPrompt: 'You are Stride, a local vault assistant.',
+        prompt: text,
+        signal: controller.signal,
+        streamFn: (model, context, options) => resolved.models.streamSimple(model, context, {
+          ...options,
+          apiKey: resolved.apiKey,
+        }),
+        onText: (delta) => appendAssistantDelta(this.sessions, sessionId, 'text', delta),
+        onThinking: (delta) => appendAssistantDelta(this.sessions, sessionId, 'thinking', delta),
+      })
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Agent failed'
+      this.error = redactSecret(message, runtime.apiKey)
+    } finally {
+      this.running = false
+      this.controller = null
+    }
   }
 }
 
@@ -312,6 +383,17 @@ export class SettingsService extends Service {
       model: config.model,
       baseUrl: effectiveBaseUrl(config),
       apiKey: this.memoryLlmKeys[config.id] ?? '',
+    }
+  }
+
+  devLlmBaseUrl(baseUrl: string): string {
+    if (!import.meta.env.DEV || !isHttpUrl(baseUrl)) return baseUrl
+    try {
+      const path = llmProxyBaseUrl(baseUrl)
+      const origin = globalThis.location?.origin
+      return origin && origin !== 'null' ? `${origin}${path}` : baseUrl
+    } catch {
+      return baseUrl
     }
   }
 

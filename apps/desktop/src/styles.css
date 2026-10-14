@@ -978,3 +978,12 @@ textarea {
   margin: 0.75rem 0.15rem 0.2rem;
   color: var(--muted);
 }
+
+.chat-tabs { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-bottom: 0.75rem; }
+.chat-tabs button[aria-pressed='true'] { border-color: var(--ink); }
+.chat-messages { display: flex; flex-direction: column; gap: 0.75rem; }
+.chat-message { white-space: pre-wrap; }
+.chat-thinking { color: var(--muted); margin: 0.35rem 0; }
+.chat-markdown pre { overflow: auto; background: var(--paper-2); padding: 0.5rem; }
+.chat-compose { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.75rem; }
+.chat-compose textarea { min-height: 5rem; width: 100%; }

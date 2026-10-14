@@ -21,6 +21,7 @@ import { PropertiesPanel } from './ui/properties-panel'
 import { QuickOpen } from './ui/quick-open'
 import { SearchPanel } from './ui/search-panel'
 import { TocPanel } from './ui/toc-panel'
+import { ChatMarkdown } from './ui/chat-markdown'
 
 const TYPE_ICONS: Record<string, Icon> = {
   note: Note,
@@ -248,17 +249,48 @@ const GitPanel = observer(function GitPanel() {
 
 const ChatPanel = observer(function ChatPanel() {
   const chat = useService(ChatService)
+  const session = chat.sessions.find((item) => item.id === chat.activeId) ?? chat.sessions[0]
   return (
-    <div>
+    <div data-testid="chat-panel">
       <h2>Agent</h2>
-      <div className="history">
-        {chat.lines.map((line, index) => (
-          <p key={`${line.role}-${index}`}><strong>{line.role}</strong> {line.text}</p>
+      <div className="chat-tabs" data-testid="chat-tabs">
+        {chat.sessions.map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            aria-pressed={item.id === chat.activeId}
+            onClick={() => chat.select(item.id)}
+          >
+            {item.title}
+          </button>
+        ))}
+        <button type="button" data-testid="chat-new" onClick={() => chat.newSession()}>New</button>
+      </div>
+      <div className="chat-messages" data-testid="chat-messages">
+        {session?.messages.map((message, index) => (
+          <div key={`${message.role}-${index}`} className="chat-message">
+            <strong>{message.role}</strong>
+            {message.role === 'assistant' && message.thinking ? (
+              <details className="chat-thinking" data-testid="chat-thinking">
+                <summary>思考</summary>
+                <ChatMarkdown text={message.thinking} />
+              </details>
+            ) : null}
+            {message.role === 'assistant' ? <ChatMarkdown text={message.text} /> : <p>{message.text}</p>}
+          </div>
         ))}
       </div>
       {chat.error && <p className="error">{chat.error}</p>}
-      <textarea value={chat.draft} onChange={(event) => chat.setDraft(event.target.value)} placeholder="Ask about the open note" />
-      <button className="primary" type="button" onClick={() => chat.send()}>Send</button>
+      <div className="chat-compose">
+        <textarea
+          data-testid="chat-draft"
+          value={chat.draft}
+          onChange={(event) => chat.setDraft(event.target.value)}
+          placeholder="Ask about the open note"
+        />
+        <button className="primary" type="button" data-testid="chat-send" disabled={chat.running} onClick={() => { void chat.send() }}>Send</button>
+        <button type="button" data-testid="chat-abort" disabled={!chat.running} onClick={() => chat.abort()}>Stop</button>
+      </div>
     </div>
   )
 })
