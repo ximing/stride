@@ -657,3 +657,18 @@ textarea {
 .slash-menu-empty {
   color: var(--muted);
 }
+
+.editor .ProseMirror .callout-block {
+  border: 1px solid var(--line);
+  border-radius: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  margin: 0.4rem 0;
+}
+
+.editor .ProseMirror .callout-block[data-kind="warning"] {
+  border-color: #a33;
+}
+
+.editor .ProseMirror .callout-block[data-kind="tip"] {
+  border-color: var(--moss);
+}

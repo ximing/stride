@@ -3,6 +3,7 @@ import Highlight from '@tiptap/extension-highlight'
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import StarterKit from '@tiptap/starter-kit'
+import { calloutNode, calloutSlashCommand, highlightInputExtension } from './callout'
 import { registerSlashCommand, slashMenu } from './slash'
 import { tableExtensions, tableSlashCommand } from './table'
 import { createTaskExtensions, taskSlashCommand } from './task'
@@ -10,6 +11,7 @@ import { createWikilinkNode, createWikilinkSuggestionExtension } from './wikilin
 
 registerSlashCommand(taskSlashCommand)
 registerSlashCommand(tableSlashCommand)
+registerSlashCommand(calloutSlashCommand)
 
 export type FormatName =
   | 'bold'
@@ -61,6 +63,8 @@ export function createEditorExtensions(options: {
     ...createTaskExtensions(),
     slashMenu,
     ...tableExtensions(),
+    calloutNode,
+    highlightInputExtension,
   ]
 }
 

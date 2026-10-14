@@ -95,6 +95,7 @@ describe('slash menu', () => {
       'hr',
       'task',
       'table',
+      'callout',
     ])
     for (const query of ['code', '代码']) {
       const ids = filterSlashCommands(query).map((item) => item.id)
