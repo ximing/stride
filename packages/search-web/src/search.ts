@@ -118,6 +118,8 @@ class VaneSearchBackend implements SearchBackend {
 
   async upsert(docs: SearchDocument[]): Promise<void> {
     this.assertOpen()
+    if (docs.length === 0) return
+    await this.vane.delete(this.col, docs.map((doc) => doc.id))
     await this.vane.add(this.col, toDocs(docs, this.dim))
     await this.vane.flush(this.col)
     for (const doc of docs) this.texts.set(doc.id, doc.text)
@@ -185,6 +187,10 @@ export function createVaneSearchOpener(
       }
       // createVane transfers the buffer. slice keeps a shared copy usable and sends only these bytes.
       const dictData = loaded.dictData.slice()
+      if (vfs === 'opfs' && navigator.storage?.getDirectory) {
+        const root = await navigator.storage.getDirectory()
+        await root.removeEntry(dbPath).catch(() => undefined)
+      }
       const vane = await factory({ vfs, dbPath, dictData, dictSha256: loaded.dictSha256 })
       try {
         await vane.open(dbPath, { autoCommit: 'off', persistence: 'persistent' })

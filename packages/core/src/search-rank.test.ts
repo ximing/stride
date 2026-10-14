@@ -35,4 +35,17 @@ describe('rankSearch', () => {
   it('returns nothing for a blank query', () => {
     expect(rankSearch('  ', [{ id: 'a', title: '会议纪要', text: '会议纪要' }], [])).toEqual([])
   })
+
+  it('keeps only the higher-scoring bm25 hit when the same id is returned twice', () => {
+    const hits = rankSearch('采购', [
+      { id: 'dup', title: '其他', text: '其他\n采购流程' },
+    ], [
+      { id: 'dup', score: 1, snippet: 'low' },
+      { id: 'dup', score: 9, snippet: 'high' },
+    ])
+    expect(hits).toHaveLength(1)
+    expect(hits[0]?.id).toBe('dup')
+    expect(hits[0]?.score).toBe(9)
+    expect(hits[0]?.source).toBe('body')
+  })
 })

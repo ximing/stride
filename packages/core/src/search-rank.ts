@@ -55,9 +55,11 @@ export function rankSearch(query: string, notes: RankNote[], bm25: RankHit[], li
   titleHits.sort(byScoreThenId)
   const claimed = new Set(titleHits.map((hit) => hit.id))
   const terms = needle.split(/\s+/).filter((term) => term.length > 0)
-  const bodyHits: RankedHit[] = []
+  const bodyBest = new Map<string, RankedHit>()
   for (const hit of bm25) {
     if (claimed.has(hit.id)) continue
+    const previous = bodyBest.get(hit.id)
+    if (previous && previous.score >= hit.score) continue
     const note = byId.get(hit.id)
     const text = note?.text ?? ''
     const lower = text.toLowerCase()
@@ -74,7 +76,7 @@ export function rankSearch(query: string, notes: RankNote[], bm25: RankHit[], li
       offset = 0
       length = 0
     }
-    bodyHits.push({
+    bodyBest.set(hit.id, {
       id: hit.id,
       score: hit.score,
       snippet: text ? snippetAt(text, offset, length) : (hit.snippet ?? ''),
@@ -83,6 +85,7 @@ export function rankSearch(query: string, notes: RankNote[], bm25: RankHit[], li
       length,
     })
   }
+  const bodyHits = [...bodyBest.values()]
   bodyHits.sort(byScoreThenId)
   return [...titleHits, ...bodyHits].slice(0, Math.max(0, limit))
 }

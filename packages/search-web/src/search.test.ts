@@ -81,12 +81,14 @@ function createMemoryVane(options: MemoryOptions = {}): {
   opened: OpenedSchema[]
   queries: VaneQuery[]
   added: Doc[]
+  ops: string[]
   workerOpts: VaneWorkerOpts[]
 } {
   const stores = new Map<string, Map<string, Doc>>()
   const opened: OpenedSchema[] = []
   const queries: VaneQuery[] = []
   const added: Doc[] = []
+  const ops: string[] = []
   const workerOpts: VaneWorkerOpts[] = []
 
   const factory: VaneFactory = (opts?: VaneWorkerOpts) => {
@@ -117,6 +119,7 @@ function createMemoryVane(options: MemoryOptions = {}): {
       async add(_col, rows) {
         guard()
         for (const row of rows) {
+          ops.push(`add:${row.id}`)
           docs.set(row.id, { id: row.id, text: row.text, vector: row.vector })
           added.push(row)
         }
@@ -149,7 +152,10 @@ function createMemoryVane(options: MemoryOptions = {}): {
       async delete(_col, ids) {
         guard()
         let removed = 0
-        for (const id of ids) if (docs.delete(id)) removed += 1
+        for (const id of ids) {
+          ops.push(`delete:${id}`)
+          if (docs.delete(id)) removed += 1
+        }
         return removed
       },
       async close() {
@@ -160,7 +166,7 @@ function createMemoryVane(options: MemoryOptions = {}): {
     return Promise.resolve(session)
   }
 
-  return { factory, opened, queries, added, workerOpts }
+  return { factory, opened, queries, added, ops, workerOpts }
 }
 
 const backends: SearchBackend[] = []
@@ -247,6 +253,16 @@ describe('vane web search', () => {
     expect(hits[0]?.id).toBe('moss')
     expect(hits[0]?.snippet).toContain('苔藓')
     expect(hits[0]?.snippet?.length).toBeGreaterThan(0)
+  })
+
+  it('deletes an id before adding it again on the second upsert', async () => {
+    const memory = createMemoryVane()
+    const backend = await openBackend(openerFor(memory), 'vault-replace')
+    await backend.upsert([{ id: 'same', text: 'first xylophonequartz' }])
+    await backend.upsert([{ id: 'same', text: 'second xylophonequartz' }])
+    expect(memory.ops).toEqual(['delete:same', 'add:same', 'delete:same', 'add:same'])
+    const hits = await backend.search({ text: 'second', topK: 5, mode: 'text' })
+    expect(hits.map((hit) => hit.id)).toEqual(['same'])
   })
 
   it('misses an id after remove', async () => {

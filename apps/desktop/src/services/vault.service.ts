@@ -186,6 +186,7 @@ export class VaultService extends Service {
   private rebuilder: NoteRebuilder | null = null
   private rebuildEpoch = 0
   private rebuildDone: Promise<void> = Promise.resolve()
+  private openQueue: Promise<void> = Promise.resolve()
   private docTimer: ReturnType<typeof setTimeout> | null = null
   private pendingId = ''
   private retryDelay = 1000
@@ -831,18 +832,28 @@ export class VaultService extends Service {
     return this.resolve(ListFilterService)
   }
 
-  private async openBackend(backend: FileSystemBackend) {
+  private openBackend(backend: FileSystemBackend): Promise<void> {
+    const run = this.openQueue.catch(() => undefined).then(() => this.openBackendBody(backend))
+    this.openQueue = run.then(() => undefined, () => undefined)
+    return run
+  }
+
+  private async openBackendBody(backend: FileSystemBackend) {
     await recoverRename(backend)
     const opened = await openVault(backend, HOME_DIR)
     const renameFromHeading = await readRenameFromHeading(backend)
     const advanceInbox = await readAdvanceInbox(backend)
+    this.rebuildEpoch += 1
+    const epoch = this.rebuildEpoch
+    const retiring = this.index
+    const retiringRebuild = this.rebuildDone
+    this.index = null
+    this.rebuilder = null
+    await retiringRebuild.catch(() => undefined)
+    await retiring?.close().catch(() => undefined)
     const opener = await this.searchOpener()
     const search = await opener.open({ vaultKey: backend.rootLabel, dim: 0 })
     const index = noteIndex(search, 0)
-    const retiring = this.index
-    const retiringRebuild = this.rebuildDone
-    this.rebuildEpoch += 1
-    const epoch = this.rebuildEpoch
     this.index = index
     this.rebuilder = noteRebuilder(index)
     this.fs = backend
@@ -865,10 +876,7 @@ export class VaultService extends Service {
     this.indexPhase = snapshot.length > 0 ? 'rebuilding' : 'ready'
     this.phase = 'ready'
     this.rebuildDone = snapshot.length > 0 ? this.startRebuild(epoch, snapshot) : Promise.resolve()
-    // The previous rebuild sees the new epoch and stops. Close that backend after it does.
-    void retiringRebuild
-      .catch(() => undefined)
-      .then(() => retiring?.close().catch(() => undefined))
+    this.error = ''
     await this.rememberVault(backend)
   }
 
