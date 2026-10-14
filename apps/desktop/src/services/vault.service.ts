@@ -1201,6 +1201,9 @@ export class VaultService extends Service {
     this.docTimer = setTimeout(() => {
       void this.flush()
     }, 350)
+    void import('./panels.service').then(({ GitService }) => {
+      if (has(GitService)) this.resolve(GitService).noteActivity()
+    })
   }
 
   private writeProperty(field: string, value: NoteProperty) {

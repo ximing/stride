@@ -239,6 +239,9 @@ export class Desk {
       releasesUrl: incoming.releasesUrl ?? current.releasesUrl,
       gitEnabled: current.gitEnabled,
       autoSyncMinutes: current.autoSyncMinutes,
+      autoGitEnabled: current.autoGitEnabled,
+      autoGitIdleSeconds: current.autoGitIdleSeconds,
+      autoGitBlurSeconds: current.autoGitBlurSeconds,
     }
     await writeSettings(this.configFs, this.settingsName, next, this.secrets)
     this.settings = next

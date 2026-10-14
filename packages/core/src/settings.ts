@@ -22,6 +22,9 @@ export interface AppSettings {
   releasesUrl: string
   gitEnabled: boolean
   autoSyncMinutes: number
+  autoGitEnabled: boolean
+  autoGitIdleSeconds: number
+  autoGitBlurSeconds: number
 }
 
 interface SealedLlmConfig {
@@ -41,6 +44,9 @@ interface SealedSettings {
   releasesUrl: string
   gitEnabled: boolean
   autoSyncMinutes: number
+  autoGitEnabled: boolean
+  autoGitIdleSeconds: number
+  autoGitBlurSeconds: number
 }
 
 interface ParsedLlmConfig {
@@ -61,6 +67,9 @@ interface ParsedSettings {
   releasesUrl?: string
   gitEnabled?: unknown
   autoSyncMinutes?: unknown
+  autoGitEnabled?: unknown
+  autoGitIdleSeconds?: unknown
+  autoGitBlurSeconds?: unknown
 }
 
 export interface PublicLlmConfig {
@@ -78,6 +87,11 @@ export function normalizeAutoSyncMinutes(value: unknown): number {
   return value
 }
 
+export function normalizeAutoGitSeconds(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return 0
+  return value
+}
+
 export function defaultSettings(): AppSettings {
   return {
     embedding: { endpoint: '', model: '', apiKey: '', dim: 4 },
@@ -85,6 +99,9 @@ export function defaultSettings(): AppSettings {
     releasesUrl: '',
     gitEnabled: true,
     autoSyncMinutes: 0,
+    autoGitEnabled: false,
+    autoGitIdleSeconds: 0,
+    autoGitBlurSeconds: 0,
   }
 }
 
@@ -181,6 +198,9 @@ async function sealAll(secrets: SecretsStore, settings: AppSettings): Promise<Se
     releasesUrl: settings.releasesUrl,
     gitEnabled: settings.gitEnabled !== false,
     autoSyncMinutes: normalizeAutoSyncMinutes(settings.autoSyncMinutes),
+    autoGitEnabled: settings.autoGitEnabled === true,
+    autoGitIdleSeconds: normalizeAutoGitSeconds(settings.autoGitIdleSeconds),
+    autoGitBlurSeconds: normalizeAutoGitSeconds(settings.autoGitBlurSeconds),
   }
 }
 
@@ -190,6 +210,9 @@ export function publicSettings(settings: AppSettings): {
   releasesUrl: string
   gitEnabled: boolean
   autoSyncMinutes: number
+  autoGitEnabled: boolean
+  autoGitIdleSeconds: number
+  autoGitBlurSeconds: number
 } {
   return {
     embedding: {
@@ -210,6 +233,9 @@ export function publicSettings(settings: AppSettings): {
     releasesUrl: settings.releasesUrl,
     gitEnabled: settings.gitEnabled !== false,
     autoSyncMinutes: normalizeAutoSyncMinutes(settings.autoSyncMinutes),
+    autoGitEnabled: settings.autoGitEnabled === true,
+    autoGitIdleSeconds: normalizeAutoGitSeconds(settings.autoGitIdleSeconds),
+    autoGitBlurSeconds: normalizeAutoGitSeconds(settings.autoGitBlurSeconds),
   }
 }
 
@@ -247,6 +273,9 @@ export async function readSettings(
     releasesUrl: parsed.releasesUrl ?? '',
     gitEnabled: parsed.gitEnabled !== false,
     autoSyncMinutes: normalizeAutoSyncMinutes(parsed.autoSyncMinutes),
+    autoGitEnabled: parsed.autoGitEnabled === true,
+    autoGitIdleSeconds: normalizeAutoGitSeconds(parsed.autoGitIdleSeconds),
+    autoGitBlurSeconds: normalizeAutoGitSeconds(parsed.autoGitBlurSeconds),
   }
 }
 

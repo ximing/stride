@@ -507,6 +507,32 @@ const SettingsPanel = observer(function SettingsPanel() {
           onChange={(event) => settings.setAutoSyncMinutes(Number(event.target.value))}
         />
       </label>
+      <label className="field"><span>Auto Git</span>
+        <input
+          type="checkbox"
+          data-testid="auto-git-enabled"
+          checked={settings.form.autoGitEnabled}
+          onChange={(event) => settings.setAutoGitEnabled(event.target.checked)}
+        />
+      </label>
+      <label className="field"><span>Auto Git idle (seconds)</span>
+        <input
+          type="number"
+          min={0}
+          data-testid="auto-git-idle"
+          value={settings.form.autoGitIdleSeconds}
+          onChange={(event) => settings.setAutoGitIdleSeconds(Number(event.target.value))}
+        />
+      </label>
+      <label className="field"><span>Auto Git blur (seconds)</span>
+        <input
+          type="number"
+          min={0}
+          data-testid="auto-git-blur"
+          value={settings.form.autoGitBlurSeconds}
+          onChange={(event) => settings.setAutoGitBlurSeconds(Number(event.target.value))}
+        />
+      </label>
       <div className="editor-tools">
         <button type="button" data-testid="settings-save" onClick={() => settings.save()}>Save settings</button>
         <button type="button" onClick={() => updates.check()}>Check for updates</button>
@@ -562,8 +588,17 @@ const Workspace = observer(function Workspace() {
     if (vault.phase !== 'ready') return
     void git.refresh()
     git.ensureAutoSync()
-    return () => { git.stopAutoSync() }
-  }, [git, vault.phase, vault.fs, settings.form.gitEnabled, settings.form.autoSyncMinutes])
+    git.ensureAutoGit()
+    return () => {
+      git.stopAutoSync()
+      git.stopAutoGit()
+    }
+  }, [git, vault.phase, vault.fs, settings.form.gitEnabled, settings.form.autoSyncMinutes, settings.form.autoGitEnabled, settings.form.autoGitIdleSeconds, settings.form.autoGitBlurSeconds])
+  useEffect(() => {
+    const onBlur = () => { git.noteBlur() }
+    window.addEventListener('blur', onBlur)
+    return () => { window.removeEventListener('blur', onBlur) }
+  }, [git])
   return (
     <div className="shell" data-testid="vault-surface">
       <UpdateBanner />

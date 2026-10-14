@@ -10,6 +10,7 @@ import {
   gitClone,
   gitCommit,
   gitDiff,
+  GitError,
   gitPull,
   gitPush,
   gitResolveKeepingCheckpoint,
@@ -20,6 +21,7 @@ import {
   gitSurface,
   initGit,
   isDedicatedVault,
+  isNothingToCommit,
   llmProxyBaseUrl,
   maskSecret,
   parsePorcelain,
@@ -29,6 +31,7 @@ import {
   suggestCommitMessage,
   testLlmConnection,
   toolsForAgentMode,
+  unmergedFiles,
   vaultTools,
   writeSettings,
   type AppSettings,
@@ -51,6 +54,9 @@ interface PublicSettings {
   releasesUrl: string
   gitEnabled: boolean
   autoSyncMinutes: number
+  autoGitEnabled: boolean
+  autoGitIdleSeconds: number
+  autoGitBlurSeconds: number
 }
 
 const emptySettings = (): PublicSettings => ({
@@ -59,6 +65,9 @@ const emptySettings = (): PublicSettings => ({
   releasesUrl: '',
   gitEnabled: true,
   autoSyncMinutes: 0,
+  autoGitEnabled: false,
+  autoGitIdleSeconds: 0,
+  autoGitBlurSeconds: 0,
 })
 
 const GIT_BROWSER = 'Git is not available in the browser'
@@ -144,6 +153,11 @@ export class GitService extends Service {
   busy = false
   private busyCount = 0
   private autoSyncTimer: ReturnType<typeof setInterval> | null = null
+  lastActivityAt = 0
+  lastBlurAt = 0
+  private idleCheckpointAt = 0
+  private blurCheckpointAt = 0
+  private autoGitTimer: ReturnType<typeof setInterval> | null = null
   private diffPath = ''
   private suggestController: AbortController | null = null
   private suggestGeneration = 0
@@ -567,6 +581,28 @@ export class GitService extends Service {
     this.autoSyncTimer = null
   }
 
+  noteActivity() {
+    this.lastActivityAt = Date.now()
+  }
+
+  noteBlur() {
+    this.lastBlurAt = Date.now()
+  }
+
+  ensureAutoGit() {
+    this.stopAutoGit()
+    if (this.settings.form.autoGitEnabled !== true) return
+    this.autoGitTimer = setInterval(() => {
+      void this.autoGitTick(Date.now())
+    }, 1000)
+  }
+
+  stopAutoGit() {
+    if (this.autoGitTimer === null) return
+    clearInterval(this.autoGitTimer)
+    this.autoGitTimer = null
+  }
+
   async autoSyncTick() {
     const minutes = this.settings.form.autoSyncMinutes
     if (!(minutes > 0)) return
@@ -610,6 +646,88 @@ export class GitService extends Service {
         this.busyCount = 0
         this.busy = false
       }
+    }
+  }
+
+  async autoGitTick(now: number) {
+    if (this.settings.form.autoGitEnabled !== true) return
+    const idleSeconds = this.settings.form.autoGitIdleSeconds
+    const blurSeconds = this.settings.form.autoGitBlurSeconds
+    const idleDue = idleSeconds > 0
+      && this.lastActivityAt > 0
+      && this.lastActivityAt !== this.idleCheckpointAt
+      && now - this.lastActivityAt >= idleSeconds * 1000
+    const blurDue = blurSeconds > 0
+      && this.lastBlurAt > 0
+      && this.lastBlurAt !== this.blurCheckpointAt
+      && now - this.lastBlurAt >= blurSeconds * 1000
+    if (!idleDue && !blurDue) return
+    if (this.busy) return
+    if (this.vault.phase !== 'ready') return
+    if (!this.gitEnabled()) return
+    if (this.surface !== 'ready') return
+    const backend = await resolveGitBackend()
+    if (!backend.available) return
+    const fs = this.vault.fs
+    if (!fs) return
+    const unmerged = await unmergedFiles(fs, backend)
+    if (unmerged.length > 0) return
+    this.busyCount += 1
+    this.busy = true
+    try {
+      try {
+        await this.vault.flush()
+      } catch (error) {
+        this.output = errorText(error)
+        return
+      }
+      let diff = ''
+      try {
+        diff = await gitDiff(fs, backend)
+      } catch (error) {
+        this.output = errorText(error)
+        return
+      }
+      const message = await this.checkpointMessage(diff)
+      try {
+        await gitCommit(fs, backend, message)
+      } catch (error) {
+        const output = error instanceof GitError ? error.output || error.message : errorText(error)
+        if (!isNothingToCommit(output)) {
+          this.output = output
+          return
+        }
+      }
+      if (idleDue) this.idleCheckpointAt = this.lastActivityAt
+      if (blurDue) this.blurCheckpointAt = this.lastBlurAt
+      await this.refresh()
+    } finally {
+      this.busyCount -= 1
+      if (this.busyCount <= 0) {
+        this.busyCount = 0
+        this.busy = false
+      }
+    }
+  }
+
+  private async checkpointMessage(diff: string): Promise<string> {
+    try {
+      const signal = new AbortController().signal
+      const hooked = commitMessageSuggestForTests
+      let suggested = ''
+      if (hooked) {
+        const result = await hooked(diff, signal)
+        suggested = result?.message ?? ''
+      } else {
+        const runtime = this.settings.llmRuntime()
+        if (runtime?.apiKey && runtime.model && runtime.baseUrl) {
+          const result = await this.suggestWithLlm(diff, signal)
+          suggested = result?.message ?? ''
+        }
+      }
+      return suggested.trim() || 'Checkpoint'
+    } catch {
+      return 'Checkpoint'
     }
   }
 
@@ -1108,6 +1226,20 @@ export class SettingsService extends Service {
     this.form = { ...this.form, autoSyncMinutes: minutes }
   }
 
+  setAutoGitEnabled(value: boolean) {
+    this.form = { ...this.form, autoGitEnabled: value === true }
+  }
+
+  setAutoGitIdleSeconds(value: number) {
+    const seconds = typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0
+    this.form = { ...this.form, autoGitIdleSeconds: seconds }
+  }
+
+  setAutoGitBlurSeconds(value: number) {
+    const seconds = typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0
+    this.form = { ...this.form, autoGitBlurSeconds: seconds }
+  }
+
   setEmbeddingDim(value: string) {
     this.embeddingDimText = value
     const parsed = parsePositiveInt(value)
@@ -1190,6 +1322,9 @@ export class SettingsService extends Service {
         releasesUrl: this.form.releasesUrl,
         gitEnabled: this.form.gitEnabled,
         autoSyncMinutes: this.form.autoSyncMinutes,
+        autoGitEnabled: this.form.autoGitEnabled,
+        autoGitIdleSeconds: this.form.autoGitIdleSeconds,
+        autoGitBlurSeconds: this.form.autoGitBlurSeconds,
       }
       const fs = await settingsFile()
       await writeSettings(fs, SETTINGS_FILE, settings, secrets)
@@ -1224,6 +1359,9 @@ export class SettingsService extends Service {
         releasesUrl: settings.releasesUrl,
         gitEnabled: settings.gitEnabled,
         autoSyncMinutes: settings.autoSyncMinutes,
+        autoGitEnabled: settings.autoGitEnabled,
+        autoGitIdleSeconds: settings.autoGitIdleSeconds,
+        autoGitBlurSeconds: settings.autoGitBlurSeconds,
       }
       this.notice = ''
       after = this.embeddingRuntime()
@@ -1320,6 +1458,9 @@ export class SettingsService extends Service {
         releasesUrl: settings.releasesUrl,
         gitEnabled: settings.gitEnabled,
         autoSyncMinutes: settings.autoSyncMinutes,
+        autoGitEnabled: settings.autoGitEnabled,
+        autoGitIdleSeconds: settings.autoGitIdleSeconds,
+        autoGitBlurSeconds: settings.autoGitBlurSeconds,
       }
       this.notice = ''
     } catch (error) {

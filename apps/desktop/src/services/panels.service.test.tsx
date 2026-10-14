@@ -17,6 +17,9 @@ function resetSettingsMemory() {
     releasesUrl: '',
     gitEnabled: true,
     autoSyncMinutes: 0,
+    autoGitEnabled: false,
+    autoGitIdleSeconds: 0,
+    autoGitBlurSeconds: 0,
   }
   settings.setEmbeddingDim('4')
   settings.embeddingKey = ''
@@ -46,6 +49,10 @@ describe('browser panels', () => {
     if (has(GitService)) {
       const git = resolve(GitService)
       git.stopAutoSync()
+      git.stopAutoGit()
+      git.lastActivityAt = 0
+      git.lastBlurAt = 0
+      Object.assign(git, { idleCheckpointAt: 0, blurCheckpointAt: 0 })
       git.abortSuggest()
       git.cloneUrl = ''
       git.cloneError = ''
@@ -515,6 +522,109 @@ describe('browser panels', () => {
     await git.autoSyncTick()
     expect(reopened).toBe(1)
     expect(git.conflicts).toEqual(['notes/a.stride.json'])
+  })
+
+  it('does not checkpoint when auto git is off', async () => {
+    const commits: Array<{ message: string; paths?: string[] }> = []
+    const repo = { porcelain: ' M notes/a.stride.json\n' }
+    setGitBackendForTests(twoFileGit(repo, commits))
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const files = new MemoryFileSystem('/tmp/vault-autogit-off')
+    await files.mkdir('.git')
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.phase = 'ready'
+    vault.broad = false
+    const settings = resolve(SettingsService)
+    settings.setGitEnabled(true)
+    settings.setAutoGitEnabled(false)
+    settings.setAutoGitIdleSeconds(60)
+    const git = resolve(GitService)
+    git.surface = 'ready'
+    git.noteActivity()
+    await git.autoGitTick(Date.now() + 120_000)
+    expect(commits).toEqual([])
+  })
+
+  it('checkpoints the full tree once when idle is due', async () => {
+    const commits: Array<{ message: string; paths?: string[] }> = []
+    const repo = { porcelain: ' M notes/a.stride.json\n' }
+    setGitBackendForTests(twoFileGit(repo, commits))
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const files = new MemoryFileSystem('/tmp/vault-autogit-idle')
+    await files.mkdir('.git')
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.phase = 'ready'
+    vault.broad = false
+    const settings = resolve(SettingsService)
+    settings.setGitEnabled(true)
+    settings.setAutoGitEnabled(true)
+    settings.setAutoGitIdleSeconds(60)
+    settings.setAutoGitBlurSeconds(0)
+    const git = resolve(GitService)
+    git.surface = 'ready'
+    git.lastActivityAt = 1_000
+    await git.autoGitTick(61_000)
+    expect(commits).toEqual([{ message: 'Checkpoint', paths: undefined }])
+    await git.autoGitTick(61_000)
+    expect(commits).toEqual([{ message: 'Checkpoint', paths: undefined }])
+  })
+
+  it('does not checkpoint while files are unmerged', async () => {
+    const commits: Array<{ message: string; paths?: string[] }> = []
+    const repo = { porcelain: 'UU notes/a.stride.json\n' }
+    const backend = twoFileGit(repo, commits)
+    backend.unmerged = () => Promise.resolve(['notes/a.stride.json'])
+    setGitBackendForTests(backend)
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const files = new MemoryFileSystem('/tmp/vault-autogit-unmerged')
+    await files.mkdir('.git')
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.phase = 'ready'
+    vault.broad = false
+    const settings = resolve(SettingsService)
+    settings.setGitEnabled(true)
+    settings.setAutoGitEnabled(true)
+    settings.setAutoGitIdleSeconds(60)
+    settings.setAutoGitBlurSeconds(0)
+    const git = resolve(GitService)
+    git.surface = 'ready'
+    git.lastActivityAt = 1_000
+    await git.autoGitTick(61_000)
+    expect(commits).toEqual([])
+  })
+
+  it('does not checkpoint on blur when the blur threshold is 0', async () => {
+    const commits: Array<{ message: string; paths?: string[] }> = []
+    const repo = { porcelain: ' M notes/a.stride.json\n' }
+    setGitBackendForTests(twoFileGit(repo, commits))
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const files = new MemoryFileSystem('/tmp/vault-autogit-blur')
+    await files.mkdir('.git')
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.phase = 'ready'
+    vault.broad = false
+    const settings = resolve(SettingsService)
+    settings.setGitEnabled(true)
+    settings.setAutoGitEnabled(true)
+    settings.setAutoGitIdleSeconds(0)
+    settings.setAutoGitBlurSeconds(0)
+    const git = resolve(GitService)
+    git.surface = 'ready'
+    git.noteBlur()
+    await git.autoGitTick(Date.now() + 120_000)
+    expect(commits).toEqual([])
   })
 
   it('does not pull a dirty vault', async () => {

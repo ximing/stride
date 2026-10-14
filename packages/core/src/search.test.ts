@@ -125,6 +125,9 @@ describe('search notes', () => {
       releasesUrl: '',
       gitEnabled: true,
       autoSyncMinutes: 0,
+      autoGitEnabled: false,
+      autoGitIdleSeconds: 0,
+      autoGitBlurSeconds: 0,
     }
     await writeSettings(files, 'settings.json', settings, secrets)
     expect(await settingsContainRawKey(files, 'settings.json', key)).toBe(false)
@@ -144,6 +147,9 @@ describe('search notes', () => {
       releasesUrl: '',
       gitEnabled: true,
       autoSyncMinutes: 0,
+      autoGitEnabled: false,
+      autoGitIdleSeconds: 0,
+      autoGitBlurSeconds: 0,
     }, secrets)
     expect((await readSettings(files, 'zero-dim.json', secrets)).embedding.dim).toBe(0)
     expect(defaultSettingsPath('/Users/someone')).toBe('/Users/someone/.stride/settings.json')

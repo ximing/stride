@@ -55,6 +55,9 @@ describe('VaultService', () => {
         releasesUrl: '',
         gitEnabled: true,
         autoSyncMinutes: 0,
+        autoGitEnabled: false,
+        autoGitIdleSeconds: 0,
+        autoGitBlurSeconds: 0,
       }
       settings.setEmbeddingDim('4')
       settings.embeddingKey = ''

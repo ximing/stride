@@ -68,6 +68,9 @@ describe('llm settings', () => {
       releasesUrl: '',
       gitEnabled: true,
       autoSyncMinutes: 0,
+      autoGitEnabled: false,
+      autoGitIdleSeconds: 0,
+      autoGitBlurSeconds: 0,
     }, secrets)
     const text = await files.readText('two.json')
     expect(text.includes(keyA)).toBe(false)
@@ -101,9 +104,22 @@ describe('llm settings', () => {
     expect((await readSettings(files, 'other.json', secrets)).gitEnabled).toBe(true)
     expect(missing.autoSyncMinutes).toBe(0)
     expect(defaultSettings().autoSyncMinutes).toBe(0)
+    expect(missing.autoGitEnabled).toBe(false)
+    expect(missing.autoGitIdleSeconds).toBe(0)
+    expect(missing.autoGitBlurSeconds).toBe(0)
     await files.writeText('bad-interval.json', JSON.stringify({ autoSyncMinutes: '5' }))
     expect((await readSettings(files, 'bad-interval.json', secrets)).autoSyncMinutes).toBe(0)
+    await files.writeText('bad-autogit.json', JSON.stringify({ autoGitIdleSeconds: '5', autoGitBlurSeconds: '5', autoGitEnabled: 'yes' }))
+    const badAutoGit = await readSettings(files, 'bad-autogit.json', secrets)
+    expect(badAutoGit.autoGitEnabled).toBe(false)
+    expect(badAutoGit.autoGitIdleSeconds).toBe(0)
+    expect(badAutoGit.autoGitBlurSeconds).toBe(0)
     await writeSettings(files, 'five.json', { ...defaultSettings(), autoSyncMinutes: 5 }, secrets)
     expect((await readSettings(files, 'five.json', secrets)).autoSyncMinutes).toBe(5)
+    await writeSettings(files, 'autogit.json', { ...defaultSettings(), autoGitEnabled: true, autoGitIdleSeconds: 30, autoGitBlurSeconds: 10 }, secrets)
+    const autoGit = await readSettings(files, 'autogit.json', secrets)
+    expect(autoGit.autoGitEnabled).toBe(true)
+    expect(autoGit.autoGitIdleSeconds).toBe(30)
+    expect(autoGit.autoGitBlurSeconds).toBe(10)
   })
 })

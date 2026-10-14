@@ -98,6 +98,9 @@ describe('vane search', () => {
       releasesUrl: '',
       gitEnabled: true,
       autoSyncMinutes: 0,
+      autoGitEnabled: false,
+      autoGitIdleSeconds: 0,
+      autoGitBlurSeconds: 0,
     }
     const settingsFs = new NodeFileSystem(dir)
     await writeSettings(settingsFs, 'settings.json', settings, secrets)
