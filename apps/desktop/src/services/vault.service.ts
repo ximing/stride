@@ -393,6 +393,21 @@ export class VaultService extends Service {
     }
   }
 
+  // Born with `title`. createNote() writes Untitled and switches notes first.
+  async createLinkedNote(title: string) {
+    this.error = ''
+    if (!title.trim()) return
+    try {
+      if (!this.fs) throw new Error('Open a vault first')
+      const note = await createVaultNote(this.fs, title)
+      this.notes = [note, ...this.notes.filter((item) => item.id !== note.id)]
+      await this.upsertIndexed(note)
+      this.select(note.id)
+    } catch (error) {
+      this.error = errorText(error)
+    }
+  }
+
   async createType() {
     this.error = ''
     try {

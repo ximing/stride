@@ -154,14 +154,12 @@ export function EditorToolbar({
 
   const [linkForm, setLinkForm] = useState<LinkForm | null>(null)
   const [linkSession, setLinkSession] = useState(0)
-  const [wikilinkDraft, setWikilinkDraft] = useState<string | null>(null)
   const hrefRef = useRef<HTMLInputElement>(null)
 
   openLinkRef.current = () => {
     const { from, to } = editor.state.selection
     const linked = editor.isActive('link')
     const raw = editor.getAttributes('link').href
-    setWikilinkDraft(null)
     setLinkForm({
       href: linked && typeof raw === 'string' ? raw : '',
       from,
@@ -198,15 +196,6 @@ export function EditorToolbar({
     setLinkForm(null)
   }
 
-  function submitWikilink(event: FormEvent) {
-    event.preventDefault()
-    const target = (wikilinkDraft ?? '').trim()
-    if (target) {
-      editor.chain().insertContent({ type: 'wikilink', attrs: { target } }).run()
-    }
-    setWikilinkDraft(null)
-  }
-
   const bubbleTools = editorTools.filter((tool) => tool.bubble)
 
   return (
@@ -230,7 +219,7 @@ export function EditorToolbar({
           onMouseDown={keepSelection}
           onClick={() => {
             setLinkForm(null)
-            setWikilinkDraft('')
+            editor.chain().insertContent('[[').run()
           }}
         >
           Wikilink
@@ -251,19 +240,6 @@ export function EditorToolbar({
               移除链接
             </button>
             <button type="button" onClick={() => setLinkForm(null)}>取消</button>
-          </form>
-        )}
-        {wikilinkDraft !== null && (
-          <form className="wikilink-draft" onSubmit={submitWikilink}>
-            <input
-              aria-label="Wikilink target"
-              value={wikilinkDraft}
-              placeholder="Note title"
-              autoComplete="off"
-              onChange={(event) => setWikilinkDraft(event.target.value)}
-            />
-            <button type="submit">Insert</button>
-            <button type="button" onClick={() => setWikilinkDraft(null)}>Cancel</button>
           </form>
         )}
       </div>

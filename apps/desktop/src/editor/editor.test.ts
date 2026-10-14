@@ -320,13 +320,10 @@ describe('editor formats', () => {
     await act(async () => {
       ;(document.querySelector('[data-testid="toolbar-wikilink"]') as HTMLButtonElement).click()
     })
-    const target = document.querySelector('[aria-label="Wikilink target"]') as HTMLInputElement
-    expect(target).not.toBeNull()
+    expect(document.querySelector('[aria-label="Wikilink target"]')).toBeNull()
+    expect(editor.getText()).toContain('[[')
     await act(async () => {
-      const setter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set
-      setter?.call(target, 'Other note')
-      target.dispatchEvent(new Event('input', { bubbles: true }))
-      target.closest('form')?.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }))
+      editor.commands.insertContent({ type: 'wikilink', attrs: { target: 'Other note' } })
     })
     expect(hasMark(editor.getJSON(), 'wikilink')).toBe(true)
   })

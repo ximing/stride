@@ -1,10 +1,11 @@
-import { Extension, Node, mergeAttributes, type Editor } from '@tiptap/core'
+import { Extension, type Editor } from '@tiptap/core'
 import Highlight from '@tiptap/extension-highlight'
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import StarterKit from '@tiptap/starter-kit'
 import { slashMenu } from './slash'
 import { createTaskExtensions } from './task'
+import { createWikilinkNode, createWikilinkSuggestionExtension } from './wikilink'
 
 export type FormatName =
   | 'bold'
@@ -21,26 +22,11 @@ export type FormatName =
   | 'highlight'
   | 'hr'
 
-function createWikilink() {
-  return Node.create({
-    name: 'wikilink',
-    group: 'inline',
-    inline: true,
-    atom: true,
-    addAttributes() {
-      return { target: { default: '' } }
-    },
-    parseHTML() {
-      return [{ tag: 'span[data-wikilink]' }]
-    },
-    renderHTML({ HTMLAttributes }) {
-      const target = String(HTMLAttributes.target || '')
-      return ['span', mergeAttributes(HTMLAttributes, { 'data-wikilink': target, class: 'wikilink' }), `[[${target}]]`]
-    },
-  })
-}
-
-export function createEditorExtensions(options: { onModK: () => boolean }) {
+export function createEditorExtensions(options: {
+  onModK: () => boolean
+  getNotes?: () => { id: string; title: string }[]
+  onOpen?: (target: string) => void
+}) {
   // StarterKit already registers Link. A second copy clashes on the name.
   // trailingNode stays on.
   const linkKeymap = Extension.create({
@@ -52,6 +38,9 @@ export function createEditorExtensions(options: { onModK: () => boolean }) {
     },
   })
 
+  const getNotes = options.getNotes ?? (() => [])
+  const onOpen = options.onOpen ?? (() => {})
+
   return [
     StarterKit.configure({ link: false }),
     Link.configure({
@@ -61,9 +50,10 @@ export function createEditorExtensions(options: { onModK: () => boolean }) {
       HTMLAttributes: {},
     }),
     Highlight.configure({ multicolor: false }),
-    createWikilink(),
     linkKeymap,
     Placeholder.configure({ placeholder: 'Write in the vault…' }),
+    createWikilinkNode({ getNotes, onOpen }),
+    createWikilinkSuggestionExtension(getNotes),
     ...createTaskExtensions(),
     slashMenu,
   ]
