@@ -256,6 +256,11 @@ const GitPanel = observer(function GitPanel() {
       onCommit={(paths) => { void git.commitSelected(paths) }}
       onSuggest={() => { void git.suggestMessage() }}
       onInit={() => { void git.init() }}
+      remote={git.remote}
+      onRemote={(value) => git.setRemote(value)}
+      onAddRemote={() => { void git.addRemote() }}
+      onPull={() => { void git.pull() }}
+      onPush={() => { void git.push() }}
       onCommitOpenChange={(open) => {
         if (!open) git.abortSuggest()
       }}

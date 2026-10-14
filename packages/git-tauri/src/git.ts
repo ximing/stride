@@ -3,8 +3,10 @@ import {
   GitError,
   isExistingRemote,
   isNoCommitHistory,
+  isNoSuchRemote,
   isNothingToCommit,
   isNoUpstream,
+  mergeBaseSharesHistory,
   parseAheadBehind,
   parseGitHistory,
   parseGitStatus,
@@ -113,6 +115,16 @@ export class ShellGitBackend implements GitBackend {
     }
   }
 
+  async remoteUrl(repo: string, name = 'origin'): Promise<string | null> {
+    try {
+      const { stdout } = await runGit(repo, ['remote', 'get-url', name])
+      return stdout.trim()
+    } catch (error) {
+      if (error instanceof GitError && isNoSuchRemote(error.output)) return null
+      throw error
+    }
+  }
+
   async addRemote(repo: string, url: string, name = 'origin'): Promise<void> {
     try {
       await runGit(repo, ['remote', 'add', name, url])
@@ -123,6 +135,26 @@ export class ShellGitBackend implements GitBackend {
       }
       throw error
     }
+  }
+
+  async fetch(repo: string, remote = 'origin'): Promise<void> {
+    await runGit(repo, ['fetch', remote])
+  }
+
+  async sharesHistory(repo: string): Promise<boolean> {
+    try {
+      await runGit(repo, ['merge-base', 'HEAD', 'FETCH_HEAD'])
+      return true
+    } catch (error) {
+      if (!(error instanceof GitError)) throw error
+      const shared = mergeBaseSharesHistory(error.code, error.output)
+      if (shared === null) throw error
+      return shared
+    }
+  }
+
+  async removeRemote(repo: string, name = 'origin'): Promise<void> {
+    await runGit(repo, ['remote', 'remove', name])
   }
 
   async push(repo: string): Promise<string> {

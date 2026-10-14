@@ -178,6 +178,26 @@ describe('ShellGitBackend', () => {
     ])
   })
 
+  it('reads a remote url with git and treats a missing remote as null', async () => {
+    shell.handle((call) => {
+      if (call.cwd === '/repo/missing') return fail(2, "fatal: No such remote 'origin'\n")
+      if (call.cwd === '/repo/broken') return fail(128, 'fatal: not a git repository\n')
+      if (call.args[2] === 'upstream') return ok('https://example.com/upstream.git\n')
+      return ok('https://example.com/origin.git\n')
+    })
+    await expect(git.remoteUrl('/repo')).resolves.toBe('https://example.com/origin.git')
+    await expect(git.remoteUrl('/repo', 'upstream')).resolves.toBe('https://example.com/upstream.git')
+    await expect(git.remoteUrl('/repo/missing')).resolves.toBeNull()
+    await expect(git.remoteUrl('/repo/broken')).rejects.toBeInstanceOf(GitError)
+    expect(shell.calls.every((call) => call.program === 'git')).toBe(true)
+    expect(argLines()).toEqual([
+      ['remote', 'get-url', 'origin'],
+      ['remote', 'get-url', 'upstream'],
+      ['remote', 'get-url', 'origin'],
+      ['remote', 'get-url', 'origin'],
+    ])
+  })
+
   it('sets the url when the remote already exists', async () => {
     const url = 'https://example.com/origin.git'
     shell.handle((call) => {
@@ -189,6 +209,34 @@ describe('ShellGitBackend', () => {
       ['remote', 'add', 'origin', url],
       ['remote', 'set-url', 'origin', url],
     ])
+  })
+
+  it('fetches a remote, compares FETCH_HEAD, and removes an unrelated remote', async () => {
+    shell.handle((call) => {
+      if (call.args[0] !== 'merge-base') return ok()
+      if (call.cwd === '/repo/unrelated') return fail(1, '')
+      if (call.cwd === '/repo/empty') return fail(128, 'fatal: Not a valid object name FETCH_HEAD\n')
+      if (call.cwd === '/repo/broken') return fail(128, 'fatal: not a git repository\n')
+      return ok('abc123\n')
+    })
+    await git.fetch('/repo')
+    await expect(git.sharesHistory('/repo')).resolves.toBe(true)
+    await git.fetch('/repo/unrelated', 'upstream')
+    await expect(git.sharesHistory('/repo/unrelated')).resolves.toBe(false)
+    await git.removeRemote('/repo/unrelated', 'upstream')
+    await expect(git.sharesHistory('/repo/empty')).resolves.toBe(true)
+    await expect(git.sharesHistory('/repo/broken')).rejects.toBeInstanceOf(GitError)
+    expect(shell.calls.every((call) => call.program === 'git')).toBe(true)
+    expect(argLines()).toEqual([
+      ['fetch', 'origin'],
+      ['merge-base', 'HEAD', 'FETCH_HEAD'],
+      ['fetch', 'upstream'],
+      ['merge-base', 'HEAD', 'FETCH_HEAD'],
+      ['remote', 'remove', 'upstream'],
+      ['merge-base', 'HEAD', 'FETCH_HEAD'],
+      ['merge-base', 'HEAD', 'FETCH_HEAD'],
+    ])
+    expect(shell.calls.some((call) => call.args.includes('--force') || call.args[0] === 'reset' || call.args[0] === 'clean')).toBe(false)
   })
 
   it('pushes the current branch upstream', async () => {

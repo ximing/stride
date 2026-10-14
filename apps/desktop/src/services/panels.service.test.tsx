@@ -430,6 +430,84 @@ describe('browser panels', () => {
     expect(git.message).toBe('draft')
     expect(git.suggesting).toBe(false)
   })
+
+  it('does not pull a dirty vault', async () => {
+    const commits: Array<{ message: string; paths?: string[] }> = []
+    const pulls: string[] = []
+    const repo = { porcelain: ' M a.md\n' }
+    const backend = twoFileGit(repo, commits)
+    backend.pull = () => {
+      pulls.push('pull')
+      return Promise.resolve({ conflict: false, files: [], output: '' })
+    }
+    setGitBackendForTests(backend)
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const files = new MemoryFileSystem('/tmp/vault-dirty-pull')
+    await files.mkdir('.git')
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.broad = false
+    resolve(SettingsService).setGitEnabled(true)
+    const git = resolve(GitService)
+    await git.pull()
+    expect(pulls).toEqual([])
+    expect(commits).toEqual([])
+    expect(git.output).toBe('Commit local changes before pulling')
+  })
+
+  it('clears ahead after a successful push and reports an incompatible remote', async () => {
+    let pushed = false
+    const removed: string[] = []
+    setGitBackendForTests({
+      available: true,
+      init: () => Promise.resolve(),
+      status: () => Promise.resolve({ repo: true, porcelain: '', clean: true }),
+      diff: () => Promise.resolve(''),
+      commit: () => Promise.resolve(''),
+      history: () => Promise.resolve([]),
+      currentBranch: () => Promise.resolve('main'),
+      aheadBehind: () => Promise.resolve({ ahead: pushed ? 0 : 3, behind: 1 }),
+      remoteUrl: () => Promise.resolve(null),
+      addRemote: () => Promise.resolve(),
+      fetch: () => Promise.resolve(),
+      sharesHistory: () => Promise.resolve(false),
+      removeRemote: (_repo, name) => {
+        removed.push(name ?? 'origin')
+        return Promise.resolve()
+      },
+      push: () => {
+        pushed = true
+        return Promise.resolve('pushed')
+      },
+      pull: () => Promise.resolve({ conflict: false, files: [], output: '' }),
+      unmerged: () => Promise.resolve([]),
+      resolve: () => Promise.resolve(),
+      clone: () => Promise.resolve(),
+    })
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const files = new MemoryFileSystem('/tmp/vault-push')
+    await files.mkdir('.git')
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.broad = false
+    resolve(SettingsService).setGitEnabled(true)
+    const git = resolve(GitService)
+    await git.refresh()
+    expect(git.ahead).toBe(3)
+    await git.push()
+    expect(pushed).toBe(true)
+    expect(git.ahead).toBe(0)
+    expect(git.behind).toBe(1)
+    expect(git.output).toBe('')
+    git.setRemote('https://example.test/other.git')
+    await git.addRemote()
+    expect(removed).toEqual(['origin'])
+    expect(git.output).toBe('Remote history is not compatible with this vault')
+  })
 })
 
 function recordingGit(calls: string[]): GitBackend {
@@ -447,7 +525,11 @@ function recordingGit(calls: string[]): GitBackend {
     },
     history: () => Promise.resolve([]),
     currentBranch: () => Promise.resolve('main'),
+    remoteUrl: () => Promise.resolve(null),
     addRemote: () => Promise.resolve(),
+    fetch: () => Promise.resolve(),
+    sharesHistory: () => Promise.resolve(true),
+    removeRemote: () => Promise.resolve(),
     push: () => Promise.resolve(''),
     pull: () => Promise.resolve({ conflict: false, files: [], output: '' }),
     unmerged: () => Promise.resolve([]),
@@ -473,7 +555,11 @@ function twoFileGit(
     history: () => Promise.resolve([]),
     currentBranch: () => Promise.resolve('main'),
     aheadBehind: () => Promise.resolve({ ahead: 1, behind: 0 }),
+    remoteUrl: () => Promise.resolve(null),
     addRemote: () => Promise.resolve(),
+    fetch: () => Promise.resolve(),
+    sharesHistory: () => Promise.resolve(true),
+    removeRemote: () => Promise.resolve(),
     push: () => Promise.resolve(''),
     pull: () => Promise.resolve({ conflict: false, files: [], output: '' }),
     unmerged: () => Promise.resolve([]),

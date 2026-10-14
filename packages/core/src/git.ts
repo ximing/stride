@@ -43,7 +43,15 @@ export function parsePullResult(output: string, files: string[]): PullResult {
 }
 
 export function isNoCommitHistory(output: string): boolean {
-  return /does not have any commits|unknown revision|bad default revision/.test(output)
+  // merge-base says "Not a valid object name" when HEAD or FETCH_HEAD has no commit.
+  return /does not have any commits|unknown revision|bad default revision|Not a valid object name/.test(output)
+}
+
+// null means the failure is not a history answer and the caller should rethrow.
+export function mergeBaseSharesHistory(code: number, output: string): boolean | null {
+  if (isNoCommitHistory(output)) return true
+  if (code === 1 || /no merge base/i.test(output)) return false
+  return null
 }
 
 export function isNothingToCommit(output: string): boolean {
@@ -70,6 +78,10 @@ export type { GitSurface } from './git-surface.ts'
 
 export function isExistingRemote(output: string): boolean {
   return output.includes('already exists')
+}
+
+export function isNoSuchRemote(output: string): boolean {
+  return /no such remote/i.test(output)
 }
 
 export function vaultRelative(relPath: string): string {
@@ -147,13 +159,38 @@ export async function currentBranch(git: GitBackend, repo: string): Promise<stri
   return git.currentBranch(repo)
 }
 
+async function restoreRemote(
+  git: GitBackend,
+  repo: string,
+  name: string,
+  previous: string | null,
+): Promise<void> {
+  try {
+    if (previous === null) await git.removeRemote(repo, name)
+    else await git.addRemote(repo, previous, name)
+  } catch {
+    // Restore is best-effort. The original error is the one to report.
+  }
+}
+
 export async function gitAddRemote(
   fs: FileSystemBackend,
   git: GitBackend,
   url: string,
   name = 'origin',
 ): Promise<void> {
-  await git.addRemote(fs.rootLabel, url, name)
+  const repo = fs.rootLabel
+  const previous = await git.remoteUrl(repo, name)
+  await git.addRemote(repo, url, name)
+  try {
+    await git.fetch(repo, name)
+    if (!(await git.sharesHistory(repo))) {
+      throw new Error('Remote history is not compatible with this vault')
+    }
+  } catch (error) {
+    await restoreRemote(git, repo, name, previous)
+    throw error
+  }
 }
 
 export async function gitPush(fs: FileSystemBackend, git: GitBackend): Promise<string> {
@@ -165,6 +202,9 @@ export async function unmergedFiles(fs: FileSystemBackend, git: GitBackend): Pro
 }
 
 export async function gitPull(fs: FileSystemBackend, git: GitBackend): Promise<PullResult> {
+  const status = await gitStatus(fs, git)
+  if (!status.clean) throw new Error('Commit local changes before pulling')
+  if (!status.repo) throw new Error('Not a git repository')
   return git.pull(fs.rootLabel)
 }
 

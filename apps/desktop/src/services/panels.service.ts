@@ -5,8 +5,11 @@ import {
   catalogDefaultModel,
   currentBranch,
   effectiveBaseUrl,
+  gitAddRemote,
   gitCommit,
   gitDiff,
+  gitPull,
+  gitPush,
   gitStatus,
   gitSurface,
   initGit,
@@ -455,13 +458,81 @@ export class GitService extends Service {
   }
 
   async pull() {
+    try {
+      await this.vault.flush()
+    } catch (error) {
+      this.output = error instanceof Error ? error.message : String(error)
+      return
+    }
     const backend = await resolveGitBackend()
-    if (!backend.available) this.output = GIT_BROWSER
+    if (!backend.available) {
+      this.output = GIT_BROWSER
+      return
+    }
+    if (!this.gitEnabled()) {
+      this.notice = GIT_OFF
+      this.output = GIT_OFF
+      return
+    }
+    const fs = this.vault.fs
+    if (!fs) return
+    try {
+      await gitPull(fs, backend)
+      this.output = ''
+      await this.refresh()
+    } catch (error) {
+      this.output = error instanceof Error ? error.message : String(error)
+    }
   }
 
   async push() {
+    try {
+      await this.vault.flush()
+    } catch (error) {
+      this.output = error instanceof Error ? error.message : String(error)
+      return
+    }
     const backend = await resolveGitBackend()
-    if (!backend.available) this.output = GIT_BROWSER
+    if (!backend.available) {
+      this.output = GIT_BROWSER
+      return
+    }
+    if (!this.gitEnabled()) {
+      this.notice = GIT_OFF
+      this.output = GIT_OFF
+      return
+    }
+    const fs = this.vault.fs
+    if (!fs) return
+    try {
+      await gitPush(fs, backend)
+      this.output = ''
+      await this.refresh()
+    } catch (error) {
+      this.output = error instanceof Error ? error.message : String(error)
+    }
+  }
+
+  async addRemote() {
+    const backend = await resolveGitBackend()
+    if (!backend.available) {
+      this.output = GIT_BROWSER
+      return
+    }
+    if (!this.gitEnabled()) {
+      this.notice = GIT_OFF
+      this.output = GIT_OFF
+      return
+    }
+    const fs = this.vault.fs
+    if (!fs) return
+    try {
+      await gitAddRemote(fs, backend, this.remote.trim())
+      this.output = ''
+      await this.refresh()
+    } catch (error) {
+      this.output = error instanceof Error ? error.message : String(error)
+    }
   }
 
   async keepSide(_id: string, _side: 'ours' | 'theirs') {

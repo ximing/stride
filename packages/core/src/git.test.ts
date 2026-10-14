@@ -1,7 +1,17 @@
 import { describe, expect, it } from 'vitest'
 import { MemoryFileSystem, unavailableGit, type GitBackend } from '@stride/platform'
 import { DEDICATED_ERROR, isBroadPersonalRoot } from './roots.ts'
-import { gitCommit, gitResolve, gitStatus, initGit, isNoUpstream, VAULT_GITIGNORE } from './git.ts'
+import {
+  gitAddRemote,
+  gitCommit,
+  gitPull,
+  gitResolve,
+  gitStatus,
+  initGit,
+  isNoUpstream,
+  mergeBaseSharesHistory,
+  VAULT_GITIGNORE,
+} from './git.ts'
 import { markDedicatedVault } from './vault.ts'
 
 function fakeGit(): GitBackend & { calls: string[] } {
@@ -24,7 +34,11 @@ function fakeGit(): GitBackend & { calls: string[] } {
     },
     history: () => Promise.resolve([]),
     currentBranch: () => Promise.resolve('main'),
+    remoteUrl: () => Promise.resolve(null),
     addRemote: () => Promise.resolve(),
+    fetch: () => Promise.resolve(),
+    sharesHistory: () => Promise.resolve(true),
+    removeRemote: () => Promise.resolve(),
     push: () => Promise.resolve(''),
     pull: () => Promise.resolve({ conflict: false, files: [], output: '' }),
     unmerged: () => Promise.resolve([]),
@@ -115,6 +129,204 @@ describe('vault git policy', () => {
     await expect(initGit(files, unavailableGit(), '/Users/someone')).rejects.toThrow(/not available/i)
     expect(await files.stat('.git')).toBeNull()
     expect(await files.stat('.gitignore')).toBeNull()
+  })
+})
+
+describe('gitPull', () => {
+  it('does not pull when git status is dirty', async () => {
+    const files = new MemoryFileSystem('/tmp/dirty-pull')
+    await files.mkdir('.git')
+    const git = fakeGit()
+    const pulls: string[] = []
+    git.status = () => Promise.resolve({ repo: true, porcelain: ' M note.md\n', clean: false })
+    git.pull = () => {
+      pulls.push('pull')
+      return Promise.resolve({ conflict: false, files: [], output: '' })
+    }
+    await expect(gitPull(files, git)).rejects.toThrow('Commit local changes before pulling')
+    expect(pulls).toEqual([])
+  })
+
+  it('pulls when the working tree is clean', async () => {
+    const files = new MemoryFileSystem('/tmp/clean-pull')
+    await files.mkdir('.git')
+    const git = fakeGit()
+    const pulls: string[] = []
+    git.pull = () => {
+      pulls.push('pull')
+      return Promise.resolve({ conflict: false, files: [], output: 'ok' })
+    }
+    await expect(gitPull(files, git)).resolves.toEqual({ conflict: false, files: [], output: 'ok' })
+    expect(pulls).toEqual(['pull'])
+  })
+
+  it('does not pull when the folder is not a git repository', async () => {
+    const files = new MemoryFileSystem('/tmp/not-a-repo')
+    const git = fakeGit()
+    const pulls: string[] = []
+    git.pull = () => {
+      pulls.push('pull')
+      return Promise.resolve({ conflict: false, files: [], output: '' })
+    }
+    await expect(gitPull(files, git)).rejects.toThrow('Not a git repository')
+    expect(pulls).toEqual([])
+  })
+})
+
+describe('gitAddRemote', () => {
+  it('keeps a related remote and removes an unrelated one before throwing', async () => {
+    const files = new MemoryFileSystem('/tmp/remote-vault')
+    const related = fakeGit()
+    const relatedCalls: string[] = []
+    related.addRemote = (_repo, url, name) => {
+      relatedCalls.push(`add ${name ?? ''} ${url}`)
+      return Promise.resolve()
+    }
+    related.fetch = (_repo, remote) => {
+      relatedCalls.push(`fetch ${remote ?? ''}`)
+      return Promise.resolve()
+    }
+    related.sharesHistory = () => {
+      relatedCalls.push('shares')
+      return Promise.resolve(true)
+    }
+    related.removeRemote = () => {
+      relatedCalls.push('remove')
+      return Promise.resolve()
+    }
+    await gitAddRemote(files, related, 'https://example.test/related.git')
+    expect(relatedCalls).toEqual(['add origin https://example.test/related.git', 'fetch origin', 'shares'])
+
+    const unrelated = fakeGit()
+    const unrelatedCalls: string[] = []
+    unrelated.addRemote = (_repo, url, name) => {
+      unrelatedCalls.push(`add ${name ?? ''} ${url}`)
+      return Promise.resolve()
+    }
+    unrelated.fetch = (_repo, remote) => {
+      unrelatedCalls.push(`fetch ${remote ?? ''}`)
+      return Promise.resolve()
+    }
+    unrelated.sharesHistory = () => {
+      unrelatedCalls.push('shares')
+      return Promise.resolve(false)
+    }
+    unrelated.removeRemote = (_repo, name) => {
+      unrelatedCalls.push(`remove ${name ?? ''}`)
+      return Promise.resolve()
+    }
+    await expect(gitAddRemote(files, unrelated, 'https://example.test/other.git', 'upstream')).rejects.toThrow(
+      'Remote history is not compatible with this vault',
+    )
+    expect(unrelatedCalls).toEqual([
+      'add upstream https://example.test/other.git',
+      'fetch upstream',
+      'shares',
+      'remove upstream',
+    ])
+  })
+
+  it('removes the remote when fetch fails and rethrows that error', async () => {
+    const files = new MemoryFileSystem('/tmp/fetch-fail')
+    const git = fakeGit()
+    const calls: string[] = []
+    git.addRemote = () => {
+      calls.push('add')
+      return Promise.resolve()
+    }
+    git.fetch = () => {
+      calls.push('fetch')
+      return Promise.reject(new Error('network down'))
+    }
+    git.removeRemote = () => {
+      calls.push('remove')
+      return Promise.reject(new Error('remove failed'))
+    }
+    await expect(gitAddRemote(files, git, 'https://example.test/x.git')).rejects.toThrow('network down')
+    expect(calls).toEqual(['add', 'fetch', 'remove'])
+  })
+
+  it('restores the previous url when fetch fails and does not remove the remote', async () => {
+    const files = new MemoryFileSystem('/tmp/fetch-restore')
+    const git = fakeGit()
+    const calls: string[] = []
+    git.remoteUrl = () => Promise.resolve('https://example.test/old.git')
+    git.addRemote = (_repo, url, name) => {
+      calls.push(`add ${name ?? ''} ${url}`)
+      return Promise.resolve()
+    }
+    git.fetch = () => {
+      calls.push('fetch')
+      return Promise.reject(new Error('network down'))
+    }
+    git.removeRemote = () => {
+      calls.push('remove')
+      return Promise.resolve()
+    }
+    await expect(gitAddRemote(files, git, 'https://example.test/new.git')).rejects.toThrow('network down')
+    expect(calls).toEqual([
+      'add origin https://example.test/new.git',
+      'fetch',
+      'add origin https://example.test/old.git',
+    ])
+  })
+
+  it('restores the previous url when history is unrelated', async () => {
+    const files = new MemoryFileSystem('/tmp/unrelated-restore')
+    const git = fakeGit()
+    const calls: string[] = []
+    git.remoteUrl = () => Promise.resolve('https://example.test/old.git')
+    git.addRemote = (_repo, url, name) => {
+      calls.push(`add ${name ?? ''} ${url}`)
+      return Promise.resolve()
+    }
+    git.fetch = () => {
+      calls.push('fetch')
+      return Promise.resolve()
+    }
+    git.sharesHistory = () => Promise.resolve(false)
+    git.removeRemote = () => {
+      calls.push('remove')
+      return Promise.resolve()
+    }
+    await expect(gitAddRemote(files, git, 'https://example.test/other.git', 'upstream')).rejects.toThrow(
+      'Remote history is not compatible with this vault',
+    )
+    expect(calls).toEqual([
+      'add upstream https://example.test/other.git',
+      'fetch',
+      'add upstream https://example.test/old.git',
+    ])
+  })
+
+  it('rethrows the original error when restoring the previous url fails', async () => {
+    const files = new MemoryFileSystem('/tmp/restore-fails')
+    const git = fakeGit()
+    const calls: string[] = []
+    git.remoteUrl = () => Promise.resolve('https://example.test/old.git')
+    git.addRemote = (_repo, url) => {
+      calls.push(url)
+      if (url.endsWith('old.git')) return Promise.reject(new Error('set-url failed'))
+      return Promise.resolve()
+    }
+    git.fetch = () => Promise.reject(new Error('network down'))
+    git.removeRemote = () => {
+      calls.push('remove')
+      return Promise.resolve()
+    }
+    git.sharesHistory = () => Promise.reject(new Error('merge-base failed'))
+    await expect(gitAddRemote(files, git, 'https://example.test/new.git')).rejects.toThrow('network down')
+    expect(calls).toEqual(['https://example.test/new.git', 'https://example.test/old.git'])
+  })
+})
+
+describe('mergeBaseSharesHistory', () => {
+  it('treats a missing commit as shared history and exit 1 as unrelated', () => {
+    expect(mergeBaseSharesHistory(128, 'fatal: Not a valid object name FETCH_HEAD')).toBe(true)
+    expect(mergeBaseSharesHistory(128, "fatal: your current branch 'main' does not have any commits yet")).toBe(true)
+    expect(mergeBaseSharesHistory(1, '')).toBe(false)
+    expect(mergeBaseSharesHistory(128, 'fatal: no merge base')).toBe(false)
+    expect(mergeBaseSharesHistory(128, 'fatal: not a git repository')).toBeNull()
   })
 })
 

@@ -97,7 +97,7 @@
 |---|---|---|---|
 | T5.1 ✅ 2026-10-15 | Git UI 分层：非 git vault 显示初始化入口；`git_enabled` 全局开关 | T0.6 | 两种 vault 状态 UI 正确 |
 | T5.2 ✅ 2026-10-15 | Git 面板：status 变更列表、diff 查看、commit 对话框 | T0.6 | 提交后状态栏 ahead+1 |
-| T5.3 | pull/push/remote：ahead/behind badge、添加 remote（历史兼容校验） | T5.2 | 对接 GitHub 仓库推拉成功 |
+| T5.3 ✅ 2026-10-15 | pull/push/remote：ahead/behind badge、添加 remote（历史兼容校验） | T5.2 | 对接 GitHub 仓库推拉成功 |
 | T5.4 | clone 为新 vault | T5.3 | clone URL → 打开 |
 | T5.5 | 冲突解决模态（按文件 ours/theirs） | T5.3 | 制造冲突可解决 |
 | T5.6 | 同步状态机 + 状态栏 badge/弹层 | T5.2 | 五态切换正确 |

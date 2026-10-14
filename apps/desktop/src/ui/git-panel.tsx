@@ -19,6 +19,11 @@ export function GitPanelView(props: {
   onCommit: (paths: string[]) => void
   onSuggest: () => void
   onInit: () => void
+  remote: string
+  onRemote: (value: string) => void
+  onAddRemote: () => void
+  onPull: () => void
+  onPush: () => void
   browserNeedsInit?: boolean
   error?: string
   onCommitOpenChange?: (open: boolean) => void
@@ -55,6 +60,20 @@ export function GitPanelView(props: {
           <p className="meta" data-testid="git-ahead">ahead {props.ahead}</p>
           <p className="meta" data-testid="git-behind">behind {props.behind}</p>
           {props.notice ? <p className="meta" data-testid="git-notice">{props.notice}</p> : null}
+          <label className="field">
+            <span>Remote</span>
+            <input
+              type="text"
+              data-testid="git-remote"
+              value={props.remote}
+              onChange={(event) => props.onRemote(event.target.value)}
+            />
+          </label>
+          <div className="editor-tools">
+            <button type="button" data-testid="git-remote-add" onClick={() => props.onAddRemote()}>Add remote</button>
+            <button type="button" data-testid="git-pull" onClick={() => props.onPull()}>Pull</button>
+            <button type="button" data-testid="git-push" onClick={() => props.onPush()}>Push</button>
+          </div>
           {props.changes.length === 0 ? (
             <p data-testid="git-clean">Working tree clean</p>
           ) : (

@@ -11,8 +11,9 @@ const changes: GitChange[] = [
   { path: 'notes/c.stride.json', code: '??', staged: false, unstaged: false, untracked: true, unmerged: false },
 ]
 
-function setControlValue(element: HTMLTextAreaElement, value: string) {
-  const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
+function setControlValue(element: HTMLTextAreaElement | HTMLInputElement, value: string) {
+  const prototype = element instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype : HTMLInputElement.prototype
+  const setter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set
   setter?.call(element, value)
   element.dispatchEvent(new Event('input', { bubbles: true }))
   element.dispatchEvent(new Event('change', { bubbles: true }))
@@ -32,11 +33,15 @@ function Harness(props: {
   onSuggest?: () => void
   onOpenFileDiff?: (path: string) => void
   onInit?: () => void
+  onPull?: () => void
+  onPush?: () => void
+  onAddRemote?: (url: string) => void
   browserNeedsInit?: boolean
   error?: string
 }) {
   const [selected, setSelected] = useState<string[]>([...(props.initialSelected ?? [])])
   const [message, setMessage] = useState('')
+  const [remote, setRemote] = useState('')
   return (
     <GitPanelView
       surface={props.surface ?? 'ready'}
@@ -59,6 +64,11 @@ function Harness(props: {
       onCommit={props.onCommit ?? (() => {})}
       onSuggest={props.onSuggest ?? (() => {})}
       onInit={props.onInit ?? (() => {})}
+      remote={remote}
+      onRemote={setRemote}
+      onAddRemote={() => props.onAddRemote?.(remote)}
+      onPull={props.onPull ?? (() => {})}
+      onPush={props.onPush ?? (() => {})}
       browserNeedsInit={props.browserNeedsInit}
       error={props.error}
     />
@@ -200,6 +210,28 @@ describe('GitPanelView', () => {
     expect(host?.querySelector('[data-testid="git-branch"]')?.textContent).toBe('main')
   })
 
+  it('edits the remote and runs add, pull, and push', async () => {
+    const events: string[] = []
+    await render(
+      <Harness
+        onAddRemote={(url) => events.push(`add ${url}`)}
+        onPull={() => events.push('pull')}
+        onPush={() => events.push('push')}
+      />,
+    )
+    const input = host?.querySelector<HTMLInputElement>('[data-testid="git-remote"]')
+    expect(input).not.toBeNull()
+    await act(async () => {
+      setControlValue(input!, 'https://example.test/vault.git')
+    })
+    await act(async () => {
+      host?.querySelector<HTMLButtonElement>('[data-testid="git-remote-add"]')?.click()
+      host?.querySelector<HTMLButtonElement>('[data-testid="git-pull"]')?.click()
+      host?.querySelector<HTMLButtonElement>('[data-testid="git-push"]')?.click()
+    })
+    expect(events).toEqual(['add https://example.test/vault.git', 'pull', 'push'])
+  })
+
   it('offers init only when the vault needs a repository', async () => {
     let inits = 0
     await render(<Harness surface="needs-init" branch="" changes={changes} onInit={() => { inits += 1 }} />)
@@ -207,6 +239,9 @@ describe('GitPanelView', () => {
     expect(host?.textContent).toContain('This vault is not a Git repository.')
     expect(host?.querySelector('[data-testid="git-change"]')).toBeNull()
     expect(host?.querySelector('[data-testid="git-commit-open"]')).toBeNull()
+    expect(host?.querySelector('[data-testid="git-remote"]')).toBeNull()
+    expect(host?.querySelector('[data-testid="git-pull"]')).toBeNull()
+    expect(host?.querySelector('[data-testid="git-push"]')).toBeNull()
     await act(async () => {
       host?.querySelector<HTMLButtonElement>('[data-testid="git-init"]')?.click()
     })

@@ -26,7 +26,11 @@ export interface GitBackend {
   history(repo: string, relPath?: string): Promise<GitCommitInfo[]>
   currentBranch(repo: string): Promise<string>
   aheadBehind(repo: string): Promise<{ ahead: number; behind: number }>
+  remoteUrl(repo: string, name?: string): Promise<string | null>
   addRemote(repo: string, url: string, name?: string): Promise<void>
+  fetch(repo: string, remote?: string): Promise<void>
+  sharesHistory(repo: string): Promise<boolean>
+  removeRemote(repo: string, name?: string): Promise<void>
   push(repo: string): Promise<string>
   pull(repo: string): Promise<PullResult>
   unmerged(repo: string): Promise<string[]>
@@ -48,7 +52,11 @@ export function unavailableGit(): GitBackend {
     history: () => unavailable(),
     currentBranch: () => unavailable(),
     aheadBehind: () => unavailable(),
+    remoteUrl: () => unavailable(),
     addRemote: () => unavailable(),
+    fetch: () => unavailable(),
+    sharesHistory: () => unavailable(),
+    removeRemote: () => unavailable(),
     push: () => unavailable(),
     pull: () => unavailable(),
     unmerged: () => unavailable(),

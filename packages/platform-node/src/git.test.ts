@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process'
 import fs from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
@@ -33,6 +34,17 @@ function tempDir(): string {
 
 function at(dir: string): NodeFileSystem {
   return new NodeFileSystem(dir)
+}
+
+function gitRemotes(dir: string): string[] {
+  return execFileSync('git', ['remote'], { cwd: dir, encoding: 'utf8' })
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+}
+
+function originUrl(dir: string): string {
+  return execFileSync('git', ['remote', 'get-url', 'origin'], { cwd: dir, encoding: 'utf8' }).trim()
 }
 
 afterEach(() => {
@@ -115,5 +127,52 @@ describe('vault git', () => {
     expect(resolved).toContain('SIDE_B')
     expect(resolved).not.toContain('SIDE_A')
     expect(resolved).not.toContain('<<<<<<<')
+  })
+
+  it('rejects an unrelated remote and still accepts a cloned origin', async () => {
+    const root = tempDir()
+    const left = path.join(root, 'left')
+    const right = path.join(root, 'right')
+    fs.mkdirSync(left)
+    fs.mkdirSync(right)
+    fs.writeFileSync(path.join(left, 'left.txt'), 'left\n')
+    fs.writeFileSync(path.join(right, 'right.txt'), 'right\n')
+    await initGit(at(left), git, os.homedir())
+    await initGit(at(right), git, os.homedir())
+    await expect(gitAddRemote(at(left), git, right)).rejects.toThrow(
+      'Remote history is not compatible with this vault',
+    )
+    expect(gitRemotes(left)).not.toContain('origin')
+
+    const bare = path.join(root, 'shared.git')
+    await gitInitBare(bare)
+    await gitAddRemote(at(right), git, bare)
+    await gitPush(at(right), git)
+    const clone = path.join(root, 'clone')
+    await gitClone(git, bare, clone)
+    await gitAddRemote(at(clone), git, bare)
+    expect(gitRemotes(clone)).toContain('origin')
+  })
+
+  it('restores an existing origin when the replacement remote is unrelated', async () => {
+    const root = tempDir()
+    const vault = path.join(root, 'vault')
+    const unrelated = path.join(root, 'unrelated')
+    fs.mkdirSync(vault)
+    fs.mkdirSync(unrelated)
+    fs.writeFileSync(path.join(vault, 'vault.txt'), 'vault\n')
+    fs.writeFileSync(path.join(unrelated, 'other.txt'), 'other\n')
+    await initGit(at(vault), git, os.homedir())
+    await initGit(at(unrelated), git, os.homedir())
+    const bare = path.join(root, 'origin.git')
+    await gitInitBare(bare)
+    await gitAddRemote(at(vault), git, bare)
+    await gitPush(at(vault), git)
+    const original = originUrl(vault)
+    await expect(gitAddRemote(at(vault), git, unrelated)).rejects.toThrow(
+      'Remote history is not compatible with this vault',
+    )
+    expect(originUrl(vault)).toBe(original)
+    expect(gitRemotes(vault)).toContain('origin')
   })
 })
