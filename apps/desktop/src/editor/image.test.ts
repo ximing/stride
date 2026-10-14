@@ -3,7 +3,7 @@ import { parseNote, serializeNote, type TipTapNode } from '@stride/core/note'
 import { MemoryFileSystem } from '@stride/platform'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createEditorExtensions } from './extensions'
-import { localizeRemoteImage, saveAttachment } from './image'
+import { attachmentPath, localizeRemoteImage, saveAttachment } from './image'
 
 const layoutBox = () => ({
   x: 0,
@@ -60,6 +60,15 @@ describe('image attachments', () => {
     expect(path.startsWith('blob:')).toBe(false)
     expect(path.startsWith('data:')).toBe(false)
     expect(await fs.readBytes(path)).toEqual(bytes)
+  })
+
+  it('does not reuse a path when later bytes differ', () => {
+    const header = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
+    const first = attachmentPath(new Uint8Array([...header, 1, 2, 3]), 'png')
+    const second = attachmentPath(new Uint8Array([...header, 1, 2, 4]), 'png')
+    expect(first.startsWith('attachments/')).toBe(true)
+    expect(second.startsWith('attachments/')).toBe(true)
+    expect(first).not.toBe(second)
   })
 
   it('keeps a remote url when fetch fails', async () => {

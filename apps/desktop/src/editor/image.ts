@@ -17,12 +17,13 @@ export function imageMimeExtension(type: string): string {
 }
 
 export function attachmentPath(bytes: Uint8Array, ext: string): string {
-  let hex = ''
-  const count = Math.min(8, bytes.length)
-  for (let index = 0; index < count; index += 1) {
-    hex += bytes[index]!.toString(16).padStart(2, '0')
+  let hash = 2166136261
+  for (let index = 0; index < bytes.length; index += 1) {
+    hash ^= bytes[index]!
+    hash = Math.imul(hash, 16777619)
   }
-  return `attachments/${hex}.${ext}`
+  hash = Math.imul(hash ^ bytes.length, 16777619) >>> 0
+  return `attachments/${hash.toString(16).padStart(8, '0')}.${ext}`
 }
 
 async function blobBytes(file: Blob): Promise<Uint8Array> {
