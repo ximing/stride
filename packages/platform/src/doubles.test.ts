@@ -21,6 +21,7 @@ describe('unavailableGit', () => {
       git.history('repo'),
       git.history('repo', 'note.md'),
       git.currentBranch('repo'),
+      git.aheadBehind('repo'),
       git.addRemote('repo', 'https://example.test/vault.git'),
       git.addRemote('repo', 'https://example.test/vault.git', 'origin'),
       git.push('repo'),

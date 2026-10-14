@@ -50,6 +50,14 @@ export function isNothingToCommit(output: string): boolean {
   return /nothing to commit|No changes/.test(output)
 }
 
+export function isNoUpstream(output: string): boolean {
+  return output.includes('no upstream')
+    || output.includes('@{upstream}')
+    || output.includes('no such branch')
+}
+
+export { parseAheadBehind } from './git-ahead.ts'
+
 export const VAULT_GITIGNORE = `.DS_Store
 Thumbs.db
 .stride/rename-tx/
@@ -110,9 +118,19 @@ export async function gitDiff(fs: FileSystemBackend, git: GitBackend, relPath?: 
   return git.diff(fs.rootLabel, relative)
 }
 
-export async function gitCommit(fs: FileSystemBackend, git: GitBackend, message: string): Promise<string> {
+export async function gitCommit(
+  fs: FileSystemBackend,
+  git: GitBackend,
+  message: string,
+  paths?: string[],
+): Promise<string> {
   const trimmed = message.trim()
   if (!trimmed) throw new Error('Commit message is empty')
+  if (paths && paths.length === 0) throw new Error('Choose files to commit')
+  if (paths) {
+    const normalized = paths.map((path) => vaultRelative(path))
+    return git.commit(fs.rootLabel, trimmed, normalized)
+  }
   return git.commit(fs.rootLabel, trimmed)
 }
 

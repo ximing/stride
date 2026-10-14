@@ -16,6 +16,7 @@ import { typeSidebarLabel } from '../../../packages/core/src/types'
 import { NoteEditor } from './editor'
 import { ChatService, GitService, SettingsService, UpdateService } from './services/panels.service'
 import { VaultService } from './services/vault.service'
+import { GitPanelView } from './ui/git-panel'
 import { Mark } from './ui/icon'
 import { FolderTree } from './ui/folder-tree'
 import { PropertiesPanel } from './ui/properties-panel'
@@ -215,11 +216,12 @@ export const Rail = observer(function Rail() {
   )
 })
 
-function gitBadge(surface: GitSurface, branch: string): string {
+function gitBadge(surface: GitSurface, branch: string, ahead: number): string {
   if (surface === 'unavailable') return 'Git unavailable'
   if (surface === 'disabled') return 'Git off'
   if (surface === 'blocked') return 'Git blocked'
   if (surface === 'needs-init') return 'Not a repo'
+  if (ahead > 0) return `ahead ${ahead}`
   return branch || 'Git'
 }
 
@@ -228,28 +230,36 @@ const GitPanel = observer(function GitPanel() {
   useEffect(() => {
     void git.refresh()
   }, [git])
+  const error = git.output
+    && git.output !== 'Git is not available in the browser'
+    && git.output !== 'Git is turned off.'
+    && git.output !== DEDICATED_ERROR
+    ? git.output
+    : ''
   return (
-    <div data-testid="git-panel">
-      <h2>Git</h2>
-      {git.surface === 'unavailable' && (
-        <>
-          <p data-testid="git-unavailable">Git is not available in the browser</p>
-          {git.hasVault && !git.isRepo ? (
-            <p data-testid="git-needs-init">This vault is not a Git repository. Initialize it in the desktop app.</p>
-          ) : null}
-        </>
-      )}
-      {git.surface === 'disabled' && <p data-testid="git-disabled">Git is turned off.</p>}
-      {git.surface === 'blocked' && <p data-testid="git-blocked">{DEDICATED_ERROR}</p>}
-      {git.surface === 'needs-init' && (
-        <>
-          <p>This vault is not a Git repository.</p>
-          <button type="button" data-testid="git-init" onClick={() => { void git.init() }}>Initialize Git</button>
-        </>
-      )}
-      {git.surface === 'ready' && <p className="meta" data-testid="git-branch">{git.branch}</p>}
-      {git.output && git.output !== 'Git is not available in the browser' && git.output !== 'Git is turned off.' && git.output !== DEDICATED_ERROR ? <p className="error" data-testid="git-error">{git.output}</p> : null}
-    </div>
+    <GitPanelView
+      surface={git.surface}
+      branch={git.branch}
+      changes={git.changes}
+      selected={git.selected}
+      diff={git.diff}
+      message={git.message}
+      ahead={git.ahead}
+      behind={git.behind}
+      suggesting={git.suggesting}
+      notice={git.surface === 'blocked' ? DEDICATED_ERROR : git.notice}
+      browserNeedsInit={git.hasVault && !git.isRepo}
+      error={error}
+      onToggle={(path) => git.toggle(path)}
+      onMessage={(value) => git.setMessage(value)}
+      onOpenFileDiff={(path) => { void git.openDiff(path) }}
+      onCommit={(paths) => { void git.commitSelected(paths) }}
+      onSuggest={() => { void git.suggestMessage() }}
+      onInit={() => { void git.init() }}
+      onCommitOpenChange={(open) => {
+        if (!open) git.abortSuggest()
+      }}
+    />
   )
 })
 
@@ -559,7 +569,7 @@ const Workspace = observer(function Workspace() {
       <QuickOpen />
       <SearchPanel />
       <footer className="git-status">
-        <span data-testid="git-status-badge">{gitBadge(git.surface, git.branch)}</span>
+        <span data-testid="git-status-badge">{gitBadge(git.surface, git.branch, git.ahead)}</span>
       </footer>
     </div>
   )

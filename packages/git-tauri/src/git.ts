@@ -4,6 +4,8 @@ import {
   isExistingRemote,
   isNoCommitHistory,
   isNothingToCommit,
+  isNoUpstream,
+  parseAheadBehind,
   parseGitHistory,
   parseGitStatus,
   parsePullResult,
@@ -94,6 +96,21 @@ export class ShellGitBackend implements GitBackend {
   async currentBranch(repo: string): Promise<string> {
     const { stdout } = await runGit(repo, ['rev-parse', '--abbrev-ref', 'HEAD'])
     return stdout.trim()
+  }
+
+  async aheadBehind(repo: string): Promise<{ ahead: number; behind: number }> {
+    try {
+      const { stdout } = await runGit(repo, ['rev-list', '--left-right', '--count', 'HEAD...@{upstream}'])
+      return parseAheadBehind(stdout)
+    } catch (error) {
+      const output = error instanceof GitError
+        ? error.output
+        : error instanceof Error
+          ? error.message
+          : String(error)
+      if (isNoUpstream(output)) return { ahead: 0, behind: 0 }
+      throw error
+    }
   }
 
   async addRemote(repo: string, url: string, name = 'origin'): Promise<void> {

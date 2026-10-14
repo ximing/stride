@@ -5,20 +5,25 @@ import {
   catalogDefaultModel,
   currentBranch,
   effectiveBaseUrl,
+  gitCommit,
+  gitDiff,
   gitStatus,
   gitSurface,
   initGit,
   isDedicatedVault,
   llmProxyBaseUrl,
   maskSecret,
+  parsePorcelain,
   readSettings,
   redactSecret,
   resolveLlm,
+  suggestCommitMessage,
   testLlmConnection,
   toolsForAgentMode,
   vaultTools,
   writeSettings,
   type AppSettings,
+  type GitChange,
   type GitSurface,
   type LlmConfig,
   type PublicLlmConfig,
@@ -46,11 +51,19 @@ const emptySettings = (): PublicSettings => ({
 
 const GIT_BROWSER = 'Git is not available in the browser'
 const GIT_OFF = 'Git is turned off.'
+const GIT_KEY_NOTICE = 'Add a model provider, base URL, model, and key in Settings'
 const BROWSER_HOME = '/Users/stride'
 
 let testGitBackend: GitBackend | null = null
 let testGitBackendSet = false
 let shellGitBackend: GitBackend | null = null
+
+type CommitMessageSuggest = (
+  diff: string,
+  signal: AbortSignal,
+) => Promise<{ message: string; aborted: boolean }>
+
+let commitMessageSuggestForTests: CommitMessageSuggest | null = null
 
 export function setGitBackendForTests(backend: GitBackend | null) {
   if (backend === null) {
@@ -60,6 +73,10 @@ export function setGitBackendForTests(backend: GitBackend | null) {
   }
   testGitBackend = backend
   testGitBackendSet = true
+}
+
+export function setCommitMessageSuggestForTests(next: CommitMessageSuggest | null) {
+  commitMessageSuggestForTests = next
 }
 
 function tauriRuntime(): boolean {
@@ -91,6 +108,14 @@ export class GitService extends Service {
   notice = ''
   isRepo = false
   hasVault = false
+  changes: GitChange[] = []
+  selected: string[] = []
+  ahead = 0
+  behind = 0
+  suggesting = false
+  private diffPath = ''
+  private suggestController: AbortController | null = null
+  private suggestGeneration = 0
 
   constructor() {
     super()
@@ -106,6 +131,10 @@ export class GitService extends Service {
     return this.resolve(VaultService)
   }
 
+  private get settings() {
+    return this.resolve(SettingsService)
+  }
+
   setMessage(value: string) {
     this.message = value
   }
@@ -114,8 +143,43 @@ export class GitService extends Service {
     this.remote = value
   }
 
+  toggle(path: string) {
+    if (this.selected.includes(path)) {
+      this.selected = this.selected.filter((item) => item !== path)
+      return
+    }
+    this.selected = [...this.selected, path]
+  }
+
   private gitEnabled(): boolean {
-    return this.resolve(SettingsService).form.gitEnabled !== false
+    return this.settings.form.gitEnabled !== false
+  }
+
+  private clearWorktree() {
+    this.branch = ''
+    this.ahead = 0
+    this.behind = 0
+    this.changes = []
+    this.selected = []
+    this.diff = ''
+    this.diffPath = ''
+  }
+
+  private applyChanges(next: GitChange[]) {
+    const nextPaths = next.map((change) => change.path)
+    const prevPaths = this.changes.map((change) => change.path)
+    const same = prevPaths.length === nextPaths.length && nextPaths.every((path) => prevPaths.includes(path))
+    if (same) {
+      const live = new Set(nextPaths)
+      this.selected = this.selected.filter((path) => live.has(path))
+    } else {
+      this.selected = [...nextPaths]
+    }
+    if (this.diffPath && !nextPaths.includes(this.diffPath)) {
+      this.diff = ''
+      this.diffPath = ''
+    }
+    this.changes = next
   }
 
   private async homeDirectory(): Promise<string> {
@@ -151,6 +215,7 @@ export class GitService extends Service {
           isRepo: false,
           broadBlocked: false,
         })
+        this.clearWorktree()
         return
       }
       this.hasVault = true
@@ -162,14 +227,23 @@ export class GitService extends Service {
         broadBlocked: false,
       })
       this.output = GIT_BROWSER
+      this.clearWorktree()
       return
     }
     const gitEnabled = this.gitEnabled()
+    if (!gitEnabled) {
+      this.hasVault = Boolean(fs)
+      this.isRepo = fs ? Boolean(await fs.stat('.git')) : false
+      this.surface = 'disabled'
+      this.clearWorktree()
+      this.clearStaleBrowserBanner()
+      return
+    }
     if (!fs) {
       this.hasVault = false
       this.isRepo = false
-      this.branch = ''
       this.surface = gitSurface({ backendAvailable: true, gitEnabled, isRepo: false, broadBlocked: false })
+      this.clearWorktree()
       this.clearStaleBrowserBanner()
       return
     }
@@ -184,7 +258,37 @@ export class GitService extends Service {
         isRepo: status.repo,
         broadBlocked,
       })
-      this.branch = this.surface === 'ready' ? await currentBranch(backend, fs.rootLabel) : ''
+      this.clearStaleBrowserBanner()
+      if (this.surface !== 'ready') {
+        this.clearWorktree()
+        return
+      }
+      this.branch = await currentBranch(backend, fs.rootLabel)
+      const counts = await backend.aheadBehind(fs.rootLabel)
+      this.ahead = counts.ahead
+      this.behind = counts.behind
+      this.applyChanges(parsePorcelain(status.porcelain))
+    } catch (error) {
+      this.output = error instanceof Error ? error.message : String(error)
+    }
+  }
+
+  async openDiff(path: string) {
+    const backend = await resolveGitBackend()
+    if (!backend.available) {
+      this.output = GIT_BROWSER
+      return
+    }
+    if (!this.gitEnabled()) {
+      this.output = GIT_OFF
+      this.notice = GIT_OFF
+      return
+    }
+    const fs = this.vault.fs
+    if (!fs) return
+    try {
+      this.diff = await gitDiff(fs, backend, path)
+      this.diffPath = path
       this.clearStaleBrowserBanner()
     } catch (error) {
       this.output = error instanceof Error ? error.message : String(error)
@@ -228,6 +332,126 @@ export class GitService extends Service {
     }
     const backend = await resolveGitBackend()
     if (!backend.available) this.output = GIT_BROWSER
+  }
+
+  async commitSelected(paths?: readonly string[]) {
+    try {
+      await this.vault.flush()
+    } catch (error) {
+      this.output = error instanceof Error ? error.message : String(error)
+      return
+    }
+    const backend = await resolveGitBackend()
+    if (!backend.available) {
+      this.output = GIT_BROWSER
+      return
+    }
+    if (!this.gitEnabled()) {
+      this.notice = GIT_OFF
+      this.output = GIT_OFF
+      return
+    }
+    const fs = this.vault.fs
+    if (!fs) return
+    const chosen = [...(paths ?? this.selected)]
+    try {
+      await gitCommit(fs, backend, this.message, chosen)
+      this.output = ''
+      await this.refresh()
+    } catch (error) {
+      this.output = error instanceof Error ? error.message : String(error)
+    }
+  }
+
+  abortSuggest() {
+    this.suggestGeneration += 1
+    this.suggestController?.abort()
+    this.suggestController = null
+    this.suggesting = false
+  }
+
+  async suggestMessage() {
+    this.abortSuggest()
+    const generation = this.suggestGeneration
+    const backend = await resolveGitBackend()
+    if (generation !== this.suggestGeneration) return
+    if (!backend.available) {
+      this.output = GIT_BROWSER
+      return
+    }
+    if (!this.gitEnabled()) {
+      this.notice = GIT_OFF
+      this.output = GIT_OFF
+      return
+    }
+    const fs = this.vault.fs
+    if (!fs) return
+    const paths = [...this.selected]
+    if (paths.length === 0) return
+    const hooked = commitMessageSuggestForTests
+    if (!hooked) {
+      const runtime = this.settings.llmRuntime()
+      if (!runtime?.apiKey || !runtime.model || !runtime.baseUrl) {
+        this.notice = GIT_KEY_NOTICE
+        return
+      }
+    }
+    const controller = new AbortController()
+    this.suggestController = controller
+    this.suggesting = true
+    try {
+      const chunks: string[] = []
+      for (const path of paths) {
+        chunks.push(await gitDiff(fs, backend, path))
+        if (generation !== this.suggestGeneration || controller.signal.aborted) return
+      }
+      const diff = chunks.join('')
+      const result = hooked
+        ? await hooked(diff, controller.signal)
+        : await this.suggestWithLlm(diff, controller.signal)
+      if (!result || generation !== this.suggestGeneration || controller.signal.aborted || result.aborted) return
+      this.message = result.message
+      this.notice = ''
+    } catch (error) {
+      if (generation !== this.suggestGeneration || controller.signal.aborted) return
+      this.output = error instanceof Error ? error.message : String(error)
+    } finally {
+      if (generation === this.suggestGeneration) {
+        this.suggesting = false
+        this.suggestController = null
+      }
+    }
+  }
+
+  private async suggestWithLlm(
+    diff: string,
+    signal: AbortSignal,
+  ): Promise<{ message: string; aborted: boolean } | null> {
+    const runtime = this.settings.llmRuntime()
+    if (!runtime?.apiKey || !runtime.model || !runtime.baseUrl) {
+      this.notice = GIT_KEY_NOTICE
+      return null
+    }
+    const config: LlmConfig = {
+      id: 'active',
+      name: runtime.provider,
+      provider: runtime.provider,
+      model: runtime.model,
+      baseUrl: this.settings.devLlmBaseUrl(runtime.baseUrl),
+      apiKey: runtime.apiKey,
+      isDefault: true,
+    }
+    const resolved = resolveLlm(config)
+    return suggestCommitMessage({
+      diff,
+      model: resolved.model,
+      apiKey: resolved.apiKey,
+      signal,
+      streamFn: (model, context, options) => resolved.models.streamSimple(model, context, {
+        ...options,
+        apiKey: resolved.apiKey,
+      }),
+    })
   }
 
   async pull() {

@@ -25,6 +25,7 @@ export interface GitBackend {
   commit(repo: string, message: string, paths?: string[]): Promise<string>
   history(repo: string, relPath?: string): Promise<GitCommitInfo[]>
   currentBranch(repo: string): Promise<string>
+  aheadBehind(repo: string): Promise<{ ahead: number; behind: number }>
   addRemote(repo: string, url: string, name?: string): Promise<void>
   push(repo: string): Promise<string>
   pull(repo: string): Promise<PullResult>
@@ -46,6 +47,7 @@ export function unavailableGit(): GitBackend {
     commit: () => unavailable(),
     history: () => unavailable(),
     currentBranch: () => unavailable(),
+    aheadBehind: () => unavailable(),
     addRemote: () => unavailable(),
     push: () => unavailable(),
     pull: () => unavailable(),

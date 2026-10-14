@@ -5,7 +5,7 @@ import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { UpdateBanner } from '../app'
 import { DEDICATED_ERROR, VAULT_GITIGNORE } from '@stride/core'
-import { GitService, resetSecretsStore, setGitBackendForTests, setSecretsStore, SETTINGS_STORAGE_KEY, SettingsService, UpdateService } from './panels.service'
+import { GitService, resetSecretsStore, setCommitMessageSuggestForTests, setGitBackendForTests, setSecretsStore, SETTINGS_STORAGE_KEY, SettingsService, UpdateService } from './panels.service'
 import { VaultService } from './vault.service'
 
 function resetSettingsMemory() {
@@ -38,14 +38,23 @@ describe('browser panels', () => {
     if (has(SettingsService)) resetSettingsMemory()
     resetSecretsStore()
     setGitBackendForTests(null)
+    setCommitMessageSuggestForTests(null)
     if (has(GitService)) {
       const git = resolve(GitService)
+      git.abortSuggest()
       git.output = 'Git is not available in the browser'
       git.surface = 'unavailable'
       git.notice = ''
       git.branch = ''
       git.isRepo = false
       git.hasVault = false
+      git.changes = []
+      git.selected = []
+      git.ahead = 0
+      git.behind = 0
+      git.suggesting = false
+      git.diff = ''
+      git.message = ''
     }
   })
 
@@ -309,9 +318,117 @@ describe('browser panels', () => {
     resolve(SettingsService).setGitEnabled(false)
     const git = resolve(GitService)
     await git.init()
+    await files.mkdir('.git')
+    await git.refresh()
     expect(calls).toEqual([])
     expect(git.output).toBe('Git is turned off.')
     expect(git.notice).toBe('Git is turned off.')
+    expect(git.surface).toBe('disabled')
+  })
+
+  it('commits only the selected path and records ahead', async () => {
+    const commits: Array<{ message: string; paths?: string[] }> = []
+    const repo = { porcelain: ' M a.md\n?? b.md\n' }
+    setGitBackendForTests(twoFileGit(repo, commits))
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const files = new MemoryFileSystem('/tmp/vault-commit')
+    await files.mkdir('.git')
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.broad = false
+    resolve(SettingsService).setGitEnabled(true)
+    const git = resolve(GitService)
+    await git.refresh()
+    expect(git.surface).toBe('ready')
+    expect(git.changes.map((change) => change.path)).toEqual(['a.md', 'b.md'])
+    expect(git.selected).toEqual(['a.md', 'b.md'])
+    expect(git.ahead).toBe(1)
+    await git.openDiff('a.md')
+    expect(git.diff).toBe('diff a.md\n')
+    repo.porcelain = '?? b.md\n'
+    await git.refresh()
+    expect(git.diff).toBe('')
+    expect(git.selected).toEqual(['b.md'])
+    expect(git.message).toBe('')
+    repo.porcelain = ' M a.md\n?? b.md\n'
+    await git.refresh()
+    git.toggle('b.md')
+    git.setMessage('Save a')
+    await git.commitSelected()
+    expect(commits).toEqual([{ message: 'Save a', paths: ['a.md'] }])
+    expect(git.ahead).toBe(1)
+    expect(git.message).toBe('Save a')
+    expect(git.branch).toBe('main')
+  })
+
+  it('suggests a message from the selected diffs and aborts the previous request', async () => {
+    const commits: Array<{ message: string; paths?: string[] }> = []
+    const repo = { porcelain: ' M a.md\n?? b.md\n' }
+    const seen: string[] = []
+    let first: AbortSignal | null = null
+    setGitBackendForTests(twoFileGit(repo, commits))
+    setCommitMessageSuggestForTests((diff, signal) => {
+      seen.push(diff)
+      if (!first) {
+        first = signal
+        return new Promise((resolvePromise) => {
+          if (signal.aborted) {
+            resolvePromise({ message: 'first', aborted: true })
+            return
+          }
+          signal.addEventListener('abort', () => resolvePromise({ message: 'first', aborted: true }), { once: true })
+        })
+      }
+      return Promise.resolve({ message: 'Update a', aborted: false })
+    })
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const files = new MemoryFileSystem('/tmp/vault-suggest')
+    await files.mkdir('.git')
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.broad = false
+    resolve(SettingsService).setGitEnabled(true)
+    const git = resolve(GitService)
+    await git.refresh()
+    git.toggle('b.md')
+    const pending = git.suggestMessage()
+    await vi.waitFor(() => expect(first).not.toBeNull())
+    const next = git.suggestMessage()
+    await pending
+    await next
+    expect(git.message).toBe('Update a')
+    expect(seen).toEqual(['diff a.md\n', 'diff a.md\n'])
+    expect(seen.some((diff) => diff.includes('b.md'))).toBe(false)
+    expect(git.suggesting).toBe(false)
+    expect(commits).toEqual([])
+  })
+
+  it('asks for a model key instead of calling the network', async () => {
+    const commits: Array<{ message: string; paths?: string[] }> = []
+    const repo = { porcelain: ' M a.md\n' }
+    setCommitMessageSuggestForTests(null)
+    setGitBackendForTests(twoFileGit(repo, commits))
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const files = new MemoryFileSystem('/tmp/vault-nokey')
+    await files.mkdir('.git')
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.broad = false
+    const settings = resolve(SettingsService)
+    settings.form = { ...settings.form, llmConfigs: [], gitEnabled: true }
+    const git = resolve(GitService)
+    await git.refresh()
+    git.setMessage('draft')
+    await git.suggestMessage()
+    expect(git.notice).toBe('Add a model provider, base URL, model, and key in Settings')
+    expect(git.message).toBe('draft')
+    expect(git.suggesting).toBe(false)
   })
 })
 
@@ -330,6 +447,32 @@ function recordingGit(calls: string[]): GitBackend {
     },
     history: () => Promise.resolve([]),
     currentBranch: () => Promise.resolve('main'),
+    addRemote: () => Promise.resolve(),
+    push: () => Promise.resolve(''),
+    pull: () => Promise.resolve({ conflict: false, files: [], output: '' }),
+    unmerged: () => Promise.resolve([]),
+    resolve: () => Promise.resolve(),
+    clone: () => Promise.resolve(),
+    aheadBehind: () => Promise.resolve({ ahead: 0, behind: 0 }),
+  }
+}
+
+function twoFileGit(
+  repo: { porcelain: string },
+  commits: Array<{ message: string; paths?: string[] }>,
+): GitBackend {
+  return {
+    available: true,
+    init: () => Promise.resolve(),
+    status: () => Promise.resolve({ repo: true, porcelain: repo.porcelain, clean: false }),
+    diff: (_repo, relPath) => Promise.resolve(`diff ${relPath ?? ''}\n`),
+    commit: (_repo, message, paths) => {
+      commits.push({ message, paths: paths ? [...paths] : undefined })
+      return Promise.resolve(message)
+    },
+    history: () => Promise.resolve([]),
+    currentBranch: () => Promise.resolve('main'),
+    aheadBehind: () => Promise.resolve({ ahead: 1, behind: 0 }),
     addRemote: () => Promise.resolve(),
     push: () => Promise.resolve(''),
     pull: () => Promise.resolve({ conflict: false, files: [], output: '' }),

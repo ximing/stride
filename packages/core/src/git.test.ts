@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { MemoryFileSystem, unavailableGit, type GitBackend } from '@stride/platform'
 import { DEDICATED_ERROR, isBroadPersonalRoot } from './roots.ts'
-import { gitCommit, gitResolve, gitStatus, initGit, VAULT_GITIGNORE } from './git.ts'
+import { gitCommit, gitResolve, gitStatus, initGit, isNoUpstream, VAULT_GITIGNORE } from './git.ts'
 import { markDedicatedVault } from './vault.ts'
 
 function fakeGit(): GitBackend & { calls: string[] } {
@@ -33,6 +33,7 @@ function fakeGit(): GitBackend & { calls: string[] } {
       return Promise.resolve()
     },
     clone: () => Promise.resolve(),
+    aheadBehind: () => Promise.resolve({ ahead: 0, behind: 0 }),
   }
 }
 
@@ -91,10 +92,39 @@ describe('vault git policy', () => {
     await expect(initGit(broken, failing, '/Users/someone')).rejects.toThrow(/index locked/)
   })
 
+  it('commits normalized paths and skips git when the message, selection, or path is unusable', async () => {
+    const files = new MemoryFileSystem('/tmp/dedicated-vault')
+    const calls: Array<{ message: string; paths?: string[] }> = []
+    const git = fakeGit()
+    git.commit = (_repo, message, paths) => {
+      calls.push({ message, paths })
+      return Promise.resolve(message)
+    }
+    await expect(gitCommit(files, git, 'Save notes', ['./notes/a.md', 'notes/./b.md'])).resolves.toBe('Save notes')
+    expect(calls).toEqual([{ message: 'Save notes', paths: ['notes/a.md', 'notes/b.md'] }])
+    await expect(gitCommit(files, git, '   ', ['notes/a.md'])).rejects.toThrow(/empty/)
+    await expect(gitCommit(files, git, 'Save notes', ['../outside'])).rejects.toThrow(/escapes the vault/)
+    await expect(gitCommit(files, git, 'Save notes', [])).rejects.toThrow('Choose files to commit')
+    expect(calls).toEqual([{ message: 'Save notes', paths: ['notes/a.md', 'notes/b.md'] }])
+    await expect(gitCommit(files, git, 'Initial commit')).resolves.toBe('Initial commit')
+    expect(calls[1]).toEqual({ message: 'Initial commit', paths: undefined })
+  })
+
   it('propagates an unavailable git backend', async () => {
     const files = new MemoryFileSystem('/tmp/vault')
     await expect(initGit(files, unavailableGit(), '/Users/someone')).rejects.toThrow(/not available/i)
     expect(await files.stat('.git')).toBeNull()
     expect(await files.stat('.gitignore')).toBeNull()
+  })
+})
+
+describe('isNoUpstream', () => {
+  it('matches a missing upstream and ignores other git failures', () => {
+    expect(isNoUpstream("fatal: no upstream configured for branch 'main'")).toBe(true)
+    expect(isNoUpstream("fatal: ambiguous argument 'HEAD...@{upstream}': unknown revision")).toBe(true)
+    expect(isNoUpstream("fatal: no such branch: 'main'")).toBe(true)
+    expect(isNoUpstream('fatal: not a git repository')).toBe(false)
+    expect(isNoUpstream('index locked')).toBe(false)
+    expect(isNoUpstream('nothing to commit')).toBe(false)
   })
 })

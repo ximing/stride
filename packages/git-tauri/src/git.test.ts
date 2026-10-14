@@ -146,6 +146,22 @@ describe('ShellGitBackend', () => {
     ])
   })
 
+  it('counts commits ahead of upstream and treats a missing upstream as zero', async () => {
+    shell.handle((call) => {
+      if (call.cwd === '/repo/local') return fail(128, "fatal: no upstream configured for branch 'main'\n")
+      if (call.cwd === '/repo/missing') return fail(128, 'fatal: not a git repository\n')
+      return ok('1\t0\n')
+    })
+    await expect(git.aheadBehind('/repo')).resolves.toEqual({ ahead: 1, behind: 0 })
+    await expect(git.aheadBehind('/repo/local')).resolves.toEqual({ ahead: 0, behind: 0 })
+    await expect(git.aheadBehind('/repo/missing')).rejects.toBeInstanceOf(GitError)
+    expect(argLines()).toEqual([
+      ['rev-list', '--left-right', '--count', 'HEAD...@{upstream}'],
+      ['rev-list', '--left-right', '--count', 'HEAD...@{upstream}'],
+      ['rev-list', '--left-right', '--count', 'HEAD...@{upstream}'],
+    ])
+  })
+
   it('parses history and treats a repo with no commits as empty', async () => {
     shell.handle((call) => {
       if (call.cwd === '/repo/empty') return fail(128, "fatal: your current branch 'main' does not have any commits yet\n")
