@@ -276,6 +276,14 @@ const ChatPanel = observer(function ChatPanel() {
                 <ChatMarkdown text={message.thinking} />
               </details>
             ) : null}
+            {message.role === 'assistant' && message.tools.map((tool) => (
+              <div key={tool.id} className={tool.isError ? 'chat-tool is-error' : 'chat-tool'} data-testid="chat-tool">
+                <span data-testid="chat-tool-name">{tool.name}</span>
+                <span data-testid="chat-tool-args">{tool.argsSummary}</span>
+                {tool.pending ? <span>running</span> : <span data-testid="chat-tool-result">{tool.resultSummary}</span>}
+                {typeof tool.durationMs === 'number' ? <span data-testid="chat-tool-duration">{tool.durationMs} ms</span> : null}
+              </div>
+            ))}
             {message.role === 'assistant' ? <ChatMarkdown text={message.text} /> : <p>{message.text}</p>}
           </div>
         ))}

@@ -9,12 +9,14 @@ import {
   redactSecret,
   resolveLlm,
   testLlmConnection,
+  vaultTools,
   writeSettings,
   type AppSettings,
   type LlmConfig,
   type PublicLlmConfig,
 } from '@stride/core'
-import { appendAssistantDelta, playChatTurn, type ChatSession } from './chat-turn'
+import { appendAssistantDelta, appendToolEnd, appendToolStart, playChatTurn, type ChatSession } from './chat-turn'
+import { chatVaultHost } from './chat-vault-host'
 import { browserGitBackend } from '@stride/git-web'
 import { MemoryFileSystem, type SecretsStore } from '@stride/platform'
 import { webSecretsStore } from '../../../../packages/secrets-web/src/index.ts'
@@ -105,6 +107,7 @@ export class ChatService extends Service {
   sessions: ChatSession[] = [{ id: 'session-1', title: 'New', messages: [] }]
   activeId = 'session-1'
   private controller: AbortController | null = null
+  private vaultToolSet: { id: string; tools: ReturnType<typeof vaultTools> } | null = null
 
   private get settings() {
     return this.resolve(SettingsService)
@@ -128,6 +131,15 @@ export class ChatService extends Service {
     this.controller?.abort()
   }
 
+  private vaultTools() {
+    const vault = this.resolve(VaultService)
+    const id = vault.activeVaultId || 'none'
+    if (!this.vaultToolSet || this.vaultToolSet.id !== id) {
+      this.vaultToolSet = { id, tools: vaultTools(chatVaultHost(vault)) }
+    }
+    return this.vaultToolSet.tools
+  }
+
   async send() {
     const text = this.draft.trim()
     if (!text || this.running) return
@@ -141,8 +153,8 @@ export class ChatService extends Service {
     this.error = ''
     this.draft = ''
     if (session.title === 'New') session.title = text.slice(0, 32)
-    session.messages.push({ role: 'user', text, thinking: '' })
-    session.messages.push({ role: 'assistant', text: '', thinking: '' })
+    session.messages.push({ role: 'user', text, thinking: '', tools: [] })
+    session.messages.push({ role: 'assistant', text: '', thinking: '', tools: [] })
     const sessionId = session.id
     this.running = true
     const controller = new AbortController()
@@ -163,6 +175,7 @@ export class ChatService extends Service {
         apiKey: resolved.apiKey,
         systemPrompt: 'You are Stride, a local vault assistant.',
         prompt: text,
+        tools: this.vaultTools(),
         signal: controller.signal,
         streamFn: (model, context, options) => resolved.models.streamSimple(model, context, {
           ...options,
@@ -170,6 +183,8 @@ export class ChatService extends Service {
         }),
         onText: (delta) => appendAssistantDelta(this.sessions, sessionId, 'text', delta),
         onThinking: (delta) => appendAssistantDelta(this.sessions, sessionId, 'thinking', delta),
+        onToolStart: (call) => appendToolStart(this.sessions, sessionId, call),
+        onToolEnd: (call) => appendToolEnd(this.sessions, sessionId, call),
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Agent failed'

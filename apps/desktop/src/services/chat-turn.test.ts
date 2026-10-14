@@ -1,10 +1,10 @@
 import { createAssistantMessageEventStream } from '../../../../packages/core/node_modules/@earendil-works/pi-ai/dist/utils/event-stream.js'
-import type { AssistantMessage, Model, StopReason } from '@earendil-works/pi-ai'
-import type { StreamFn } from '@earendil-works/pi-agent-core'
+import { Type, type AssistantMessage, type Model, type StopReason } from '../../../../packages/core/node_modules/@earendil-works/pi-ai/dist/index.js'
+import type { AgentTool, StreamFn } from '@earendil-works/pi-agent-core'
 import { has, register, resolve } from '@rabjs/react'
 import { describe, expect, it } from 'vitest'
 import { ChatService, SettingsService } from './panels.service'
-import { appendAssistantDelta, playChatTurn, type ChatSession } from './chat-turn'
+import { appendAssistantDelta, appendToolEnd, appendToolStart, playChatTurn, type ChatSession } from './chat-turn'
 
 const usage = {
   input: 3,
@@ -28,10 +28,10 @@ const model = {
   maxTokens: 4096,
 } as Model<'openai-completions'>
 
-function assistant(text: string, stopReason: StopReason = 'stop'): AssistantMessage {
+function assistant(text: string, stopReason: StopReason = 'stop', content?: AssistantMessage['content']): AssistantMessage {
   return {
     role: 'assistant',
-    content: [{ type: 'text', text }],
+    content: content ?? [{ type: 'text', text }],
     api: 'openai-completions',
     provider: 'openai',
     model: 'gpt-4o-mini',
@@ -117,12 +117,12 @@ describe('playChatTurn', () => {
 
   it('writes deltas only into the session that started the turn', () => {
     const sessions: ChatSession[] = [
-      { id: 'a', title: 'A', messages: [{ role: 'assistant', text: '', thinking: '' }] },
+      { id: 'a', title: 'A', messages: [{ role: 'assistant', text: '', thinking: '', tools: [] }] },
       { id: 'b', title: 'B', messages: [] },
     ]
     appendAssistantDelta(sessions, 'a', 'text', 'hello')
     appendAssistantDelta(sessions, 'a', 'thinking', 'hmm')
-    expect(sessions[0]?.messages[0]).toEqual({ role: 'assistant', text: 'hello', thinking: 'hmm' })
+    expect(sessions[0]?.messages[0]).toEqual({ role: 'assistant', text: 'hello', thinking: 'hmm', tools: [] })
     expect(sessions[1]?.messages).toEqual([])
   })
 
@@ -135,5 +135,86 @@ describe('playChatTurn', () => {
     await chat.send()
     expect(chat.error).toContain('Settings')
     expect(chat.sessions[0]?.messages).toEqual([])
+  })
+
+  it('records a tool card on the session that started the turn', () => {
+    const sessions: ChatSession[] = [
+      { id: 'a', title: 'A', messages: [{ role: 'assistant', text: '', thinking: '', tools: [] }] },
+      { id: 'b', title: 'B', messages: [] },
+    ]
+    appendToolStart(sessions, 'a', { id: 'call_1', name: 'search_vault', args: { query: 'moss' } })
+    appendToolEnd(sessions, 'a', {
+      id: 'call_1',
+      name: 'search_vault',
+      isError: false,
+      durationMs: 12,
+      resultSummary: 'one hit',
+    })
+    expect(sessions[0]?.messages[0]?.tools).toEqual([{
+      id: 'call_1',
+      name: 'search_vault',
+      argsSummary: '{"query":"moss"}',
+      resultSummary: 'one hit',
+      durationMs: 12,
+      isError: false,
+      pending: false,
+    }])
+    expect(sessions[1]?.messages).toEqual([])
+  })
+
+  it('forwards a tool result and redacts the key', async () => {
+    let calls = 0
+    const started: string[] = []
+    const ended: string[] = []
+    const toolCall = { type: 'toolCall' as const, id: 'call_1', name: 'ping', arguments: { q: 'a' } }
+    const ping: AgentTool = {
+      name: 'ping',
+      label: 'Ping',
+      description: 'ping',
+      parameters: Type.Object({ q: Type.String() }),
+      execute: async () => ({
+        content: [{ type: 'text' as const, text: 'tool-ok sk-passed' }],
+        details: null,
+      }),
+    }
+    const streamFn: StreamFn = () => {
+      calls += 1
+      const stream = createAssistantMessageEventStream()
+      queueMicrotask(() => {
+        if (calls === 1) {
+          const partial = assistant('', 'toolUse', [toolCall])
+          stream.push({ type: 'start', partial })
+          stream.push({ type: 'toolcall_end', contentIndex: 0, toolCall, partial })
+          stream.push({ type: 'done', reason: 'toolUse', message: partial })
+          stream.end(partial)
+          return
+        }
+        const done = assistant('after')
+        stream.push({ type: 'start', partial: assistant('') })
+        stream.push({ type: 'text_delta', contentIndex: 0, delta: 'after', partial: done })
+        stream.push({ type: 'done', reason: 'stop', message: done })
+        stream.end(done)
+      })
+      return stream
+    }
+    const result = await playChatTurn({
+      model,
+      apiKey: 'sk-passed',
+      systemPrompt: 'test',
+      prompt: 'go',
+      tools: [ping],
+      streamFn,
+      onText: () => {},
+      onThinking: () => {},
+      onToolStart: (call) => started.push(call.name),
+      onToolEnd: (call) => ended.push(call.resultSummary),
+    })
+    expect(calls).toBe(2)
+    expect(started).toEqual(['ping'])
+    expect(ended).toHaveLength(1)
+    expect(ended[0]?.includes('sk-passed')).toBe(false)
+    expect(ended[0]?.includes('••••')).toBe(true)
+    expect(result.aborted).toBe(false)
+    expect(result.text).toBe('after')
   })
 })

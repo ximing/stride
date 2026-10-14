@@ -987,3 +987,5 @@ textarea {
 .chat-markdown pre { overflow: auto; background: var(--paper-2); padding: 0.5rem; }
 .chat-compose { display: flex; flex-direction: column; gap: 0.5rem; margin-top: 0.75rem; }
 .chat-compose textarea { min-height: 5rem; width: 100%; }
+.chat-tool { display: flex; flex-wrap: wrap; gap: 0.35rem 0.75rem; border: 1px solid var(--line); padding: 0.4rem 0.55rem; }
+.chat-tool.is-error { color: #a33; }
