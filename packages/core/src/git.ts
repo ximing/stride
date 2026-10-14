@@ -50,6 +50,16 @@ export function isNothingToCommit(output: string): boolean {
   return /nothing to commit|No changes/.test(output)
 }
 
+export const VAULT_GITIGNORE = `.DS_Store
+Thumbs.db
+.stride/rename-tx/
+.stride/vane/
+.stride/vane-dim
+`
+
+export { gitSurface } from './git-surface.ts'
+export type { GitSurface } from './git-surface.ts'
+
 export function isExistingRemote(output: string): boolean {
   return output.includes('already exists')
 }
@@ -77,6 +87,17 @@ export async function initGit(fs: FileSystemBackend, git: GitBackend, homeDir: s
   await assertCanInitGit(fs, homeDir)
   if (await fs.stat('.git')) return
   await git.init(fs.rootLabel)
+  if (!(await fs.stat('.gitignore'))) await fs.writeText('.gitignore', VAULT_GITIGNORE)
+  try {
+    await git.commit(fs.rootLabel, 'Initial commit')
+  } catch (error) {
+    const output = error instanceof GitError
+      ? error.output
+      : error instanceof Error
+        ? error.message
+        : String(error)
+    if (!isNothingToCommit(output)) throw error
+  }
 }
 
 export async function gitStatus(fs: FileSystemBackend, git: GitBackend): Promise<GitStatus> {

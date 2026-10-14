@@ -53,6 +53,7 @@ describe('VaultService', () => {
         embedding: { endpoint: '', model: '', keyMask: '', dim: 4 },
         llmConfigs: [],
         releasesUrl: '',
+        gitEnabled: true,
       }
       settings.setEmbeddingDim('4')
       settings.embeddingKey = ''

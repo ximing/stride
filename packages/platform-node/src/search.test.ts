@@ -96,6 +96,7 @@ describe('vane search', () => {
       embedding,
       llmConfigs: [{ id: 'c1', name: 'OpenAI', provider: 'openai', model: 'm', baseUrl: endpoint, apiKey: key, isDefault: true }],
       releasesUrl: '',
+      gitEnabled: true,
     }
     const settingsFs = new NodeFileSystem(dir)
     await writeSettings(settingsFs, 'settings.json', settings, secrets)

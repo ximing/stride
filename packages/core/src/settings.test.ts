@@ -3,6 +3,7 @@ import { MemoryFileSystem, MemorySecretsStore } from '@stride/platform'
 import {
   defaultLlmSettings,
   defaultSettings,
+  publicSettings,
   readSettings,
   writeSettings,
 } from './settings.ts'
@@ -65,6 +66,7 @@ describe('llm settings', () => {
         { id: 'b', name: 'B', provider: 'deepseek', model: 'deepseek-chat', baseUrl: 'https://api.deepseek.com', apiKey: keyB, isDefault: false },
       ],
       releasesUrl: '',
+      gitEnabled: true,
     }, secrets)
     const text = await files.readText('two.json')
     expect(text.includes(keyA)).toBe(false)
@@ -75,5 +77,26 @@ describe('llm settings', () => {
     expect(loaded.llmConfigs.map((config) => config.apiKey)).toEqual([keyA, keyB])
     expect(defaultLlmSettings(loaded)?.apiKey).toBe(keyA)
     expect(defaultLlmSettings(loaded)?.provider).toBe('openai')
+  })
+
+  it('round-trips gitEnabled and keeps a missing flag on', async () => {
+    const files = new MemoryFileSystem('/virtual/settings')
+    const secrets = new MemorySecretsStore()
+    await writeSettings(files, 'off.json', { ...defaultSettings(), gitEnabled: false }, secrets)
+    const off = await readSettings(files, 'off.json', secrets)
+    expect(off.gitEnabled).toBe(false)
+    expect(publicSettings(off).gitEnabled).toBe(false)
+    expect(JSON.parse(await files.readText('off.json')).gitEnabled).toBe(false)
+
+    await files.writeText('missing.json', JSON.stringify({
+      embedding: { endpoint: '', model: '', keySeal: '', keyMask: '', dim: 4 },
+      releasesUrl: '',
+    }))
+    const missing = await readSettings(files, 'missing.json', secrets)
+    expect(missing.gitEnabled).toBe(true)
+    expect(defaultSettings().gitEnabled).toBe(true)
+
+    await files.writeText('other.json', JSON.stringify({ gitEnabled: 'false' }))
+    expect((await readSettings(files, 'other.json', secrets)).gitEnabled).toBe(true)
   })
 })

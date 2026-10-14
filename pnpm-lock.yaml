@@ -40,6 +40,9 @@ importers:
       '@stride/fs-web':
         specifier: workspace:*
         version: link:../../packages/fs-web
+      '@stride/git-tauri':
+        specifier: workspace:*
+        version: link:../../packages/git-tauri
       '@stride/git-web':
         specifier: workspace:*
         version: link:../../packages/git-web

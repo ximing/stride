@@ -23,6 +23,7 @@
     "@stride/core": "workspace:*",
     "@stride/fs-tauri": "workspace:*",
     "@stride/fs-web": "workspace:*",
+    "@stride/git-tauri": "workspace:*",
     "@stride/git-web": "workspace:*",
     "@stride/platform": "workspace:*",
     "@stride/platform-node": "workspace:*",

@@ -123,6 +123,7 @@ describe('search notes', () => {
       embedding: { endpoint: 'http://127.0.0.1/v1', model: 'fixture-embed', apiKey: key, dim: 4 },
       llmConfigs: [{ id: 'c1', name: 'OpenAI', provider: 'openai', model: 'm', baseUrl: 'http://127.0.0.1/v1', apiKey: key, isDefault: true }],
       releasesUrl: '',
+      gitEnabled: true,
     }
     await writeSettings(files, 'settings.json', settings, secrets)
     expect(await settingsContainRawKey(files, 'settings.json', key)).toBe(false)
@@ -140,6 +141,7 @@ describe('search notes', () => {
       embedding: { endpoint: 'http://127.0.0.1/v1', model: 'fixture-embed', apiKey: '', dim: 0 },
       llmConfigs: [],
       releasesUrl: '',
+      gitEnabled: true,
     }, secrets)
     expect((await readSettings(files, 'zero-dim.json', secrets)).embedding.dim).toBe(0)
     expect(defaultSettingsPath('/Users/someone')).toBe('/Users/someone/.stride/settings.json')

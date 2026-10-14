@@ -61,13 +61,13 @@ describe('vault git', () => {
 
     const vault = path.join(root, 'dedicated-vault')
     fs.mkdirSync(vault)
+    await initGit(at(vault), git, os.homedir())
     const note = await createVaultNote(at(vault), 'Status')
     note.doc = {
       type: 'doc',
       content: [{ type: 'paragraph', content: [{ type: 'text', text: 'base' }] }],
     }
     await saveNote(at(vault), note)
-    await initGit(at(vault), git, os.homedir())
     await gitCommit(at(vault), git, 'Add status note')
 
     note.doc = {

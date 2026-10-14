@@ -45,6 +45,7 @@ async function blankSettings(file: string, embedding?: AppSettings['embedding'])
     embedding: embedding ?? { endpoint: '', model: '', apiKey: '', dim: 4 },
     llmConfigs: [],
     releasesUrl: '',
+    gitEnabled: true,
   }, secrets)
 }
 
@@ -97,13 +98,13 @@ describe('Desk vault paths', () => {
     const root = tempDir()
     const vault = path.join(root, 'vault')
     fs.mkdirSync(vault)
+    await initGit(vaultOf(vault), git, os.homedir())
     const note = await createVaultNote(vaultOf(vault), 'Status')
     note.doc = {
       type: 'doc',
       content: [{ type: 'paragraph', content: [{ type: 'text', text: 'base' }] }],
     }
     await saveNote(vaultOf(vault), note)
-    await initGit(vaultOf(vault), git, os.homedir())
     await gitCommit(vaultOf(vault), git, 'Add status note')
     const bare = path.join(root, 'origin.git')
     await gitInitBare(bare)
@@ -252,6 +253,7 @@ describe('Desk vault paths', () => {
         embedding: { endpoint: '', model: '', apiKey: '', dim: 4 },
         llmConfigs: [],
         releasesUrl: `http://127.0.0.1:${address.port}/releases`,
+        gitEnabled: true,
       }, secrets)
       fs.writeFileSync(marker, `${APP_VERSION}\n`)
       const handoffs: string[] = []
@@ -342,6 +344,7 @@ async function openUpdateDesk(root: string, releasesUrl: string, handoff: () => 
     embedding: { endpoint: '', model: '', apiKey: '', dim: 4 },
     llmConfigs: [],
     releasesUrl,
+    gitEnabled: true,
   }, secrets)
   fs.writeFileSync(marker, `${APP_VERSION}\n`)
   const desk = new Desk(settings, { handoff })

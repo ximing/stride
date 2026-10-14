@@ -1,10 +1,11 @@
 import { has, observer, register, resolve, useService } from '@rabjs/react'
-import { MemorySecretsStore } from '@stride/platform'
+import { MemoryFileSystem, MemorySecretsStore, type GitBackend } from '@stride/platform'
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { UpdateBanner } from '../app'
-import { GitService, resetSecretsStore, setSecretsStore, SETTINGS_STORAGE_KEY, SettingsService, UpdateService } from './panels.service'
+import { DEDICATED_ERROR, VAULT_GITIGNORE } from '@stride/core'
+import { GitService, resetSecretsStore, setGitBackendForTests, setSecretsStore, SETTINGS_STORAGE_KEY, SettingsService, UpdateService } from './panels.service'
 import { VaultService } from './vault.service'
 
 function resetSettingsMemory() {
@@ -13,6 +14,7 @@ function resetSettingsMemory() {
     embedding: { endpoint: '', model: '', keyMask: '', dim: 4 },
     llmConfigs: [],
     releasesUrl: '',
+    gitEnabled: true,
   }
   settings.setEmbeddingDim('4')
   settings.embeddingKey = ''
@@ -35,6 +37,16 @@ describe('browser panels', () => {
     localStorage.removeItem(SETTINGS_STORAGE_KEY)
     if (has(SettingsService)) resetSettingsMemory()
     resetSecretsStore()
+    setGitBackendForTests(null)
+    if (has(GitService)) {
+      const git = resolve(GitService)
+      git.output = 'Git is not available in the browser'
+      git.surface = 'unavailable'
+      git.notice = ''
+      git.branch = ''
+      git.isRepo = false
+      git.hasVault = false
+    }
   })
 
   it('boots without calling the API and keeps updates idle', async () => {
@@ -246,4 +258,83 @@ describe('browser panels', () => {
     root.unmount()
     host.remove()
   })
+
+  it('initializes a non-repo vault when a git backend is available', async () => {
+    const calls: string[] = []
+    setGitBackendForTests(recordingGit(calls))
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const files = new MemoryFileSystem('/tmp/vault')
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.broad = false
+    resolve(SettingsService).setGitEnabled(true)
+    const git = resolve(GitService)
+    await git.refresh()
+    expect(git.surface).toBe('needs-init')
+    await git.init()
+    expect(calls).toEqual(['init /tmp/vault', 'commit Initial commit'])
+    expect(await files.readText('.gitignore')).toBe(VAULT_GITIGNORE)
+  })
+
+  it('refuses to initialize a broad Desktop root', async () => {
+    const calls: string[] = []
+    setGitBackendForTests(recordingGit(calls))
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const files = new MemoryFileSystem('/tmp/Desktop')
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.broad = true
+    const git = resolve(GitService)
+    await git.init()
+    expect(calls).toEqual([])
+    expect(git.output).toBe(DEDICATED_ERROR)
+    expect(git.surface).toBe('blocked')
+    expect(await files.stat('.git')).toBeNull()
+  })
+
+  it('does not call git when the setting is off', async () => {
+    const calls: string[] = []
+    setGitBackendForTests(recordingGit(calls))
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const files = new MemoryFileSystem('/tmp/vault-off')
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.broad = false
+    resolve(SettingsService).setGitEnabled(false)
+    const git = resolve(GitService)
+    await git.init()
+    expect(calls).toEqual([])
+    expect(git.output).toBe('Git is turned off.')
+    expect(git.notice).toBe('Git is turned off.')
+  })
 })
+
+function recordingGit(calls: string[]): GitBackend {
+  return {
+    available: true,
+    init: (repo) => {
+      calls.push(`init ${repo}`)
+      return Promise.resolve()
+    },
+    status: () => Promise.resolve({ repo: true, porcelain: '', clean: true }),
+    diff: () => Promise.resolve(''),
+    commit: (_repo, message) => {
+      calls.push(`commit ${message}`)
+      return Promise.resolve(message)
+    },
+    history: () => Promise.resolve([]),
+    currentBranch: () => Promise.resolve('main'),
+    addRemote: () => Promise.resolve(),
+    push: () => Promise.resolve(''),
+    pull: () => Promise.resolve({ conflict: false, files: [], output: '' }),
+    unmerged: () => Promise.resolve([]),
+    resolve: () => Promise.resolve(),
+    clone: () => Promise.resolve(),
+  }
+}

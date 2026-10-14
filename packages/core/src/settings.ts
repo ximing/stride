@@ -20,6 +20,7 @@ export interface AppSettings {
   embedding: EmbeddingSettings
   llmConfigs: LlmConfig[]
   releasesUrl: string
+  gitEnabled: boolean
 }
 
 interface SealedLlmConfig {
@@ -37,6 +38,7 @@ interface SealedSettings {
   embedding: { endpoint: string; model: string; keySeal: string; keyMask: string; dim: number }
   llmConfigs: SealedLlmConfig[]
   releasesUrl: string
+  gitEnabled: boolean
 }
 
 interface ParsedLlmConfig {
@@ -55,6 +57,7 @@ interface ParsedSettings {
   llmConfigs?: ParsedLlmConfig[]
   llm?: { provider?: string; model?: string; baseUrl?: string; keySeal?: string; keyMask?: string }
   releasesUrl?: string
+  gitEnabled?: unknown
 }
 
 export interface PublicLlmConfig {
@@ -72,6 +75,7 @@ export function defaultSettings(): AppSettings {
     embedding: { endpoint: '', model: '', apiKey: '', dim: 4 },
     llmConfigs: [],
     releasesUrl: '',
+    gitEnabled: true,
   }
 }
 
@@ -166,6 +170,7 @@ async function sealAll(secrets: SecretsStore, settings: AppSettings): Promise<Se
       isDefault: config.isDefault,
     }))),
     releasesUrl: settings.releasesUrl,
+    gitEnabled: settings.gitEnabled !== false,
   }
 }
 
@@ -173,6 +178,7 @@ export function publicSettings(settings: AppSettings): {
   embedding: { endpoint: string; model: string; keyMask: string; dim: number }
   llmConfigs: PublicLlmConfig[]
   releasesUrl: string
+  gitEnabled: boolean
 } {
   return {
     embedding: {
@@ -191,6 +197,7 @@ export function publicSettings(settings: AppSettings): {
       isDefault: config.isDefault,
     })),
     releasesUrl: settings.releasesUrl,
+    gitEnabled: settings.gitEnabled !== false,
   }
 }
 
@@ -226,6 +233,7 @@ export async function readSettings(
     },
     llmConfigs: await openLlmConfigs(parsed, secrets),
     releasesUrl: parsed.releasesUrl ?? '',
+    gitEnabled: parsed.gitEnabled !== false,
   }
 }
 

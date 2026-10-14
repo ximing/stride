@@ -211,6 +211,12 @@ textarea {
   grid-template-columns: 260px 1fr 320px;
 }
 
+.git-status {
+  padding: 0.25rem 0.8rem 0.4rem;
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
 .rail, .stage, .panel {
   min-height: 0;
   overflow: auto;

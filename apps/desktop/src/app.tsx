@@ -8,8 +8,9 @@ import { Star } from '@phosphor-icons/react/Star'
 import { Tag } from '@phosphor-icons/react/Tag'
 import { User } from '@phosphor-icons/react/User'
 import { observer, useService } from '@rabjs/react'
-import { useState } from 'react'
-import { LLM_PROVIDERS, catalogBaseUrl, catalogModelSuggestions } from '@stride/core'
+import { useEffect, useState } from 'react'
+import { DEDICATED_ERROR, LLM_PROVIDERS, catalogBaseUrl, catalogModelSuggestions } from '@stride/core'
+import type { GitSurface } from '@stride/core'
 import type { StrideNote } from '@stride/core/note'
 import { typeSidebarLabel } from '../../../packages/core/src/types'
 import { NoteEditor } from './editor'
@@ -214,35 +215,40 @@ export const Rail = observer(function Rail() {
   )
 })
 
+function gitBadge(surface: GitSurface, branch: string): string {
+  if (surface === 'unavailable') return 'Git unavailable'
+  if (surface === 'disabled') return 'Git off'
+  if (surface === 'blocked') return 'Git blocked'
+  if (surface === 'needs-init') return 'Not a repo'
+  return branch || 'Git'
+}
+
 const GitPanel = observer(function GitPanel() {
   const git = useService(GitService)
+  useEffect(() => {
+    void git.refresh()
+  }, [git])
   return (
-    <div>
+    <div data-testid="git-panel">
       <h2>Git</h2>
-      <div className="editor-tools">
-        <button type="button" onClick={() => git.init()}>Init</button>
-        <button type="button" onClick={() => git.refresh()}>Status</button>
-        <button type="button" onClick={() => git.pull()}>Pull</button>
-        <button type="button" onClick={() => git.push()}>Push</button>
-      </div>
-      <label className="field"><span>Remote</span>
-        <input value={git.remote} onChange={(event) => git.setRemote(event.target.value)} placeholder="https:// or a local path" />
-      </label>
-      <label className="field"><span>Commit</span>
-        <input value={git.message} onChange={(event) => git.setMessage(event.target.value)} />
-      </label>
-      <button type="button" onClick={() => git.commit()}>Commit</button>
-      <p className="meta">{git.status}</p>
-      <p className="meta">{git.output}</p>
-      {git.conflicts.map((id) => (
-        <div key={id} className="editor-tools">
-          <span>{id}</span>
-          <button type="button" onClick={() => git.keepSide(id, 'ours')}>Keep ours</button>
-          <button type="button" onClick={() => git.keepSide(id, 'theirs')}>Keep theirs</button>
-        </div>
-      ))}
-      <pre className="diff">{git.diff}</pre>
-      <pre className="history">{git.history}</pre>
+      {git.surface === 'unavailable' && (
+        <>
+          <p data-testid="git-unavailable">Git is not available in the browser</p>
+          {git.hasVault && !git.isRepo ? (
+            <p data-testid="git-needs-init">This vault is not a Git repository. Initialize it in the desktop app.</p>
+          ) : null}
+        </>
+      )}
+      {git.surface === 'disabled' && <p data-testid="git-disabled">Git is turned off.</p>}
+      {git.surface === 'blocked' && <p data-testid="git-blocked">{DEDICATED_ERROR}</p>}
+      {git.surface === 'needs-init' && (
+        <>
+          <p>This vault is not a Git repository.</p>
+          <button type="button" data-testid="git-init" onClick={() => { void git.init() }}>Initialize Git</button>
+        </>
+      )}
+      {git.surface === 'ready' && <p className="meta" data-testid="git-branch">{git.branch}</p>}
+      {git.output && git.output !== 'Git is not available in the browser' && git.output !== 'Git is turned off.' && git.output !== DEDICATED_ERROR ? <p className="error" data-testid="git-error">{git.output}</p> : null}
     </div>
   )
 })
@@ -409,6 +415,14 @@ const SettingsPanel = observer(function SettingsPanel() {
       <label className="field"><span>GitHub releases URL</span>
         <input value={settings.form.releasesUrl} onChange={(event) => settings.setReleasesUrl(event.target.value)} />
       </label>
+      <label className="field"><span>Git enabled</span>
+        <input
+          type="checkbox"
+          data-testid="git-enabled"
+          checked={settings.form.gitEnabled}
+          onChange={(event) => settings.setGitEnabled(event.target.checked)}
+        />
+      </label>
       <div className="editor-tools">
         <button type="button" data-testid="settings-save" onClick={() => settings.save()}>Save settings</button>
         <button type="button" onClick={() => updates.check()}>Check for updates</button>
@@ -457,7 +471,13 @@ const VaultSwitcher = observer(function VaultSwitcher() {
 
 const Workspace = observer(function Workspace() {
   const vault = useService(VaultService)
+  const git = useService(GitService)
+  const settings = useService(SettingsService)
   const note = vault.active
+  useEffect(() => {
+    if (vault.phase !== 'ready') return
+    void git.refresh()
+  }, [git, vault.phase, vault.fs, settings.form.gitEnabled])
   return (
     <div className="shell" data-testid="vault-surface">
       <UpdateBanner />
@@ -538,6 +558,9 @@ const Workspace = observer(function Workspace() {
       </div>
       <QuickOpen />
       <SearchPanel />
+      <footer className="git-status">
+        <span data-testid="git-status-badge">{gitBadge(git.surface, git.branch)}</span>
+      </footer>
     </div>
   )
 })

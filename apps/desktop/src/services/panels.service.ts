@@ -1,8 +1,14 @@
 import { has, Service } from '@rabjs/react'
 import {
   EmbeddingClient,
+  DEDICATED_ERROR,
   catalogDefaultModel,
+  currentBranch,
   effectiveBaseUrl,
+  gitStatus,
+  gitSurface,
+  initGit,
+  isDedicatedVault,
   llmProxyBaseUrl,
   maskSecret,
   readSettings,
@@ -13,13 +19,14 @@ import {
   vaultTools,
   writeSettings,
   type AppSettings,
+  type GitSurface,
   type LlmConfig,
   type PublicLlmConfig,
 } from '@stride/core'
 import { appendAssistantDelta, appendToolEnd, appendToolStart, playChatTurn, type ChatSession } from './chat-turn'
 import { chatSystemPrompt, chatVaultHost } from './chat-vault-host'
 import { browserGitBackend } from '@stride/git-web'
-import { MemoryFileSystem, type SecretsStore } from '@stride/platform'
+import { MemoryFileSystem, type GitBackend, type SecretsStore } from '@stride/platform'
 import { webSecretsStore } from '../../../../packages/secrets-web/src/index.ts'
 import { VaultService } from './vault.service'
 
@@ -27,15 +34,49 @@ interface PublicSettings {
   embedding: { endpoint: string; model: string; keyMask: string; dim: number }
   llmConfigs: PublicLlmConfig[]
   releasesUrl: string
+  gitEnabled: boolean
 }
 
 const emptySettings = (): PublicSettings => ({
   embedding: { endpoint: '', model: '', keyMask: '', dim: 4 },
   llmConfigs: [],
   releasesUrl: '',
+  gitEnabled: true,
 })
 
 const GIT_BROWSER = 'Git is not available in the browser'
+const GIT_OFF = 'Git is turned off.'
+const BROWSER_HOME = '/Users/stride'
+
+let testGitBackend: GitBackend | null = null
+let testGitBackendSet = false
+let shellGitBackend: GitBackend | null = null
+
+export function setGitBackendForTests(backend: GitBackend | null) {
+  if (backend === null) {
+    testGitBackend = null
+    testGitBackendSet = false
+    return
+  }
+  testGitBackend = backend
+  testGitBackendSet = true
+}
+
+function tauriRuntime(): boolean {
+  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+}
+
+async function resolveGitBackend(): Promise<GitBackend> {
+  if (testGitBackendSet && testGitBackend) return testGitBackend
+  if (tauriRuntime()) {
+    if (!shellGitBackend) {
+      const { ShellGitBackend } = await import('@stride/git-tauri')
+      shellGitBackend = new ShellGitBackend()
+    }
+    return shellGitBackend
+  }
+  return browserGitBackend()
+}
 
 export class GitService extends Service {
   status = ''
@@ -45,11 +86,20 @@ export class GitService extends Service {
   remote = ''
   output = ''
   conflicts: string[] = []
-  private readonly git = browserGitBackend()
+  surface: GitSurface = 'needs-init'
+  branch = ''
+  notice = ''
+  isRepo = false
+  hasVault = false
 
   constructor() {
     super()
-    if (!this.git.available) this.output = GIT_BROWSER
+    if (tauriRuntime()) return
+    const preset = testGitBackendSet ? testGitBackend : browserGitBackend()
+    if (preset && !preset.available) {
+      this.output = GIT_BROWSER
+      this.surface = 'unavailable'
+    }
   }
 
   private get vault() {
@@ -64,18 +114,109 @@ export class GitService extends Service {
     this.remote = value
   }
 
-  private browserBlocked(): boolean {
-    if (this.git.available) return false
-    this.output = GIT_BROWSER
-    return true
+  private gitEnabled(): boolean {
+    return this.resolve(SettingsService).form.gitEnabled !== false
+  }
+
+  private async homeDirectory(): Promise<string> {
+    if (!tauriRuntime()) return BROWSER_HOME
+    try {
+      const { homeDir } = await import('@tauri-apps/api/path')
+      const home = await homeDir()
+      if (!home) {
+        this.output = 'Could not resolve the home directory'
+        return ''
+      }
+      return home
+    } catch (error) {
+      this.output = error instanceof Error ? error.message : String(error)
+      return ''
+    }
+  }
+
+  private clearStaleBrowserBanner() {
+    if (this.output === GIT_BROWSER) this.output = ''
   }
 
   async refresh() {
-    if (this.browserBlocked()) return
+    const backend = await resolveGitBackend()
+    const fs = this.vault.fs
+    if (!backend.available) {
+      if (!fs) {
+        this.hasVault = false
+        this.isRepo = false
+        this.surface = gitSurface({
+          backendAvailable: false,
+          gitEnabled: true,
+          isRepo: false,
+          broadBlocked: false,
+        })
+        return
+      }
+      this.hasVault = true
+      this.isRepo = Boolean(await fs.stat('.git'))
+      this.surface = gitSurface({
+        backendAvailable: false,
+        gitEnabled: true,
+        isRepo: this.isRepo,
+        broadBlocked: false,
+      })
+      this.output = GIT_BROWSER
+      return
+    }
+    const gitEnabled = this.gitEnabled()
+    if (!fs) {
+      this.hasVault = false
+      this.isRepo = false
+      this.branch = ''
+      this.surface = gitSurface({ backendAvailable: true, gitEnabled, isRepo: false, broadBlocked: false })
+      this.clearStaleBrowserBanner()
+      return
+    }
+    try {
+      const status = await gitStatus(fs, backend)
+      this.hasVault = true
+      this.isRepo = status.repo
+      const broadBlocked = this.vault.broad && !(await isDedicatedVault(fs))
+      this.surface = gitSurface({
+        backendAvailable: true,
+        gitEnabled,
+        isRepo: status.repo,
+        broadBlocked,
+      })
+      this.branch = this.surface === 'ready' ? await currentBranch(backend, fs.rootLabel) : ''
+      this.clearStaleBrowserBanner()
+    } catch (error) {
+      this.output = error instanceof Error ? error.message : String(error)
+    }
   }
 
   async init() {
-    if (this.browserBlocked()) return
+    const backend = await resolveGitBackend()
+    if (!backend.available) {
+      this.output = GIT_BROWSER
+      this.surface = 'unavailable'
+      return
+    }
+    if (!this.gitEnabled()) {
+      this.notice = GIT_OFF
+      this.output = GIT_OFF
+      this.surface = 'disabled'
+      return
+    }
+    const fs = this.vault.fs
+    if (!fs) return
+    const home = await this.homeDirectory()
+    if (!home) return
+    try {
+      await initGit(fs, backend, home)
+      await this.refresh()
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error)
+      this.output = message
+      this.notice = message
+      if (message === DEDICATED_ERROR) this.surface = 'blocked'
+    }
   }
 
   async commit() {
@@ -85,19 +226,23 @@ export class GitService extends Service {
       this.output = error instanceof Error ? error.message : String(error)
       return
     }
-    if (this.browserBlocked()) return
+    const backend = await resolveGitBackend()
+    if (!backend.available) this.output = GIT_BROWSER
   }
 
   async pull() {
-    if (this.browserBlocked()) return
+    const backend = await resolveGitBackend()
+    if (!backend.available) this.output = GIT_BROWSER
   }
 
   async push() {
-    if (this.browserBlocked()) return
+    const backend = await resolveGitBackend()
+    if (!backend.available) this.output = GIT_BROWSER
   }
 
   async keepSide(_id: string, _side: 'ours' | 'theirs') {
-    if (this.browserBlocked()) return
+    const backend = await resolveGitBackend()
+    if (!backend.available) this.output = GIT_BROWSER
   }
 }
 
@@ -374,6 +519,10 @@ export class SettingsService extends Service {
     this.form = { ...this.form, releasesUrl: value }
   }
 
+  setGitEnabled(value: boolean) {
+    this.form = { ...this.form, gitEnabled: value }
+  }
+
   setEmbeddingDim(value: string) {
     this.embeddingDimText = value
     const parsed = parsePositiveInt(value)
@@ -454,6 +603,7 @@ export class SettingsService extends Service {
         },
         llmConfigs,
         releasesUrl: this.form.releasesUrl,
+        gitEnabled: this.form.gitEnabled,
       }
       const fs = await settingsFile()
       await writeSettings(fs, SETTINGS_FILE, settings, secrets)
@@ -486,6 +636,7 @@ export class SettingsService extends Service {
           isDefault: config.isDefault,
         })),
         releasesUrl: settings.releasesUrl,
+        gitEnabled: settings.gitEnabled,
       }
       this.notice = ''
       after = this.embeddingRuntime()
@@ -580,6 +731,7 @@ export class SettingsService extends Service {
           isDefault: config.isDefault,
         })),
         releasesUrl: settings.releasesUrl,
+        gitEnabled: settings.gitEnabled,
       }
       this.notice = ''
     } catch (error) {
