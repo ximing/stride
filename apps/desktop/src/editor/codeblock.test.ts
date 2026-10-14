@@ -98,7 +98,7 @@ describe('code block', () => {
       let codePos = -1
       editor.state.doc.descendants((node, pos) => {
         if (node.type.name === 'codeBlock') {
-          codePos = pos
+          codePos = pos + 1
           return false
         }
         return true
