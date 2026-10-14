@@ -30,7 +30,7 @@ import {
   type SearchBackendOpener,
 } from '@stride/platform'
 import { EmbeddingClient } from '../../../../packages/core/src/embeddings'
-import { noteIndex, searchNotes, type NoteIndex } from '../../../../packages/core/src/search'
+import { noteIndex, noteRebuilder, searchNotes, type NoteIndex, type NoteRebuilder } from '../../../../packages/core/src/search'
 import { writeSampleNotes } from '../../../../packages/core/src/sample'
 import { initializeVault } from '../../../../packages/core/src/seed'
 import { compareTypeDocuments, isTypeVisible, nextTypeOrder, templateBody } from '../../../../packages/core/src/types'
@@ -84,6 +84,7 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+// Title plus body only. Properties (including archived) stay out of the full-text index.
 function indexText(note: StrideNote): string {
   return `${note.title}\n${plainText(note.doc)}`
 }
@@ -164,6 +165,9 @@ export class VaultService extends Service {
   searchQuery = ''
   searchHits: { id: string; score: number }[] = []
   searchMode = ''
+  indexPhase: 'idle' | 'rebuilding' | 'ready' | 'error' = 'idle'
+  indexDone = 0
+  indexTotal = 0
   panel: 'properties' | 'toc' | 'git' | 'chat' | 'settings' = 'properties'
   docEpoch = 0
   renameFromHeading = true
@@ -177,6 +181,9 @@ export class VaultService extends Service {
   vaults: VaultRecord[] = []
   activeVaultId = ''
   private index: NoteIndex | null = null
+  private rebuilder: NoteRebuilder | null = null
+  private rebuildEpoch = 0
+  private rebuildDone: Promise<void> = Promise.resolve()
   private docTimer: ReturnType<typeof setTimeout> | null = null
   private pendingId = ''
   private retryDelay = 1000
@@ -507,6 +514,23 @@ export class VaultService extends Service {
     if (previous !== undefined) this.titleBaseline.set(toId, previous)
   }
 
+  // Folder rename and note moves change ids. Drop the old id and index the note at the new one.
+  async syncMovedIds(changes: { fromId: string; toId: string }[]): Promise<void> {
+    const moved = changes.filter((change) => change.fromId !== change.toId)
+    if (moved.length === 0) return
+    for (const change of moved) {
+      if (this.pendingId === change.fromId) this.pendingId = change.toId
+    }
+    await this.removeIndexed(moved.map((change) => change.fromId))
+    const docs = []
+    for (const change of moved) {
+      const note = this.notes.find((item) => item.id === change.toId)
+      if (note) docs.push({ id: note.id, text: indexText(note) })
+    }
+    if (!this.rebuilder || docs.length === 0) return
+    await this.rebuilder.upsert(docs)
+  }
+
   async commitHeadingRename(explicit?: StrideNote | null) {
     const leaving = explicit === undefined ? this.active : explicit
     const fs = this.fs
@@ -550,7 +574,7 @@ export class VaultService extends Service {
         this.notes = this.notes.map((note) => (note.id === fromId ? renamed : note))
         if (this.activeId === fromId) this.activeId = nextId
         if (this.pendingId === fromId) this.pendingId = nextId
-        await this.index?.remove([fromId])
+        await this.removeIndexed([fromId])
         await this.upsertIndexed(renamed)
       }
       this.titleBaseline.delete(fromId)
@@ -788,14 +812,17 @@ export class VaultService extends Service {
   private async openBackend(backend: FileSystemBackend) {
     await recoverRename(backend)
     const opened = await openVault(backend, HOME_DIR)
+    const renameFromHeading = await readRenameFromHeading(backend)
+    const advanceInbox = await readAdvanceInbox(backend)
     const opener = await this.searchOpener()
     const search = await opener.open({ vaultKey: backend.rootLabel, dim: 0 })
     const index = noteIndex(search, 0)
-    if (opened.notes.length) {
-      await index.upsert(opened.notes.map((note) => ({ id: note.id, text: indexText(note) })))
-    }
-    await this.index?.close().catch(() => undefined)
+    const retiring = this.index
+    const retiringRebuild = this.rebuildDone
+    this.rebuildEpoch += 1
+    const epoch = this.rebuildEpoch
     this.index = index
+    this.rebuilder = noteRebuilder(index)
     this.fs = backend
     this.vaultPath = opened.path
     this.broad = opened.broad
@@ -806,11 +833,42 @@ export class VaultService extends Service {
     this.searchHits = []
     this.searchQuery = ''
     this.searchMode = ''
-    this.renameFromHeading = await readRenameFromHeading(backend)
-    this.advanceInbox = await readAdvanceInbox(backend)
+    this.renameFromHeading = renameFromHeading
+    this.advanceInbox = advanceInbox
     this.resetPropertyEditor()
+    const snapshot = opened.notes.map((note) => ({ id: note.id, text: indexText(note) }))
+    this.indexDone = 0
+    this.indexTotal = snapshot.length
+    this.indexPhase = snapshot.length > 0 ? 'rebuilding' : 'ready'
     this.phase = 'ready'
+    this.rebuildDone = snapshot.length > 0 ? this.startRebuild(epoch, snapshot) : Promise.resolve()
+    // The previous rebuild sees the new epoch and stops. Close that backend after it does.
+    void retiringRebuild
+      .catch(() => undefined)
+      .then(() => retiring?.close().catch(() => undefined))
     await this.rememberVault(backend)
+  }
+
+  private startRebuild(epoch: number, docs: { id: string; text: string }[]): Promise<void> {
+    const rebuilder = this.rebuilder
+    if (!rebuilder) return Promise.resolve()
+    return rebuilder.rebuild(docs, {
+      shouldContinue: () => epoch === this.rebuildEpoch,
+      onProgress: (done, total) => {
+        if (epoch !== this.rebuildEpoch) return
+        this.indexDone = done
+        this.indexTotal = total
+        this.indexPhase = 'rebuilding'
+      },
+    }).then((result) => {
+      if (epoch !== this.rebuildEpoch || result.aborted) return
+      this.indexDone = docs.length
+      this.indexTotal = docs.length
+      this.indexPhase = 'ready'
+    }, () => {
+      if (epoch !== this.rebuildEpoch) return
+      this.indexPhase = 'error'
+    })
   }
 
   private memoryFixtureRoot(): MemoryFileSystem {
@@ -908,8 +966,13 @@ export class VaultService extends Service {
   }
 
   private async upsertIndexed(note: StrideNote) {
-    if (!this.index) return
-    await this.index.upsert([{ id: note.id, text: indexText(note) }])
+    if (!this.rebuilder) return
+    await this.rebuilder.upsert([{ id: note.id, text: indexText(note) }])
+  }
+
+  private async removeIndexed(ids: string[]) {
+    if (!this.rebuilder || ids.length === 0) return
+    await this.rebuilder.remove(ids)
   }
 
   private replace(note: StrideNote) {
@@ -974,7 +1037,7 @@ export class VaultService extends Service {
     if (!current || !fs) return
     try {
       await fs.remove(notePath(current.id))
-      await this.index?.remove([current.id])
+      await this.removeIndexed([current.id])
       this.notes = this.notes.filter((note) => note.id !== current.id)
       this.activeId = this.visibleNotes[0]?.id ?? ''
       this.docEpoch += 1

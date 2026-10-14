@@ -38,6 +38,13 @@ function propertyText(value: StrideNote['properties'][string] | undefined): stri
   return ''
 }
 
+function indexStatusLabel(phase: VaultService['indexPhase'], done: number, total: number): string {
+  if (phase === 'rebuilding') return `索引 ${done}/${total}`
+  if (phase === 'ready') return '索引就绪'
+  if (phase === 'error') return '索引失败'
+  return ''
+}
+
 function typeIconKey(note: StrideNote): string {
   const key = propertyText(note.properties._icon).trim().toLowerCase()
   return key in TYPE_ICONS ? key : 'note'
@@ -345,6 +352,7 @@ const Workspace = observer(function Workspace() {
           <button type="submit" data-testid="run-search">Search</button>
           <button type="button" onClick={() => vault.clearSearch()}>Clear</button>
           <span className="search-mode" data-testid="search-mode">{vault.searchMode ? `Search mode ${vault.searchMode}` : ''}</span>
+          <span className="index-status" data-testid="index-status">{indexStatusLabel(vault.indexPhase, vault.indexDone, vault.indexTotal)}</span>
         </form>
         <button
           type="button"

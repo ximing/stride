@@ -188,6 +188,12 @@ textarea {
   white-space: nowrap;
 }
 
+.index-status {
+  font-size: 0.72rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
 .wikilink-draft {
   display: flex;
   align-items: center;

@@ -231,6 +231,121 @@ describe('VaultService', () => {
     expect(vault.searchHits.some((hit) => hit.id === secondId)).toBe(true)
   })
 
+  it('reindexes a note when it is moved into a folder', async () => {
+    useMemoryFixture()
+    register(VaultService)
+    register(FolderService)
+    const vault = resolve(VaultService)
+    const folders = resolve(FolderService)
+    await vault.openFromDraft()
+    await vault.createNote()
+    vault.updateTitle('Field notes')
+    vault.updateDoc({
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'movequark' }] }],
+    })
+    await vault.commitHeadingRename()
+    expect(vault.active?.id).toBe('field-notes')
+    await folders.createFolder('box')
+    await folders.moveNote('field-notes', 'box')
+    expect(vault.error).toBe('')
+    expect(vault.active?.id).toBe('box/field-notes')
+    vault.searchQuery = 'movequark'
+    await vault.runSearch()
+    expect(vault.searchHits.some((hit) => hit.id === 'box/field-notes')).toBe(true)
+    expect(vault.searchHits.some((hit) => hit.id === 'field-notes')).toBe(false)
+  })
+
+  it('reindexes a note when its folder is renamed', async () => {
+    useMemoryFixture()
+    register(VaultService)
+    register(FolderService)
+    const vault = resolve(VaultService)
+    const folders = resolve(FolderService)
+    await vault.openFromDraft()
+    await vault.createNote()
+    vault.updateTitle('Field notes')
+    vault.updateDoc({
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'folderquark' }] }],
+    })
+    await vault.commitHeadingRename()
+    await folders.createFolder('box')
+    await folders.moveNote('field-notes', 'box')
+    await folders.renameFolder('box', 'crate')
+    expect(vault.error).toBe('')
+    expect(vault.active?.id).toBe('crate/field-notes')
+    vault.searchQuery = 'folderquark'
+    await vault.runSearch()
+    expect(vault.searchHits.some((hit) => hit.id === 'crate/field-notes')).toBe(true)
+    expect(vault.searchHits.some((hit) => hit.id === 'box/field-notes')).toBe(false)
+    expect(vault.searchHits.some((hit) => hit.id === 'field-notes')).toBe(false)
+  })
+
+  it('drops a deleted note from search', async () => {
+    useMemoryFixture()
+    register(VaultService)
+    register(FolderService)
+    const vault = resolve(VaultService)
+    await vault.openFromDraft()
+    await vault.createNote()
+    const id = vault.active?.id ?? ''
+    vault.updateDoc({
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'deletequark' }] }],
+    })
+    await vault.flush()
+    vault.searchQuery = 'deletequark'
+    await vault.runSearch()
+    expect(vault.searchHits.some((hit) => hit.id === id)).toBe(true)
+    await vault.deleteActiveNote()
+    await vault.runSearch()
+    expect(vault.searchHits.some((hit) => hit.id === id)).toBe(false)
+  })
+
+  it('stays editable while a reopen rebuilds and keeps the live save searchable', async () => {
+    useMemoryFixture()
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    register(VaultService)
+    register(FolderService)
+    const vault = resolve(VaultService)
+    await vault.openFromDraft()
+    await vault.createNote()
+    const id = vault.active?.id ?? ''
+    vault.updateDoc({
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'opencore' }] }],
+    })
+    await vault.flush()
+    await vault.openFromDraft()
+    expect(vault.phase).toBe('ready')
+    expect(vault.indexPhase).toBe('rebuilding')
+    expect(vault.indexDone).toBe(0)
+    expect(vault.indexTotal).toBeGreaterThan(0)
+    vault.activeId = id
+    vault.updateTitle('Still editable')
+    vault.updateDoc({
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'livecore' }] }],
+    })
+    await vault.flush()
+    vault.searchQuery = 'livecore'
+    await vault.runSearch()
+    expect(vault.searchHits.some((hit) => hit.id === id)).toBe(true)
+    vault.searchQuery = 'opencore'
+    await vault.runSearch()
+    expect(vault.searchHits.some((hit) => hit.id === id)).toBe(false)
+    await vi.runAllTimersAsync()
+    expect(vault.indexPhase).toBe('ready')
+    expect(vault.indexDone).toBe(vault.indexTotal)
+    vault.searchQuery = 'livecore'
+    await vault.runSearch()
+    expect(vault.searchHits.some((hit) => hit.id === id)).toBe(true)
+    vault.searchQuery = 'opencore'
+    await vault.runSearch()
+    expect(vault.searchHits.some((hit) => hit.id === id)).toBe(false)
+  })
+
   it('leaves the untitled filename when renameFromHeading is false', async () => {
     useMemoryFixture()
     register(VaultService)
@@ -460,6 +575,21 @@ describe('VaultService', () => {
     expect(host.querySelector('[data-testid="run-search"]')).not.toBeNull()
     expect(host.querySelector('[data-testid="new-note"]')).not.toBeNull()
     expect(host.querySelector('[data-testid="search-mode"]')).not.toBeNull()
+    expect(host.querySelector('[data-testid="index-status"]')?.textContent).toBe('索引就绪')
+    await act(async () => {
+      vault.indexPhase = 'rebuilding'
+      vault.indexDone = 2
+      vault.indexTotal = 9
+    })
+    expect(host.querySelector('[data-testid="index-status"]')?.textContent).toBe('索引 2/9')
+    await act(async () => {
+      vault.indexPhase = 'error'
+    })
+    expect(host.querySelector('[data-testid="index-status"]')?.textContent).toBe('索引失败')
+    await act(async () => {
+      vault.indexPhase = 'ready'
+    })
+    expect(host.querySelector('[data-testid="index-status"]')?.textContent).toBe('索引就绪')
     root.unmount()
     host.remove()
   })

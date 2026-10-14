@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { MemoryFileSystem, MemorySearchBackend, MemorySecretsStore } from '@stride/platform'
 import { EmbeddingClient } from './embeddings.ts'
-import { noteIndex, searchNotes } from './search.ts'
+import { noteIndex, noteRebuilder, searchNotes } from './search.ts'
 import {
   defaultSettings,
   defaultSettingsPath,
@@ -82,5 +82,81 @@ describe('search notes', () => {
       doc: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'alpha-note' }] }] },
     })
     expect((await vault.readText(`${note.id}.stride.json`)).includes(key)).toBe(false)
+  })
+
+  it('rebuilds 1000 short notes from 0 to 1000, can stop, and stays under 5000ms', async () => {
+    const docs = Array.from({ length: 1000 }, (_, index) => ({
+      id: `n${index}`,
+      text: `short note ${index} uniquequark${index}`,
+    }))
+    const backend = new MemorySearchBackend()
+    const session = noteRebuilder(backend)
+    const progress: number[] = []
+    const started = performance.now()
+    const result = await session.rebuild(docs, {
+      onProgress: (done) => {
+        progress.push(done)
+      },
+    })
+    const elapsed = performance.now() - started
+    console.info(`T3.2 rebuild 1000 notes: ${elapsed.toFixed(1)}ms`)
+    expect(result.aborted, `rebuild took ${elapsed.toFixed(1)}ms`).toBe(false)
+    expect(progress[0]).toBe(0)
+    expect(progress[progress.length - 1]).toBe(1000)
+    for (let index = 1; index < progress.length; index += 1) {
+      expect(progress[index]).toBeGreaterThanOrEqual(progress[index - 1] ?? 0)
+    }
+    expect(elapsed, `rebuild took ${elapsed.toFixed(1)}ms`).toBeLessThan(5000)
+
+    const stoppedBackend = new MemorySearchBackend()
+    const stopped = noteRebuilder(stoppedBackend)
+    let allow = true
+    const stoppedProgress: number[] = []
+    const stoppedResult = await stopped.rebuild(docs, {
+      shouldContinue: () => allow,
+      onProgress: (done) => {
+        stoppedProgress.push(done)
+        if (done > 0) allow = false
+      },
+    })
+    expect(stoppedResult.aborted).toBe(true)
+    expect(stoppedProgress[0]).toBe(0)
+    expect(stoppedProgress[stoppedProgress.length - 1] ?? 1000).toBeLessThan(1000)
+    const early = await stoppedBackend.search({ text: 'uniquequark0', topK: 5, mode: 'text' })
+    expect(early.map((hit) => hit.id)).toEqual(['n0'])
+    const late = await stoppedBackend.search({ text: 'uniquequark999', topK: 5, mode: 'text' })
+    expect(late).toEqual([])
+    await backend.close()
+    await stoppedBackend.close()
+  })
+
+  it('keeps a live upsert ahead of the rebuild snapshot', async () => {
+    const backend = new MemorySearchBackend()
+    const session = noteRebuilder(backend)
+    const docs = Array.from({ length: 12 }, (_, index) => ({
+      id: `n${index}`,
+      text: `snapshot-old oldtoken${index}`,
+    }))
+    const result = await session.rebuild(docs, {
+      batchSize: 4,
+      onProgress: async (done) => {
+        if (done !== 4) return
+        await session.upsert([{ id: 'n1', text: 'live-fresh freshtoken' }])
+        await session.upsert([{ id: 'n9', text: 'live-later latertoken' }])
+        await session.remove(['n2'])
+      },
+    })
+    expect(result.aborted).toBe(false)
+    const fresh = await backend.search({ text: 'freshtoken', topK: 5, mode: 'text' })
+    expect(fresh.map((hit) => hit.id)).toEqual(['n1'])
+    const stale = await backend.search({ text: 'oldtoken1', topK: 12, mode: 'text' })
+    expect(stale.some((hit) => hit.id === 'n1')).toBe(false)
+    const later = await backend.search({ text: 'latertoken', topK: 5, mode: 'text' })
+    expect(later.map((hit) => hit.id)).toEqual(['n9'])
+    const laterStale = await backend.search({ text: 'oldtoken9', topK: 12, mode: 'text' })
+    expect(laterStale.some((hit) => hit.id === 'n9')).toBe(false)
+    const removed = await backend.search({ text: 'oldtoken2', topK: 12, mode: 'text' })
+    expect(removed.some((hit) => hit.id === 'n2')).toBe(false)
+    await backend.close()
   })
 })
