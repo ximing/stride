@@ -132,6 +132,8 @@ export class GitService extends Service {
   ahead = 0
   behind = 0
   suggesting = false
+  busy = false
+  private busyCount = 0
   private diffPath = ''
   private suggestController: AbortController | null = null
   private suggestGeneration = 0
@@ -226,73 +228,83 @@ export class GitService extends Service {
   }
 
   async refresh() {
-    const backend = await resolveGitBackend()
-    const fs = this.vault.fs
-    if (!backend.available) {
-      if (!fs) {
-        this.hasVault = false
-        this.isRepo = false
+    this.busyCount += 1
+    this.busy = true
+    try {
+      const backend = await resolveGitBackend()
+      const fs = this.vault.fs
+      if (!backend.available) {
+        if (!fs) {
+          this.hasVault = false
+          this.isRepo = false
+          this.surface = gitSurface({
+            backendAvailable: false,
+            gitEnabled: true,
+            isRepo: false,
+            broadBlocked: false,
+          })
+          this.clearWorktree()
+          return
+        }
+        this.hasVault = true
+        this.isRepo = Boolean(await fs.stat('.git'))
         this.surface = gitSurface({
           backendAvailable: false,
           gitEnabled: true,
-          isRepo: false,
+          isRepo: this.isRepo,
           broadBlocked: false,
         })
+        this.output = GIT_BROWSER
         this.clearWorktree()
         return
       }
-      this.hasVault = true
-      this.isRepo = Boolean(await fs.stat('.git'))
-      this.surface = gitSurface({
-        backendAvailable: false,
-        gitEnabled: true,
-        isRepo: this.isRepo,
-        broadBlocked: false,
-      })
-      this.output = GIT_BROWSER
-      this.clearWorktree()
-      return
-    }
-    const gitEnabled = this.gitEnabled()
-    if (!gitEnabled) {
-      this.hasVault = Boolean(fs)
-      this.isRepo = fs ? Boolean(await fs.stat('.git')) : false
-      this.surface = 'disabled'
-      this.clearWorktree()
-      this.clearStaleBrowserBanner()
-      return
-    }
-    if (!fs) {
-      this.hasVault = false
-      this.isRepo = false
-      this.surface = gitSurface({ backendAvailable: true, gitEnabled, isRepo: false, broadBlocked: false })
-      this.clearWorktree()
-      this.clearStaleBrowserBanner()
-      return
-    }
-    try {
-      const status = await gitStatus(fs, backend)
-      this.hasVault = true
-      this.isRepo = status.repo
-      const broadBlocked = this.vault.broad && !(await isDedicatedVault(fs))
-      this.surface = gitSurface({
-        backendAvailable: true,
-        gitEnabled,
-        isRepo: status.repo,
-        broadBlocked,
-      })
-      this.clearStaleBrowserBanner()
-      if (this.surface !== 'ready') {
+      const gitEnabled = this.gitEnabled()
+      if (!gitEnabled) {
+        this.hasVault = Boolean(fs)
+        this.isRepo = fs ? Boolean(await fs.stat('.git')) : false
+        this.surface = 'disabled'
         this.clearWorktree()
+        this.clearStaleBrowserBanner()
         return
       }
-      this.branch = await currentBranch(backend, fs.rootLabel)
-      const counts = await backend.aheadBehind(fs.rootLabel)
-      this.ahead = counts.ahead
-      this.behind = counts.behind
-      this.applyChanges(parsePorcelain(status.porcelain))
-    } catch (error) {
-      this.output = error instanceof Error ? error.message : String(error)
+      if (!fs) {
+        this.hasVault = false
+        this.isRepo = false
+        this.surface = gitSurface({ backendAvailable: true, gitEnabled, isRepo: false, broadBlocked: false })
+        this.clearWorktree()
+        this.clearStaleBrowserBanner()
+        return
+      }
+      try {
+        const status = await gitStatus(fs, backend)
+        this.hasVault = true
+        this.isRepo = status.repo
+        const broadBlocked = this.vault.broad && !(await isDedicatedVault(fs))
+        this.surface = gitSurface({
+          backendAvailable: true,
+          gitEnabled,
+          isRepo: status.repo,
+          broadBlocked,
+        })
+        this.clearStaleBrowserBanner()
+        if (this.surface !== 'ready') {
+          this.clearWorktree()
+          return
+        }
+        this.branch = await currentBranch(backend, fs.rootLabel)
+        const counts = await backend.aheadBehind(fs.rootLabel)
+        this.ahead = counts.ahead
+        this.behind = counts.behind
+        this.applyChanges(parsePorcelain(status.porcelain))
+      } catch (error) {
+        this.output = error instanceof Error ? error.message : String(error)
+      }
+    } finally {
+      this.busyCount -= 1
+      if (this.busyCount <= 0) {
+        this.busyCount = 0
+        this.busy = false
+      }
     }
   }
 
@@ -347,42 +359,62 @@ export class GitService extends Service {
   }
 
   async commit() {
+    this.busyCount += 1
+    this.busy = true
     try {
-      await this.vault.flush()
-    } catch (error) {
-      this.output = error instanceof Error ? error.message : String(error)
-      return
+      try {
+        await this.vault.flush()
+      } catch (error) {
+        this.output = error instanceof Error ? error.message : String(error)
+        return
+      }
+      const backend = await resolveGitBackend()
+      if (!backend.available) this.output = GIT_BROWSER
+    } finally {
+      this.busyCount -= 1
+      if (this.busyCount <= 0) {
+        this.busyCount = 0
+        this.busy = false
+      }
     }
-    const backend = await resolveGitBackend()
-    if (!backend.available) this.output = GIT_BROWSER
   }
 
   async commitSelected(paths?: readonly string[]) {
+    this.busyCount += 1
+    this.busy = true
     try {
-      await this.vault.flush()
-    } catch (error) {
-      this.output = error instanceof Error ? error.message : String(error)
-      return
-    }
-    const backend = await resolveGitBackend()
-    if (!backend.available) {
-      this.output = GIT_BROWSER
-      return
-    }
-    if (!this.gitEnabled()) {
-      this.notice = GIT_OFF
-      this.output = GIT_OFF
-      return
-    }
-    const fs = this.vault.fs
-    if (!fs) return
-    const chosen = [...(paths ?? this.selected)]
-    try {
-      await gitCommit(fs, backend, this.message, chosen)
-      this.output = ''
-      await this.refresh()
-    } catch (error) {
-      this.output = error instanceof Error ? error.message : String(error)
+      try {
+        await this.vault.flush()
+      } catch (error) {
+        this.output = error instanceof Error ? error.message : String(error)
+        return
+      }
+      const backend = await resolveGitBackend()
+      if (!backend.available) {
+        this.output = GIT_BROWSER
+        return
+      }
+      if (!this.gitEnabled()) {
+        this.notice = GIT_OFF
+        this.output = GIT_OFF
+        return
+      }
+      const fs = this.vault.fs
+      if (!fs) return
+      const chosen = [...(paths ?? this.selected)]
+      try {
+        await gitCommit(fs, backend, this.message, chosen)
+        this.output = ''
+        await this.refresh()
+      } catch (error) {
+        this.output = error instanceof Error ? error.message : String(error)
+      }
+    } finally {
+      this.busyCount -= 1
+      if (this.busyCount <= 0) {
+        this.busyCount = 0
+        this.busy = false
+      }
     }
   }
 
@@ -522,105 +554,145 @@ export class GitService extends Service {
   }
 
   async pull() {
+    this.busyCount += 1
+    this.busy = true
     try {
-      await this.vault.flush()
-    } catch (error) {
-      this.output = error instanceof Error ? error.message : String(error)
-      return
-    }
-    const backend = await resolveGitBackend()
-    if (!backend.available) {
-      this.output = GIT_BROWSER
-      return
-    }
-    if (!this.gitEnabled()) {
-      this.notice = GIT_OFF
-      this.output = GIT_OFF
-      return
-    }
-    const fs = this.vault.fs
-    if (!fs) return
-    try {
-      const result = await gitPull(fs, backend)
-      if (result.conflict) {
-        this.conflicts = [...result.files]
-        this.output = result.output
-      } else {
-        this.conflicts = []
-        this.output = ''
+      try {
+        await this.vault.flush()
+      } catch (error) {
+        this.output = error instanceof Error ? error.message : String(error)
+        return
       }
-      await this.refresh()
-    } catch (error) {
-      this.output = error instanceof Error ? error.message : String(error)
+      const backend = await resolveGitBackend()
+      if (!backend.available) {
+        this.output = GIT_BROWSER
+        return
+      }
+      if (!this.gitEnabled()) {
+        this.notice = GIT_OFF
+        this.output = GIT_OFF
+        return
+      }
+      const fs = this.vault.fs
+      if (!fs) return
+      try {
+        const result = await gitPull(fs, backend)
+        if (result.conflict) {
+          this.conflicts = [...result.files]
+          this.output = result.output
+        } else {
+          this.conflicts = []
+          this.output = ''
+        }
+        await this.refresh()
+      } catch (error) {
+        this.output = error instanceof Error ? error.message : String(error)
+      }
+    } finally {
+      this.busyCount -= 1
+      if (this.busyCount <= 0) {
+        this.busyCount = 0
+        this.busy = false
+      }
     }
   }
 
   async push() {
+    this.busyCount += 1
+    this.busy = true
     try {
-      await this.vault.flush()
-    } catch (error) {
-      this.output = error instanceof Error ? error.message : String(error)
-      return
-    }
-    const backend = await resolveGitBackend()
-    if (!backend.available) {
-      this.output = GIT_BROWSER
-      return
-    }
-    if (!this.gitEnabled()) {
-      this.notice = GIT_OFF
-      this.output = GIT_OFF
-      return
-    }
-    const fs = this.vault.fs
-    if (!fs) return
-    try {
-      await gitPush(fs, backend)
-      this.output = ''
-      await this.refresh()
-    } catch (error) {
-      this.output = error instanceof Error ? error.message : String(error)
+      try {
+        await this.vault.flush()
+      } catch (error) {
+        this.output = error instanceof Error ? error.message : String(error)
+        return
+      }
+      const backend = await resolveGitBackend()
+      if (!backend.available) {
+        this.output = GIT_BROWSER
+        return
+      }
+      if (!this.gitEnabled()) {
+        this.notice = GIT_OFF
+        this.output = GIT_OFF
+        return
+      }
+      const fs = this.vault.fs
+      if (!fs) return
+      try {
+        await gitPush(fs, backend)
+        this.output = ''
+        await this.refresh()
+      } catch (error) {
+        this.output = error instanceof Error ? error.message : String(error)
+      }
+    } finally {
+      this.busyCount -= 1
+      if (this.busyCount <= 0) {
+        this.busyCount = 0
+        this.busy = false
+      }
     }
   }
 
   async addRemote() {
-    const backend = await resolveGitBackend()
-    if (!backend.available) {
-      this.output = GIT_BROWSER
-      return
-    }
-    if (!this.gitEnabled()) {
-      this.notice = GIT_OFF
-      this.output = GIT_OFF
-      return
-    }
-    const fs = this.vault.fs
-    if (!fs) return
+    this.busyCount += 1
+    this.busy = true
     try {
-      await gitAddRemote(fs, backend, this.remote.trim())
-      this.output = ''
-      await this.refresh()
-    } catch (error) {
-      this.output = error instanceof Error ? error.message : String(error)
+      const backend = await resolveGitBackend()
+      if (!backend.available) {
+        this.output = GIT_BROWSER
+        return
+      }
+      if (!this.gitEnabled()) {
+        this.notice = GIT_OFF
+        this.output = GIT_OFF
+        return
+      }
+      const fs = this.vault.fs
+      if (!fs) return
+      try {
+        await gitAddRemote(fs, backend, this.remote.trim())
+        this.output = ''
+        await this.refresh()
+      } catch (error) {
+        this.output = error instanceof Error ? error.message : String(error)
+      }
+    } finally {
+      this.busyCount -= 1
+      if (this.busyCount <= 0) {
+        this.busyCount = 0
+        this.busy = false
+      }
     }
   }
 
   async keepSide(path: string, side: 'ours' | 'theirs') {
-    const backend = await resolveGitBackend()
-    if (!backend.available) {
-      this.output = GIT_BROWSER
-      return
-    }
-    const fs = this.vault.fs
-    if (!fs) return
+    this.busyCount += 1
+    this.busy = true
     try {
-      await gitResolveKeepingCheckpoint(fs, backend, path, side)
-      this.conflicts = await backend.unmerged(fs.rootLabel)
-      this.output = ''
-      await this.refresh()
-      await this.vault.reopenForSettings()
-    } catch (error) {
-      this.output = error instanceof Error ? error.message : String(error)
+      const backend = await resolveGitBackend()
+      if (!backend.available) {
+        this.output = GIT_BROWSER
+        return
+      }
+      const fs = this.vault.fs
+      if (!fs) return
+      try {
+        await gitResolveKeepingCheckpoint(fs, backend, path, side)
+        this.conflicts = await backend.unmerged(fs.rootLabel)
+        this.output = ''
+        await this.refresh()
+        await this.vault.reopenForSettings()
+      } catch (error) {
+        this.output = error instanceof Error ? error.message : String(error)
+      }
+    } finally {
+      this.busyCount -= 1
+      if (this.busyCount <= 0) {
+        this.busyCount = 0
+        this.busy = false
+      }
     }
   }
 }

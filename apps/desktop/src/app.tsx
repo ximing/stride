@@ -9,8 +9,8 @@ import { Tag } from '@phosphor-icons/react/Tag'
 import { User } from '@phosphor-icons/react/User'
 import { observer, useService } from '@rabjs/react'
 import { useEffect, useState } from 'react'
-import { DEDICATED_ERROR, LLM_PROVIDERS, catalogBaseUrl, catalogModelSuggestions } from '@stride/core'
-import type { GitSurface } from '@stride/core'
+import { DEDICATED_ERROR, LLM_PROVIDERS, catalogBaseUrl, catalogModelSuggestions, syncState } from '@stride/core'
+import type { GitSurface, SyncState } from '@stride/core'
 import type { StrideNote } from '@stride/core/note'
 import { typeSidebarLabel } from '../../../packages/core/src/types'
 import { NoteEditor } from './editor'
@@ -24,6 +24,7 @@ import { QuickOpen } from './ui/quick-open'
 import { SearchPanel } from './ui/search-panel'
 import { TocPanel } from './ui/toc-panel'
 import { ChatMarkdown } from './ui/chat-markdown'
+import { Popover, PopoverContent, PopoverTrigger } from './ui/popover'
 
 const TYPE_ICONS: Record<string, Icon> = {
   note: Note,
@@ -238,14 +239,44 @@ export const Rail = observer(function Rail() {
   )
 })
 
-function gitBadge(surface: GitSurface, branch: string, ahead: number): string {
+function gitSyncFailed(surface: GitSurface, output: string): boolean {
+  if (surface !== 'ready') return false
+  if (output === 'Git is not available in the browser') return false
+  if (output === 'Git is turned off.') return false
+  return output.length > 0
+}
+
+function gitBadge(surface: GitSurface, state: SyncState): string {
   if (surface === 'unavailable') return 'Git unavailable'
   if (surface === 'disabled') return 'Git off'
   if (surface === 'blocked') return 'Git blocked'
   if (surface === 'needs-init') return 'Not a repo'
-  if (ahead > 0) return `ahead ${ahead}`
-  return branch || 'Git'
+  if (state === 'pull_required') return 'pull required'
+  return state
 }
+
+export const GitStatusBadge = observer(function GitStatusBadge() {
+  const git = useService(GitService)
+  const state = syncState({
+    busy: git.busy,
+    conflict: git.conflicts.length > 0,
+    behind: git.behind,
+    error: gitSyncFailed(git.surface, git.output),
+  })
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button type="button" className="git-status-badge" data-testid="git-status-badge">{gitBadge(git.surface, state)}</button>
+      </PopoverTrigger>
+      <PopoverContent className="git-sync-popover" side="top" data-testid="git-sync-popover">
+        <p>{git.branch}</p>
+        <p>ahead {git.ahead}</p>
+        <p>behind {git.behind}</p>
+        {state === 'error' ? <p>{git.output}</p> : null}
+      </PopoverContent>
+    </Popover>
+  )
+})
 
 const GitPanel = observer(function GitPanel() {
   const git = useService(GitService)
@@ -598,7 +629,7 @@ const Workspace = observer(function Workspace() {
       <QuickOpen />
       <SearchPanel />
       <footer className="git-status">
-        <span data-testid="git-status-badge">{gitBadge(git.surface, git.branch, git.ahead)}</span>
+        <GitStatusBadge />
       </footer>
     </div>
   )

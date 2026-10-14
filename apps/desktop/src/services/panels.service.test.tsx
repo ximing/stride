@@ -57,6 +57,7 @@ describe('browser panels', () => {
       git.ahead = 0
       git.behind = 0
       git.suggesting = false
+      git.busy = false
       git.diff = ''
       git.message = ''
       git.conflicts = []
