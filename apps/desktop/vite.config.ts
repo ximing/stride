@@ -5,6 +5,10 @@ const apiPort = process.env.STRIDE_API_PORT || '1421'
 
 export default defineConfig({
   plugins: [react()],
+  // esbuild prebundling rewrites import.meta.url, so the vane worker 404s and vault open never finishes.
+  optimizeDeps: {
+    exclude: ['@vane-rs/web'],
+  },
   server: {
     host: '127.0.0.1',
     port: 1420,
