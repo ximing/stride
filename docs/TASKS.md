@@ -89,7 +89,7 @@
 | T4.5 ✅ 2026-10-14 | 工具调用卡片：名称/参数摘要/结果摘要/耗时/错误态；思考块折叠 | T4.4 | 卡片与 inwit 体验对齐 |
 | T4.6 ✅ 2026-10-14 | 上下文快照：activeNote + openTabs + vault 概览结构化注入 system/context | T4.4 | 提问"当前笔记"类问题命中 |
 | T4.7 | 权限模式：每 vault Safe/Power 两档（Safe 只挂只读工具） | T4.3 | Safe 下无写工具 |
-| T4.8 | AI commit message（commit 对话框按 diff 生成） | T4.2, T6.4 | 生成可编辑草稿 |
+| T4.8 ✅ 2026-10-14 | AI commit message（commit 对话框按 diff 生成） | T4.2, T6.4 | 生成可编辑草稿 |
 
 ## Phase 5 — Git 同步
 
