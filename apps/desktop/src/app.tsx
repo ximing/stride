@@ -371,6 +371,18 @@ const Workspace = observer(function Workspace() {
                 onChange={(event) => vault.updateTitle(event.target.value)}
                 onBlur={() => { void vault.commitHeadingRename() }}
               />
+              <span
+                className={vault.saveStatus === 'error' ? 'save-status is-error' : 'save-status'}
+                data-testid="save-status"
+              >
+                {vault.saveStatus === 'pending' || vault.saveStatus === 'saving'
+                  ? '保存中'
+                  : vault.saveStatus === 'saved'
+                    ? '已保存'
+                    : vault.saveStatus === 'error'
+                      ? '保存失败'
+                      : ''}
+              </span>
               <label>
                 <input
                   type="checkbox"

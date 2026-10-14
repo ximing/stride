@@ -142,6 +142,54 @@ describe('VaultService', () => {
     expect(resolve(GitService).output).toBe('Git is not available in the browser')
   })
 
+  it('retries a failed autosave and keeps the in-memory note', async () => {
+    useMemoryFixture()
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    const picker = vi.fn()
+    vi.stubGlobal('showDirectoryPicker', picker)
+    register(VaultService)
+    register(FolderService)
+    register(GitService)
+    const vault = resolve(VaultService)
+    await vault.restoreOpened()
+    await vault.openFromDraft()
+    await vault.createNote()
+    const id = vault.active?.id ?? ''
+    const writeText = vault.fs!.writeText.bind(vault.fs)
+    let failed = false
+    vault.fs!.writeText = async (path: string, data: string) => {
+      if (!failed && path.endsWith('.stride.json')) {
+        failed = true
+        throw new Error('disk full')
+      }
+      return writeText(path, data)
+    }
+
+    vault.updateDoc({
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'keep-me' }] }],
+    })
+    await vi.advanceTimersByTimeAsync(350)
+
+    expect(vault.saveStatus).toBe('error')
+    expect(plainText(vault.active!.doc)).toContain('keep-me')
+    let onDisk = ''
+    try {
+      onDisk = plainText((await readNoteFile(vault.fs!, `${id}.stride.json`, id)).doc)
+    } catch {
+      onDisk = ''
+    }
+    expect(onDisk).not.toContain('keep-me')
+
+    await vi.advanceTimersByTimeAsync(1000)
+
+    expect(vault.saveStatus).toBe('saved')
+    const saved = await readNoteFile(vault.fs!, `${id}.stride.json`, id)
+    expect(plainText(saved.doc)).toContain('keep-me')
+    expect(plainText(vault.active!.doc)).toContain('keep-me')
+    vault.cancelPending()
+  })
+
   it('renames on commitHeadingRename and keeps the new id searchable', async () => {
     useMemoryFixture()
     register(VaultService)

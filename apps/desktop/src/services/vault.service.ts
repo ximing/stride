@@ -160,6 +160,7 @@ export class VaultService extends Service {
   activeId = ''
   listFilter = 'all'
   error = ''
+  saveStatus: 'idle' | 'pending' | 'saving' | 'saved' | 'error' = 'idle'
   searchQuery = ''
   searchHits: { id: string; score: number }[] = []
   searchMode = ''
@@ -178,6 +179,7 @@ export class VaultService extends Service {
   private index: NoteIndex | null = null
   private docTimer: ReturnType<typeof setTimeout> | null = null
   private pendingId = ''
+  private retryDelay = 1000
   private renaming = false
   private titleBaseline = new Map<string, string>()
   private leaveQueue: StrideNote[] = []
@@ -733,6 +735,8 @@ export class VaultService extends Service {
     if (this.docTimer) clearTimeout(this.docTimer)
     this.docTimer = null
     this.pendingId = ''
+    this.retryDelay = 1000
+    this.saveStatus = 'idle'
   }
 
   async flush(): Promise<void> {
@@ -740,15 +744,42 @@ export class VaultService extends Service {
       clearTimeout(this.docTimer)
       this.docTimer = null
     }
+    if (!this.pendingId) return
     const id = this.pendingId
-    if (!id) return
-    this.pendingId = ''
     const generation = this.saveGeneration
     const note = this.notes.find((item) => item.id === id)
-    if (!note || !this.fs) return
-    const saved = await saveNote(this.fs, noteForSave(note))
+    if (!note || !this.fs) {
+      this.pendingId = ''
+      this.saveStatus = 'idle'
+      return
+    }
+    this.saveStatus = 'saving'
+    let saved: StrideNote
+    try {
+      saved = await saveNote(this.fs, noteForSave(note))
+    } catch (error) {
+      this.error = errorText(error)
+      if (generation !== this.saveGeneration) {
+        this.saveStatus = this.pendingId ? 'pending' : 'error'
+        return
+      }
+      this.pendingId = id
+      this.saveStatus = 'error'
+      const delay = this.retryDelay
+      this.docTimer = setTimeout(() => {
+        void this.flush()
+      }, delay)
+      this.retryDelay = Math.min(delay * 2, 8000)
+      return
+    }
     // A newer edit landed while the file write was in flight.
-    if (generation !== this.saveGeneration) return
+    if (generation !== this.saveGeneration) {
+      if (this.pendingId) this.saveStatus = 'pending'
+      return
+    }
+    this.pendingId = ''
+    this.retryDelay = 1000
+    this.saveStatus = 'saved'
     this.replace(saved)
     await this.upsertIndexed(saved)
   }
@@ -887,11 +918,10 @@ export class VaultService extends Service {
   private schedule(id: string) {
     this.pendingId = id
     this.saveGeneration += 1
+    this.saveStatus = 'pending'
     if (this.docTimer) clearTimeout(this.docTimer)
     this.docTimer = setTimeout(() => {
-      void this.flush().catch((error: unknown) => {
-        this.error = errorText(error)
-      })
+      void this.flush()
     }, 350)
   }
 

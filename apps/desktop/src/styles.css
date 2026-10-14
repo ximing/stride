@@ -742,3 +742,6 @@ textarea {
   max-width: 90vw;
   max-height: 90vh;
 }
+
+.save-status { color: var(--muted); font-size: 0.75rem; margin-left: 0.6rem; }
+.save-status.is-error { color: #a33; }
