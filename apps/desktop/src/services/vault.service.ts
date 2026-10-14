@@ -780,6 +780,7 @@ export class VaultService extends Service {
     this.pendingId = ''
     this.retryDelay = 1000
     this.saveStatus = 'saved'
+    this.error = ''
     this.replace(saved)
     await this.upsertIndexed(saved)
   }

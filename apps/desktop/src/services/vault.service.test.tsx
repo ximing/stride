@@ -184,6 +184,7 @@ describe('VaultService', () => {
     await vi.advanceTimersByTimeAsync(1000)
 
     expect(vault.saveStatus).toBe('saved')
+    expect(vault.error).toBe('')
     const saved = await readNoteFile(vault.fs!, `${id}.stride.json`, id)
     expect(plainText(saved.doc)).toContain('keep-me')
     expect(plainText(vault.active!.doc)).toContain('keep-me')
