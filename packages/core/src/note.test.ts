@@ -81,6 +81,22 @@ describe('note codec', () => {
     expect(direct.properties.status).toBe('draft')
   })
 
+  it('opens the vault when one note file is a git conflict and leaves that file untouched', async () => {
+    const files = vault('/tmp/stride-conflict-note')
+    await saveNote(files, {
+      id: 'ok',
+      title: 'Ok',
+      type: 'note',
+      properties: {},
+      doc: { type: 'doc', content: [{ type: 'paragraph' }] },
+    })
+    const conflict = '<<<<<<< HEAD\nnot json\n=======\ntheirs\n>>>>>>> abc\n'
+    await files.writeText('untitled-nbz2.stride.json', conflict)
+    const opened = await openVault(files, '/home/tester')
+    expect(opened.notes.map((note) => note.id)).toEqual(['ok'])
+    expect(await files.readText('untitled-nbz2.stride.json')).toBe(conflict)
+  })
+
   it('keeps a spaced wikilink intact and does not rewrite a partial [[', async () => {
     let shown = ''
     for (const ch of '[[Parent]]') {

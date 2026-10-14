@@ -99,8 +99,22 @@ export function notePath(id: string): string {
 export async function loadNotes(fs: FileSystemBackend): Promise<StrideNote[]> {
   const files = await listNoteFiles(fs)
   const notes: StrideNote[] = []
-  for (const file of files) notes.push(await readNoteFile(fs, file, noteIdFromPath(file)))
+  for (const file of files) {
+    try {
+      notes.push(await readNoteFile(fs, file, noteIdFromPath(file)))
+    } catch (error) {
+      // A mid-merge note is not TipTap JSON. Leave the file untouched so Git can resolve it.
+      if (!isUnreadableNote(error)) throw error
+    }
+  }
   return notes
+}
+
+function isUnreadableNote(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error)
+  return message.includes('is not TipTap JSON')
+    || message.includes('is not a TipTap document')
+    || message.includes('not Markdown frontmatter')
 }
 
 export async function openVault(fs: FileSystemBackend, homeDir: string): Promise<OpenedVault> {

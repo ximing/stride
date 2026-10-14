@@ -212,6 +212,7 @@ export class GitService extends Service {
     this.selected = []
     this.diff = ''
     this.diffPath = ''
+    this.conflicts = []
   }
 
   private applyChanges(next: GitChange[]) {
@@ -319,7 +320,9 @@ export class GitService extends Service {
         const counts = await backend.aheadBehind(fs.rootLabel)
         this.ahead = counts.ahead
         this.behind = counts.behind
-        this.applyChanges(parsePorcelain(status.porcelain))
+        const next = parsePorcelain(status.porcelain)
+        this.applyChanges(next)
+        this.conflicts = next.filter((change) => change.unmerged).map((change) => change.path)
       } catch (error) {
         this.output = error instanceof Error ? error.message : String(error)
       }

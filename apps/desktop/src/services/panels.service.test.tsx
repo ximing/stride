@@ -482,15 +482,23 @@ describe('browser panels', () => {
     const pulls: string[] = []
     let output = 'Fast-forward\n notes/a.stride.json'
     let conflict = false
+    let conflicted = false
     const backend = recordingGit([])
     backend.pull = () => {
       pulls.push('pull')
+      if (conflict) conflicted = true
       return Promise.resolve({
         conflict,
         files: conflict ? ['notes/a.stride.json'] : [],
         output,
       })
     }
+    // Pull refuses a dirty tree. The UU line appears only after that pull returns.
+    backend.status = () => Promise.resolve({
+      repo: true,
+      porcelain: conflicted ? 'UU notes/a.stride.json\n' : '',
+      clean: !conflicted,
+    })
     setGitBackendForTests(backend)
     register(VaultService)
     register(SettingsService)
@@ -653,13 +661,37 @@ describe('browser panels', () => {
     expect(git.output).toBe('Commit local changes before pulling')
   })
 
+  it('shows an in-progress merge as conflicts on refresh', async () => {
+    const backend = recordingGit([])
+    backend.status = () => Promise.resolve({
+      repo: true,
+      porcelain: 'UU untitled-nbz2.stride.json\n',
+      clean: false,
+    })
+    setGitBackendForTests(backend)
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const files = new MemoryFileSystem('/tmp/vault-refresh-conflict')
+    await files.mkdir('.git')
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.broad = false
+    vault.phase = 'chooser'
+    resolve(SettingsService).setGitEnabled(true)
+    const git = resolve(GitService)
+    await git.refresh()
+    expect(git.conflicts).toEqual(['untitled-nbz2.stride.json'])
+    expect(git.behind).toBe(0)
+  })
+
   it('records pull conflicts and clears them after a clean pull', async () => {
     let treeClean = true
     let conflictPull = true
     const backend = recordingGit([])
     backend.status = () => Promise.resolve({
       repo: true,
-      porcelain: treeClean ? '' : 'UU notes/a.md\n',
+      porcelain: treeClean ? '' : 'UU notes/a.md\nUU notes/b.md\n',
       clean: treeClean,
     })
     backend.pull = () => {
