@@ -464,3 +464,71 @@ textarea {
   border-radius: 8px;
   padding: 0.35rem 0.55rem;
 }
+
+.editor-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  margin-bottom: 0.6rem;
+  padding: 0.2rem;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  background: var(--paper);
+}
+
+.editor-tool {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  color: inherit;
+}
+
+.editor-tool-text {
+  width: auto;
+  padding: 0 0.65rem;
+}
+
+.editor-toolbar .editor-tool[aria-pressed="true"],
+.editor-toolbar .editor-tool.is-active,
+.editor-bubble .editor-tool[aria-pressed="true"],
+.editor-bubble .editor-tool.is-active {
+  background: color-mix(in srgb, var(--moss) 18%, var(--paper));
+  color: var(--moss);
+}
+
+.editor-bubble {
+  position: absolute;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.2rem;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  background: var(--paper);
+}
+
+.editor mark {
+  background: #f3e2a8;
+  color: inherit;
+}
+
+@media (prefers-color-scheme: dark) {
+  .editor mark {
+    background: #6b5a2e;
+    color: #f6efe4;
+  }
+}
+
+.editor a {
+  color: var(--moss);
+  text-decoration: underline;
+}
