@@ -1,4 +1,6 @@
 import type { FileSystemBackend, SecretsStore } from '@stride/platform'
+import { effectiveBaseUrl, type LlmConfig } from './llm.ts'
+import { isLlmProvider } from './llm-catalog.ts'
 
 export interface EmbeddingSettings {
   endpoint: string
@@ -16,20 +18,59 @@ export interface LlmSettings {
 
 export interface AppSettings {
   embedding: EmbeddingSettings
-  llm: LlmSettings
+  llmConfigs: LlmConfig[]
   releasesUrl: string
+}
+
+interface SealedLlmConfig {
+  id: string
+  name: string
+  provider: string
+  model: string
+  baseUrl: string
+  keySeal: string
+  keyMask: string
+  isDefault: boolean
 }
 
 interface SealedSettings {
   embedding: { endpoint: string; model: string; keySeal: string; keyMask: string; dim: number }
-  llm: { provider: string; model: string; baseUrl: string; keySeal: string; keyMask: string }
+  llmConfigs: SealedLlmConfig[]
   releasesUrl: string
+}
+
+interface ParsedLlmConfig {
+  id?: string
+  name?: string
+  provider?: string
+  model?: string
+  baseUrl?: string
+  keySeal?: string
+  keyMask?: string
+  isDefault?: boolean
+}
+
+interface ParsedSettings {
+  embedding?: { endpoint?: string; model?: string; keySeal?: string; keyMask?: string; dim?: number }
+  llmConfigs?: ParsedLlmConfig[]
+  llm?: { provider?: string; model?: string; baseUrl?: string; keySeal?: string; keyMask?: string }
+  releasesUrl?: string
+}
+
+export interface PublicLlmConfig {
+  id: string
+  name: string
+  provider: string
+  model: string
+  baseUrl: string
+  keyMask: string
+  isDefault: boolean
 }
 
 export function defaultSettings(): AppSettings {
   return {
     embedding: { endpoint: '', model: '', apiKey: '', dim: 4 },
-    llm: { provider: '', model: '', baseUrl: '', apiKey: '' },
+    llmConfigs: [],
     releasesUrl: '',
   }
 }
@@ -61,7 +102,51 @@ function normalizeEmbeddingDim(value: number | undefined, fallback = 4): number 
   return fallback
 }
 
+function singleDefault(configs: LlmConfig[]): LlmConfig[] {
+  let taken = false
+  return configs.map((config) => {
+    if (!config.isDefault) return config
+    if (taken) return { ...config, isDefault: false }
+    taken = true
+    return config
+  })
+}
+
+function textField(value: string | undefined): string {
+  return typeof value === 'string' ? value : ''
+}
+
+async function openLlmConfigs(parsed: ParsedSettings, secrets: SecretsStore): Promise<LlmConfig[]> {
+  if (Array.isArray(parsed.llmConfigs)) {
+    const configs = await Promise.all(parsed.llmConfigs.map(async (item, index) => ({
+      id: typeof item?.id === 'string' && item.id.trim() ? item.id : `legacy-${index}`,
+      name: textField(item?.name),
+      provider: textField(item?.provider),
+      model: textField(item?.model),
+      baseUrl: textField(item?.baseUrl),
+      apiKey: item?.keySeal ? await secrets.open(item.keySeal) : '',
+      isDefault: item?.isDefault === true,
+    })))
+    return singleDefault(configs)
+  }
+  if (parsed.llm && typeof parsed.llm === 'object') {
+    const legacy = parsed.llm
+    const provider = typeof legacy.provider === 'string' && isLlmProvider(legacy.provider) ? legacy.provider : 'custom'
+    return [{
+      id: 'legacy',
+      name: 'LLM',
+      provider,
+      model: textField(legacy.model),
+      baseUrl: textField(legacy.baseUrl),
+      apiKey: legacy.keySeal ? await secrets.open(legacy.keySeal) : '',
+      isDefault: true,
+    }]
+  }
+  return []
+}
+
 async function sealAll(secrets: SecretsStore, settings: AppSettings): Promise<SealedSettings> {
+  const llmConfigs = singleDefault(settings.llmConfigs)
   return {
     embedding: {
       endpoint: settings.embedding.endpoint,
@@ -70,20 +155,23 @@ async function sealAll(secrets: SecretsStore, settings: AppSettings): Promise<Se
       keyMask: maskSecret(settings.embedding.apiKey),
       dim: normalizeEmbeddingDim(settings.embedding.dim),
     },
-    llm: {
-      provider: settings.llm.provider,
-      model: settings.llm.model,
-      baseUrl: settings.llm.baseUrl,
-      keySeal: settings.llm.apiKey ? await secrets.seal(settings.llm.apiKey) : '',
-      keyMask: maskSecret(settings.llm.apiKey),
-    },
+    llmConfigs: await Promise.all(llmConfigs.map(async (config) => ({
+      id: config.id,
+      name: config.name,
+      provider: config.provider,
+      model: config.model,
+      baseUrl: config.baseUrl,
+      keySeal: config.apiKey ? await secrets.seal(config.apiKey) : '',
+      keyMask: maskSecret(config.apiKey),
+      isDefault: config.isDefault,
+    }))),
     releasesUrl: settings.releasesUrl,
   }
 }
 
 export function publicSettings(settings: AppSettings): {
   embedding: { endpoint: string; model: string; keyMask: string; dim: number }
-  llm: { provider: string; model: string; baseUrl: string; keyMask: string }
+  llmConfigs: PublicLlmConfig[]
   releasesUrl: string
 } {
   return {
@@ -93,13 +181,31 @@ export function publicSettings(settings: AppSettings): {
       keyMask: maskSecret(settings.embedding.apiKey),
       dim: normalizeEmbeddingDim(settings.embedding.dim),
     },
-    llm: {
-      provider: settings.llm.provider,
-      model: settings.llm.model,
-      baseUrl: settings.llm.baseUrl,
-      keyMask: maskSecret(settings.llm.apiKey),
-    },
+    llmConfigs: singleDefault(settings.llmConfigs).map((config) => ({
+      id: config.id,
+      name: config.name,
+      provider: config.provider,
+      model: config.model,
+      baseUrl: config.baseUrl,
+      keyMask: maskSecret(config.apiKey),
+      isDefault: config.isDefault,
+    })),
     releasesUrl: settings.releasesUrl,
+  }
+}
+
+export function defaultLlmConfig(settings: AppSettings): LlmConfig | null {
+  return singleDefault(settings.llmConfigs).find((config) => config.isDefault) ?? null
+}
+
+export function defaultLlmSettings(settings: AppSettings): LlmSettings | null {
+  const config = defaultLlmConfig(settings)
+  if (!config) return null
+  return {
+    provider: config.provider,
+    model: config.model,
+    baseUrl: effectiveBaseUrl(config),
+    apiKey: config.apiKey,
   }
 }
 
@@ -109,7 +215,7 @@ export async function readSettings(
   secrets: SecretsStore,
 ): Promise<AppSettings> {
   if (!(await fs.stat(file))) return defaultSettings()
-  const parsed = JSON.parse(await fs.readText(file)) as Partial<SealedSettings>
+  const parsed = JSON.parse(await fs.readText(file)) as ParsedSettings
   const base = defaultSettings()
   return {
     embedding: {
@@ -118,12 +224,7 @@ export async function readSettings(
       apiKey: parsed.embedding?.keySeal ? await secrets.open(parsed.embedding.keySeal) : '',
       dim: normalizeEmbeddingDim(parsed.embedding?.dim, base.embedding.dim),
     },
-    llm: {
-      provider: parsed.llm?.provider ?? '',
-      model: parsed.llm?.model ?? '',
-      baseUrl: parsed.llm?.baseUrl ?? '',
-      apiKey: parsed.llm?.keySeal ? await secrets.open(parsed.llm.keySeal) : '',
-    },
+    llmConfigs: await openLlmConfigs(parsed, secrets),
     releasesUrl: parsed.releasesUrl ?? '',
   }
 }

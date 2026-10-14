@@ -49,17 +49,21 @@ describe('VaultService', () => {
     resetSecretsStore()
     if (has(SettingsService)) {
       const settings = resolve(SettingsService)
-      settings.patchEmbedding({ endpoint: '', model: '', keyMask: '', dim: 4 })
-      settings.patchLlm({ provider: '', model: '', baseUrl: '', keyMask: '' })
-      settings.setReleasesUrl('')
+      settings.form = {
+        embedding: { endpoint: '', model: '', keyMask: '', dim: 4 },
+        llmConfigs: [],
+        releasesUrl: '',
+      }
       settings.setEmbeddingDim('4')
       settings.embeddingKey = ''
-      settings.llmKey = ''
+      settings.llmKeyDrafts = {}
+      settings.selectedLlmId = ''
       settings.notice = ''
       settings.embeddingTestResult = ''
+      settings.llmTestResult = ''
       Object.assign(settings, {
         memoryEmbeddingKey: '',
-        memoryLlmKey: '',
+        memoryLlmKeys: {},
         loaded: false,
         loadTask: null,
       })

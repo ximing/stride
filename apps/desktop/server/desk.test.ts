@@ -43,7 +43,7 @@ function tempDir(): string {
 async function blankSettings(file: string, embedding?: AppSettings['embedding']) {
   await writeSettings(new NodeFileSystem(path.dirname(file)), path.basename(file), {
     embedding: embedding ?? { endpoint: '', model: '', apiKey: '', dim: 4 },
-    llm: { provider: '', model: '', baseUrl: '', apiKey: '' },
+    llmConfigs: [],
     releasesUrl: '',
   }, secrets)
 }
@@ -250,7 +250,7 @@ describe('Desk vault paths', () => {
       const marker = path.join(root, 'version-marker.txt')
       await writeSettings(new NodeFileSystem(root), 'settings.json', {
         embedding: { endpoint: '', model: '', apiKey: '', dim: 4 },
-        llm: { provider: '', model: '', baseUrl: '', apiKey: '' },
+        llmConfigs: [],
         releasesUrl: `http://127.0.0.1:${address.port}/releases`,
       }, secrets)
       fs.writeFileSync(marker, `${APP_VERSION}\n`)
@@ -340,7 +340,7 @@ async function openUpdateDesk(root: string, releasesUrl: string, handoff: () => 
   const marker = path.join(root, 'version-marker.txt')
   await writeSettings(new NodeFileSystem(root), 'settings.json', {
     embedding: { endpoint: '', model: '', apiKey: '', dim: 4 },
-    llm: { provider: '', model: '', baseUrl: '', apiKey: '' },
+    llmConfigs: [],
     releasesUrl,
   }, secrets)
   fs.writeFileSync(marker, `${APP_VERSION}\n`)

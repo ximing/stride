@@ -19,7 +19,7 @@ export interface OpenedVault {
 
 export interface PublicSettings {
   embedding: { endpoint: string; model: string; keyMask: string; dim: number }
-  llm: { provider: string; model: string; baseUrl: string; keyMask: string }
+  llmConfigs: { id: string; name: string; provider: string; model: string; baseUrl: string; keyMask: string; isDefault: boolean }[]
   releasesUrl: string
 }
 

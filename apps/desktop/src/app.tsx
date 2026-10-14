@@ -9,6 +9,7 @@ import { Tag } from '@phosphor-icons/react/Tag'
 import { User } from '@phosphor-icons/react/User'
 import { observer, useService } from '@rabjs/react'
 import { useState } from 'react'
+import { LLM_PROVIDERS, catalogBaseUrl, catalogModelSuggestions } from '@stride/core'
 import type { StrideNote } from '@stride/core/note'
 import { typeSidebarLabel } from '../../../packages/core/src/types'
 import { NoteEditor } from './editor'
@@ -265,6 +266,7 @@ const ChatPanel = observer(function ChatPanel() {
 const SettingsPanel = observer(function SettingsPanel() {
   const settings = useService(SettingsService)
   const updates = useService(UpdateService)
+  const selected = settings.form.llmConfigs.find((config) => config.id === settings.selectedLlmId)
   return (
     <div>
       <h2>Settings</h2>
@@ -295,23 +297,75 @@ const SettingsPanel = observer(function SettingsPanel() {
         <button type="button" data-testid="embedding-test" onClick={() => { void settings.testEmbedding() }}>Test connection</button>
       </div>
       <p className="meta" data-testid="embedding-test-result">{settings.embeddingTestResult}</p>
-      <label className="field"><span>LLM provider</span>
-        <input value={settings.form.llm.provider} onChange={(event) => settings.patchLlm({ provider: event.target.value })} />
+      <label className="field"><span>LLM config</span>
+        <select
+          data-testid="llm-config"
+          value={settings.selectedLlmId}
+          onChange={(event) => { settings.selectedLlmId = event.target.value }}
+        >
+          {settings.form.llmConfigs.map((config) => (
+            <option key={config.id} value={config.id}>{config.name || config.id}</option>
+          ))}
+        </select>
       </label>
-      <label className="field"><span>LLM model</span>
-        <input value={settings.form.llm.model} onChange={(event) => settings.patchLlm({ model: event.target.value })} />
-      </label>
-      <label className="field"><span>LLM base URL</span>
-        <input value={settings.form.llm.baseUrl} onChange={(event) => settings.patchLlm({ baseUrl: event.target.value })} />
-      </label>
-      <label className="field"><span>LLM key</span>
-        <input type="password" value={settings.llmKey} onChange={(event) => { settings.llmKey = event.target.value }} />
-      </label>
+      <div className="editor-tools">
+        <button type="button" data-testid="llm-add" onClick={() => settings.addLlmConfig()}>Add</button>
+        <button type="button" data-testid="llm-delete" onClick={() => settings.removeLlmConfig()}>Delete</button>
+        <button type="button" data-testid="llm-default" onClick={() => settings.setDefaultLlmConfig()}>Default</button>
+      </div>
+      {selected && (
+        <>
+          <label className="field"><span>Name</span>
+            <input data-testid="llm-name" value={selected.name} onChange={(event) => settings.patchLlmConfig({ name: event.target.value })} />
+          </label>
+          <label className="field"><span>Provider</span>
+            <select data-testid="llm-provider" value={selected.provider} onChange={(event) => settings.patchLlmConfig({ provider: event.target.value })}>
+              {LLM_PROVIDERS.map((provider) => (
+                <option key={provider.id} value={provider.id}>{provider.label}</option>
+              ))}
+            </select>
+          </label>
+          <label className="field"><span>Model</span>
+            <input
+              data-testid="llm-model"
+              value={selected.model}
+              list="llm-model-suggestions"
+              onChange={(event) => settings.patchLlmConfig({ model: event.target.value })}
+            />
+            <datalist id="llm-model-suggestions">
+              {catalogModelSuggestions(selected.provider).map((model) => (
+                <option key={model} value={model} />
+              ))}
+            </datalist>
+          </label>
+          <label className="field"><span>Base URL</span>
+            <input
+              data-testid="llm-base-url"
+              value={selected.baseUrl}
+              placeholder={catalogBaseUrl(selected.provider)}
+              onChange={(event) => settings.patchLlmConfig({ baseUrl: event.target.value })}
+            />
+          </label>
+          <label className="field"><span>API key</span>
+            <input
+              data-testid="llm-key"
+              type="password"
+              value={settings.llmKeyDrafts[selected.id] ?? ''}
+              placeholder={selected.keyMask}
+              onChange={(event) => { settings.llmKeyDrafts = { ...settings.llmKeyDrafts, [selected.id]: event.target.value } }}
+            />
+          </label>
+          <div className="editor-tools">
+            <button type="button" data-testid="llm-test" onClick={() => { void settings.testSelectedLlm() }}>Test connection</button>
+          </div>
+          <p className="meta" data-testid="llm-test-result">{settings.llmTestResult}</p>
+        </>
+      )}
       <label className="field"><span>GitHub releases URL</span>
         <input value={settings.form.releasesUrl} onChange={(event) => settings.setReleasesUrl(event.target.value)} />
       </label>
       <div className="editor-tools">
-        <button type="button" onClick={() => settings.save()}>Save settings</button>
+        <button type="button" data-testid="settings-save" onClick={() => settings.save()}>Save settings</button>
         <button type="button" onClick={() => updates.check()}>Check for updates</button>
       </div>
       {settings.notice && <p className="meta">{settings.notice}</p>}

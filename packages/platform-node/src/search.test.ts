@@ -94,7 +94,7 @@ describe('vane search', () => {
     const settingsFile = path.join(dir, 'settings.json')
     const settings: AppSettings = {
       embedding,
-      llm: { provider: 'fixture', model: 'm', baseUrl: endpoint, apiKey: key },
+      llmConfigs: [{ id: 'c1', name: 'OpenAI', provider: 'openai', model: 'm', baseUrl: endpoint, apiKey: key, isDefault: true }],
       releasesUrl: '',
     }
     const settingsFs = new NodeFileSystem(dir)

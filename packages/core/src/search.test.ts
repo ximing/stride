@@ -3,6 +3,7 @@ import { MemoryFileSystem, MemorySearchBackend, MemorySecretsStore } from '@stri
 import { EmbeddingClient } from './embeddings.ts'
 import { noteIndex, noteRebuilder, searchNotes } from './search.ts'
 import {
+  defaultLlmConfig,
   defaultSettings,
   defaultSettingsPath,
   maskSecret,
@@ -120,7 +121,7 @@ describe('search notes', () => {
     const key = 'sk-stride-embed-test-key'
     const settings: AppSettings = {
       embedding: { endpoint: 'http://127.0.0.1/v1', model: 'fixture-embed', apiKey: key, dim: 4 },
-      llm: { provider: 'fixture', model: 'm', baseUrl: 'http://127.0.0.1/v1', apiKey: key },
+      llmConfigs: [{ id: 'c1', name: 'OpenAI', provider: 'openai', model: 'm', baseUrl: 'http://127.0.0.1/v1', apiKey: key, isDefault: true }],
       releasesUrl: '',
     }
     await writeSettings(files, 'settings.json', settings, secrets)
@@ -128,7 +129,7 @@ describe('search notes', () => {
     expect(maskSecret(key)).toBe('••••-key')
     const loaded = await readSettings(files, 'settings.json', secrets)
     expect(loaded.embedding.apiKey).toBe(key)
-    expect(loaded.llm.apiKey).toBe(key)
+    expect(defaultLlmConfig(loaded)?.apiKey).toBe(key)
     expect(publicSettings(loaded).embedding.keyMask).toBe('••••-key')
     expect(await secrets.seal('')).toBe('')
     expect(await secrets.open('')).toBe('')
@@ -137,7 +138,7 @@ describe('search notes', () => {
     expect((await readSettings(files, 'empty.json', secrets)).embedding.dim).toBe(4)
     await writeSettings(files, 'zero-dim.json', {
       embedding: { endpoint: 'http://127.0.0.1/v1', model: 'fixture-embed', apiKey: '', dim: 0 },
-      llm: { provider: '', model: '', baseUrl: '', apiKey: '' },
+      llmConfigs: [],
       releasesUrl: '',
     }, secrets)
     expect((await readSettings(files, 'zero-dim.json', secrets)).embedding.dim).toBe(0)

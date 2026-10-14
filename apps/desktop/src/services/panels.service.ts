@@ -1,5 +1,17 @@
 import { has, Service } from '@rabjs/react'
-import { EmbeddingClient, maskSecret, readSettings, writeSettings, type AppSettings } from '@stride/core'
+import {
+  EmbeddingClient,
+  catalogDefaultModel,
+  effectiveBaseUrl,
+  llmProxyBaseUrl,
+  maskSecret,
+  readSettings,
+  testLlmConnection,
+  writeSettings,
+  type AppSettings,
+  type LlmConfig,
+  type PublicLlmConfig,
+} from '@stride/core'
 import { browserGitBackend } from '@stride/git-web'
 import { MemoryFileSystem, type SecretsStore } from '@stride/platform'
 import { webSecretsStore } from '../../../../packages/secrets-web/src/index.ts'
@@ -7,13 +19,13 @@ import { VaultService } from './vault.service'
 
 interface PublicSettings {
   embedding: { endpoint: string; model: string; keyMask: string; dim: number }
-  llm: { provider: string; model: string; baseUrl: string; keyMask: string }
+  llmConfigs: PublicLlmConfig[]
   releasesUrl: string
 }
 
 const emptySettings = (): PublicSettings => ({
   embedding: { endpoint: '', model: '', keyMask: '', dim: 4 },
-  llm: { provider: '', model: '', baseUrl: '', keyMask: '' },
+  llmConfigs: [],
   releasesUrl: '',
 })
 
@@ -146,6 +158,12 @@ function resolveKey(draft: string, stored: string): string {
   return draft
 }
 
+// An untouched LLM draft is missing and keeps the sealed key. Empty string clears it.
+function resolveLlmKey(draft: string | undefined, stored: string): string {
+  if (draft === undefined) return stored
+  return resolveKey(draft, stored)
+}
+
 function keyForTest(draft: string, stored: string): string {
   if (draft === '' || draft.startsWith('••••')) return stored
   return draft
@@ -179,15 +197,26 @@ async function settingsFile(): Promise<MemoryFileSystem> {
   return fs
 }
 
+function isHttpUrl(value: string): boolean {
+  try {
+    const url = new URL(value)
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
 export class SettingsService extends Service {
   form = emptySettings()
   embeddingKey = ''
-  llmKey = ''
+  llmKeyDrafts: Record<string, string> = {}
+  selectedLlmId = ''
   embeddingDimText = '4'
   embeddingTestResult = ''
+  llmTestResult = ''
   notice = ''
   private memoryEmbeddingKey = ''
-  private memoryLlmKey = ''
+  private memoryLlmKeys: Record<string, string> = {}
   private loadTask: Promise<void> | null = null
   private loaded = false
 
@@ -195,8 +224,63 @@ export class SettingsService extends Service {
     this.form = { ...this.form, embedding: { ...this.form.embedding, ...partial } }
   }
 
-  patchLlm(partial: Partial<PublicSettings['llm']>) {
-    this.form = { ...this.form, llm: { ...this.form.llm, ...partial } }
+  addLlmConfig() {
+    const id = crypto.randomUUID()
+    const config: PublicLlmConfig = {
+      id,
+      name: 'OpenAI',
+      provider: 'openai',
+      model: catalogDefaultModel('openai') || 'gpt-4o-mini',
+      baseUrl: '',
+      keyMask: '',
+      isDefault: this.form.llmConfigs.length === 0,
+    }
+    this.form = { ...this.form, llmConfigs: [...this.form.llmConfigs, config] }
+    this.selectedLlmId = id
+  }
+
+  removeLlmConfig(id = this.selectedLlmId) {
+    if (!id) return
+    const removed = this.form.llmConfigs.find((config) => config.id === id)
+    if (!removed) return
+    let llmConfigs = this.form.llmConfigs.filter((config) => config.id !== id)
+    if (removed.isDefault && llmConfigs.length > 0 && !llmConfigs.some((config) => config.isDefault)) {
+      llmConfigs = llmConfigs.map((config, index) => ({ ...config, isDefault: index === 0 }))
+    }
+    this.form = { ...this.form, llmConfigs }
+    const drafts = { ...this.llmKeyDrafts }
+    delete drafts[id]
+    this.llmKeyDrafts = drafts
+    const memory = { ...this.memoryLlmKeys }
+    delete memory[id]
+    this.memoryLlmKeys = memory
+    if (this.selectedLlmId === id) {
+      this.selectedLlmId = llmConfigs.find((config) => config.isDefault)?.id ?? llmConfigs[0]?.id ?? ''
+    }
+  }
+
+  setDefaultLlmConfig(id = this.selectedLlmId) {
+    if (!id || !this.form.llmConfigs.some((config) => config.id === id)) return
+    this.form = {
+      ...this.form,
+      llmConfigs: this.form.llmConfigs.map((config) => ({ ...config, isDefault: config.id === id })),
+    }
+  }
+
+  patchLlmConfig(partial: { name?: string; provider?: string; model?: string; baseUrl?: string }) {
+    const current = this.form.llmConfigs.find((config) => config.id === this.selectedLlmId)
+    if (!current) return
+    let model = current.model
+    if (partial.provider !== undefined && partial.provider !== current.provider && partial.model === undefined) {
+      const previousDefault = catalogDefaultModel(current.provider)
+      if (!current.model.trim() || current.model === previousDefault) model = catalogDefaultModel(partial.provider)
+    }
+    if (partial.model !== undefined) model = partial.model
+    const next: PublicLlmConfig = { ...current, ...partial, model }
+    this.form = {
+      ...this.form,
+      llmConfigs: this.form.llmConfigs.map((config) => config.id === current.id ? next : config),
+    }
   }
 
   setReleasesUrl(value: string) {
@@ -218,6 +302,17 @@ export class SettingsService extends Service {
     const intended = endpoint !== '' && model !== '' && dim !== null
     const active = intended && apiKey !== ''
     return { endpoint, model, apiKey, dim: dim ?? 0, intended, active }
+  }
+
+  llmRuntime(): { provider: string; model: string; baseUrl: string; apiKey: string } | null {
+    const config = this.form.llmConfigs.find((item) => item.isDefault)
+    if (!config) return null
+    return {
+      provider: config.provider,
+      model: config.model,
+      baseUrl: effectiveBaseUrl(config),
+      apiKey: this.memoryLlmKeys[config.id] ?? '',
+    }
   }
 
   // Overlapping calls share one read. A later call loads again.
@@ -242,7 +337,15 @@ export class SettingsService extends Service {
     let after: EmbeddingRuntime
     try {
       const embeddingKey = resolveKey(this.embeddingKey, this.memoryEmbeddingKey)
-      const llmKey = resolveKey(this.llmKey, this.memoryLlmKey)
+      const llmConfigs: LlmConfig[] = this.form.llmConfigs.map((config) => ({
+        id: config.id,
+        name: config.name,
+        provider: config.provider,
+        model: config.model,
+        baseUrl: config.baseUrl,
+        apiKey: resolveLlmKey(this.llmKeyDrafts[config.id], this.memoryLlmKeys[config.id] ?? ''),
+        isDefault: config.isDefault,
+      }))
       const dim = parsePositiveInt(this.embeddingDimText)
       const settings: AppSettings = {
         embedding: {
@@ -251,26 +354,22 @@ export class SettingsService extends Service {
           apiKey: embeddingKey,
           dim: dim ?? 0,
         },
-        llm: {
-          provider: this.form.llm.provider,
-          model: this.form.llm.model,
-          baseUrl: this.form.llm.baseUrl,
-          apiKey: llmKey,
-        },
+        llmConfigs,
         releasesUrl: this.form.releasesUrl,
       }
       const fs = await settingsFile()
       await writeSettings(fs, SETTINGS_FILE, settings, secrets)
       const written = await fs.readText(SETTINGS_FILE)
-      if ((embeddingKey && written.includes(embeddingKey)) || (llmKey && written.includes(llmKey))) {
+      const rawKeys = [embeddingKey, ...llmConfigs.map((config) => config.apiKey)].filter((key) => key)
+      if (rawKeys.some((key) => written.includes(key))) {
         if (typeof localStorage !== 'undefined') localStorage.removeItem(SETTINGS_STORAGE_KEY)
         throw new Error('Refusing to keep a plaintext key')
       }
       if (typeof localStorage !== 'undefined') localStorage.setItem(SETTINGS_STORAGE_KEY, written)
       this.memoryEmbeddingKey = embeddingKey
-      this.memoryLlmKey = llmKey
+      this.memoryLlmKeys = Object.fromEntries(llmConfigs.map((config) => [config.id, config.apiKey]))
       this.embeddingKey = ''
-      this.llmKey = ''
+      this.llmKeyDrafts = {}
       this.embeddingDimText = dim === null ? this.embeddingDimText : String(dim)
       this.form = {
         embedding: {
@@ -279,12 +378,15 @@ export class SettingsService extends Service {
           keyMask: maskSecret(embeddingKey),
           dim: dim ?? 0,
         },
-        llm: {
-          provider: settings.llm.provider,
-          model: settings.llm.model,
-          baseUrl: settings.llm.baseUrl,
-          keyMask: maskSecret(llmKey),
-        },
+        llmConfigs: llmConfigs.map((config) => ({
+          id: config.id,
+          name: config.name,
+          provider: config.provider,
+          model: config.model,
+          baseUrl: config.baseUrl,
+          keyMask: maskSecret(config.apiKey),
+          isDefault: config.isDefault,
+        })),
         releasesUrl: settings.releasesUrl,
       }
       this.notice = ''
@@ -320,16 +422,49 @@ export class SettingsService extends Service {
     }
   }
 
+  async testSelectedLlm() {
+    const current = this.form.llmConfigs.find((config) => config.id === this.selectedLlmId)
+    if (!current) {
+      this.llmTestResult = 'Missing model'
+      return
+    }
+    const config: LlmConfig = {
+      id: current.id,
+      name: current.name,
+      provider: current.provider,
+      model: current.model,
+      baseUrl: current.baseUrl,
+      apiKey: keyForTest(this.llmKeyDrafts[current.id] ?? '', this.memoryLlmKeys[current.id] ?? ''),
+      isDefault: current.isDefault,
+    }
+    const configured = effectiveBaseUrl(config)
+    let baseUrl: string | undefined
+    if (import.meta.env.DEV && isHttpUrl(configured)) {
+      try {
+        const path = llmProxyBaseUrl(configured)
+        const origin = globalThis.location?.origin
+        // pi-ai rejects a relative base URL. Same-origin keeps the request on the dev proxy.
+        baseUrl = origin && origin !== 'null' ? `${origin}${path}` : path
+      } catch {
+        baseUrl = undefined
+      }
+    }
+    const result = await testLlmConnection(config, { fetch: globalThis.fetch.bind(globalThis), baseUrl })
+    this.llmTestResult = result.ok ? '连接成功' : result.error
+  }
+
   private async loadBody() {
     const secrets = await this.openSecrets()
     if (!secrets) return
     try {
       const settings = await readSettings(await settingsFile(), SETTINGS_FILE, secrets)
       this.memoryEmbeddingKey = settings.embedding.apiKey
-      this.memoryLlmKey = settings.llm.apiKey
+      this.memoryLlmKeys = Object.fromEntries(settings.llmConfigs.map((config) => [config.id, config.apiKey]))
       this.embeddingKey = ''
-      this.llmKey = ''
+      this.llmKeyDrafts = {}
       this.embeddingDimText = settings.embedding.dim > 0 ? String(settings.embedding.dim) : ''
+      const preferred = settings.llmConfigs.find((config) => config.isDefault) ?? settings.llmConfigs[0]
+      this.selectedLlmId = preferred?.id ?? ''
       this.form = {
         embedding: {
           endpoint: settings.embedding.endpoint,
@@ -337,12 +472,15 @@ export class SettingsService extends Service {
           keyMask: maskSecret(settings.embedding.apiKey),
           dim: settings.embedding.dim,
         },
-        llm: {
-          provider: settings.llm.provider,
-          model: settings.llm.model,
-          baseUrl: settings.llm.baseUrl,
-          keyMask: maskSecret(settings.llm.apiKey),
-        },
+        llmConfigs: settings.llmConfigs.map((config) => ({
+          id: config.id,
+          name: config.name,
+          provider: config.provider,
+          model: config.model,
+          baseUrl: config.baseUrl,
+          keyMask: maskSecret(config.apiKey),
+          isDefault: config.isDefault,
+        })),
         releasesUrl: settings.releasesUrl,
       }
       this.notice = ''

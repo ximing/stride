@@ -9,17 +9,21 @@ import { VaultService } from './vault.service'
 
 function resetSettingsMemory() {
   const settings = resolve(SettingsService)
-  settings.patchEmbedding({ endpoint: '', model: '', keyMask: '', dim: 4 })
-  settings.patchLlm({ provider: '', model: '', baseUrl: '', keyMask: '' })
-  settings.setReleasesUrl('')
+  settings.form = {
+    embedding: { endpoint: '', model: '', keyMask: '', dim: 4 },
+    llmConfigs: [],
+    releasesUrl: '',
+  }
   settings.setEmbeddingDim('4')
   settings.embeddingKey = ''
-  settings.llmKey = ''
+  settings.llmKeyDrafts = {}
+  settings.selectedLlmId = ''
   settings.embeddingTestResult = ''
+  settings.llmTestResult = ''
   settings.notice = ''
   Object.assign(settings, {
     memoryEmbeddingKey: '',
-    memoryLlmKey: '',
+    memoryLlmKeys: {},
     loaded: false,
     loadTask: null,
   })
@@ -152,6 +156,78 @@ describe('browser panels', () => {
     await settings.testEmbedding()
     expect(settings.embeddingTestResult).toBe('维度不符')
     expect(fetchMock.mock.calls.length).toBe(calls)
+  })
+
+  it('saves two llm configs, switches the default, and refuses a plaintext key', async () => {
+    const secrets = new MemorySecretsStore()
+    setSecretsStore(secrets)
+    register(SettingsService)
+    const settings = resolve(SettingsService)
+    settings.addLlmConfig()
+    const first = settings.selectedLlmId
+    settings.patchLlmConfig({ name: 'Primary' })
+    settings.llmKeyDrafts = { [first]: 'sk-stride-llm-alpha-key' }
+    settings.addLlmConfig()
+    const second = settings.selectedLlmId
+    expect(second).not.toBe(first)
+    expect(settings.form.llmConfigs[0]?.isDefault).toBe(true)
+    expect(settings.form.llmConfigs[1]?.isDefault).toBe(false)
+    settings.patchLlmConfig({ name: 'Backup', provider: 'deepseek' })
+    expect(settings.form.llmConfigs.find((config) => config.id === second)?.model).toBe('deepseek-chat')
+    settings.llmKeyDrafts = { ...settings.llmKeyDrafts, [second]: 'sk-stride-llm-beta-key' }
+    await settings.save()
+    const stored = localStorage.getItem(SETTINGS_STORAGE_KEY) ?? ''
+    expect(stored.includes('sk-stride-llm-alpha-key')).toBe(false)
+    expect(stored.includes('sk-stride-llm-beta-key')).toBe(false)
+    expect(stored.includes('"apiKey"')).toBe(false)
+    expect(settings.notice).toBe('')
+    expect(settings.llmKeyDrafts).toEqual({})
+    await settings.load()
+    expect(settings.form.llmConfigs).toHaveLength(2)
+    expect(settings.llmRuntime()?.apiKey).toBe('sk-stride-llm-alpha-key')
+    expect(settings.llmRuntime()?.provider).toBe('openai')
+
+    settings.selectedLlmId = second
+    settings.setDefaultLlmConfig()
+    expect(settings.form.llmConfigs.find((config) => config.id === second)?.isDefault).toBe(true)
+    expect(settings.form.llmConfigs.find((config) => config.id === first)?.isDefault).toBe(false)
+    const masks = Object.fromEntries(settings.form.llmConfigs.map((config) => [config.id, config.keyMask]))
+    settings.llmKeyDrafts = masks
+    await settings.save()
+    await settings.load()
+    expect(settings.llmRuntime()?.provider).toBe('deepseek')
+    expect(settings.llmRuntime()?.apiKey).toBe('sk-stride-llm-beta-key')
+    expect(settings.llmRuntime()?.model).toBe('deepseek-chat')
+
+    setSecretsStore({
+      seal: async (value) => value,
+      open: async (value) => value,
+    })
+    settings.selectedLlmId = first
+    settings.llmKeyDrafts = { [first]: 'sk-plaintext-should-not-land' }
+    await settings.save()
+    expect(settings.notice).toContain('plaintext')
+    expect(localStorage.getItem(SETTINGS_STORAGE_KEY) ?? '').not.toContain('sk-plaintext-should-not-land')
+  })
+
+  it('reports a successful llm probe from the selected config', async () => {
+    const sse = [
+      'data: {"id":"x","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"role":"assistant","content":"pong"},"finish_reason":null}]}',
+      '',
+      'data: {"id":"x","object":"chat.completion.chunk","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}',
+      '',
+      'data: [DONE]',
+      '',
+    ].join('\n')
+    const fetchMock = vi.fn(async () => new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } }))
+    vi.stubGlobal('fetch', fetchMock)
+    register(SettingsService)
+    const settings = resolve(SettingsService)
+    settings.addLlmConfig()
+    settings.llmKeyDrafts = { [settings.selectedLlmId]: 'sk-stride-llm-test-key' }
+    await settings.testSelectedLlm()
+    expect(settings.llmTestResult).toBe('连接成功')
+    expect(fetchMock).toHaveBeenCalled()
   })
 
   it('hides the update banner while idle', async () => {

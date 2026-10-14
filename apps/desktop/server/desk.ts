@@ -9,6 +9,7 @@ import {
   EmbeddingClient,
   UpdateController,
   createVaultNote,
+  defaultLlmSettings,
   defaultSettings,
   defaultSettingsPath,
   gitAddRemote,
@@ -24,6 +25,7 @@ import {
   loadNotes,
   noteIdFromPath,
   noteIndex,
+  isLlmProvider,
   notePath,
   openVault,
   plainText,
@@ -37,6 +39,7 @@ import {
   writeSettings,
   type AppSettings,
   type ChatLine,
+  type LlmConfig,
   type NoteIndex,
   type StrideNote,
 } from '@stride/core'
@@ -232,12 +235,7 @@ export class Desk {
         dim: incoming.embedding?.dim || current.embedding.dim || 4,
         apiKey: mergeKey(current.embedding.apiKey, incoming.embedding?.apiKey),
       },
-      llm: {
-        provider: incoming.llm?.provider ?? current.llm.provider,
-        model: incoming.llm?.model ?? current.llm.model,
-        baseUrl: incoming.llm?.baseUrl ?? current.llm.baseUrl,
-        apiKey: mergeKey(current.llm.apiKey, incoming.llm?.apiKey),
-      },
+      llmConfigs: applyLlmUpdate(current.llmConfigs, incoming.llm),
       releasesUrl: incoming.releasesUrl ?? current.releasesUrl,
     }
     await writeSettings(this.configFs, this.settingsName, next, this.secrets)
@@ -249,11 +247,12 @@ export class Desk {
   async chatTurn(message: string, activeId?: string) {
     await this.ready
     this.requireVault()
-    if (!this.settings.llm.apiKey || !this.settings.llm.baseUrl || !this.settings.llm.model) {
+    const llm = defaultLlmSettings(this.settings)
+    if (!llm || !llm.apiKey || !llm.baseUrl || !llm.model) {
       throw new Error('Add a model provider, base URL, model, and key in Settings')
     }
     const turn = await runVaultTurn({
-      settings: this.settings.llm,
+      settings: llm,
       history: this.chat,
       userText: message,
       tools: vaultTools({
@@ -501,4 +500,34 @@ function mergeKey(current: string, incoming: string | undefined): string {
   if (incoming === '') return ''
   if (incoming.startsWith('••••')) return current
   return incoming
+}
+
+function applyLlmUpdate(
+  configs: LlmConfig[],
+  llm: { provider?: string; model?: string; baseUrl?: string; apiKey?: string } | undefined,
+): LlmConfig[] {
+  if (!llm) return configs
+  const index = configs.findIndex((config) => config.isDefault)
+  if (index === -1) {
+    const requested = llm.provider
+    return [{
+      id: 'legacy',
+      name: 'LLM',
+      provider: requested !== undefined && isLlmProvider(requested) ? requested : 'custom',
+      model: llm.model ?? '',
+      baseUrl: llm.baseUrl ?? '',
+      apiKey: mergeKey('', llm.apiKey),
+      isDefault: true,
+    }]
+  }
+  return configs.map((config, configIndex) => {
+    if (configIndex !== index) return config
+    return {
+      ...config,
+      provider: llm.provider === undefined ? config.provider : (isLlmProvider(llm.provider) ? llm.provider : 'custom'),
+      model: llm.model ?? config.model,
+      baseUrl: llm.baseUrl ?? config.baseUrl,
+      apiKey: mergeKey(config.apiKey, llm.apiKey),
+    }
+  })
 }
