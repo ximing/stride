@@ -85,10 +85,13 @@ describe('pi-agent vault turn', () => {
       readNote: async (id) => {
         const loaded = await readNoteFile(files, `${id}.stride.json`, id)
         readText = plainText(loaded.doc)
-        return readText
+        return loaded
       },
-      searchVault: () => '',
-      writeNote: () => 'saved',
+      searchVault: async () => [],
+      writeSerialized: async () => {},
+      listNotes: async () => [],
+      createNote: async () => note,
+      loadNotes: async () => [note],
     })
 
     const settings = {

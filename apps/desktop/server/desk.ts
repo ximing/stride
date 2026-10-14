@@ -257,22 +257,24 @@ export class Desk {
       userText: message,
       tools: vaultTools({
         activeNoteId: activeId,
-        readNote: async (id) => plainText((await this.read(id)).doc),
+        readNote: (id) => this.read(id),
+        writeSerialized: async (id, serialized) => {
+          await this.vaultBackend().writeText(notePath(id), serialized)
+          this.notes = await loadNotes(this.vaultBackend())
+        },
         searchVault: async (query) => {
           const ranked = await this.search(query)
-          return ranked.hits.map((hit) => hit.id).join('\n')
+          return ranked.hits.map((hit) => ({
+            id: hit.id,
+            title: this.notes.find((note) => note.id === hit.id)?.title ?? hit.id,
+            snippet: 'snippet' in hit && typeof hit.snippet === 'string' ? hit.snippet : '',
+          }))
         },
-        writeNote: async (id, text) => {
-          const note = await this.read(id)
-          note.doc = {
-            type: 'doc',
-            content: [
-              ...(note.doc.content || []).filter((node) => node.type === 'heading'),
-              { type: 'paragraph', content: [{ type: 'text', text }] },
-            ],
-          }
-          await this.save(note)
-          return plainText(note.doc)
+        listNotes: async () => this.notes.map((note) => ({ id: note.id, title: note.title })),
+        createNote: (title) => this.create(title),
+        loadNotes: async () => {
+          this.notes = await loadNotes(this.vaultBackend())
+          return this.notes
         },
       }),
     })

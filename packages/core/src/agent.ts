@@ -1,6 +1,5 @@
 import { Agent, type AgentTool } from '@earendil-works/pi-agent-core'
 import {
-  Type,
   createModels,
   createProvider,
   type ApiKeyAuth,
@@ -8,6 +7,7 @@ import {
 } from '@earendil-works/pi-ai'
 import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completions.lazy'
 import type { LlmSettings } from './settings.ts'
+export { vaultTools, type VaultToolHost } from './vault-tools.ts'
 
 export interface ChatLine {
   role: 'user' | 'assistant'
@@ -45,68 +45,6 @@ export function chatModel(settings: LlmSettings): Model<'openai-completions'> {
     maxTokens: 4_096,
     compat: LOCAL_COMPAT,
   }
-}
-
-export interface VaultToolHost {
-  readNote: (id: string) => Promise<string> | string
-  searchVault: (query: string) => Promise<string> | string
-  writeNote: (id: string, text: string) => Promise<string> | string
-  activeNoteId?: string
-}
-
-function toolText(text: string, details: unknown = null) {
-  return { content: [{ type: 'text' as const, text }], details }
-}
-
-export function vaultTools(host: VaultToolHost): AgentTool[] {
-  const readNote: AgentTool = {
-    name: 'read_note',
-    label: 'Read note',
-    description: 'Read the plain text of a vault note by id.',
-    parameters: Type.Object({ id: Type.String({ minLength: 1 }) }),
-    execute: async (_toolCallId, params) => {
-      const record = params as { id: string }
-      const text = await host.readNote(record.id)
-      return toolText(text, { id: record.id, text })
-    },
-  }
-  const readActive: AgentTool = {
-    name: 'read_active_note',
-    label: 'Read active note',
-    description: 'Read the plain text of the note currently open in the vault.',
-    parameters: Type.Object({}),
-    execute: async () => {
-      if (!host.activeNoteId) throw new Error('No note is open')
-      const text = await host.readNote(host.activeNoteId)
-      return toolText(text, { id: host.activeNoteId, text })
-    },
-  }
-  const search: AgentTool = {
-    name: 'search_vault',
-    label: 'Search vault',
-    description: 'Search vault notes. Returns matching note ids.',
-    parameters: Type.Object({ query: Type.String({ minLength: 1 }) }),
-    execute: async (_toolCallId, params) => {
-      const record = params as { query: string }
-      const text = await host.searchVault(record.query)
-      return toolText(text, { query: record.query })
-    },
-  }
-  const write: AgentTool = {
-    name: 'write_note',
-    label: 'Write note',
-    description: 'Replace the body text of a note.',
-    parameters: Type.Object({
-      id: Type.String({ minLength: 1 }),
-      text: Type.String(),
-    }),
-    execute: async (_toolCallId, params) => {
-      const record = params as { id: string; text: string }
-      const text = await host.writeNote(record.id, record.text)
-      return toolText(text, { id: record.id })
-    },
-  }
-  return [readNote, readActive, search, write]
 }
 
 function textOf(content: unknown): string {
