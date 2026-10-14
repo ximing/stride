@@ -1,7 +1,7 @@
 import { has, register, resolve } from '@rabjs/react'
 import type { StrideNote } from '@stride/core'
 import { describe, expect, it } from 'vitest'
-import { chatVaultHost } from './chat-vault-host'
+import { chatSystemPrompt, chatVaultHost } from './chat-vault-host'
 import { VaultService } from './vault.service'
 
 const note: StrideNote = {
@@ -30,6 +30,27 @@ describe('chatVaultHost', () => {
       vault.notes = previousNotes
       vault.searchQuery = previousQuery
     }
+  })
+
+  it('puts the open note title in the system prompt and leaves keys out', () => {
+    const vault = {
+      active: note,
+      notes: [note],
+      currentVaultLabel: 'Field notes',
+    } as unknown as VaultService
+    const prompt = chatSystemPrompt(vault)
+    expect(prompt).toContain('Moss garden')
+    expect(prompt).toContain('ferns by the wall')
+    expect(prompt).not.toContain('apiKey')
+  })
+
+  it('says when no note is open', () => {
+    const vault = {
+      active: null,
+      notes: [],
+      currentVaultLabel: '',
+    } as unknown as VaultService
+    expect(chatSystemPrompt(vault)).toContain('No note is open')
   })
 
   it('refuses to create a note when no vault is open', async () => {

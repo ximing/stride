@@ -1,5 +1,27 @@
-import { loadNotes, notePath, type VaultToolHost } from '@stride/core'
+import { buildAgentContext, loadNotes, notePath, plainText, type VaultToolHost } from '@stride/core'
 import { VaultService } from './vault.service'
+
+export function chatSystemPrompt(vault: VaultService): string {
+  const active = vault.active
+  const snapshot = buildAgentContext({
+    activeNote: active
+      ? {
+          id: active.id,
+          title: active.title,
+          type: active.type,
+          properties: active.properties,
+          text: plainText(active.doc),
+        }
+      : null,
+    openTabs: active ? [{ id: active.id, title: active.title }] : [],
+    vault: {
+      label: vault.currentVaultLabel,
+      noteCount: vault.notes.length,
+      titles: vault.notes.map((note) => note.title),
+    },
+  })
+  return `${snapshot}\nYou are Stride, a local vault assistant.`
+}
 
 export function chatVaultHost(vault: VaultService): VaultToolHost {
   return {

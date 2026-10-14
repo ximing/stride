@@ -16,7 +16,7 @@ import {
   type PublicLlmConfig,
 } from '@stride/core'
 import { appendAssistantDelta, appendToolEnd, appendToolStart, playChatTurn, type ChatSession } from './chat-turn'
-import { chatVaultHost } from './chat-vault-host'
+import { chatSystemPrompt, chatVaultHost } from './chat-vault-host'
 import { browserGitBackend } from '@stride/git-web'
 import { MemoryFileSystem, type SecretsStore } from '@stride/platform'
 import { webSecretsStore } from '../../../../packages/secrets-web/src/index.ts'
@@ -173,7 +173,7 @@ export class ChatService extends Service {
       await playChatTurn({
         model: resolved.model,
         apiKey: resolved.apiKey,
-        systemPrompt: 'You are Stride, a local vault assistant.',
+        systemPrompt: chatSystemPrompt(this.resolve(VaultService)),
         prompt: text,
         tools: this.vaultTools(),
         signal: controller.signal,

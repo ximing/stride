@@ -87,7 +87,7 @@
 | T4.3 ✅ 2026-10-14 | Vault 工具集：read_note/read_active_note/search_vault(走 vane)/create_note/append_to_note/list_notes/get_backlinks；write_note 结构化合并不压平文档（修复现版缺陷）+ 写前快照可撤销 | T4.2, T0.5 | 工具单测 + write 往返测试 |
 | T4.4 ✅ 2026-10-14 | 流式对话 UI：text/thinking delta 流式渲染、Markdown 渲染、可中断、多会话 tab | T4.2 | 打字机效果 + abort 生效 |
 | T4.5 ✅ 2026-10-14 | 工具调用卡片：名称/参数摘要/结果摘要/耗时/错误态；思考块折叠 | T4.4 | 卡片与 inwit 体验对齐 |
-| T4.6 | 上下文快照：activeNote + openTabs + vault 概览结构化注入 system/context | T4.4 | 提问"当前笔记"类问题命中 |
+| T4.6 ✅ 2026-10-14 | 上下文快照：activeNote + openTabs + vault 概览结构化注入 system/context | T4.4 | 提问"当前笔记"类问题命中 |
 | T4.7 | 权限模式：每 vault Safe/Power 两档（Safe 只挂只读工具） | T4.3 | Safe 下无写工具 |
 | T4.8 | AI commit message（commit 对话框按 diff 生成） | T4.2, T6.4 | 生成可编辑草稿 |
 
