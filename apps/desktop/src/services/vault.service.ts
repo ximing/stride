@@ -163,7 +163,7 @@ export class VaultService extends Service {
   searchQuery = ''
   searchHits: { id: string; score: number }[] = []
   searchMode = ''
-  panel: 'properties' | 'git' | 'chat' | 'settings' = 'properties'
+  panel: 'properties' | 'toc' | 'git' | 'chat' | 'settings' = 'properties'
   docEpoch = 0
   renameFromHeading = true
   advanceInbox = true

@@ -400,6 +400,34 @@ textarea {
   border-radius: 8px;
 }
 
+.topbar button[aria-pressed='true'] {
+  border-color: var(--moss);
+  color: var(--moss);
+  background: color-mix(in srgb, var(--moss) 18%, var(--paper));
+}
+
+.toc-item {
+  display: block;
+  width: 100%;
+  margin: 0 0 0.2rem;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-color: transparent;
+  border-radius: 8px;
+  color: var(--ink);
+}
+
+.toc-item[data-level='1'] {
+  font-family: "Iowan Old Style", Palatino, Georgia, serif;
+}
+
+.toc-item[data-level='3'] {
+  padding-left: 1.6rem;
+  color: var(--muted);
+}
+
 .progress {
   flex: 1;
   height: 6px;

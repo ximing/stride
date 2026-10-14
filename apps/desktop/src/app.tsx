@@ -17,6 +17,7 @@ import { VaultService } from './services/vault.service'
 import { Mark } from './ui/icon'
 import { FolderTree } from './ui/folder-tree'
 import { PropertiesPanel } from './ui/properties-panel'
+import { TocPanel } from './ui/toc-panel'
 
 const TYPE_ICONS: Record<string, Icon> = {
   note: Note,
@@ -345,6 +346,14 @@ const Workspace = observer(function Workspace() {
           <button type="button" onClick={() => vault.clearSearch()}>Clear</button>
           <span className="search-mode" data-testid="search-mode">{vault.searchMode ? `Search mode ${vault.searchMode}` : ''}</span>
         </form>
+        <button
+          type="button"
+          data-testid="toc-toggle"
+          aria-pressed={vault.panel === 'toc'}
+          onClick={() => vault.setPanel('toc')}
+        >
+          大纲
+        </button>
         <button type="button" onClick={() => vault.setPanel('properties')}>Properties</button>
         <button type="button" onClick={() => vault.setPanel('git')}>Git</button>
         <button type="button" onClick={() => vault.setPanel('chat')}>Agent</button>
@@ -381,6 +390,7 @@ const Workspace = observer(function Workspace() {
         </main>
         <aside className="panel">
           {vault.panel === 'properties' && <PropertiesPanel />}
+          {vault.panel === 'toc' && <TocPanel />}
           {vault.panel === 'git' && <GitPanel />}
           {vault.panel === 'chat' && <ChatPanel />}
           {vault.panel === 'settings' && <SettingsPanel />}
