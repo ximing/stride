@@ -83,7 +83,7 @@
 | ID | 任务 | 依赖 | 验收 |
 |---|---|---|---|
 | T4.1 ✅ 2026-10-14 | LLM 配置层：provider 目录（openai-completions / anthropic）、多配置 + 默认、key 加密存储（参考 inwit `llm/pi.ts`） | T0.7 | 配置 → 连通性测试通过 |
-| T4.2 | Agent 内核：pi-agent-core 封装（参考 inwit `run-agent-job.ts`）：maxTurns、abort、事件订阅、token 用量记录 | T4.1 | 单测 mock streamFn 跑通 loop |
+| T4.2 ✅ 2026-10-14 | Agent 内核：pi-agent-core 封装（参考 inwit `run-agent-job.ts`）：maxTurns、abort、事件订阅、token 用量记录 | T4.1 | 单测 mock streamFn 跑通 loop |
 | T4.3 | Vault 工具集：read_note/read_active_note/search_vault(走 vane)/create_note/append_to_note/list_notes/get_backlinks；write_note 结构化合并不压平文档（修复现版缺陷）+ 写前快照可撤销 | T4.2, T0.5 | 工具单测 + write 往返测试 |
 | T4.4 | 流式对话 UI：text/thinking delta 流式渲染、Markdown 渲染、可中断、多会话 tab | T4.2 | 打字机效果 + abort 生效 |
 | T4.5 | 工具调用卡片：名称/参数摘要/结果摘要/耗时/错误态；思考块折叠 | T4.4 | 卡片与 inwit 体验对齐 |
