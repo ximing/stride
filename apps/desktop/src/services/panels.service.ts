@@ -13,7 +13,9 @@ import {
   gitPull,
   gitPush,
   gitResolveKeepingCheckpoint,
+  gitShow,
   gitStatus,
+  notePath,
   repoNameFromUrl,
   gitSurface,
   initGit,
@@ -31,6 +33,7 @@ import {
   writeSettings,
   type AppSettings,
   type GitChange,
+  type GitCommitInfo,
   type GitSurface,
   type LlmConfig,
   type PublicLlmConfig,
@@ -133,6 +136,10 @@ export class GitService extends Service {
   selected: string[] = []
   ahead = 0
   behind = 0
+  historyEntries: GitCommitInfo[] = []
+  historyText = ''
+  historyRev = ''
+  private historyPath = ''
   suggesting = false
   busy = false
   private busyCount = 0
@@ -728,6 +735,64 @@ export class GitService extends Service {
         this.busyCount = 0
         this.busy = false
       }
+    }
+  }
+
+  async loadHistory() {
+    const backend = await resolveGitBackend()
+    if (!backend.available) {
+      this.output = GIT_BROWSER
+      return
+    }
+    const fs = this.vault.fs
+    const id = this.vault.activeId
+    if (!fs || !id) return
+    try {
+      const path = notePath(id)
+      this.historyPath = path
+      this.historyEntries = await backend.history(fs.rootLabel, path)
+      this.historyText = ''
+      this.historyRev = ''
+    } catch (error) {
+      this.output = error instanceof Error ? error.message : String(error)
+    }
+  }
+
+  async showHistory(rev: string) {
+    const backend = await resolveGitBackend()
+    if (!backend.available) {
+      this.output = GIT_BROWSER
+      return
+    }
+    const fs = this.vault.fs
+    if (!fs || !this.historyPath) return
+    try {
+      this.historyText = await gitShow(fs, backend, rev, this.historyPath)
+      this.historyRev = rev
+      this.output = ''
+    } catch (error) {
+      this.output = error instanceof Error ? error.message : String(error)
+    }
+  }
+
+  async restoreHistory() {
+    const backend = await resolveGitBackend()
+    if (!backend.available) {
+      this.output = GIT_BROWSER
+      return
+    }
+    const fs = this.vault.fs
+    const id = this.vault.activeId
+    if (!fs || !id || !this.historyPath || !this.historyRev) return
+    if (this.historyPath !== notePath(id)) {
+      this.output = 'Open the note whose history you are restoring'
+      return
+    }
+    try {
+      await this.vault.restoreActiveNote(this.historyText)
+      this.output = ''
+    } catch (error) {
+      this.output = error instanceof Error ? error.message : String(error)
     }
   }
 

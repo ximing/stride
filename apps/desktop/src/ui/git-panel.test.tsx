@@ -40,6 +40,10 @@ function Harness(props: {
   error?: string
   conflicts?: readonly string[]
   onKeepSide?: (path: string, side: 'ours' | 'theirs') => void
+  historyEntries?: readonly { hash: string; subject: string }[]
+  historyText?: string
+  onShowHistory?: (rev: string) => void
+  onRestoreHistory?: () => void
 }) {
   const [selected, setSelected] = useState<string[]>([...(props.initialSelected ?? [])])
   const [message, setMessage] = useState('')
@@ -75,6 +79,10 @@ function Harness(props: {
       error={props.error}
       conflicts={props.conflicts}
       onKeepSide={props.onKeepSide}
+      historyEntries={props.historyEntries}
+      historyText={props.historyText}
+      onShowHistory={props.onShowHistory}
+      onRestoreHistory={props.onRestoreHistory}
     />
   )
 }
@@ -302,5 +310,31 @@ describe('GitPanelView', () => {
       ['notes/a.md', 'theirs'],
     ])
     expect(document.querySelectorAll('[data-testid="git-conflict"]')).toHaveLength(1)
+  })
+
+  it('opens a restore confirm and writes nothing until confirm', async () => {
+    const restored: string[] = []
+    const shown: string[] = []
+    await render(
+      <Harness
+        historyEntries={[{ hash: 'abc', subject: 'Add note' }]}
+        historyText="previous"
+        onShowHistory={(rev) => shown.push(rev)}
+        onRestoreHistory={() => restored.push('restore')}
+      />,
+    )
+    await act(async () => {
+      host?.querySelector<HTMLButtonElement>('[data-testid="git-history-row"]')?.click()
+    })
+    expect(shown).toEqual(['abc'])
+    await act(async () => {
+      host?.querySelector<HTMLButtonElement>('[data-testid="git-history-restore"]')?.click()
+    })
+    expect(restored).toEqual([])
+    expect(document.querySelector('[data-testid="git-history-restore-confirm"]')).not.toBeNull()
+    await act(async () => {
+      document.querySelector<HTMLButtonElement>('[data-testid="git-history-restore-confirm"]')?.click()
+    })
+    expect(restored).toEqual(['restore'])
   })
 })

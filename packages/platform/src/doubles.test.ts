@@ -20,6 +20,7 @@ describe('unavailableGit', () => {
       git.commit('repo', 'message', ['note.md']),
       git.history('repo'),
       git.history('repo', 'note.md'),
+      git.show('repo', 'abc', 'note.md'),
       git.currentBranch('repo'),
       git.aheadBehind('repo'),
       git.remoteUrl('repo'),

@@ -314,6 +314,11 @@ const GitPanel = observer(function GitPanel() {
       onAddRemote={() => { void git.addRemote() }}
       onPull={() => { void git.pull() }}
       onPush={() => { void git.push() }}
+      historyEntries={git.historyEntries}
+      historyText={git.historyText}
+      onLoadHistory={() => { void git.loadHistory() }}
+      onShowHistory={(rev) => { void git.showHistory(rev) }}
+      onRestoreHistory={() => { void git.restoreHistory() }}
       conflicts={git.conflicts}
       onKeepSide={(path, side) => { void git.keepSide(path, side) }}
       onCommitOpenChange={(open) => {

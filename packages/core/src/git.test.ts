@@ -10,6 +10,7 @@ import {
   gitPull,
   gitResolve,
   gitResolveKeepingCheckpoint,
+  gitShow,
   gitStatus,
   initGit,
   repoNameFromUrl,
@@ -38,6 +39,7 @@ function fakeGit(): GitBackend & { calls: string[] } {
       return Promise.resolve(message)
     },
     history: () => Promise.resolve([]),
+    show: () => Promise.resolve(''),
     currentBranch: () => Promise.resolve('main'),
     remoteUrl: () => Promise.resolve(null),
     addRemote: () => Promise.resolve(),
@@ -175,6 +177,23 @@ describe('gitPull', () => {
     }
     await expect(gitPull(files, git)).rejects.toThrow('Not a git repository')
     expect(pulls).toEqual([])
+  })
+})
+
+describe('gitShow', () => {
+  it('refuses a path escape and an empty revision before calling show', async () => {
+    const files = new MemoryFileSystem('/tmp/show')
+    const git = fakeGit()
+    const calls: string[] = []
+    git.show = (_repo, rev, relPath) => {
+      calls.push(`${rev} ${relPath}`)
+      return Promise.resolve('old text')
+    }
+    await expect(gitShow(files, git, 'abc', '..')).rejects.toThrow('Path escapes the vault')
+    await expect(gitShow(files, git, '  ', 'notes/a.md')).rejects.toThrow('Choose a revision')
+    expect(calls).toEqual([])
+    await expect(gitShow(files, git, 'abc', 'notes/a.md')).resolves.toBe('old text')
+    expect(calls).toEqual(['abc notes/a.md'])
   })
 })
 

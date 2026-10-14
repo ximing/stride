@@ -9,6 +9,7 @@ import {
   noteForSave,
   parseFiniteNumber,
   parseListInput,
+  parseNote,
   parsePropertyInput,
   plainText,
   type NoteProperty,
@@ -214,6 +215,7 @@ export class VaultService extends Service {
   private numberDrafts: Record<string, string> = {}
   private listDrafts: Record<string, string> = {}
   private saveGeneration = 0
+  private saveChain: Promise<void> = Promise.resolve()
   private registryReady = false
   private memoryRoot: MemoryFileSystem | null = null
   private readonly backends = new Map<string, FileSystemBackend>()
@@ -824,6 +826,30 @@ export class VaultService extends Service {
     this.saveStatus = 'idle'
   }
 
+  // File writes share one chain so a debounced save cannot land after a restore.
+  private enqueueWrite(job: () => Promise<void>): Promise<void> {
+    const run = this.saveChain.then(job, job)
+    this.saveChain = run.then(() => undefined, () => undefined)
+    return run
+  }
+
+  async restoreActiveNote(raw: string): Promise<void> {
+    const id = this.activeId
+    const fs = this.fs
+    if (!id || !fs) throw new Error('No active note')
+    const note = parseNote(raw, id)
+    const path = notePath(id)
+    this.cancelPending()
+    this.saveGeneration += 1
+    await this.enqueueWrite(async () => {
+      await fs.writeText(path, raw)
+    })
+    if (this.notes.some((item) => item.id === note.id)) this.replace(note)
+    else this.notes = [note, ...this.notes]
+    this.docEpoch += 1
+    await this.upsertIndexed(note)
+  }
+
   async flush(): Promise<void> {
     if (this.docTimer) {
       clearTimeout(this.docTimer)
@@ -838,36 +864,45 @@ export class VaultService extends Service {
       this.saveStatus = 'idle'
       return
     }
+    const fs = this.fs
     this.saveStatus = 'saving'
-    let saved: StrideNote
-    try {
-      saved = await saveNote(this.fs, noteForSave(note))
-    } catch (error) {
-      this.error = errorText(error)
+    await this.enqueueWrite(async () => {
       if (generation !== this.saveGeneration) {
-        this.saveStatus = this.pendingId ? 'pending' : 'error'
+        if (this.pendingId) this.saveStatus = 'pending'
+        else if (this.saveStatus === 'saving') this.saveStatus = 'idle'
         return
       }
-      this.pendingId = id
-      this.saveStatus = 'error'
-      const delay = this.retryDelay
-      this.docTimer = setTimeout(() => {
-        void this.flush()
-      }, delay)
-      this.retryDelay = Math.min(delay * 2, 8000)
-      return
-    }
-    // A newer edit landed while the file write was in flight.
-    if (generation !== this.saveGeneration) {
-      if (this.pendingId) this.saveStatus = 'pending'
-      return
-    }
-    this.pendingId = ''
-    this.retryDelay = 1000
-    this.saveStatus = 'saved'
-    this.error = ''
-    this.replace(saved)
-    await this.upsertIndexed(saved)
+      let saved: StrideNote
+      try {
+        saved = await saveNote(fs, noteForSave(note))
+      } catch (error) {
+        this.error = errorText(error)
+        if (generation !== this.saveGeneration) {
+          this.saveStatus = this.pendingId ? 'pending' : 'error'
+          return
+        }
+        this.pendingId = id
+        this.saveStatus = 'error'
+        const delay = this.retryDelay
+        this.docTimer = setTimeout(() => {
+          void this.flush()
+        }, delay)
+        this.retryDelay = Math.min(delay * 2, 8000)
+        return
+      }
+      // A newer edit landed while the file write was in flight.
+      if (generation !== this.saveGeneration) {
+        if (this.pendingId) this.saveStatus = 'pending'
+        else if (this.saveStatus === 'saving') this.saveStatus = 'idle'
+        return
+      }
+      this.pendingId = ''
+      this.retryDelay = 1000
+      this.saveStatus = 'saved'
+      this.error = ''
+      this.replace(saved)
+      await this.upsertIndexed(saved)
+    })
   }
 
   private get listFilterService() {

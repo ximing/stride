@@ -24,6 +24,11 @@ export function GitPanelView(props: {
   onAddRemote: () => void
   onPull: () => void
   onPush: () => void
+  historyEntries?: readonly { hash: string; subject: string }[]
+  historyText?: string
+  onLoadHistory?: () => void
+  onShowHistory?: (rev: string) => void
+  onRestoreHistory?: () => void
   browserNeedsInit?: boolean
   error?: string
   onCommitOpenChange?: (open: boolean) => void
@@ -31,6 +36,8 @@ export function GitPanelView(props: {
   onKeepSide?: (path: string, side: 'ours' | 'theirs') => void
 }) {
   const [commitOpen, setCommitOpen] = useState(false)
+  const [restoreOpen, setRestoreOpen] = useState(false)
+  const historyEntries = props.historyEntries ?? []
   const conflicts = props.conflicts ?? []
   const selected = props.selected
   const canOpen = selected.length > 0
@@ -99,6 +106,38 @@ export function GitPanelView(props: {
             ))
           )}
           <pre className="diff" data-testid="git-diff">{props.diff}</pre>
+          <div className="editor-tools">
+            <button type="button" data-testid="git-history" onClick={() => props.onLoadHistory?.()}>History</button>
+          </div>
+          {historyEntries.map((entry) => (
+            <button
+              key={entry.hash}
+              type="button"
+              data-testid="git-history-row"
+              data-hash={entry.hash}
+              onClick={() => props.onShowHistory?.(entry.hash)}
+            >
+              {entry.subject}
+            </button>
+          ))}
+          <pre data-testid="git-history-text">{props.historyText ?? ''}</pre>
+          <button type="button" data-testid="git-history-restore" onClick={() => setRestoreOpen(true)}>Restore</button>
+          <Modal open={restoreOpen} onOpenChange={setRestoreOpen}>
+            <ModalContent title="Restore version" description="Replace the current file with the shown revision. Nothing is committed.">
+              <div className="editor-tools">
+                <button
+                  type="button"
+                  data-testid="git-history-restore-confirm"
+                  onClick={() => {
+                    props.onRestoreHistory?.()
+                    setRestoreOpen(false)
+                  }}
+                >
+                  Restore
+                </button>
+              </div>
+            </ModalContent>
+          </Modal>
           <div className="editor-tools">
             <button
               type="button"

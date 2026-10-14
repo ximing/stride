@@ -178,6 +178,14 @@ describe('ShellGitBackend', () => {
     ])
   })
 
+  it('shows one file at a revision without checkout', async () => {
+    shell.handle(() => ok('previous note\n'))
+    await expect(git.show('/repo', 'abc123', 'notes/a.stride.json')).resolves.toBe('previous note\n')
+    expect(shell.calls.every((call) => call.program === 'git')).toBe(true)
+    expect(argLines()).toEqual([['show', 'abc123:notes/a.stride.json']])
+    expect(shell.calls.some((call) => call.args[0] === 'checkout' || call.args[0] === 'reset' || call.args[0] === 'clean' || call.args.includes('--force'))).toBe(false)
+  })
+
   it('reads a remote url with git and treats a missing remote as null', async () => {
     shell.handle((call) => {
       if (call.cwd === '/repo/missing') return fail(2, "fatal: No such remote 'origin'\n")

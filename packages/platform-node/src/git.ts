@@ -93,6 +93,11 @@ export class NodeGitBackend implements GitBackend {
     }
   }
 
+  async show(repo: string, rev: string, relPath: string): Promise<string> {
+    const { stdout } = await runGit(repo, ['show', `${rev}:${relPath}`])
+    return stdout
+  }
+
   async currentBranch(repo: string): Promise<string> {
     const { stdout } = await runGit(repo, ['rev-parse', '--abbrev-ref', 'HEAD'])
     return stdout.trim()

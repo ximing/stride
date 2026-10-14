@@ -5,6 +5,7 @@ import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { App, UpdateBanner } from '../app'
 import { DEDICATED_ERROR, VAULT_GITIGNORE } from '@stride/core'
+import { createNote, serializeNote } from '@stride/core/note'
 import { GitService, resetSecretsStore, setCloneDestForTests, setCloneParentForTests, setCommitMessageSuggestForTests, setGitBackendForTests, setSecretsStore, SETTINGS_STORAGE_KEY, SettingsService, UpdateService } from './panels.service'
 import { VaultService } from './vault.service'
 
@@ -650,6 +651,7 @@ describe('browser panels', () => {
       diff: () => Promise.resolve(''),
       commit: () => Promise.resolve(''),
       history: () => Promise.resolve([]),
+      show: () => Promise.resolve(''),
       currentBranch: () => Promise.resolve('main'),
       aheadBehind: () => Promise.resolve({ ahead: pushed ? 0 : 3, behind: 1 }),
       remoteUrl: () => Promise.resolve(null),
@@ -788,6 +790,49 @@ describe('browser panels', () => {
     expect(calls).toEqual([])
     expect(git.cloneError).toBe(DEDICATED_ERROR)
   })
+
+  it('writes a shown revision and does not commit it', async () => {
+    const commits: string[] = []
+    const current = serializeNote(createNote('a', 'Current'))
+    const previous = serializeNote(createNote('a', 'Previous'))
+    const backend = recordingGit([])
+    backend.history = () => Promise.resolve([{ hash: 'abc', subject: 'Add note' }])
+    backend.show = () => Promise.resolve(previous)
+    backend.commit = (_repo, message) => {
+      commits.push(message)
+      return Promise.resolve(message)
+    }
+    setGitBackendForTests(backend)
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const files = new MemoryFileSystem('/tmp/vault-history')
+    await files.writeText('a.stride.json', current)
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.notes = [createNote('a', 'Current')]
+    vault.activeId = 'a'
+    vault.updateDoc({
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'unsaved' }] }],
+    })
+    resolve(SettingsService).setGitEnabled(true)
+    const git = resolve(GitService)
+    await git.loadHistory()
+    await git.showHistory('abc')
+    expect(git.historyText).toBe(previous)
+    const epoch = vault.docEpoch
+    await git.restoreHistory()
+    await new Promise((resolveTimer) => setTimeout(resolveTimer, 500))
+    expect(await files.readText('a.stride.json')).toBe(previous)
+    expect(vault.active?.title).toBe('Previous')
+    expect(vault.docEpoch).toBe(epoch + 1)
+    expect(commits).toEqual([])
+    git.historyText = 'not json'
+    await git.restoreHistory()
+    expect(git.output).toMatch(/not TipTap JSON/)
+    expect(await files.readText('a.stride.json')).toBe(previous)
+  })
 })
 
 function setControlValue(element: HTMLInputElement, value: string) {
@@ -822,6 +867,7 @@ function recordingGit(calls: string[]): GitBackend {
       return Promise.resolve(message)
     },
     history: () => Promise.resolve([]),
+    show: () => Promise.resolve(''),
     currentBranch: () => Promise.resolve('main'),
     remoteUrl: () => Promise.resolve(null),
     addRemote: () => Promise.resolve(),
@@ -851,6 +897,7 @@ function twoFileGit(
       return Promise.resolve(message)
     },
     history: () => Promise.resolve([]),
+    show: () => Promise.resolve(''),
     currentBranch: () => Promise.resolve('main'),
     aheadBehind: () => Promise.resolve({ ahead: 1, behind: 0 }),
     remoteUrl: () => Promise.resolve(null),

@@ -146,6 +146,18 @@ export async function gitCommit(
   return git.commit(fs.rootLabel, trimmed)
 }
 
+export async function gitShow(
+  fs: FileSystemBackend,
+  git: GitBackend,
+  rev: string,
+  relPath: string,
+): Promise<string> {
+  const relative = vaultRelative(relPath)
+  const revision = rev.trim()
+  if (!revision) throw new Error('Choose a revision')
+  return git.show(fs.rootLabel, revision, relative)
+}
+
 export async function gitHistory(
   fs: FileSystemBackend,
   git: GitBackend,
