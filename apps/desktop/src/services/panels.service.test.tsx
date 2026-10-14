@@ -59,6 +59,7 @@ describe('browser panels', () => {
       git.suggesting = false
       git.diff = ''
       git.message = ''
+      git.conflicts = []
     }
   })
 
@@ -459,6 +460,104 @@ describe('browser panels', () => {
     expect(pulls).toEqual([])
     expect(commits).toEqual([])
     expect(git.output).toBe('Commit local changes before pulling')
+  })
+
+  it('records pull conflicts and clears them after a clean pull', async () => {
+    let treeClean = true
+    let conflictPull = true
+    const backend = recordingGit([])
+    backend.status = () => Promise.resolve({
+      repo: true,
+      porcelain: treeClean ? '' : 'UU notes/a.md\n',
+      clean: treeClean,
+    })
+    backend.pull = () => {
+      if (conflictPull) {
+        conflictPull = false
+        treeClean = false
+        return Promise.resolve({
+          conflict: true,
+          files: ['notes/a.md', 'notes/b.md'],
+          output: 'CONFLICT (content): Merge conflict in notes/a.md',
+        })
+      }
+      treeClean = true
+      return Promise.resolve({ conflict: false, files: [], output: '' })
+    }
+    setGitBackendForTests(backend)
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const files = new MemoryFileSystem('/tmp/vault-conflict-pull')
+    await files.mkdir('.git')
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.broad = false
+    vault.phase = 'chooser'
+    resolve(SettingsService).setGitEnabled(true)
+    const git = resolve(GitService)
+    await git.pull()
+    expect(git.conflicts).toEqual(['notes/a.md', 'notes/b.md'])
+    expect(git.output).toBe('CONFLICT (content): Merge conflict in notes/a.md')
+    treeClean = true
+    await git.pull()
+    expect(git.conflicts).toEqual([])
+    expect(git.output).toBe('')
+  })
+
+  it('checkpoints the conflicted text before resolve and refuses a .. path', async () => {
+    const marker = '<<<<<<< ours\nlocal\n=======\nremote\n>>>>>>> theirs\n'
+    const events: string[] = []
+    let pending = ['notes/a.md']
+    let sawCheckpoint = false
+    const files = new MemoryFileSystem('/tmp/vault-keep-side')
+    await files.mkdir('.git')
+    await files.writeText('notes/a.md', marker)
+    const backend = recordingGit(events)
+    backend.status = () => Promise.resolve({ repo: true, porcelain: '', clean: true })
+    backend.unmerged = () => Promise.resolve(pending)
+    backend.resolve = async () => {
+      expect(events.some((event) => event.startsWith('commit'))).toBe(false)
+      const entries = await files.list('.stride/conflict-checkpoints')
+      expect(entries).toHaveLength(1)
+      expect(await files.readText(`.stride/conflict-checkpoints/${entries[0]!.name}`)).toBe(marker)
+      sawCheckpoint = true
+      events.push('resolve')
+      pending = []
+      await files.writeText('notes/a.md', 'kept ours\n')
+    }
+    backend.commit = (_repo, message, paths) => {
+      events.push(`commit ${message} ${(paths ?? []).join(' ')}`)
+      return Promise.resolve(message)
+    }
+    setGitBackendForTests(backend)
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.broad = false
+    vault.phase = 'chooser'
+    resolve(SettingsService).setGitEnabled(true)
+    const git = resolve(GitService)
+    await git.keepSide('..', 'ours')
+    expect(events).toEqual([])
+    expect(sawCheckpoint).toBe(false)
+    expect(git.output).toMatch(/escapes the vault/)
+    expect(await files.stat('.stride/conflict-checkpoints')).toBeNull()
+    expect(await files.readText('notes/a.md')).toBe(marker)
+    await git.keepSide('notes/a.md', 'ours')
+    expect(sawCheckpoint).toBe(true)
+    const resolveAt = events.indexOf('resolve')
+    const commitAt = events.findIndex((event) => event.startsWith('commit Checkpoint conflicted file contents'))
+    expect(resolveAt).toBeGreaterThanOrEqual(0)
+    expect(commitAt).toBeGreaterThan(resolveAt)
+    expect(git.conflicts).toEqual([])
+    expect(git.output).toBe('')
+    const left = await files.list('.stride/conflict-checkpoints')
+    expect(left).toHaveLength(1)
+    expect(await files.readText(`.stride/conflict-checkpoints/${left[0]!.name}`)).toBe(marker)
+    expect(await files.readText('notes/a.md')).toBe('kept ours\n')
   })
 
   it('clears ahead after a successful push and reports an incompatible remote', async () => {

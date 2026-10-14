@@ -283,6 +283,8 @@ const GitPanel = observer(function GitPanel() {
       onAddRemote={() => { void git.addRemote() }}
       onPull={() => { void git.pull() }}
       onPush={() => { void git.push() }}
+      conflicts={git.conflicts}
+      onKeepSide={(path, side) => { void git.keepSide(path, side) }}
       onCommitOpenChange={(open) => {
         if (!open) git.abortSuggest()
       }}

@@ -27,8 +27,11 @@ export function GitPanelView(props: {
   browserNeedsInit?: boolean
   error?: string
   onCommitOpenChange?: (open: boolean) => void
+  conflicts?: readonly string[]
+  onKeepSide?: (path: string, side: 'ours' | 'theirs') => void
 }) {
   const [commitOpen, setCommitOpen] = useState(false)
+  const conflicts = props.conflicts ?? []
   const selected = props.selected
   const canOpen = selected.length > 0
   const canSuggest = canOpen && !props.suggesting
@@ -155,6 +158,42 @@ export function GitPanelView(props: {
           </Modal>
         </>
       )}
+      {conflicts.length > 0 ? (
+        <Modal
+          open
+          onOpenChange={() => {
+            // Dismiss is not a choice. The list stays until each file keeps a side.
+          }}
+        >
+          <ModalContent title="Resolve conflicts" description="Keep ours or theirs for each file.">
+            <div data-testid="git-conflict">
+              {conflicts.map((path) => (
+                <div key={path} className="field">
+                  <span>{path}</span>
+                  <div className="editor-tools">
+                    <button
+                      type="button"
+                      data-testid="git-keep-ours"
+                      data-path={path}
+                      onClick={() => props.onKeepSide?.(path, 'ours')}
+                    >
+                      Keep ours
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="git-keep-theirs"
+                      data-path={path}
+                      onClick={() => props.onKeepSide?.(path, 'theirs')}
+                    >
+                      Keep theirs
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ModalContent>
+        </Modal>
+      ) : null}
       {props.error ? <p className="error" data-testid="git-error">{props.error}</p> : null}
     </div>
   )

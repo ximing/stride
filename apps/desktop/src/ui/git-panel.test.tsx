@@ -38,6 +38,8 @@ function Harness(props: {
   onAddRemote?: (url: string) => void
   browserNeedsInit?: boolean
   error?: string
+  conflicts?: readonly string[]
+  onKeepSide?: (path: string, side: 'ours' | 'theirs') => void
 }) {
   const [selected, setSelected] = useState<string[]>([...(props.initialSelected ?? [])])
   const [message, setMessage] = useState('')
@@ -71,6 +73,8 @@ function Harness(props: {
       onPush={props.onPush ?? (() => {})}
       browserNeedsInit={props.browserNeedsInit}
       error={props.error}
+      conflicts={props.conflicts}
+      onKeepSide={props.onKeepSide}
     />
   )
 }
@@ -267,5 +271,36 @@ describe('GitPanelView', () => {
     await rerender(<Harness surface="blocked" branch="" notice="This folder is too broad." />)
     expect(host?.querySelector('[data-testid="git-blocked"]')?.textContent).toBe('This folder is too broad.')
     expect(host?.querySelector('[data-testid="git-change"]')).toBeNull()
+  })
+
+  it('shows a conflict modal and keeps a side without a second confirmation', async () => {
+    const kept: Array<[string, 'ours' | 'theirs']> = []
+    await render(<Harness conflicts={[]} />)
+    expect(document.querySelector('[data-testid="git-conflict"]')).toBeNull()
+
+    await rerender(
+      <Harness
+        conflicts={['notes/a.md', 'notes/b.md']}
+        onKeepSide={(path, side) => kept.push([path, side])}
+      />,
+    )
+    const modal = document.querySelector('[data-testid="git-conflict"]')
+    expect(modal).not.toBeNull()
+    expect(modal?.textContent).toContain('notes/a.md')
+    expect(modal?.textContent).toContain('notes/b.md')
+    expect(document.body.textContent?.toLowerCase()).not.toContain('discard all')
+    const ours = document.querySelector<HTMLButtonElement>('[data-testid="git-keep-ours"][data-path="notes/b.md"]')
+    const theirs = document.querySelector<HTMLButtonElement>('[data-testid="git-keep-theirs"][data-path="notes/a.md"]')
+    expect(ours).not.toBeNull()
+    expect(theirs).not.toBeNull()
+    await act(async () => {
+      ours?.click()
+      theirs?.click()
+    })
+    expect(kept).toEqual([
+      ['notes/b.md', 'ours'],
+      ['notes/a.md', 'theirs'],
+    ])
+    expect(document.querySelectorAll('[data-testid="git-conflict"]')).toHaveLength(1)
   })
 })

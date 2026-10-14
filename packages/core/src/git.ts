@@ -219,6 +219,41 @@ export async function gitResolve(
   await git.resolve(fs.rootLabel, relative, side)
 }
 
+const CONFLICT_CHECKPOINT_DIR = '.stride/conflict-checkpoints'
+
+// Checkpoint before checkout: a commit is refused while the index is unmerged.
+export async function gitResolveKeepingCheckpoint(
+  fs: FileSystemBackend,
+  git: GitBackend,
+  relPath: string,
+  side: 'ours' | 'theirs',
+): Promise<void> {
+  if (side !== 'ours' && side !== 'theirs') throw new Error('Choose ours or theirs')
+  const relative = vaultRelative(relPath)
+  await fs.mkdir(CONFLICT_CHECKPOINT_DIR)
+  const text = await fs.readText(relative)
+  const stamp = new Date().toISOString().replaceAll(':', '-').replaceAll('.', '-')
+  const checkpoint = `${CONFLICT_CHECKPOINT_DIR}/${stamp}-${relative.replaceAll('/', '_')}.txt`
+  await fs.writeText(checkpoint, text)
+  await git.resolve(fs.rootLabel, relative, side)
+  const still = await git.unmerged(fs.rootLabel)
+  if (still.length > 0) return
+  const entries = await fs.list(CONFLICT_CHECKPOINT_DIR)
+  const paths = entries
+    .filter((entry) => entry.kind === 'file')
+    .map((entry) => `${CONFLICT_CHECKPOINT_DIR}/${entry.name}`)
+  try {
+    await gitCommit(fs, git, 'Checkpoint conflicted file contents', paths)
+  } catch (error) {
+    const output = error instanceof GitError
+      ? error.output
+      : error instanceof Error
+        ? error.message
+        : String(error)
+    if (!isNothingToCommit(output)) throw error
+  }
+}
+
 export function repoNameFromUrl(url: string): string {
   const trimmed = url.trim().replace(/\/+$/, '')
   const slash = trimmed.lastIndexOf('/')

@@ -6,8 +6,10 @@ import {
   gitAddRemote,
   gitClone,
   gitCommit,
+  GitError,
   gitPull,
   gitResolve,
+  gitResolveKeepingCheckpoint,
   gitStatus,
   initGit,
   repoNameFromUrl,
@@ -366,6 +368,96 @@ describe('gitAddRemote', () => {
     git.sharesHistory = () => Promise.reject(new Error('merge-base failed'))
     await expect(gitAddRemote(files, git, 'https://example.test/new.git')).rejects.toThrow('network down')
     expect(calls).toEqual(['https://example.test/new.git', 'https://example.test/old.git'])
+  })
+})
+
+describe('gitResolveKeepingCheckpoint', () => {
+  const marker = '<<<<<<< ours\nlocal\n=======\nremote\n>>>>>>> theirs\n'
+
+  it('writes the pre-resolution text before resolve, then commits the checkpoint', async () => {
+    const files = new MemoryFileSystem('/tmp/conflict-vault')
+    await files.writeText('notes/a.md', marker)
+    const commits: Array<{ message: string; paths?: string[] }> = []
+    const git = fakeGit()
+    let sawCheckpoint = false
+    git.resolve = async () => {
+      expect(commits).toEqual([])
+      const entries = await files.list('.stride/conflict-checkpoints')
+      expect(entries).toHaveLength(1)
+      const name = entries[0]!.name
+      expect(name).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d+Z-notes_a\.md\.txt$/)
+      expect(await files.readText(`.stride/conflict-checkpoints/${name}`)).toBe(marker)
+      sawCheckpoint = true
+      await files.writeText('notes/a.md', 'kept ours\n')
+      git.calls.push('resolve')
+    }
+    git.commit = (_repo, message, paths) => {
+      commits.push({ message, paths: paths ? [...paths] : undefined })
+      return Promise.resolve(message)
+    }
+    git.unmerged = () => Promise.resolve([])
+    await gitResolveKeepingCheckpoint(files, git, 'notes/a.md', 'ours')
+    expect(sawCheckpoint).toBe(true)
+    expect(git.calls).toContain('resolve')
+    expect(commits).toHaveLength(1)
+    expect(commits[0]?.message).toBe('Checkpoint conflicted file contents')
+    expect(commits[0]?.paths?.[0]).toMatch(/^\.stride\/conflict-checkpoints\/\d{4}-\d{2}-\d{2}T\d{2}-\d{2}-\d{2}-\d+Z-notes_a\.md\.txt$/)
+    expect(await files.readText('notes/a.md')).toBe('kept ours\n')
+    const left = await files.list('.stride/conflict-checkpoints')
+    expect(left).toHaveLength(1)
+    expect(await files.readText(`.stride/conflict-checkpoints/${left[0]!.name}`)).toBe(marker)
+  })
+
+  it('throws on a .. path and does not write or resolve', async () => {
+    const files = new MemoryFileSystem('/tmp/conflict-escape')
+    await files.writeText('keep.txt', 'stay')
+    const git = fakeGit()
+    let resolved = 0
+    git.resolve = () => {
+      resolved += 1
+      return Promise.resolve()
+    }
+    await expect(gitResolveKeepingCheckpoint(files, git, '..', 'ours')).rejects.toThrow(/escapes the vault/)
+    expect(resolved).toBe(0)
+    expect(git.calls).toEqual([])
+    expect(await files.list('')).toEqual([{ name: 'keep.txt', kind: 'file' }])
+    expect(await files.readText('keep.txt')).toBe('stay')
+  })
+
+  it('leaves the checkpoint in place when files stay unmerged', async () => {
+    const files = new MemoryFileSystem('/tmp/conflict-partial')
+    await files.writeText('notes/a.md', marker)
+    const git = fakeGit()
+    const commits: string[] = []
+    git.commit = (_repo, message) => {
+      commits.push(message)
+      return Promise.resolve(message)
+    }
+    git.unmerged = () => Promise.resolve(['notes/b.md'])
+    await gitResolveKeepingCheckpoint(files, git, 'notes/a.md', 'theirs')
+    expect(git.calls).toContain('resolve')
+    expect(commits).toEqual([])
+    const left = await files.list('.stride/conflict-checkpoints')
+    expect(left).toHaveLength(1)
+    expect(await files.readText(`.stride/conflict-checkpoints/${left[0]!.name}`)).toBe(marker)
+  })
+
+  it('ignores nothing-to-commit and still keeps the checkpoint', async () => {
+    const files = new MemoryFileSystem('/tmp/conflict-empty-commit')
+    await files.writeText('notes/a.md', marker)
+    const git = fakeGit()
+    git.commit = () => Promise.reject(new GitError(1, 'nothing to commit, working tree clean'))
+    await expect(gitResolveKeepingCheckpoint(files, git, 'notes/a.md', 'ours')).resolves.toBeUndefined()
+    const left = await files.list('.stride/conflict-checkpoints')
+    expect(left).toHaveLength(1)
+    expect(await files.readText(`.stride/conflict-checkpoints/${left[0]!.name}`)).toBe(marker)
+
+    const locked = new MemoryFileSystem('/tmp/conflict-locked')
+    await locked.writeText('notes/a.md', marker)
+    const failing = fakeGit()
+    failing.commit = () => Promise.reject(new Error('index locked'))
+    await expect(gitResolveKeepingCheckpoint(locked, failing, 'notes/a.md', 'ours')).rejects.toThrow(/index locked/)
+    expect(await locked.list('.stride/conflict-checkpoints')).toHaveLength(1)
   })
 })
 

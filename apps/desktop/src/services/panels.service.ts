@@ -12,6 +12,7 @@ import {
   gitDiff,
   gitPull,
   gitPush,
+  gitResolveKeepingCheckpoint,
   gitStatus,
   repoNameFromUrl,
   gitSurface,
@@ -540,8 +541,14 @@ export class GitService extends Service {
     const fs = this.vault.fs
     if (!fs) return
     try {
-      await gitPull(fs, backend)
-      this.output = ''
+      const result = await gitPull(fs, backend)
+      if (result.conflict) {
+        this.conflicts = [...result.files]
+        this.output = result.output
+      } else {
+        this.conflicts = []
+        this.output = ''
+      }
       await this.refresh()
     } catch (error) {
       this.output = error instanceof Error ? error.message : String(error)
@@ -598,9 +605,23 @@ export class GitService extends Service {
     }
   }
 
-  async keepSide(_id: string, _side: 'ours' | 'theirs') {
+  async keepSide(path: string, side: 'ours' | 'theirs') {
     const backend = await resolveGitBackend()
-    if (!backend.available) this.output = GIT_BROWSER
+    if (!backend.available) {
+      this.output = GIT_BROWSER
+      return
+    }
+    const fs = this.vault.fs
+    if (!fs) return
+    try {
+      await gitResolveKeepingCheckpoint(fs, backend, path, side)
+      this.conflicts = await backend.unmerged(fs.rootLabel)
+      this.output = ''
+      await this.refresh()
+      await this.vault.reopenForSettings()
+    } catch (error) {
+      this.output = error instanceof Error ? error.message : String(error)
+    }
   }
 }
 
