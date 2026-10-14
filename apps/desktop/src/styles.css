@@ -775,3 +775,69 @@ textarea {
 .editor .ProseMirror .editor-code-overlay { position: absolute; inset: 0; pointer-events: none; margin: 0; }
 .editor .ProseMirror .editor-code select,
 .editor .ProseMirror .editor-code button { width: auto; }
+
+.quick-open-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding-top: 12vh;
+  background: rgba(28, 23, 18, 0.28);
+}
+
+.quick-open {
+  width: min(32rem, calc(100vw - 2rem));
+  max-height: min(28rem, calc(100vh - 8rem));
+  display: flex;
+  flex-direction: column;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(28, 23, 18, 0.18);
+  padding: 0.85rem;
+}
+
+.quick-open-title {
+  margin: 0 0 0.55rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.quick-open-input {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper-2);
+  color: var(--ink);
+  padding: 0.55rem 0.7rem;
+}
+
+.quick-open-list {
+  margin-top: 0.55rem;
+  overflow: auto;
+  max-height: 18rem;
+}
+
+.quick-open-result {
+  display: block;
+  width: 100%;
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  padding: 0.4rem 0.55rem;
+}
+
+.quick-open-result[aria-selected="true"],
+.quick-open-result:hover {
+  background: var(--paper-2);
+  border-color: var(--line);
+}
+
+.quick-open-empty {
+  margin: 0.75rem 0.15rem 0.2rem;
+  color: var(--muted);
+}

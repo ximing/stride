@@ -5,6 +5,7 @@ import { App } from './app'
 import { ChatService, GitService, SettingsService, UpdateService } from './services/panels.service'
 import { FolderService } from './services/folder.service'
 import { ListFilterService } from './services/list-filter.service'
+import { QuickOpenService } from './services/quick-open.service'
 import { VaultService } from './services/vault.service'
 import './styles.css'
 
@@ -22,6 +23,7 @@ if (showComponents) {
 } else {
   register(VaultService)
   register(ListFilterService)
+  register(QuickOpenService)
   register(FolderService)
   register(GitService)
   register(SettingsService)

@@ -17,6 +17,7 @@ import { VaultService } from './services/vault.service'
 import { Mark } from './ui/icon'
 import { FolderTree } from './ui/folder-tree'
 import { PropertiesPanel } from './ui/properties-panel'
+import { QuickOpen } from './ui/quick-open'
 import { TocPanel } from './ui/toc-panel'
 
 const TYPE_ICONS: Record<string, Icon> = {
@@ -416,6 +417,7 @@ const Workspace = observer(function Workspace() {
           {vault.panel === 'settings' && <SettingsPanel />}
         </aside>
       </div>
+      <QuickOpen />
     </div>
   )
 })
