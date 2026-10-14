@@ -1,10 +1,11 @@
 import type { TipTapNode } from '@stride/core/note'
-import { isArchived, stripLeadingH1 } from '@stride/core/note'
+import { isArchived, plainText, stripLeadingH1 } from '@stride/core/note'
 import { EditorContent, useEditor } from '@tiptap/react'
 import { useEffect, useMemo, useRef } from 'react'
 import { observer, useService } from '@rabjs/react'
 import { VaultService } from '../services/vault.service'
 import { createEditorExtensions } from './extensions'
+import { plainTextSelection } from './search-jump'
 import { EditorToolbar } from './toolbar'
 import { resolveWikilinkClick } from './wikilink'
 
@@ -57,6 +58,25 @@ export const NoteEditor = observer(function NoteEditor() {
     if (!editor || editor.isDestroyed) return
     editor.view.dispatch(editor.state.tr.setMeta('addToHistory', false))
   }, [editor, linkableKey])
+  useEffect(() => {
+    if (!editor) return
+    const onJump = (event: Event) => {
+      if (!(event instanceof CustomEvent)) return
+      const detail = event.detail as { offset?: unknown; length?: unknown } | null
+      if (!detail || typeof detail.offset !== 'number' || !Number.isFinite(detail.offset)) return
+      const length = typeof detail.length === 'number' && Number.isFinite(detail.length) ? detail.length : 0
+      const stored = plainText(vault.active?.doc ?? { type: 'doc' })
+      const range = plainTextSelection(editor.state.doc, stored, detail.offset, length)
+      if (!range || editor.isDestroyed) return
+      try {
+        editor.chain().focus().setTextSelection(range).scrollIntoView().run()
+      } catch {
+        return
+      }
+    }
+    window.addEventListener('stride-search-jump', onJump)
+    return () => window.removeEventListener('stride-search-jump', onJump)
+  }, [editor, vault])
 
   if (!note || !editor) return null
 

@@ -18,6 +18,7 @@ import { Mark } from './ui/icon'
 import { FolderTree } from './ui/folder-tree'
 import { PropertiesPanel } from './ui/properties-panel'
 import { QuickOpen } from './ui/quick-open'
+import { SearchPanel } from './ui/search-panel'
 import { TocPanel } from './ui/toc-panel'
 
 const TYPE_ICONS: Record<string, Icon> = {
@@ -418,6 +419,7 @@ const Workspace = observer(function Workspace() {
         </aside>
       </div>
       <QuickOpen />
+      <SearchPanel />
     </div>
   )
 })

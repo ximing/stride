@@ -6,6 +6,7 @@ import { ChatService, GitService, SettingsService, UpdateService } from './servi
 import { FolderService } from './services/folder.service'
 import { ListFilterService } from './services/list-filter.service'
 import { QuickOpenService } from './services/quick-open.service'
+import { SearchPanelService } from './services/search-panel.service'
 import { VaultService } from './services/vault.service'
 import './styles.css'
 
@@ -24,6 +25,7 @@ if (showComponents) {
   register(VaultService)
   register(ListFilterService)
   register(QuickOpenService)
+  register(SearchPanelService)
   register(FolderService)
   register(GitService)
   register(SettingsService)

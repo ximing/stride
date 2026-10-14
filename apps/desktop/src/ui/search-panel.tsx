@@ -1,0 +1,139 @@
+import { observer, useService } from '@rabjs/react'
+import { useEffect, useRef, type ReactNode } from 'react'
+import { isSearchPanelShortcut, SearchPanelService } from '../services/search-panel.service'
+import { VaultService } from '../services/vault.service'
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+function markQuery(snippet: string, query: string) {
+  const terms = [...new Set(query.trim().toLowerCase().split(/\s+/).filter((term) => term.length > 0))]
+    .sort((a, b) => b.length - a.length)
+  if (terms.length === 0 || snippet.length === 0) return snippet
+  const pattern = new RegExp(terms.map(escapeRegExp).join('|'), 'gi')
+  const nodes: ReactNode[] = []
+  let cursor = 0
+  for (const match of snippet.matchAll(pattern)) {
+    const start = match.index ?? 0
+    const text = match[0] ?? ''
+    if (!text) continue
+    if (start > cursor) nodes.push(snippet.slice(cursor, start))
+    nodes.push(<mark key={start}>{text}</mark>)
+    cursor = start + text.length
+  }
+  if (cursor < snippet.length) nodes.push(snippet.slice(cursor))
+  return nodes
+}
+
+export const SearchPanel = observer(function SearchPanel() {
+  const vault = useService(VaultService)
+  const service = useService(SearchPanelService)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const listRef = useRef<HTMLDivElement>(null)
+  const results = service.open ? service.results : []
+  const selectedIndex = results.length === 0 ? -1 : Math.min(service.selected, results.length - 1)
+  const selectedId = selectedIndex >= 0 ? results[selectedIndex]?.id ?? '' : ''
+  const titles = new Map(vault.notes.map((note) => [note.id, note.title]))
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (isSearchPanelShortcut(event)) {
+        event.preventDefault()
+        event.stopPropagation()
+        if (service.open) inputRef.current?.focus()
+        else service.show()
+        return
+      }
+      if (!service.open || event.isComposing) return
+      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+        event.preventDefault()
+        event.stopPropagation()
+        service.move(event.key === 'ArrowDown' ? 1 : -1)
+        return
+      }
+      if (event.key === 'Enter') {
+        event.preventDefault()
+        event.stopPropagation()
+        service.confirm()
+        return
+      }
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        event.stopPropagation()
+        service.close()
+      }
+    }
+    window.addEventListener('keydown', onKeyDown, true)
+    return () => window.removeEventListener('keydown', onKeyDown, true)
+  }, [service])
+
+  useEffect(() => {
+    if (!service.open) return
+    inputRef.current?.focus()
+  }, [service.open])
+
+  useEffect(() => {
+    if (!service.open || !selectedId) return
+    listRef.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.scrollIntoView?.({ block: 'nearest' })
+  }, [service.open, selectedId])
+
+  if (!service.open) return null
+
+  return (
+    <div
+      className="search-panel-backdrop"
+      onClick={(event) => {
+        if (event.target === event.currentTarget) service.close()
+      }}
+    >
+      <div
+        className="search-panel"
+        data-testid="search-panel"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="search-panel-title"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <h2 id="search-panel-title" className="search-panel-title">搜索</h2>
+        <input
+          ref={inputRef}
+          className="search-panel-input"
+          data-testid="search-panel-input"
+          placeholder="搜索笔记"
+          aria-label="搜索笔记"
+          autoFocus
+          autoComplete="off"
+          spellCheck={false}
+          value={service.query}
+          onChange={(event) => { void service.setQuery(event.target.value) }}
+        />
+        {results.length === 0 ? (
+          <p className="search-panel-empty">没有匹配的笔记</p>
+        ) : (
+          <div ref={listRef} className="search-panel-list" role="listbox" aria-label="搜索结果">
+            {results.map((hit, index) => (
+              <button
+                key={hit.id}
+                type="button"
+                className="search-panel-result"
+                data-testid="search-result"
+                data-note-id={hit.id}
+                role="option"
+                aria-selected={index === selectedIndex}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => service.choose(hit.id)}
+              >
+                <span className="search-panel-result-row">
+                  <span className="search-panel-note-title">{titles.get(hit.id) || hit.id}</span>
+                  <span className="search-panel-score">{hit.score}</span>
+                </span>
+                {hit.snippet ? <span className="search-panel-snippet">{markQuery(hit.snippet, service.query)}</span> : null}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+})

@@ -31,6 +31,7 @@ import {
 } from '@stride/platform'
 import { EmbeddingClient } from '../../../../packages/core/src/embeddings'
 import { noteIndex, noteRebuilder, searchNotes, type NoteIndex, type NoteRebuilder } from '../../../../packages/core/src/search'
+import { rankSearch } from '../../../../packages/core/src/search-rank'
 import { writeSampleNotes } from '../../../../packages/core/src/sample'
 import { initializeVault } from '../../../../packages/core/src/seed'
 import { compareTypeDocuments, isTypeVisible, nextTypeOrder, templateBody } from '../../../../packages/core/src/types'
@@ -738,6 +739,22 @@ export class VaultService extends Service {
     } catch (error) {
       this.error = errorText(error)
     }
+  }
+
+  // Title substring plus a text-only BM25 pass. Never embeds.
+  async queryRanked(text: string) {
+    const trimmed = text.trim()
+    if (!trimmed) return []
+    const notes = this.notes.filter((note) => !isArchived(note)).map((note) => ({
+      id: note.id,
+      title: note.title,
+      text: `${note.title}\n${plainText(note.doc)}`,
+    }))
+    const allowed = new Set(notes.map((note) => note.id))
+    const found = this.index
+      ? await this.index.search({ text: trimmed, topK: 30, mode: 'text' })
+      : []
+    return rankSearch(trimmed, notes, found.filter((hit) => allowed.has(hit.id)))
   }
 
   clearSearch() {

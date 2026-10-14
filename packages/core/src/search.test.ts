@@ -31,6 +31,7 @@ describe('search notes', () => {
     expect(client.calls).toBe(0)
     expect(english.mode).toBe('text')
     expect(english.hits.map((hit) => hit.id)).toEqual(['alpha'])
+    expect(english.hits[0]?.snippet).toContain('xylophonequartz')
     expect(index.lastQuery?.mode).toBe('text')
 
     const embedClient = new EmbeddingClient(async (_input, init) => {

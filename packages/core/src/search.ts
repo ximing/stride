@@ -5,6 +5,7 @@ import { EmbeddingClient } from './embeddings.ts'
 export interface SearchHit {
   id: string
   score: number
+  snippet?: string
 }
 
 export type { SearchQuery }
@@ -31,7 +32,7 @@ export function noteIndex(backend: SearchBackend, dim: number): NoteIndex {
     async search(query) {
       index.lastQuery = query
       const hits = await backend.search(query)
-      return hits.map((hit) => ({ id: hit.id, score: hit.score }))
+      return hits.map((hit) => ({ id: hit.id, score: hit.score, snippet: hit.snippet }))
     },
     close() {
       return backend.close()
