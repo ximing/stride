@@ -111,6 +111,14 @@ export interface EmbeddingRuntime {
   active: boolean
 }
 
+// What an index was actually opened with. Dim is 0 unless embedding is active.
+export interface IndexSignature {
+  endpoint: string
+  model: string
+  dim: number
+  active: boolean
+}
+
 type SecretsSource = SecretsStore | (() => Promise<SecretsStore> | SecretsStore)
 
 let secretsOverride: SecretsSource | null = null
@@ -145,6 +153,22 @@ function keyForTest(draft: string, stored: string): string {
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+function openedSignature(runtime: EmbeddingRuntime): IndexSignature {
+  return {
+    endpoint: runtime.endpoint,
+    model: runtime.model,
+    dim: runtime.active ? runtime.dim : 0,
+    active: runtime.active,
+  }
+}
+
+function sameIndexSignature(left: IndexSignature, right: IndexSignature): boolean {
+  return left.endpoint === right.endpoint
+    && left.model === right.model
+    && left.dim === right.dim
+    && left.active === right.active
 }
 
 async function settingsFile(): Promise<MemoryFileSystem> {
@@ -213,10 +237,9 @@ export class SettingsService extends Service {
   }
 
   async save() {
-    const before = this.embeddingRuntime()
     const secrets = await this.openSecrets()
     if (!secrets) return
-    let after = before
+    let after: EmbeddingRuntime
     try {
       const embeddingKey = resolveKey(this.embeddingKey, this.memoryEmbeddingKey)
       const llmKey = resolveKey(this.llmKey, this.memoryLlmKey)
@@ -270,7 +293,7 @@ export class SettingsService extends Service {
       this.notice = errorText(error)
       return
     }
-    await this.syncVault(before, after)
+    await this.syncVault(after)
   }
 
   async testEmbedding() {
@@ -348,10 +371,11 @@ export class SettingsService extends Service {
     }
   }
 
-  private async syncVault(before: EmbeddingRuntime, after: EmbeddingRuntime) {
+  private async syncVault(after: EmbeddingRuntime) {
     if (!has(VaultService)) return
     const vault = this.resolve(VaultService)
-    if (vault.phase === 'ready' && vault.fs && (before.dim !== after.dim || before.active !== after.active)) {
+    const next = openedSignature(after)
+    if (vault.phase === 'ready' && vault.fs && !sameIndexSignature(vault.indexSignature, next)) {
       await vault.reopenForSettings()
       return
     }

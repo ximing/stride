@@ -752,6 +752,7 @@ describe('VaultService', () => {
     expect(vault.indexPhase).toBe('ready')
     expect(vault.searchDegraded).toBe(false)
     expect(fetchMock).toHaveBeenCalled()
+    expect((vault as unknown as { index: NoteIndex }).index.dim).toBe(4)
 
     const index = (vault as unknown as { index: NoteIndex }).index
     const searches: SearchQuery[] = []
@@ -786,6 +787,7 @@ describe('VaultService', () => {
     expect(fetchMock).not.toHaveBeenCalled()
     expect(vault.indexPhase).toBe('ready')
     expect(vault.searchDegraded).toBe(true)
+    expect((vault as unknown as { index: NoteIndex }).index.dim).toBe(0)
     vault.searchQuery = 'zephyrword'
     await vault.runSearch()
     expect(vault.searchMode).toBe('text')
@@ -801,10 +803,79 @@ describe('VaultService', () => {
     }
     expect(vault.indexPhase).toBe('ready')
     expect(vault.searchDegraded).toBe(true)
+    expect((vault as unknown as { index: NoteIndex }).index.dim).toBe(4)
     vault.searchQuery = 'zephyrword'
     await vault.runSearch()
     expect(vault.searchMode).toBe('text')
     expect(vault.searchHits.some((hit) => hit.id === id)).toBe(true)
+    vault.cancelPending()
+  })
+
+  it('reopens the index when the saved embedding dim or model changes', async () => {
+    useMemoryFixture()
+    const picker = vi.fn()
+    vi.stubGlobal('showDirectoryPicker', picker)
+    setSecretsStore(new MemorySecretsStore())
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body ?? '{}')) as { input?: string[] }
+      const input = body.input ?? []
+      return new Response(JSON.stringify({
+        data: input.map((_text, index) => ({ index, embedding: [1, 0, 0, 0] })),
+      }), { status: 200, headers: { 'content-type': 'application/json' } })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    register(VaultService)
+    register(FolderService)
+    register(SettingsService)
+    const vault = resolve(VaultService)
+    const settings = resolve(SettingsService)
+    await vault.openFromDraft()
+    await vault.createNote()
+    vault.updateTitle('Field notes')
+    await vault.flush()
+    const opened = (vault as unknown as { index: NoteIndex }).index
+    expect(opened.dim).toBe(0)
+
+    await settings.save()
+    expect(picker).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect((vault as unknown as { index: NoteIndex }).index).toBe(opened)
+
+    settings.patchEmbedding({ endpoint: 'http://127.0.0.1/v1', model: 'fixture-embed' })
+    settings.setEmbeddingDim('4')
+    settings.embeddingKey = 'sk-stride-embed-test-key'
+    await settings.save()
+    for (let attempt = 0; attempt < 40 && vault.indexPhase === 'rebuilding'; attempt += 1) {
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, 0))
+    }
+    expect(vault.indexPhase).toBe('ready')
+    expect((vault as unknown as { index: NoteIndex }).index.dim).toBe(4)
+    const afterDim4 = fetchMock.mock.calls.length
+    expect(afterDim4).toBeGreaterThan(0)
+    expect(picker).not.toHaveBeenCalled()
+
+    settings.embeddingKey = settings.form.embedding.keyMask
+    settings.setEmbeddingDim('8')
+    await settings.save()
+    for (let attempt = 0; attempt < 40 && vault.indexPhase === 'rebuilding'; attempt += 1) {
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, 0))
+    }
+    expect(vault.indexPhase).toBe('ready')
+    expect((vault as unknown as { index: NoteIndex }).index.dim).toBe(8)
+    const afterDim8 = fetchMock.mock.calls.length
+    expect(afterDim8).toBeGreaterThan(afterDim4)
+    expect(picker).not.toHaveBeenCalled()
+
+    settings.embeddingKey = settings.form.embedding.keyMask
+    settings.patchEmbedding({ model: 'fixture-embed-2' })
+    await settings.save()
+    for (let attempt = 0; attempt < 40 && vault.indexPhase === 'rebuilding'; attempt += 1) {
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, 0))
+    }
+    expect(vault.indexPhase).toBe('ready')
+    expect((vault as unknown as { index: NoteIndex }).index.dim).toBe(8)
+    expect(fetchMock.mock.calls.length).toBeGreaterThan(afterDim8)
+    expect(picker).not.toHaveBeenCalled()
     vault.cancelPending()
   })
 

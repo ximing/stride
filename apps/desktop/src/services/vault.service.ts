@@ -32,7 +32,7 @@ import {
 import { EmbeddingClient } from '../../../../packages/core/src/embeddings'
 import { noteIndex, noteRebuilder, searchNotes, type NoteIndex, type NoteRebuilder, type SearchHit } from '../../../../packages/core/src/search'
 import { rankSearch } from '../../../../packages/core/src/search-rank'
-import type { EmbeddingRuntime } from './panels.service'
+import type { EmbeddingRuntime, IndexSignature } from './panels.service'
 import { writeSampleNotes } from '../../../../packages/core/src/sample'
 import { initializeVault } from '../../../../packages/core/src/seed'
 import { compareTypeDocuments, isTypeVisible, nextTypeOrder, templateBody } from '../../../../packages/core/src/types'
@@ -194,6 +194,8 @@ export class VaultService extends Service {
   fs: FileSystemBackend | null = null
   vaults: VaultRecord[] = []
   activeVaultId = ''
+  // Signature passed to the last successful opener.open. Save compares against this.
+  indexSignature: IndexSignature = { endpoint: '', model: '', dim: 0, active: false }
   private index: NoteIndex | null = null
   private rebuilder: NoteRebuilder | null = null
   private rebuildEpoch = 0
@@ -888,6 +890,7 @@ export class VaultService extends Service {
     await retiring?.close().catch(() => undefined)
     const opener = await this.searchOpener()
     const search = await opener.open({ vaultKey: backend.rootLabel, dim })
+    this.indexSignature = { endpoint: runtime.endpoint, model: runtime.model, dim, active: runtime.active }
     const index = noteIndex(search, dim)
     this.index = index
     this.rebuilder = noteRebuilder(index)
