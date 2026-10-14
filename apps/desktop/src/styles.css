@@ -588,22 +588,24 @@ textarea {
   padding-left: 0;
 }
 
-.editor .ProseMirror li[data-type='taskItem'] {
+.editor .ProseMirror ul[data-type='taskList'] > li {
   display: flex;
   align-items: flex-start;
   gap: 0.4rem;
   margin: 0.1rem 0;
 }
 
-.editor .ProseMirror li[data-type='taskItem'] > label {
+.editor .ProseMirror ul[data-type='taskList'] > li > label {
   display: flex;
   flex: none;
   margin-top: 0.35rem;
 }
 
-.editor .ProseMirror li[data-type='taskItem'] > label input[type='checkbox'] {
+.editor .ProseMirror ul[data-type='taskList'] > li > label > input[type='checkbox'] {
+  flex: none;
   width: 0.95rem;
   height: 0.95rem;
+  max-width: 0.95rem;
   margin: 0;
   padding: 0;
   border: 1px solid var(--muted);
@@ -613,12 +615,12 @@ textarea {
   cursor: pointer;
 }
 
-.editor .ProseMirror li[data-type='taskItem'] > div {
+.editor .ProseMirror ul[data-type='taskList'] > li > div {
   flex: 1;
   min-width: 0;
 }
 
-.editor .ProseMirror li[data-type='taskItem'] .task-list-block {
+.editor .ProseMirror ul[data-type='taskList'] > li .task-list-block {
   margin-top: 0.15rem;
 }
 
