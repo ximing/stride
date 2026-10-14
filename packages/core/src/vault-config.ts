@@ -52,3 +52,31 @@ export async function writeAdvanceInbox(fs: FileSystemBackend, enabled: boolean)
   const next = { ...(parsed as Record<string, unknown>), advanceInbox: enabled }
   await fs.writeText(VAULT_MARKER, `${JSON.stringify(next, null, 2)}\n`)
 }
+
+export type AgentMode = 'safe' | 'power'
+
+export async function readAgentMode(fs: FileSystemBackend): Promise<AgentMode> {
+  try {
+    const stat = await fs.stat(VAULT_MARKER)
+    if (!stat || stat.kind !== 'file') return 'safe'
+    const parsed = JSON.parse(await fs.readText(VAULT_MARKER)) as { agentMode?: unknown }
+    if (!parsed || typeof parsed !== 'object') return 'safe'
+    return parsed.agentMode === 'power' || parsed.agentMode === 'safe' ? parsed.agentMode : 'safe'
+  } catch {
+    return 'safe'
+  }
+}
+
+export async function writeAgentMode(fs: FileSystemBackend, mode: AgentMode): Promise<void> {
+  const stat = await fs.stat(VAULT_MARKER)
+  if (!stat || stat.kind !== 'file') return
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(await fs.readText(VAULT_MARKER))
+  } catch {
+    return
+  }
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return
+  const next = { ...(parsed as Record<string, unknown>), agentMode: mode }
+  await fs.writeText(VAULT_MARKER, `${JSON.stringify(next, null, 2)}\n`)
+}

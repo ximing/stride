@@ -249,6 +249,7 @@ const GitPanel = observer(function GitPanel() {
 
 const ChatPanel = observer(function ChatPanel() {
   const chat = useService(ChatService)
+  const vault = useService(VaultService)
   const session = chat.sessions.find((item) => item.id === chat.activeId) ?? chat.sessions[0]
   return (
     <div data-testid="chat-panel">
@@ -290,6 +291,10 @@ const ChatPanel = observer(function ChatPanel() {
       </div>
       {chat.error && <p className="error">{chat.error}</p>}
       <div className="chat-compose">
+        <div className="chat-mode">
+          <button type="button" data-testid="chat-mode-safe" aria-pressed={vault.agentMode === 'safe'} onClick={() => { void vault.setAgentMode('safe') }}>Safe</button>
+          <button type="button" data-testid="chat-mode-power" aria-pressed={vault.agentMode === 'power'} onClick={() => { void vault.setAgentMode('power') }}>Power</button>
+        </div>
         <textarea
           data-testid="chat-draft"
           value={chat.draft}

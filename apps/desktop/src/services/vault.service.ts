@@ -39,8 +39,10 @@ import { compareTypeDocuments, isTypeVisible, nextTypeOrder, templateBody } from
 import { recoverRename, rewriteVaultLinks } from '../../../../packages/core/src/rename-tx'
 import {
   readAdvanceInbox,
+  readAgentMode,
   readRenameFromHeading,
   writeAdvanceInbox,
+  writeAgentMode,
   writeRenameFromHeading,
 } from '../../../../packages/core/src/vault-config'
 import {
@@ -185,6 +187,7 @@ export class VaultService extends Service {
   panel: 'properties' | 'toc' | 'git' | 'chat' | 'settings' = 'properties'
   docEpoch = 0
   renameFromHeading = true
+  agentMode: 'safe' | 'power' = 'safe'
   advanceInbox = true
   propertyName = ''
   propertyType: PropertyKind = 'string'
@@ -519,6 +522,16 @@ export class VaultService extends Service {
     if (!this.fs) return
     try {
       await writeAdvanceInbox(this.fs, enabled)
+    } catch (error) {
+      this.error = errorText(error)
+    }
+  }
+
+  async setAgentMode(mode: 'safe' | 'power') {
+    this.agentMode = mode
+    if (!this.fs) return
+    try {
+      await writeAgentMode(this.fs, mode)
     } catch (error) {
       this.error = errorText(error)
     }
@@ -880,6 +893,7 @@ export class VaultService extends Service {
     const opened = await openVault(backend, HOME_DIR)
     const renameFromHeading = await readRenameFromHeading(backend)
     const advanceInbox = await readAdvanceInbox(backend)
+    const agentMode = await readAgentMode(backend)
     this.rebuildEpoch += 1
     const epoch = this.rebuildEpoch
     const retiring = this.index
@@ -907,6 +921,7 @@ export class VaultService extends Service {
     this.searchDegraded = runtime.intended && !runtime.active
     this.listFilterService.clear()
     this.renameFromHeading = renameFromHeading
+    this.agentMode = agentMode
     this.advanceInbox = advanceInbox
     this.resetPropertyEditor()
     const snapshot = opened.notes.map((note) => ({ id: note.id, text: indexText(note) }))

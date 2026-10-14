@@ -9,6 +9,7 @@ import {
   redactSecret,
   resolveLlm,
   testLlmConnection,
+  toolsForAgentMode,
   vaultTools,
   writeSettings,
   type AppSettings,
@@ -133,9 +134,9 @@ export class ChatService extends Service {
 
   private vaultTools() {
     const vault = this.resolve(VaultService)
-    const id = vault.activeVaultId || 'none'
+    const id = `${vault.activeVaultId || 'none'}:${vault.agentMode}`
     if (!this.vaultToolSet || this.vaultToolSet.id !== id) {
-      this.vaultToolSet = { id, tools: vaultTools(chatVaultHost(vault)) }
+      this.vaultToolSet = { id, tools: toolsForAgentMode(vaultTools(chatVaultHost(vault)), vault.agentMode) }
     }
     return this.vaultToolSet.tools
   }

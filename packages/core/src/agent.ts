@@ -7,7 +7,7 @@ import {
 } from '@earendil-works/pi-ai'
 import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completions.lazy'
 import type { LlmSettings } from './settings.ts'
-export { vaultTools, type VaultToolHost } from './vault-tools.ts'
+export { vaultTools, toolsForAgentMode, WRITE_VAULT_TOOLS, type VaultToolHost } from './vault-tools.ts'
 
 export interface ChatLine {
   role: 'user' | 'assistant'

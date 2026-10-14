@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import type { AgentTool } from '@earendil-works/pi-agent-core'
 import { createVaultNote, loadNotes, notePath, readNoteFile, saveNote } from './vault.ts'
 import { plainText, type StrideNote, type TipTapNode } from './note.ts'
-import { vaultTools, type VaultToolHost } from './vault-tools.ts'
+import { toolsForAgentMode, vaultTools, WRITE_VAULT_TOOLS, type VaultToolHost } from './vault-tools.ts'
 
 function text(value: string): TipTapNode {
   return { type: 'text', text: value }
@@ -159,5 +159,16 @@ describe('vault tools', () => {
     expect(listed).toContain('source')
     const created = await call(tools, 'create_note', { title: 'Fresh page' })
     expect(created).toContain('Fresh page')
+  })
+
+  it('drops write tools in safe mode and returns the same array in power mode', () => {
+    const fs = new MemoryFileSystem('/tmp/stride-vault-tools-mode')
+    const tools = vaultTools(memoryHost(fs))
+    const safe = toolsForAgentMode(tools, 'safe')
+    const names = safe.map((tool) => tool.name)
+    expect(names).toContain('search_vault')
+    expect(names).toContain('read_note')
+    for (const name of WRITE_VAULT_TOOLS) expect(names).not.toContain(name)
+    expect(toolsForAgentMode(tools, 'power')).toBe(tools)
   })
 })

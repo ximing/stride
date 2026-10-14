@@ -3,6 +3,14 @@ import { Type } from '@earendil-works/pi-ai'
 import { buildGraph, relationsOf } from './graph.ts'
 import { plainText, serializeNote, type StrideNote, type TipTapNode } from './note.ts'
 
+export const WRITE_VAULT_TOOLS = ['write_note', 'append_to_note', 'create_note', 'undo_note'] as const
+
+export function toolsForAgentMode(tools: AgentTool[], mode: 'safe' | 'power'): AgentTool[] {
+  if (mode === 'power') return tools
+  const blocked = new Set<string>(WRITE_VAULT_TOOLS)
+  return tools.filter((tool) => !blocked.has(tool.name))
+}
+
 export interface VaultToolHost {
   readNote(id: string): Promise<StrideNote> | StrideNote
   writeSerialized(id: string, serialized: string): Promise<void> | void

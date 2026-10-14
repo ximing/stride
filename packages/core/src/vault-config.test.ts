@@ -3,8 +3,10 @@ import { describe, expect, it } from 'vitest'
 import { markDedicatedVault } from './vault.ts'
 import {
   readAdvanceInbox,
+  readAgentMode,
   readRenameFromHeading,
   writeAdvanceInbox,
+  writeAgentMode,
   writeRenameFromHeading,
 } from './vault-config.ts'
 
@@ -46,5 +48,48 @@ describe('advanceInbox vault flag', () => {
     await writeAdvanceInbox(fs, true)
     expect(await readAdvanceInbox(fs)).toBe(true)
     expect(await readRenameFromHeading(fs)).toBe(false)
+  })
+})
+
+describe('agentMode vault flag', () => {
+  it('reads safe for a missing or broken marker and round-trips power then safe', async () => {
+    const missing = new MemoryFileSystem('missing-mode')
+    expect(await readAgentMode(missing)).toBe('safe')
+
+    const broken = new MemoryFileSystem('broken-mode')
+    await broken.writeText('.stride/vault.json', '{')
+    expect(await readAgentMode(broken)).toBe('safe')
+    await writeAgentMode(broken, 'power')
+    expect(await broken.readText('.stride/vault.json')).toBe('{')
+    expect(await readAgentMode(broken)).toBe('safe')
+
+    const fs = new MemoryFileSystem('field-notes-mode')
+    await markDedicatedVault(fs)
+    await writeRenameFromHeading(fs, false)
+    await writeAgentMode(fs, 'power')
+    const powered = JSON.parse(await fs.readText('.stride/vault.json')) as {
+      kind?: string
+      version?: number
+      renameFromHeading?: boolean
+      agentMode?: string
+    }
+    expect(powered.kind).toBe('stride-vault')
+    expect(powered.version).toBe(1)
+    expect(powered.renameFromHeading).toBe(false)
+    expect(powered.agentMode).toBe('power')
+    expect(await readAgentMode(fs)).toBe('power')
+
+    await writeAgentMode(fs, 'safe')
+    const restored = JSON.parse(await fs.readText('.stride/vault.json')) as {
+      kind?: string
+      version?: number
+      renameFromHeading?: boolean
+      agentMode?: string
+    }
+    expect(restored.kind).toBe('stride-vault')
+    expect(restored.version).toBe(1)
+    expect(restored.renameFromHeading).toBe(false)
+    expect(restored.agentMode).toBe('safe')
+    expect(await readAgentMode(fs)).toBe('safe')
   })
 })
