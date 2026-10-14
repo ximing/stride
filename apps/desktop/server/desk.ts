@@ -238,6 +238,7 @@ export class Desk {
       llmConfigs: applyLlmUpdate(current.llmConfigs, incoming.llm),
       releasesUrl: incoming.releasesUrl ?? current.releasesUrl,
       gitEnabled: current.gitEnabled,
+      autoSyncMinutes: current.autoSyncMinutes,
     }
     await writeSettings(this.configFs, this.settingsName, next, this.secrets)
     this.settings = next

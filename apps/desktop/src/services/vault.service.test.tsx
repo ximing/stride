@@ -54,6 +54,7 @@ describe('VaultService', () => {
         llmConfigs: [],
         releasesUrl: '',
         gitEnabled: true,
+        autoSyncMinutes: 0,
       }
       settings.setEmbeddingDim('4')
       settings.embeddingKey = ''

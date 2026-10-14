@@ -15,6 +15,7 @@ function resetSettingsMemory() {
     llmConfigs: [],
     releasesUrl: '',
     gitEnabled: true,
+    autoSyncMinutes: 0,
   }
   settings.setEmbeddingDim('4')
   settings.embeddingKey = ''
@@ -43,6 +44,7 @@ describe('browser panels', () => {
     setCommitMessageSuggestForTests(null)
     if (has(GitService)) {
       const git = resolve(GitService)
+      git.stopAutoSync()
       git.abortSuggest()
       git.cloneUrl = ''
       git.cloneError = ''
@@ -435,6 +437,83 @@ describe('browser panels', () => {
     expect(git.notice).toBe('Add a model provider, base URL, model, and key in Settings')
     expect(git.message).toBe('draft')
     expect(git.suggesting).toBe(false)
+  })
+
+  it('does not auto-sync when the interval is off or the tree is dirty', async () => {
+    const pulls: string[] = []
+    const backend = recordingGit([])
+    backend.pull = () => {
+      pulls.push('pull')
+      return Promise.resolve({ conflict: false, files: [], output: 'Fast-forward' })
+    }
+    setGitBackendForTests(backend)
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const files = new MemoryFileSystem('/tmp/vault-autosync-off')
+    await files.mkdir('.git')
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.phase = 'ready'
+    vault.broad = false
+    const settings = resolve(SettingsService)
+    settings.setGitEnabled(true)
+    settings.setAutoSyncMinutes(0)
+    const git = resolve(GitService)
+    git.surface = 'ready'
+    await git.autoSyncTick()
+    expect(pulls).toEqual([])
+    settings.setAutoSyncMinutes(1)
+    backend.status = () => Promise.resolve({ repo: true, porcelain: ' M a.md\n', clean: false })
+    await git.autoSyncTick()
+    expect(pulls).toEqual([])
+    expect(git.output).toBe('Commit local changes before pulling')
+  })
+
+  it('reloads after a fast-forward and skips reload when already up to date or in conflict', async () => {
+    const pulls: string[] = []
+    let output = 'Fast-forward\n notes/a.stride.json'
+    let conflict = false
+    const backend = recordingGit([])
+    backend.pull = () => {
+      pulls.push('pull')
+      return Promise.resolve({
+        conflict,
+        files: conflict ? ['notes/a.stride.json'] : [],
+        output,
+      })
+    }
+    setGitBackendForTests(backend)
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const files = new MemoryFileSystem('/tmp/vault-autosync-ff')
+    await files.mkdir('.git')
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.phase = 'ready'
+    vault.broad = false
+    let reopened = 0
+    vault.reopenForSettings = () => {
+      reopened += 1
+      return Promise.resolve()
+    }
+    resolve(SettingsService).setGitEnabled(true)
+    resolve(SettingsService).setAutoSyncMinutes(1)
+    const git = resolve(GitService)
+    git.surface = 'ready'
+    await git.autoSyncTick()
+    expect(pulls).toEqual(['pull'])
+    expect(reopened).toBe(1)
+    output = 'Already up to date.'
+    await git.autoSyncTick()
+    expect(pulls).toEqual(['pull', 'pull'])
+    expect(reopened).toBe(1)
+    output = 'CONFLICT (content): Merge conflict in notes/a.stride.json'
+    conflict = true
+    await git.autoSyncTick()
+    expect(reopened).toBe(1)
+    expect(git.conflicts).toEqual(['notes/a.stride.json'])
   })
 
   it('does not pull a dirty vault', async () => {

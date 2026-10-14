@@ -47,6 +47,7 @@ interface PublicSettings {
   llmConfigs: PublicLlmConfig[]
   releasesUrl: string
   gitEnabled: boolean
+  autoSyncMinutes: number
 }
 
 const emptySettings = (): PublicSettings => ({
@@ -54,6 +55,7 @@ const emptySettings = (): PublicSettings => ({
   llmConfigs: [],
   releasesUrl: '',
   gitEnabled: true,
+  autoSyncMinutes: 0,
 })
 
 const GIT_BROWSER = 'Git is not available in the browser'
@@ -134,6 +136,7 @@ export class GitService extends Service {
   suggesting = false
   busy = false
   private busyCount = 0
+  private autoSyncTimer: ReturnType<typeof setInterval> | null = null
   private diffPath = ''
   private suggestController: AbortController | null = null
   private suggestGeneration = 0
@@ -539,6 +542,67 @@ export class GitService extends Service {
       await this.vault.openClonedVault(new TauriFileSystem(dest))
     } catch (error) {
       this.cloneError = error instanceof Error ? error.message : String(error)
+    }
+  }
+
+  ensureAutoSync() {
+    this.stopAutoSync()
+    const minutes = this.settings.form.autoSyncMinutes
+    if (!(minutes > 0)) return
+    this.autoSyncTimer = setInterval(() => {
+      void this.autoSyncTick()
+    }, minutes * 60_000)
+  }
+
+  stopAutoSync() {
+    if (this.autoSyncTimer === null) return
+    clearInterval(this.autoSyncTimer)
+    this.autoSyncTimer = null
+  }
+
+  async autoSyncTick() {
+    const minutes = this.settings.form.autoSyncMinutes
+    if (!(minutes > 0)) return
+    if (this.busy) return
+    if (this.vault.phase !== 'ready') return
+    if (!this.gitEnabled()) return
+    if (this.surface !== 'ready') return
+    const backend = await resolveGitBackend()
+    if (!backend.available) return
+    const fs = this.vault.fs
+    if (!fs) return
+    this.busyCount += 1
+    this.busy = true
+    try {
+      try {
+        await this.vault.flush()
+      } catch (error) {
+        this.output = error instanceof Error ? error.message : String(error)
+        return
+      }
+      let result: Awaited<ReturnType<typeof gitPull>>
+      try {
+        result = await gitPull(fs, backend)
+      } catch (error) {
+        this.output = error instanceof Error ? error.message : String(error)
+        return
+      }
+      if (result.conflict) {
+        this.conflicts = [...result.files]
+        this.output = result.output
+        await this.refresh()
+        return
+      }
+      this.conflicts = []
+      this.output = ''
+      if (!/already up to date/i.test(result.output)) await this.vault.reopenForSettings()
+      await this.refresh()
+    } finally {
+      this.busyCount -= 1
+      if (this.busyCount <= 0) {
+        this.busyCount = 0
+        this.busy = false
+      }
     }
   }
 
@@ -974,6 +1038,11 @@ export class SettingsService extends Service {
     this.form = { ...this.form, gitEnabled: value }
   }
 
+  setAutoSyncMinutes(value: number) {
+    const minutes = typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : 0
+    this.form = { ...this.form, autoSyncMinutes: minutes }
+  }
+
   setEmbeddingDim(value: string) {
     this.embeddingDimText = value
     const parsed = parsePositiveInt(value)
@@ -1055,6 +1124,7 @@ export class SettingsService extends Service {
         llmConfigs,
         releasesUrl: this.form.releasesUrl,
         gitEnabled: this.form.gitEnabled,
+        autoSyncMinutes: this.form.autoSyncMinutes,
       }
       const fs = await settingsFile()
       await writeSettings(fs, SETTINGS_FILE, settings, secrets)
@@ -1088,6 +1158,7 @@ export class SettingsService extends Service {
         })),
         releasesUrl: settings.releasesUrl,
         gitEnabled: settings.gitEnabled,
+        autoSyncMinutes: settings.autoSyncMinutes,
       }
       this.notice = ''
       after = this.embeddingRuntime()
@@ -1183,6 +1254,7 @@ export class SettingsService extends Service {
         })),
         releasesUrl: settings.releasesUrl,
         gitEnabled: settings.gitEnabled,
+        autoSyncMinutes: settings.autoSyncMinutes,
       }
       this.notice = ''
     } catch (error) {

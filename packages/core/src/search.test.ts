@@ -124,6 +124,7 @@ describe('search notes', () => {
       llmConfigs: [{ id: 'c1', name: 'OpenAI', provider: 'openai', model: 'm', baseUrl: 'http://127.0.0.1/v1', apiKey: key, isDefault: true }],
       releasesUrl: '',
       gitEnabled: true,
+      autoSyncMinutes: 0,
     }
     await writeSettings(files, 'settings.json', settings, secrets)
     expect(await settingsContainRawKey(files, 'settings.json', key)).toBe(false)
@@ -142,6 +143,7 @@ describe('search notes', () => {
       llmConfigs: [],
       releasesUrl: '',
       gitEnabled: true,
+      autoSyncMinutes: 0,
     }, secrets)
     expect((await readSettings(files, 'zero-dim.json', secrets)).embedding.dim).toBe(0)
     expect(defaultSettingsPath('/Users/someone')).toBe('/Users/someone/.stride/settings.json')

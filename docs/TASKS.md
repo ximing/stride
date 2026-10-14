@@ -101,7 +101,7 @@
 | T5.4 ✅ 2026-10-15 | clone 为新 vault | T5.3 | clone URL → 打开 |
 | T5.5 ✅ 2026-10-15 | 冲突解决模态（按文件 ours/theirs） | T5.3 | 制造冲突可解决 |
 | T5.6 ✅ 2026-10-15 | 同步状态机 + 状态栏 badge/弹层 | T5.2 | 五态切换正确 |
-| T5.7 | AutoSync（可配间隔自动 pull + ff 后 reload） | T5.3 | 到点自动同步 |
+| T5.7 ✅ 2026-10-15 | AutoSync（可配间隔自动 pull + ff 后 reload） | T5.3 | 到点自动同步 |
 | T5.8 | 文件历史 + 历史版本查看/恢复 | T5.2 | 可回滚单笔记 |
 | T5.9 | AutoGit（空闲自动 checkpoint） | T5.7 | 阈值触发自动 commit |
 

@@ -493,6 +493,15 @@ const SettingsPanel = observer(function SettingsPanel() {
           onChange={(event) => settings.setGitEnabled(event.target.checked)}
         />
       </label>
+      <label className="field"><span>Auto sync (minutes)</span>
+        <input
+          type="number"
+          min={0}
+          data-testid="auto-sync-minutes"
+          value={settings.form.autoSyncMinutes}
+          onChange={(event) => settings.setAutoSyncMinutes(Number(event.target.value))}
+        />
+      </label>
       <div className="editor-tools">
         <button type="button" data-testid="settings-save" onClick={() => settings.save()}>Save settings</button>
         <button type="button" onClick={() => updates.check()}>Check for updates</button>
@@ -547,7 +556,9 @@ const Workspace = observer(function Workspace() {
   useEffect(() => {
     if (vault.phase !== 'ready') return
     void git.refresh()
-  }, [git, vault.phase, vault.fs, settings.form.gitEnabled])
+    git.ensureAutoSync()
+    return () => { git.stopAutoSync() }
+  }, [git, vault.phase, vault.fs, settings.form.gitEnabled, settings.form.autoSyncMinutes])
   return (
     <div className="shell" data-testid="vault-surface">
       <UpdateBanner />

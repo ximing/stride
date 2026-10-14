@@ -46,6 +46,7 @@ async function blankSettings(file: string, embedding?: AppSettings['embedding'])
     llmConfigs: [],
     releasesUrl: '',
     gitEnabled: true,
+    autoSyncMinutes: 0,
   }, secrets)
 }
 
@@ -254,6 +255,7 @@ describe('Desk vault paths', () => {
         llmConfigs: [],
         releasesUrl: `http://127.0.0.1:${address.port}/releases`,
         gitEnabled: true,
+        autoSyncMinutes: 0,
       }, secrets)
       fs.writeFileSync(marker, `${APP_VERSION}\n`)
       const handoffs: string[] = []
@@ -345,6 +347,7 @@ async function openUpdateDesk(root: string, releasesUrl: string, handoff: () => 
     llmConfigs: [],
     releasesUrl,
     gitEnabled: true,
+    autoSyncMinutes: 0,
   }, secrets)
   fs.writeFileSync(marker, `${APP_VERSION}\n`)
   const desk = new Desk(settings, { handoff })

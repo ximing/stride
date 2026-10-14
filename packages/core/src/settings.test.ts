@@ -67,6 +67,7 @@ describe('llm settings', () => {
       ],
       releasesUrl: '',
       gitEnabled: true,
+      autoSyncMinutes: 0,
     }, secrets)
     const text = await files.readText('two.json')
     expect(text.includes(keyA)).toBe(false)
@@ -98,5 +99,11 @@ describe('llm settings', () => {
 
     await files.writeText('other.json', JSON.stringify({ gitEnabled: 'false' }))
     expect((await readSettings(files, 'other.json', secrets)).gitEnabled).toBe(true)
+    expect(missing.autoSyncMinutes).toBe(0)
+    expect(defaultSettings().autoSyncMinutes).toBe(0)
+    await files.writeText('bad-interval.json', JSON.stringify({ autoSyncMinutes: '5' }))
+    expect((await readSettings(files, 'bad-interval.json', secrets)).autoSyncMinutes).toBe(0)
+    await writeSettings(files, 'five.json', { ...defaultSettings(), autoSyncMinutes: 5 }, secrets)
+    expect((await readSettings(files, 'five.json', secrets)).autoSyncMinutes).toBe(5)
   })
 })

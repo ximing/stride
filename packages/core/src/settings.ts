@@ -21,6 +21,7 @@ export interface AppSettings {
   llmConfigs: LlmConfig[]
   releasesUrl: string
   gitEnabled: boolean
+  autoSyncMinutes: number
 }
 
 interface SealedLlmConfig {
@@ -39,6 +40,7 @@ interface SealedSettings {
   llmConfigs: SealedLlmConfig[]
   releasesUrl: string
   gitEnabled: boolean
+  autoSyncMinutes: number
 }
 
 interface ParsedLlmConfig {
@@ -58,6 +60,7 @@ interface ParsedSettings {
   llm?: { provider?: string; model?: string; baseUrl?: string; keySeal?: string; keyMask?: string }
   releasesUrl?: string
   gitEnabled?: unknown
+  autoSyncMinutes?: unknown
 }
 
 export interface PublicLlmConfig {
@@ -70,12 +73,18 @@ export interface PublicLlmConfig {
   isDefault: boolean
 }
 
+export function normalizeAutoSyncMinutes(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return 0
+  return value
+}
+
 export function defaultSettings(): AppSettings {
   return {
     embedding: { endpoint: '', model: '', apiKey: '', dim: 4 },
     llmConfigs: [],
     releasesUrl: '',
     gitEnabled: true,
+    autoSyncMinutes: 0,
   }
 }
 
@@ -171,6 +180,7 @@ async function sealAll(secrets: SecretsStore, settings: AppSettings): Promise<Se
     }))),
     releasesUrl: settings.releasesUrl,
     gitEnabled: settings.gitEnabled !== false,
+    autoSyncMinutes: normalizeAutoSyncMinutes(settings.autoSyncMinutes),
   }
 }
 
@@ -179,6 +189,7 @@ export function publicSettings(settings: AppSettings): {
   llmConfigs: PublicLlmConfig[]
   releasesUrl: string
   gitEnabled: boolean
+  autoSyncMinutes: number
 } {
   return {
     embedding: {
@@ -198,6 +209,7 @@ export function publicSettings(settings: AppSettings): {
     })),
     releasesUrl: settings.releasesUrl,
     gitEnabled: settings.gitEnabled !== false,
+    autoSyncMinutes: normalizeAutoSyncMinutes(settings.autoSyncMinutes),
   }
 }
 
@@ -234,6 +246,7 @@ export async function readSettings(
     llmConfigs: await openLlmConfigs(parsed, secrets),
     releasesUrl: parsed.releasesUrl ?? '',
     gitEnabled: parsed.gitEnabled !== false,
+    autoSyncMinutes: normalizeAutoSyncMinutes(parsed.autoSyncMinutes),
   }
 }
 
