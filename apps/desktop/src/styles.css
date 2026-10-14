@@ -532,3 +532,58 @@ textarea {
   color: var(--moss);
   text-decoration: underline;
 }
+
+.editor .ProseMirror .task-list-block {
+  margin: 0.2rem 0 0.45rem;
+}
+
+.editor .ProseMirror .task-progress {
+  display: block;
+  margin-bottom: 0.15rem;
+  font-family: "Avenir Next", "Segoe UI", sans-serif;
+  font-size: 0.75rem;
+  line-height: 1.2;
+  color: var(--muted);
+  user-select: none;
+  pointer-events: none;
+}
+
+.editor .ProseMirror ul[data-type='taskList'] {
+  list-style: none;
+  margin: 0;
+  padding-left: 0;
+}
+
+.editor .ProseMirror li[data-type='taskItem'] {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin: 0.1rem 0;
+}
+
+.editor .ProseMirror li[data-type='taskItem'] > label {
+  display: flex;
+  flex: none;
+  margin-top: 0.35rem;
+}
+
+.editor .ProseMirror li[data-type='taskItem'] > label input[type='checkbox'] {
+  width: 0.95rem;
+  height: 0.95rem;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--muted);
+  border-radius: 2px;
+  accent-color: var(--moss);
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.editor .ProseMirror li[data-type='taskItem'] > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.editor .ProseMirror li[data-type='taskItem'] .task-list-block {
+  margin-top: 0.15rem;
+}

@@ -3,6 +3,7 @@ import Highlight from '@tiptap/extension-highlight'
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import StarterKit from '@tiptap/starter-kit'
+import { createTaskExtensions } from './task'
 
 export type FormatName =
   | 'bold'
@@ -11,6 +12,7 @@ export type FormatName =
   | 'h3'
   | 'bullet'
   | 'ordered'
+  | 'task'
   | 'quote'
   | 'strike'
   | 'code'
@@ -61,6 +63,7 @@ export function createEditorExtensions(options: { onModK: () => boolean }) {
     createWikilink(),
     linkKeymap,
     Placeholder.configure({ placeholder: 'Write in the vault…' }),
+    ...createTaskExtensions(),
   ]
 }
 
@@ -78,6 +81,8 @@ export function runFormat(editor: Editor, name: FormatName): boolean {
       return editor.commands.toggleBulletList()
     case 'ordered':
       return editor.commands.toggleOrderedList()
+    case 'task':
+      return editor.commands.toggleTaskList()
     case 'quote':
       return editor.commands.toggleBlockquote()
     case 'strike':

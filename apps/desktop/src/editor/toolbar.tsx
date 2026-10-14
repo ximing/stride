@@ -1,6 +1,7 @@
 import type { Editor } from '@tiptap/core'
 import type { Icon } from '@phosphor-icons/react'
 import {
+  CheckSquare,
   Code,
   CodeBlock,
   Highlighter,
@@ -28,6 +29,7 @@ type ActiveKey =
   | 'h3'
   | 'bullet'
   | 'ordered'
+  | 'task'
   | 'quote'
   | 'link'
   | 'highlight'
@@ -54,6 +56,7 @@ const IDLE: ActiveState = {
   h3: false,
   bullet: false,
   ordered: false,
+  task: false,
   quote: false,
   link: false,
   highlight: false,
@@ -70,6 +73,7 @@ export const editorTools: ToolSpec[] = [
   { id: 'h3', label: 'H3 ⌘⌥3', icon: TextHThree, bubble: true, active: 'h3', format: 'h3' },
   { id: 'bullet', label: '无序列表 ⌘⇧8', icon: ListBullets, bubble: true, active: 'bullet', format: 'bullet' },
   { id: 'ordered', label: '有序列表 ⌘⇧7', icon: ListNumbers, bubble: true, active: 'ordered', format: 'ordered' },
+  { id: 'task', label: '任务列表', icon: CheckSquare, bubble: false, active: 'task', format: 'task' },
   { id: 'quote', label: '引用 ⌘⇧B', icon: Quotes, bubble: true, active: 'quote', format: 'quote' },
   { id: 'link', label: '链接 ⌘K', icon: LinkIcon, bubble: true, active: 'link' },
   { id: 'highlight', label: '高亮 ⌘⇧H', icon: Highlighter, bubble: true, active: 'highlight', format: 'highlight' },
@@ -136,6 +140,7 @@ export function EditorToolbar({
         h3: current.isActive('heading', { level: 3 }),
         bullet: current.isActive('bulletList'),
         ordered: current.isActive('orderedList'),
+        task: current.isActive('taskList'),
         quote: current.isActive('blockquote'),
         link: current.isActive('link'),
         highlight: current.isActive('highlight'),
