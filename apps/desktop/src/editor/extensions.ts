@@ -4,6 +4,7 @@ import Highlight from '@tiptap/extension-highlight'
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import StarterKit from '@tiptap/starter-kit'
+import { codeBlockExtension } from './codeblock'
 import { calloutNode, calloutSlashCommand, highlightInputExtension } from './callout'
 import { createImageExtension, imageSlashCommand } from './image'
 import { registerSlashCommand, slashMenu } from './slash'
@@ -52,7 +53,7 @@ export function createEditorExtensions(options: {
   const onOpen = options.onOpen ?? (() => {})
 
   return [
-    StarterKit.configure({ link: false }),
+    StarterKit.configure({ link: false, codeBlock: false }),
     Link.configure({
       openOnClick: false,
       autolink: false,
@@ -70,6 +71,7 @@ export function createEditorExtensions(options: {
     calloutNode,
     highlightInputExtension,
     createImageExtension({ getFs: options.getFs ?? (() => null) }),
+    codeBlockExtension,
   ]
 }
 

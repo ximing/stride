@@ -745,3 +745,9 @@ textarea {
 
 .save-status { color: var(--muted); font-size: 0.75rem; margin-left: 0.6rem; }
 .save-status.is-error { color: #a33; }
+
+.editor .ProseMirror .editor-code { position: relative; margin: 0.4rem 0; }
+.editor .ProseMirror .editor-code pre { margin: 0; font-family: ui-monospace, monospace; white-space: pre; }
+.editor .ProseMirror .editor-code-overlay { position: absolute; inset: 0; pointer-events: none; margin: 0; }
+.editor .ProseMirror .editor-code select,
+.editor .ProseMirror .editor-code button { width: auto; }
