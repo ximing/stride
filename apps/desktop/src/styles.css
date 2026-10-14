@@ -700,3 +700,45 @@ textarea {
 .editor .ProseMirror .callout-block[data-kind="tip"] {
   border-color: var(--moss);
 }
+
+.editor .ProseMirror .editor-image {
+  margin: 0.4rem 0;
+}
+
+.editor .ProseMirror img {
+  max-width: 100%;
+}
+
+.editor .ProseMirror .editor-image-pick {
+  color: var(--ink);
+  background: var(--paper);
+  border: 1px dashed var(--line);
+  border-radius: 0.4rem;
+  padding: 0.4rem 0.7rem;
+  cursor: pointer;
+  width: auto;
+}
+
+.editor .ProseMirror .editor-image-pick:not([hidden]):hover {
+  color: var(--moss);
+  border-color: var(--moss);
+}
+
+.editor .ProseMirror .editor-image input[type='file'] {
+  display: none;
+}
+
+.image-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.72);
+}
+
+.image-lightbox img {
+  max-width: 90vw;
+  max-height: 90vh;
+}

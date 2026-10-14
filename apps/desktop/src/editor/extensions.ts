@@ -1,9 +1,11 @@
+import type { FileSystemBackend } from '@stride/platform'
 import { Extension, type Editor } from '@tiptap/core'
 import Highlight from '@tiptap/extension-highlight'
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import StarterKit from '@tiptap/starter-kit'
 import { calloutNode, calloutSlashCommand, highlightInputExtension } from './callout'
+import { createImageExtension, imageSlashCommand } from './image'
 import { registerSlashCommand, slashMenu } from './slash'
 import { tableExtensions, tableSlashCommand } from './table'
 import { createTaskExtensions, taskSlashCommand } from './task'
@@ -12,6 +14,7 @@ import { createWikilinkNode, createWikilinkSuggestionExtension } from './wikilin
 registerSlashCommand(taskSlashCommand)
 registerSlashCommand(tableSlashCommand)
 registerSlashCommand(calloutSlashCommand)
+registerSlashCommand(imageSlashCommand)
 
 export type FormatName =
   | 'bold'
@@ -32,6 +35,7 @@ export function createEditorExtensions(options: {
   onModK: () => boolean
   getNotes?: () => { id: string; title: string }[]
   onOpen?: (target: string) => void
+  getFs?: () => FileSystemBackend | null
 }) {
   // StarterKit already registers Link. A second copy clashes on the name.
   // trailingNode stays on.
@@ -65,6 +69,7 @@ export function createEditorExtensions(options: {
     ...tableExtensions(),
     calloutNode,
     highlightInputExtension,
+    createImageExtension({ getFs: options.getFs ?? (() => null) }),
   ]
 }
 

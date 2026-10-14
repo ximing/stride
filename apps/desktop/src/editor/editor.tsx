@@ -17,6 +17,8 @@ export const NoteEditor = observer(function NoteEditor() {
   const openLinkRef = useRef<() => boolean>(() => true)
   const getNotesRef = useRef<() => { id: string; title: string }[]>(() => [])
   const onOpenRef = useRef<(target: string) => void>(() => {})
+  const fsRef = useRef(vault.fs)
+  fsRef.current = vault.fs
   getNotesRef.current = () => notes
     .filter((item) => item.type !== 'Type' && !isArchived(item))
     .map((item) => ({ id: item.id, title: item.title }))
@@ -30,6 +32,7 @@ export const NoteEditor = observer(function NoteEditor() {
       onModK: () => openLinkRef.current(),
       getNotes: () => getNotesRef.current(),
       onOpen: (target) => onOpenRef.current(target),
+      getFs: () => fsRef.current,
     }),
     [],
   )
