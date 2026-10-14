@@ -279,8 +279,8 @@ importers:
         specifier: 2026.8.0
         version: 2026.8.0
       '@vane-rs/web':
-        specifier: file:/Users/ximing/project/mygithub/vane/bindings/web/vane-rs-web-0.4.2.tgz
-        version: file:../vane/bindings/web/vane-rs-web-0.4.2.tgz
+        specifier: file:/Users/ximing/project/mygithub/vane/bindings/web/vane-rs-web-0.4.3.tgz
+        version: file:../vane/bindings/web/vane-rs-web-0.4.3.tgz
     devDependencies:
       typescript:
         specifier: ^5.8.2
@@ -1821,9 +1821,9 @@ packages:
   '@vane-rs/node@0.4.1':
     resolution: {integrity: sha512-0rKpNHG1yriaMWy2ge71vKMkiMmkL8jUNNV2c2Fx28qIeRmXd8VgkBINynoUNP7oXiUqLLwMrF3cgvpSvoL7sg==}
 
-  '@vane-rs/web@file:../vane/bindings/web/vane-rs-web-0.4.2.tgz':
-    resolution: {integrity: sha512-wRC2zPK42Rr7adMI1e96Jc8B+FCHO8qAjuik8kf8T9gpctX0yCynmKxq1gmOna6cXly+17/tKA+MFjJo8AjxOg==, tarball: file:../vane/bindings/web/vane-rs-web-0.4.2.tgz}
-    version: 0.4.2
+  '@vane-rs/web@file:../vane/bindings/web/vane-rs-web-0.4.3.tgz':
+    resolution: {integrity: sha512-/3kuf525tnEcN/qxZ9kLQeRSAlhlKIVweJCummPEtj/ykIr9t5ILyTHpb26hJB0V3rl+QtRQ71ux3y4wes62nw==, tarball: file:../vane/bindings/web/vane-rs-web-0.4.3.tgz}
+    version: 0.4.3
     engines: {node: '>=16'}
 
   '@vitejs/plugin-react@4.7.0':
@@ -4049,7 +4049,7 @@ snapshots:
       '@vane-rs/node-linux-x64-gnu': 0.4.1
       '@vane-rs/node-win32-x64-msvc': 0.4.1
 
-  '@vane-rs/web@file:../vane/bindings/web/vane-rs-web-0.4.2.tgz':
+  '@vane-rs/web@file:../vane/bindings/web/vane-rs-web-0.4.3.tgz':
     optionalDependencies:
       '@vane-rs/dict-zh': 2026.8.0
 
