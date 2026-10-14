@@ -44,6 +44,18 @@ export function noteIndex(backend: SearchBackend, dim: number): NoteIndex {
 export interface RankedNotes {
   mode: 'text' | 'hybrid'
   hits: SearchHit[]
+  degraded: boolean
+}
+
+// Embed failures become a text search. index.search errors propagate.
+async function queryVector(client: EmbeddingClient, embedding: EmbeddingSettings, query: string): Promise<number[] | null> {
+  try {
+    const [vector] = await client.embed([query], embedding)
+    if (!vector || vector.length !== embedding.dim) return null
+    return vector
+  } catch {
+    return null
+  }
 }
 
 export async function searchNotes(
@@ -54,11 +66,15 @@ export async function searchNotes(
 ): Promise<RankedNotes> {
   if (!embedding?.apiKey) {
     const hits = await index.search({ text: query, topK: 8, mode: 'text' })
-    return { mode: 'text', hits }
+    return { mode: 'text', hits, degraded: false }
   }
-  const [vector] = await client.embed([query], embedding)
+  const vector = await queryVector(client, embedding, query)
+  if (!vector) {
+    const hits = await index.search({ text: query, topK: 8, mode: 'text' })
+    return { mode: 'text', hits, degraded: true }
+  }
   const hits = await index.search({ text: query, topK: 8, mode: 'hybrid', vector })
-  return { mode: 'hybrid', hits }
+  return { mode: 'hybrid', hits, degraded: false }
 }
 
 export interface NoteRebuildOptions {

@@ -325,6 +325,29 @@ describe('vane web search', () => {
     expect(hits[0]?.snippet).toContain('persist-term')
   })
 
+  it('passes rrf fusion only when the hybrid vector width matches dim', async () => {
+    const memory = createMemoryVane()
+    const backend = await openBackend(openerFor(memory), 'vault-rrf', 4)
+    await backend.upsert([{ id: 'alpha', text: 'alpha xylophonequartz', vector: [1, 0, 0, 0] }])
+    const hits = await backend.search({ text: 'xylophonequartz', topK: 5, mode: 'hybrid', vector: [1, 0, 0, 0] })
+    expect(hits[0]?.id).toBe('alpha')
+    expect(memory.queries.at(-1)).toEqual({
+      text: 'xylophonequartz',
+      topK: 5,
+      mode: 'hybrid',
+      vector: [1, 0, 0, 0],
+      fusion: 'rrf',
+    })
+    await backend.search({ text: 'xylophonequartz', topK: 5, mode: 'hybrid', vector: [1, 0, 0] })
+    expect(memory.queries.at(-1)).toEqual({ text: 'xylophonequartz', topK: 5, mode: 'text' })
+
+    const placeholder = createMemoryVane()
+    const narrow = await openBackend(openerFor(placeholder), 'vault-rrf-placeholder', 0)
+    await narrow.upsert([{ id: 'alpha', text: 'alpha xylophonequartz' }])
+    await narrow.search({ text: 'xylophonequartz', topK: 3, mode: 'hybrid', vector: [0] })
+    expect(placeholder.queries.at(-1)).toEqual({ text: 'xylophonequartz', topK: 3, mode: 'text' })
+  })
+
   it('searches BM25 when hybrid is requested without a vector', async () => {
     const memory = createMemoryVane()
     const backend = await openBackend(openerFor(memory), 'vault-hybrid')

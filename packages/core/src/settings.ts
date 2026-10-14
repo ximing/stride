@@ -53,6 +53,14 @@ export async function openSecret(secrets: SecretsStore, sealed: string): Promise
   return secrets.open(sealed)
 }
 
+// Missing or non-integer dims stay at the historical default. Explicit 0 means
+// "no real embedding width" and must not be rewritten to 4.
+function normalizeEmbeddingDim(value: number | undefined, fallback = 4): number {
+  if (value === 0) return 0
+  if (typeof value === 'number' && Number.isInteger(value) && value > 0) return value
+  return fallback
+}
+
 async function sealAll(secrets: SecretsStore, settings: AppSettings): Promise<SealedSettings> {
   return {
     embedding: {
@@ -60,7 +68,7 @@ async function sealAll(secrets: SecretsStore, settings: AppSettings): Promise<Se
       model: settings.embedding.model,
       keySeal: settings.embedding.apiKey ? await secrets.seal(settings.embedding.apiKey) : '',
       keyMask: maskSecret(settings.embedding.apiKey),
-      dim: settings.embedding.dim || 4,
+      dim: normalizeEmbeddingDim(settings.embedding.dim),
     },
     llm: {
       provider: settings.llm.provider,
@@ -83,7 +91,7 @@ export function publicSettings(settings: AppSettings): {
       endpoint: settings.embedding.endpoint,
       model: settings.embedding.model,
       keyMask: maskSecret(settings.embedding.apiKey),
-      dim: settings.embedding.dim || 4,
+      dim: normalizeEmbeddingDim(settings.embedding.dim),
     },
     llm: {
       provider: settings.llm.provider,
@@ -108,7 +116,7 @@ export async function readSettings(
       endpoint: parsed.embedding?.endpoint ?? '',
       model: parsed.embedding?.model ?? '',
       apiKey: parsed.embedding?.keySeal ? await secrets.open(parsed.embedding.keySeal) : '',
-      dim: parsed.embedding?.dim || base.embedding.dim,
+      dim: normalizeEmbeddingDim(parsed.embedding?.dim, base.embedding.dim),
     },
     llm: {
       provider: parsed.llm?.provider ?? '',

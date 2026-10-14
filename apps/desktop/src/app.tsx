@@ -274,9 +274,27 @@ const SettingsPanel = observer(function SettingsPanel() {
       <label className="field"><span>Embedding model</span>
         <input value={settings.form.embedding.model} onChange={(event) => settings.patchEmbedding({ model: event.target.value })} />
       </label>
-      <label className="field"><span>Embedding key</span>
-        <input type="password" value={settings.embeddingKey} onChange={(event) => { settings.embeddingKey = event.target.value }} />
+      <label className="field"><span>Embedding dim</span>
+        <input
+          data-testid="embedding-dim"
+          inputMode="numeric"
+          value={settings.embeddingDimText}
+          onChange={(event) => settings.setEmbeddingDim(event.target.value)}
+        />
       </label>
+      <label className="field"><span>Embedding key</span>
+        <input
+          type="password"
+          value={settings.embeddingKey}
+          placeholder={settings.form.embedding.keyMask}
+          onChange={(event) => { settings.embeddingKey = event.target.value }}
+        />
+        {settings.form.embedding.keyMask ? <span className="meta">{settings.form.embedding.keyMask}</span> : null}
+      </label>
+      <div className="editor-tools">
+        <button type="button" data-testid="embedding-test" onClick={() => { void settings.testEmbedding() }}>Test connection</button>
+      </div>
+      <p className="meta" data-testid="embedding-test-result">{settings.embeddingTestResult}</p>
       <label className="field"><span>LLM provider</span>
         <input value={settings.form.llm.provider} onChange={(event) => settings.patchLlm({ provider: event.target.value })} />
       </label>
@@ -354,6 +372,7 @@ const Workspace = observer(function Workspace() {
           <button type="submit" data-testid="run-search">Search</button>
           <button type="button" onClick={() => vault.clearSearch()}>Clear</button>
           <span className="search-mode" data-testid="search-mode">{vault.searchMode ? `Search mode ${vault.searchMode}` : ''}</span>
+          {vault.searchDegraded ? <span data-testid="search-degraded">已降级为 BM25</span> : null}
           <span className="index-status" data-testid="index-status">{indexStatusLabel(vault.indexPhase, vault.indexDone, vault.indexTotal)}</span>
         </form>
         <button

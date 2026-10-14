@@ -96,6 +96,7 @@ export const SearchPanel = observer(function SearchPanel() {
         onClick={(event) => event.stopPropagation()}
       >
         <h2 id="search-panel-title" className="search-panel-title">搜索</h2>
+        {vault.searchDegraded ? <p data-testid="search-degraded">已降级为 BM25</p> : null}
         <input
           ref={inputRef}
           className="search-panel-input"

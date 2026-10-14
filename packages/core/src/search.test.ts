@@ -48,6 +48,69 @@ describe('search notes', () => {
     expect(index.lastQuery?.mode).toBe('hybrid')
     expect(index.lastQuery?.vector).toEqual([1, 0, 0, 0])
     expect(hybrid.hits[0]?.id).toBe('alpha')
+    expect(hybrid.degraded).toBe(false)
+    await index.close()
+  })
+
+  it('does not embed and reports degraded false when no embedding key is set', async () => {
+    const backend = new MemorySearchBackend()
+    const index = noteIndex(backend, 4)
+    await index.upsert([{ id: 'alpha', text: 'alpha xylophonequartz' }])
+    const client = new EmbeddingClient(async () => {
+      throw new Error('text search must not embed')
+    })
+    const missing = await searchNotes(index, 'xylophonequartz', null, client)
+    expect(client.calls).toBe(0)
+    expect(missing).toMatchObject({ mode: 'text', degraded: false })
+    expect(missing.hits.map((hit) => hit.id)).toEqual(['alpha'])
+    const emptied = await searchNotes(index, 'xylophonequartz', {
+      endpoint: 'http://127.0.0.1/v1',
+      model: 'fixture-embed',
+      apiKey: '',
+      dim: 4,
+    }, client)
+    expect(client.calls).toBe(0)
+    expect(emptied.degraded).toBe(false)
+    expect(index.lastQuery?.mode).toBe('text')
+    expect(index.lastQuery?.vector).toBeUndefined()
+    await index.close()
+  })
+
+  it('falls back to text search when embed fails or the vector length mismatches dim', async () => {
+    const backend = new MemorySearchBackend()
+    const index = noteIndex(backend, 4)
+    await index.upsert([
+      { id: 'alpha', text: 'alpha xylophonequartz' },
+      { id: 'beta', text: 'beta soup' },
+    ])
+    const embedding = { endpoint: 'http://127.0.0.1/v1', model: 'fixture-embed', apiKey: 'sk-stride-embed-test-key', dim: 4 }
+    const failing = new EmbeddingClient(async () => new Response('no', { status: 503 }))
+    const failed = await searchNotes(index, 'xylophonequartz', embedding, failing)
+    expect(failing.calls).toBe(1)
+    expect(failed.mode).toBe('text')
+    expect(failed.degraded).toBe(true)
+    expect(failed.hits.map((hit) => hit.id)).toEqual(['alpha'])
+    expect(index.lastQuery?.mode).toBe('text')
+    expect(index.lastQuery?.vector).toBeUndefined()
+
+    const short = new EmbeddingClient(async () => new Response(JSON.stringify({
+      data: [{ index: 0, embedding: [1, 0, 0] }],
+    }), { status: 200, headers: { 'content-type': 'application/json' } }))
+    const mismatched = await searchNotes(index, 'xylophonequartz', embedding, short)
+    expect(short.calls).toBe(1)
+    expect(mismatched.mode).toBe('text')
+    expect(mismatched.degraded).toBe(true)
+    expect(index.lastQuery?.vector).toBeUndefined()
+
+    const broken = {
+      async search(): Promise<never> {
+        throw new Error('index down')
+      },
+    }
+    const embedDown = new EmbeddingClient(async () => {
+      throw new Error('embed down')
+    })
+    await expect(searchNotes(broken, 'xylophonequartz', embedding, embedDown)).rejects.toThrow('index down')
     await index.close()
   })
 
@@ -71,6 +134,13 @@ describe('search notes', () => {
     expect(await secrets.open('')).toBe('')
     await writeSettings(files, 'empty.json', defaultSettings(), secrets)
     expect((await readSettings(files, 'empty.json', secrets)).embedding.apiKey).toBe('')
+    expect((await readSettings(files, 'empty.json', secrets)).embedding.dim).toBe(4)
+    await writeSettings(files, 'zero-dim.json', {
+      embedding: { endpoint: 'http://127.0.0.1/v1', model: 'fixture-embed', apiKey: '', dim: 0 },
+      llm: { provider: '', model: '', baseUrl: '', apiKey: '' },
+      releasesUrl: '',
+    }, secrets)
+    expect((await readSettings(files, 'zero-dim.json', secrets)).embedding.dim).toBe(0)
     expect(defaultSettingsPath('/Users/someone')).toBe('/Users/someone/.stride/settings.json')
     expect(defaultSettingsPath('/Users/someone', '/tmp/custom.json')).toBe('/tmp/custom.json')
 

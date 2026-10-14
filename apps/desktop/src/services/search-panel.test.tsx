@@ -162,6 +162,22 @@ describe('search panel confirm', () => {
     }
   })
 
+  it('shows the BM25 banner only while search is degraded', async () => {
+    const { vault, panel } = await mount([note('meet', '会议纪要')])
+    await act(async () => {
+      panel.show()
+    })
+    expect(host?.querySelector('[data-testid="search-degraded"]')).toBeNull()
+    await act(async () => {
+      vault.searchDegraded = true
+    })
+    expect(host?.querySelector('[data-testid="search-degraded"]')?.textContent).toBe('已降级为 BM25')
+    await act(async () => {
+      vault.searchDegraded = false
+    })
+    expect(host?.querySelector('[data-testid="search-degraded"]')).toBeNull()
+  })
+
   it('opens on cmd-shift-f, marks the query, and confirms the selected id', async () => {
     const { vault } = await mount([note('meet', '会议纪要'), note('other', '其他')])
     const select = vi.spyOn(vault, 'select')

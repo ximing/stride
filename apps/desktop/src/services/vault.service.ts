@@ -1,4 +1,4 @@
-import { Service } from '@rabjs/react'
+import { has, Service } from '@rabjs/react'
 import { buildGraph, hasOutgoingRelationship, type VaultGraph } from '@stride/core/graph'
 import {
   applyBody,
@@ -30,8 +30,9 @@ import {
   type SearchBackendOpener,
 } from '@stride/platform'
 import { EmbeddingClient } from '../../../../packages/core/src/embeddings'
-import { noteIndex, noteRebuilder, searchNotes, type NoteIndex, type NoteRebuilder } from '../../../../packages/core/src/search'
+import { noteIndex, noteRebuilder, searchNotes, type NoteIndex, type NoteRebuilder, type SearchHit } from '../../../../packages/core/src/search'
 import { rankSearch } from '../../../../packages/core/src/search-rank'
+import type { EmbeddingRuntime } from './panels.service'
 import { writeSampleNotes } from '../../../../packages/core/src/sample'
 import { initializeVault } from '../../../../packages/core/src/seed'
 import { compareTypeDocuments, isTypeVisible, nextTypeOrder, templateBody } from '../../../../packages/core/src/types'
@@ -55,6 +56,16 @@ import {
 import { ListFilterService } from './list-filter.service'
 
 const COLLAPSED_TYPES_KEY = 'stride:collapsed-types'
+const EMBED_BATCH = 16
+
+const UNCONFIGURED_EMBEDDING: EmbeddingRuntime = {
+  endpoint: '',
+  model: '',
+  apiKey: '',
+  dim: 0,
+  intended: false,
+  active: false,
+}
 
 // The browser has no home directory. openVault only uses this to reject broad personal roots.
 const HOME_DIR = '/Users/stride'
@@ -69,14 +80,8 @@ export interface VaultRecord {
   lastOpened: string
 }
 
-// Text mode passes a null embedding. This throws if searchNotes starts calling embed anyway.
-class TextOnlyEmbeddingClient extends EmbeddingClient {
-  override embed(): Promise<number[][]> {
-    throw new Error('text search must not embed')
-  }
-}
-
-const embeddingClient = new TextOnlyEmbeddingClient()
+// Resolve fetch at call time so tests can stub globalThis.fetch after import.
+const embeddingClient = new EmbeddingClient((input, init) => globalThis.fetch(input, init))
 
 function isMemoryFixture(): boolean {
   return new URLSearchParams(window.location.search).get('fixture') === 'memory'
@@ -84,6 +89,12 @@ function isMemoryFixture(): boolean {
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+function nextMacrotask(): Promise<void> {
+  return new Promise((resolve) => {
+    setTimeout(resolve, 0)
+  })
 }
 
 // Title plus body only. Properties (including archived) stay out of the full-text index.
@@ -167,6 +178,7 @@ export class VaultService extends Service {
   searchQuery = ''
   searchHits: { id: string; score: number }[] = []
   searchMode = ''
+  searchDegraded = false
   indexPhase: 'idle' | 'rebuilding' | 'ready' | 'error' = 'idle'
   indexDone = 0
   indexTotal = 0
@@ -531,7 +543,9 @@ export class VaultService extends Service {
       if (note) docs.push({ id: note.id, text: indexText(note) })
     }
     if (!this.rebuilder || docs.length === 0) return
-    await this.rebuilder.upsert(docs)
+    const prepared = await this.prepareIndexed(docs, () => true)
+    if (!prepared) return
+    await this.rebuilder.upsert(prepared)
   }
 
   async commitHeadingRename(explicit?: StrideNote | null) {
@@ -734,15 +748,29 @@ export class VaultService extends Service {
     this.error = ''
     try {
       if (!this.index) throw new Error('Open a vault first')
-      const result = await searchNotes(this.index, this.searchQuery, null, embeddingClient)
+      const runtime = await this.currentEmbedding()
+      if (!runtime.active || this.index.dim !== runtime.dim) {
+        const result = await searchNotes(this.index, this.searchQuery, null, embeddingClient)
+        this.searchMode = 'text'
+        this.searchHits = result.hits
+        this.searchDegraded = runtime.intended
+        return
+      }
+      const result = await searchNotes(this.index, this.searchQuery, {
+        endpoint: runtime.endpoint,
+        model: runtime.model,
+        apiKey: runtime.apiKey,
+        dim: runtime.dim,
+      }, embeddingClient)
       this.searchMode = result.mode
       this.searchHits = result.hits
+      this.searchDegraded = result.degraded
     } catch (error) {
       this.error = errorText(error)
     }
   }
 
-  // Title substring plus a text-only BM25 pass. Never embeds.
+  // Title weighting stays in rankSearch. Hybrid is only the BM25/vector hit list.
   async queryRanked(text: string) {
     const trimmed = text.trim()
     if (!trimmed) return []
@@ -752,9 +780,7 @@ export class VaultService extends Service {
       text: `${note.title}\n${plainText(note.doc)}`,
     }))
     const allowed = new Set(notes.map((note) => note.id))
-    const found = this.index
-      ? await this.index.search({ text: trimmed, topK: 30, mode: 'text' })
-      : []
+    const found = this.index ? await this.rankedHits(trimmed, 30) : []
     return rankSearch(trimmed, notes, found.filter((hit) => allowed.has(hit.id)))
   }
 
@@ -838,7 +864,16 @@ export class VaultService extends Service {
     return run
   }
 
+  // Settings save reopens the current directory. It does not prompt and stays on openQueue.
+  reopenForSettings(): Promise<void> {
+    const backend = this.fs
+    if (!backend || this.phase !== 'ready') return Promise.resolve()
+    return this.openBackend(backend)
+  }
+
   private async openBackendBody(backend: FileSystemBackend) {
+    const runtime = await this.currentEmbedding()
+    const dim = runtime.active ? runtime.dim : 0
     await recoverRename(backend)
     const opened = await openVault(backend, HOME_DIR)
     const renameFromHeading = await readRenameFromHeading(backend)
@@ -852,8 +887,8 @@ export class VaultService extends Service {
     await retiringRebuild.catch(() => undefined)
     await retiring?.close().catch(() => undefined)
     const opener = await this.searchOpener()
-    const search = await opener.open({ vaultKey: backend.rootLabel, dim: 0 })
-    const index = noteIndex(search, 0)
+    const search = await opener.open({ vaultKey: backend.rootLabel, dim })
+    const index = noteIndex(search, dim)
     this.index = index
     this.rebuilder = noteRebuilder(index)
     this.fs = backend
@@ -866,6 +901,7 @@ export class VaultService extends Service {
     this.searchHits = []
     this.searchQuery = ''
     this.searchMode = ''
+    this.searchDegraded = runtime.intended && !runtime.active
     this.listFilterService.clear()
     this.renameFromHeading = renameFromHeading
     this.advanceInbox = advanceInbox
@@ -883,22 +919,26 @@ export class VaultService extends Service {
   private startRebuild(epoch: number, docs: { id: string; text: string }[]): Promise<void> {
     const rebuilder = this.rebuilder
     if (!rebuilder) return Promise.resolve()
-    return rebuilder.rebuild(docs, {
-      shouldContinue: () => epoch === this.rebuildEpoch,
-      onProgress: (done, total) => {
-        if (epoch !== this.rebuildEpoch) return
-        this.indexDone = done
-        this.indexTotal = total
-        this.indexPhase = 'rebuilding'
-      },
-    }).then((result) => {
-      if (epoch !== this.rebuildEpoch || result.aborted) return
-      this.indexDone = docs.length
-      this.indexTotal = docs.length
-      this.indexPhase = 'ready'
-    }, () => {
-      if (epoch !== this.rebuildEpoch) return
-      this.indexPhase = 'error'
+    const shouldContinue = () => epoch === this.rebuildEpoch
+    return this.prepareIndexed(docs, shouldContinue).then((prepared) => {
+      if (!prepared || !shouldContinue()) return
+      return rebuilder.rebuild(prepared, {
+        shouldContinue,
+        onProgress: (done, total) => {
+          if (!shouldContinue()) return
+          this.indexDone = done
+          this.indexTotal = total
+          this.indexPhase = 'rebuilding'
+        },
+      }).then((result) => {
+        if (!shouldContinue() || result.aborted) return
+        this.indexDone = prepared.length
+        this.indexTotal = prepared.length
+        this.indexPhase = 'ready'
+      }, () => {
+        if (!shouldContinue()) return
+        this.indexPhase = 'error'
+      })
     })
   }
 
@@ -998,7 +1038,91 @@ export class VaultService extends Service {
 
   private async upsertIndexed(note: StrideNote) {
     if (!this.rebuilder) return
-    await this.rebuilder.upsert([{ id: note.id, text: indexText(note) }])
+    const prepared = await this.prepareIndexed([{ id: note.id, text: indexText(note) }], () => true)
+    if (!prepared) return
+    await this.rebuilder.upsert(prepared)
+  }
+
+  private async currentEmbedding(): Promise<EmbeddingRuntime> {
+    const { SettingsService } = await import('./panels.service')
+    if (!has(SettingsService)) return UNCONFIGURED_EMBEDDING
+    const settings = this.resolve(SettingsService)
+    await settings.waitUntilLoaded()
+    return settings.embeddingRuntime()
+  }
+
+  private async rankedHits(text: string, topK: number): Promise<SearchHit[]> {
+    const index = this.index
+    if (!index) return []
+    const runtime = await this.currentEmbedding()
+    if (!runtime.active || index.dim !== runtime.dim) {
+      if (runtime.intended) this.searchMode = 'text'
+      this.searchDegraded = runtime.intended
+      return index.search({ text, topK, mode: 'text' })
+    }
+    let vector: number[] | undefined
+    try {
+      const [row] = await embeddingClient.embed([text], {
+        endpoint: runtime.endpoint,
+        model: runtime.model,
+        apiKey: runtime.apiKey,
+        dim: runtime.dim,
+      })
+      vector = row
+    } catch {
+      vector = undefined
+    }
+    if (vector && vector.length === runtime.dim) {
+      this.searchMode = 'hybrid'
+      this.searchDegraded = false
+      return index.search({ text, topK, mode: 'hybrid', vector })
+    }
+    this.searchMode = 'text'
+    this.searchDegraded = true
+    return index.search({ text, topK, mode: 'text' })
+  }
+
+  // Embed failures omit the vector so search-web stores zeros. The index error still rejects.
+  private async prepareIndexed(
+    docs: { id: string; text: string; vector?: number[] }[],
+    shouldContinue: () => boolean,
+  ): Promise<{ id: string; text: string; vector?: number[] }[] | null> {
+    const runtime = await this.currentEmbedding()
+    const openDim = this.index?.dim ?? 0
+    if (!runtime.active || openDim !== runtime.dim) {
+      if (runtime.intended && shouldContinue()) this.searchDegraded = true
+      return docs.map((doc) => ({ id: doc.id, text: doc.text }))
+    }
+    const prepared: { id: string; text: string; vector?: number[] }[] = []
+    for (let offset = 0; offset < docs.length; offset += EMBED_BATCH) {
+      if (offset > 0) await nextMacrotask()
+      if (!shouldContinue()) return null
+      const slice = docs.slice(offset, offset + EMBED_BATCH)
+      let vectors: number[][] | null = null
+      try {
+        vectors = await embeddingClient.embed(slice.map((doc) => doc.text), {
+          endpoint: runtime.endpoint,
+          model: runtime.model,
+          apiKey: runtime.apiKey,
+          dim: runtime.dim,
+        })
+      } catch {
+        vectors = null
+      }
+      if (!shouldContinue()) return null
+      const usable = vectors !== null && vectors.length === slice.length
+      if (!usable && shouldContinue()) this.searchDegraded = true
+      for (let index = 0; index < slice.length; index += 1) {
+        const doc = slice[index]!
+        const vector = usable ? vectors?.[index] : undefined
+        if (vector && vector.length === runtime.dim) prepared.push({ id: doc.id, text: doc.text, vector })
+        else {
+          if (shouldContinue()) this.searchDegraded = true
+          prepared.push({ id: doc.id, text: doc.text })
+        }
+      }
+    }
+    return prepared
   }
 
   private async removeIndexed(ids: string[]) {

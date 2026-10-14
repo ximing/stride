@@ -136,7 +136,10 @@ class VaneSearchBackend implements SearchBackend {
   async search(query: SearchQuery): Promise<SearchHit[]> {
     this.assertOpen()
     const terms = termsOf(query.text)
-    const vector = query.mode === 'hybrid' && query.vector && query.vector.length > 0 ? query.vector : undefined
+    // dim 0 is the placeholder schema (width 1). A vector must match the open dim or it is dropped.
+    const vector = query.mode === 'hybrid' && query.vector && this.dim > 0 && query.vector.length === this.dim
+      ? query.vector
+      : undefined
     if (terms.length === 0 && !vector) return []
     const limit = query.topK > 0 ? Math.floor(query.topK) : 0
     if (limit === 0) return []
@@ -145,7 +148,10 @@ class VaneSearchBackend implements SearchBackend {
       mode: vector ? 'hybrid' : 'text',
     }
     if (query.text.length > 0) vaneQuery.text = query.text
-    if (vector) vaneQuery.vector = vector
+    if (vector) {
+      vaneQuery.vector = vector
+      vaneQuery.fusion = 'rrf'
+    }
     const hits = await this.vane.search(this.col, vaneQuery)
     return hits.map((hit) => ({
       id: hit.id,

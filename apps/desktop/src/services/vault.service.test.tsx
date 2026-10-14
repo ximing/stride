@@ -1,13 +1,14 @@
-import { observer, register, resolve, useService } from '@rabjs/react'
+import { has, observer, register, resolve, useService } from '@rabjs/react'
 import { relationsOf, buildGraph } from '@stride/core/graph'
 import { plainText, type StrideNote, type TipTapNode } from '@stride/core/note'
-import { MemoryFileSystem, PlatformError } from '@stride/platform'
+import { MemoryFileSystem, MemorySecretsStore, PlatformError } from '@stride/platform'
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { type NoteIndex, type SearchQuery } from '@stride/core'
 import { notePath, readNoteFile } from '../../../../packages/core/src/vault'
 import { App, Rail } from '../app'
-import { ChatService, GitService, SettingsService, UpdateService } from './panels.service'
+import { ChatService, GitService, resetSecretsStore, setSecretsStore, SETTINGS_STORAGE_KEY, SettingsService, UpdateService } from './panels.service'
 import { FolderService } from './folder.service'
 import { ListFilterService } from './list-filter.service'
 import { VAULT_REGISTRY_KEY, VaultService } from './vault.service'
@@ -41,9 +42,28 @@ describe('VaultService', () => {
   afterEach(() => {
     window.history.replaceState(null, '', '/')
     localStorage.removeItem(VAULT_REGISTRY_KEY)
+    localStorage.removeItem(SETTINGS_STORAGE_KEY)
     vi.useRealTimers()
     vi.unstubAllGlobals()
     resolve(ListFilterService).clear()
+    resetSecretsStore()
+    if (has(SettingsService)) {
+      const settings = resolve(SettingsService)
+      settings.patchEmbedding({ endpoint: '', model: '', keyMask: '', dim: 4 })
+      settings.patchLlm({ provider: '', model: '', baseUrl: '', keyMask: '' })
+      settings.setReleasesUrl('')
+      settings.setEmbeddingDim('4')
+      settings.embeddingKey = ''
+      settings.llmKey = ''
+      settings.notice = ''
+      settings.embeddingTestResult = ''
+      Object.assign(settings, {
+        memoryEmbeddingKey: '',
+        memoryLlmKey: '',
+        loaded: false,
+        loadTask: null,
+      })
+    }
   })
 
   it('re-renders an observer when the service changes', async () => {
@@ -577,6 +597,15 @@ describe('VaultService', () => {
     expect(host.querySelector('[data-testid="run-search"]')).not.toBeNull()
     expect(host.querySelector('[data-testid="new-note"]')).not.toBeNull()
     expect(host.querySelector('[data-testid="search-mode"]')).not.toBeNull()
+    expect(host.querySelector('[data-testid="search-degraded"]')).toBeNull()
+    await act(async () => {
+      vault.searchDegraded = true
+    })
+    expect(host.querySelector('[data-testid="search-degraded"]')?.textContent).toBe('已降级为 BM25')
+    await act(async () => {
+      vault.searchDegraded = false
+    })
+    expect(host.querySelector('[data-testid="search-degraded"]')).toBeNull()
     expect(host.querySelector('[data-testid="index-status"]')?.textContent).toBe('索引就绪')
     await act(async () => {
       vault.indexPhase = 'rebuilding'
@@ -678,6 +707,104 @@ describe('VaultService', () => {
       'Sample project',
       'Welcome',
     ])
+    vault.cancelPending()
+  })
+
+  it('degrades to BM25 when the embedding key is removed or the request fails', async () => {
+    useMemoryFixture()
+    const picker = vi.fn()
+    vi.stubGlobal('showDirectoryPicker', picker)
+    const secrets = new MemorySecretsStore()
+    setSecretsStore(secrets)
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const body = JSON.parse(String(init?.body)) as { input?: string[] }
+      const input = body.input ?? []
+      return new Response(JSON.stringify({
+        data: input.map((_text, index) => ({ index, embedding: [1, 0, 0, 0] })),
+      }), { status: 200, headers: { 'content-type': 'application/json' } })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    register(VaultService)
+    register(FolderService)
+    register(SettingsService)
+    const vault = resolve(VaultService)
+    const settings = resolve(SettingsService)
+    await vault.openFromDraft()
+    await vault.createNote()
+    const id = vault.active?.id ?? ''
+    vault.updateTitle('Field notes')
+    vault.updateDoc({
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'zephyrword' }] }],
+    })
+    await vault.flush()
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(vault.saveStatus).toBe('saved')
+
+    settings.patchEmbedding({ endpoint: 'http://127.0.0.1/v1', model: 'fixture-embed' })
+    settings.setEmbeddingDim('4')
+    settings.embeddingKey = 'sk-stride-embed-test-key'
+    await settings.save()
+    for (let attempt = 0; attempt < 40 && vault.indexPhase === 'rebuilding'; attempt += 1) {
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, 0))
+    }
+    expect(picker).not.toHaveBeenCalled()
+    expect(vault.indexPhase).toBe('ready')
+    expect(vault.searchDegraded).toBe(false)
+    expect(fetchMock).toHaveBeenCalled()
+
+    const index = (vault as unknown as { index: NoteIndex }).index
+    const searches: SearchQuery[] = []
+    const original = index.search.bind(index)
+    index.search = async (query: SearchQuery) => {
+      searches.push(query)
+      return original(query)
+    }
+    fetchMock.mockClear()
+    const ranked = await vault.queryRanked('zephyrword')
+    expect(ranked[0]?.id).toBe(id)
+    expect(ranked[0]?.source).toBe('body')
+    expect(searches[0]).toMatchObject({ text: 'zephyrword', topK: 30, mode: 'hybrid', vector: [1, 0, 0, 0] })
+    expect(vault.searchMode).toBe('hybrid')
+    expect(vault.searchDegraded).toBe(false)
+
+    fetchMock.mockImplementation(async () => new Response('no', { status: 503 }))
+    vault.searchQuery = 'zephyrword'
+    await vault.runSearch()
+    expect(vault.error).toBe('')
+    expect(vault.searchMode).toBe('text')
+    expect(vault.searchDegraded).toBe(true)
+    expect(vault.searchHits.some((hit) => hit.id === id)).toBe(true)
+
+    fetchMock.mockClear()
+    settings.embeddingKey = ''
+    await settings.save()
+    for (let attempt = 0; attempt < 40 && vault.indexPhase === 'rebuilding'; attempt += 1) {
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, 0))
+    }
+    expect(picker).not.toHaveBeenCalled()
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect(vault.indexPhase).toBe('ready')
+    expect(vault.searchDegraded).toBe(true)
+    vault.searchQuery = 'zephyrword'
+    await vault.runSearch()
+    expect(vault.searchMode).toBe('text')
+    expect(vault.searchDegraded).toBe(true)
+    expect(fetchMock).not.toHaveBeenCalled()
+    expect((localStorage.getItem(SETTINGS_STORAGE_KEY) ?? '').includes('sk-stride-embed-test-key')).toBe(false)
+
+    settings.embeddingKey = 'sk-stride-embed-test-key'
+    fetchMock.mockImplementation(async () => new Response('no', { status: 500 }))
+    await settings.save()
+    for (let attempt = 0; attempt < 40 && vault.indexPhase === 'rebuilding'; attempt += 1) {
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, 0))
+    }
+    expect(vault.indexPhase).toBe('ready')
+    expect(vault.searchDegraded).toBe(true)
+    vault.searchQuery = 'zephyrword'
+    await vault.runSearch()
+    expect(vault.searchMode).toBe('text')
+    expect(vault.searchHits.some((hit) => hit.id === id)).toBe(true)
     vault.cancelPending()
   })
 
