@@ -505,6 +505,24 @@ textarea {
   padding: 0.35rem 0.55rem;
 }
 
+.list-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.45rem;
+}
+
+.list-filter .list-filter-input {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+
+.list-filter .list-filter-clear {
+  flex: none;
+  width: auto;
+}
+
 .editor-toolbar {
   display: flex;
   flex-wrap: wrap;

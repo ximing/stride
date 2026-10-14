@@ -2,6 +2,7 @@ import { observer, useService } from '@rabjs/react'
 import { useEffect, useState, type DragEvent } from 'react'
 import type { StrideNote } from '@stride/core/note'
 import { FolderService } from '../services/folder.service'
+import { ListFilterService } from '../services/list-filter.service'
 import { VaultService } from '../services/vault.service'
 
 function parentOf(id: string): string {
@@ -13,7 +14,7 @@ function childFolders(paths: string[], parent: string): string[] {
   return paths.filter((path) => parentOf(path) === parent)
 }
 
-function notesIn(notes: StrideNote[], parent: string): StrideNote[] {
+function notesIn(notes: readonly StrideNote[], parent: string): StrideNote[] {
   return notes.filter((note) => parentOf(note.id) === parent)
 }
 
@@ -44,7 +45,7 @@ function NoteLink({ note, active, onSelect }: { note: StrideNote; active: boolea
 interface FolderBlockProps {
   path: string
   paths: string[]
-  notes: StrideNote[]
+  notes: readonly StrideNote[]
   activeId: string
   renaming: string
   draft: string
@@ -132,6 +133,7 @@ function FolderBlock({
 export const FolderTree = observer(function FolderTree() {
   const vault = useService(VaultService)
   const folderService = useService(FolderService)
+  const listFilter = useService(ListFilterService)
   const [creating, setCreating] = useState(false)
   const [name, setName] = useState('')
   const [renaming, setRenaming] = useState('')
@@ -170,11 +172,25 @@ export const FolderTree = observer(function FolderTree() {
     if (!vault.error) setRenaming('')
   }
 
-  const notes = vault.visibleNotes
+  const notes = listFilter.apply(vault.visibleNotes)
   const paths = folderService.folders
 
   return (
     <div className="folder-tree" data-testid="folder-root" onDragOver={allowDrop} onDrop={(event) => drop(event, '')}>
+      <div className="list-filter">
+        <input
+          className="list-filter-input"
+          data-testid="list-filter"
+          placeholder="过滤标题或属性"
+          value={listFilter.query}
+          onChange={(event) => listFilter.setQuery(event.target.value)}
+        />
+        {listFilter.query.trim() !== '' && (
+          <button type="button" className="list-filter-clear" data-testid="list-filter-clear" onClick={() => listFilter.clear()}>
+            清空
+          </button>
+        )}
+      </div>
       <button type="button" data-testid="new-folder" onClick={() => setCreating(true)}>
         New folder
       </button>
