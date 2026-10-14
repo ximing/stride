@@ -6,11 +6,14 @@ import {
   currentBranch,
   effectiveBaseUrl,
   gitAddRemote,
+  assertCloneDestEmpty,
+  gitClone,
   gitCommit,
   gitDiff,
   gitPull,
   gitPush,
   gitStatus,
+  repoNameFromUrl,
   gitSurface,
   initGit,
   isDedicatedVault,
@@ -34,9 +37,9 @@ import {
 import { appendAssistantDelta, appendToolEnd, appendToolStart, playChatTurn, type ChatSession } from './chat-turn'
 import { chatSystemPrompt, chatVaultHost } from './chat-vault-host'
 import { browserGitBackend } from '@stride/git-web'
-import { MemoryFileSystem, type GitBackend, type SecretsStore } from '@stride/platform'
+import { MemoryFileSystem, PlatformError, type FileSystemBackend, type GitBackend, type SecretsStore } from '@stride/platform'
 import { webSecretsStore } from '../../../../packages/secrets-web/src/index.ts'
-import { VaultService } from './vault.service'
+import { pickVaultBackend, VaultService } from './vault.service'
 
 interface PublicSettings {
   embedding: { endpoint: string; model: string; keyMask: string; dim: number }
@@ -60,6 +63,8 @@ const BROWSER_HOME = '/Users/stride'
 let testGitBackend: GitBackend | null = null
 let testGitBackendSet = false
 let shellGitBackend: GitBackend | null = null
+let cloneParentForTests: string | null = null
+let cloneDestForTests: FileSystemBackend | null = null
 
 type CommitMessageSuggest = (
   diff: string,
@@ -76,6 +81,14 @@ export function setGitBackendForTests(backend: GitBackend | null) {
   }
   testGitBackend = backend
   testGitBackendSet = true
+}
+
+export function setCloneParentForTests(path: string | null) {
+  cloneParentForTests = path
+}
+
+export function setCloneDestForTests(fs: FileSystemBackend | null) {
+  cloneDestForTests = fs
 }
 
 export function setCommitMessageSuggestForTests(next: CommitMessageSuggest | null) {
@@ -104,6 +117,8 @@ export class GitService extends Service {
   history = ''
   message = ''
   remote = ''
+  cloneUrl = ''
+  cloneError = ''
   output = ''
   conflicts: string[] = []
   surface: GitSurface = 'needs-init'
@@ -144,6 +159,10 @@ export class GitService extends Service {
 
   setRemote(value: string) {
     this.remote = value
+  }
+
+  setCloneUrl(value: string) {
+    this.cloneUrl = value
   }
 
   toggle(path: string) {
@@ -455,6 +474,50 @@ export class GitService extends Service {
         apiKey: resolved.apiKey,
       }),
     })
+  }
+
+  async cloneRemote() {
+    this.cloneError = ''
+    const backend = await resolveGitBackend()
+    if (!backend.available) {
+      this.cloneError = 'git clone needs the desktop app'
+      return
+    }
+    try {
+      const url = this.cloneUrl
+      const parent = cloneParentForTests !== null
+        ? cloneParentForTests
+        : (await pickVaultBackend()).rootLabel
+      const dest = parent.replace(/\/$/, '') + '/' + repoNameFromUrl(url)
+      const home = await this.homeDirectory()
+      if (!home) {
+        this.cloneError = this.output || 'Could not resolve the home directory'
+        return
+      }
+      if (cloneDestForTests) {
+        await assertCloneDestEmpty(cloneDestForTests)
+      } else if (tauriRuntime()) {
+        await this.assertTauriCloneDestEmpty(dest)
+      }
+      await gitClone(backend, url, dest, home)
+      this.vault.openedClonePath = dest
+      if (!tauriRuntime()) return
+      const { TauriFileSystem } = await import('@stride/fs-tauri')
+      await this.vault.openClonedVault(new TauriFileSystem(dest))
+    } catch (error) {
+      this.cloneError = error instanceof Error ? error.message : String(error)
+    }
+  }
+
+  private async assertTauriCloneDestEmpty(dest: string): Promise<void> {
+    const { TauriFileSystem } = await import('@stride/fs-tauri')
+    try {
+      await assertCloneDestEmpty(new TauriFileSystem(dest))
+    } catch (error) {
+      // A missing folder is an empty clone destination.
+      if (error instanceof PlatformError && error.code === 'not-found') return
+      throw error
+    }
   }
 
   async pull() {

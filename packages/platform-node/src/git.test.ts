@@ -102,7 +102,7 @@ describe('vault git', () => {
     await gitPush(at(vault), git)
 
     const other = path.join(root, 'other')
-    await gitClone(git, bare, other)
+    await gitClone(git, bare, other, os.homedir())
     const rel = 'status.stride.json'
     const oursFile = path.join(other, rel)
     const theirsFile = path.join(vault, rel)
@@ -149,7 +149,7 @@ describe('vault git', () => {
     await gitAddRemote(at(right), git, bare)
     await gitPush(at(right), git)
     const clone = path.join(root, 'clone')
-    await gitClone(git, bare, clone)
+    await gitClone(git, bare, clone, os.homedir())
     await gitAddRemote(at(clone), git, bare)
     expect(gitRemotes(clone)).toContain('origin')
   })

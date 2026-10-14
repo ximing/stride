@@ -219,6 +219,24 @@ export async function gitResolve(
   await git.resolve(fs.rootLabel, relative, side)
 }
 
-export async function gitClone(git: GitBackend, remote: string, dest: string): Promise<void> {
-  await git.clone(remote, dest)
+export function repoNameFromUrl(url: string): string {
+  const trimmed = url.trim().replace(/\/+$/, '')
+  const slash = trimmed.lastIndexOf('/')
+  const segment = (slash === -1 ? trimmed : trimmed.slice(slash + 1)).replace(/\.git$/, '')
+  if (segment === '' || segment === '.' || segment === '..') {
+    throw new Error('Remote URL has no repository name')
+  }
+  return segment
+}
+
+export async function assertCloneDestEmpty(fs: FileSystemBackend): Promise<void> {
+  const entries = await fs.list('')
+  if (entries.length > 0) throw new Error('Destination is not empty')
+}
+
+export async function gitClone(git: GitBackend, remote: string, dest: string, homeDir: string): Promise<void> {
+  const url = remote.trim()
+  if (url === '') throw new Error('Remote URL is empty')
+  if (isBroadPersonalRoot(dest, homeDir)) throw new Error(DEDICATED_ERROR)
+  await git.clone(url, dest)
 }

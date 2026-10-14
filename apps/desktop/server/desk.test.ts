@@ -111,7 +111,7 @@ describe('Desk vault paths', () => {
     await gitAddRemote(vaultOf(vault), git, bare)
     await gitPush(vaultOf(vault), git)
     const other = path.join(root, 'other')
-    await gitClone(git, bare, other)
+    await gitClone(git, bare, other, os.homedir())
 
     const settings = path.join(root, 'settings.json')
     await blankSettings(settings)

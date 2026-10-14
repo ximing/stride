@@ -156,7 +156,7 @@ async function sameDirectory(left: FileSystemDirectoryHandle, right: FileSystemD
   return left.isSameEntry(right)
 }
 
-async function pickVaultBackend(): Promise<FileSystemBackend> {
+export async function pickVaultBackend(): Promise<FileSystemBackend> {
   if (!hasTauriInternals()) return pickVaultDirectory()
   const dialog = await import('@tauri-apps/plugin-dialog')
   const selected = await dialog.open({ directory: true, multiple: false })
@@ -170,6 +170,7 @@ async function pickVaultBackend(): Promise<FileSystemBackend> {
 export class VaultService extends Service {
   phase: 'chooser' | 'ready' = 'chooser'
   vaultPath = ''
+  openedClonePath = ''
   pathDraft = ''
   broad = false
   notes: StrideNote[] = []
@@ -871,6 +872,11 @@ export class VaultService extends Service {
 
   private get listFilterService() {
     return this.resolve(ListFilterService)
+  }
+
+  openClonedVault(backend: FileSystemBackend): Promise<void> {
+    this.openedClonePath = backend.rootLabel
+    return this.openBackend(backend)
   }
 
   private openBackend(backend: FileSystemBackend): Promise<void> {

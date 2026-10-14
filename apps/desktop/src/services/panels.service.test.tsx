@@ -3,9 +3,9 @@ import { MemoryFileSystem, MemorySecretsStore, type GitBackend } from '@stride/p
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { UpdateBanner } from '../app'
+import { App, UpdateBanner } from '../app'
 import { DEDICATED_ERROR, VAULT_GITIGNORE } from '@stride/core'
-import { GitService, resetSecretsStore, setCommitMessageSuggestForTests, setGitBackendForTests, setSecretsStore, SETTINGS_STORAGE_KEY, SettingsService, UpdateService } from './panels.service'
+import { GitService, resetSecretsStore, setCloneDestForTests, setCloneParentForTests, setCommitMessageSuggestForTests, setGitBackendForTests, setSecretsStore, SETTINGS_STORAGE_KEY, SettingsService, UpdateService } from './panels.service'
 import { VaultService } from './vault.service'
 
 function resetSettingsMemory() {
@@ -38,10 +38,14 @@ describe('browser panels', () => {
     if (has(SettingsService)) resetSettingsMemory()
     resetSecretsStore()
     setGitBackendForTests(null)
+    setCloneParentForTests(null)
+    setCloneDestForTests(null)
     setCommitMessageSuggestForTests(null)
     if (has(GitService)) {
       const git = resolve(GitService)
       git.abortSuggest()
+      git.cloneUrl = ''
+      git.cloneError = ''
       git.output = 'Git is not available in the browser'
       git.surface = 'unavailable'
       git.notice = ''
@@ -508,7 +512,122 @@ describe('browser panels', () => {
     expect(removed).toEqual(['origin'])
     expect(git.output).toBe('Remote history is not compatible with this vault')
   })
+
+  it('disables clone and does not call git when the backend is unavailable', async () => {
+    const calls: string[] = []
+    setGitBackendForTests(recordingClone(calls, false))
+    register(VaultService)
+    register(GitService)
+    const git = resolve(GitService)
+    git.surface = 'unavailable'
+    const vault = resolve(VaultService)
+    vault.phase = 'chooser'
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    await act(async () => {
+      root.render(<App />)
+    })
+    const button = host.querySelector<HTMLButtonElement>('[data-testid="git-clone"]')
+    expect(button).not.toBeNull()
+    expect(button!.disabled).toBe(true)
+    expect(host.querySelector('[data-testid="git-clone-unavailable"]')?.textContent).toBe('git clone needs the desktop app')
+    await act(async () => {
+      button!.click()
+    })
+    await git.cloneRemote()
+    expect(calls).toEqual([])
+    expect(git.cloneError).toBe('git clone needs the desktop app')
+    root.unmount()
+    host.remove()
+  })
+
+  it('clones into the test parent using the repository name', async () => {
+    const calls: string[] = []
+    setGitBackendForTests(recordingClone(calls))
+    setCloneParentForTests('/tmp/vaults')
+    register(VaultService)
+    register(GitService)
+    const git = resolve(GitService)
+    const vault = resolve(VaultService)
+    git.surface = 'needs-init'
+    vault.phase = 'chooser'
+    vault.openedClonePath = ''
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    await act(async () => {
+      root.render(<App />)
+    })
+    const input = host.querySelector<HTMLInputElement>('[data-testid="git-clone-url"]')
+    const button = host.querySelector<HTMLButtonElement>('[data-testid="git-clone"]')
+    expect(button).not.toBeNull()
+    expect(button!.disabled).toBe(false)
+    expect(host.querySelector('[data-testid="git-clone-unavailable"]')).toBeNull()
+    await act(async () => {
+      setControlValue(input!, 'https://example.test/notes.git')
+    })
+    expect(git.cloneUrl).toBe('https://example.test/notes.git')
+    await act(async () => {
+      button!.click()
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, 0))
+    })
+    expect(calls).toEqual(['clone https://example.test/notes.git /tmp/vaults/notes'])
+    expect(vault.openedClonePath).toBe('/tmp/vaults/notes')
+    expect(git.cloneError).toBe('')
+    expect(vault.phase).toBe('chooser')
+    root.unmount()
+    host.remove()
+  })
+
+  it('does not clone into a non-empty destination', async () => {
+    const calls: string[] = []
+    setGitBackendForTests(recordingClone(calls))
+    setCloneParentForTests('/tmp/vaults')
+    const dest = new MemoryFileSystem('/tmp/vaults/notes')
+    await dest.writeText('keep.md', 'stay')
+    setCloneDestForTests(dest)
+    register(VaultService)
+    register(GitService)
+    const git = resolve(GitService)
+    git.setCloneUrl('https://example.test/notes.git')
+    await git.cloneRemote()
+    expect(calls).toEqual([])
+    expect(git.cloneError).toBe('Destination is not empty')
+    expect(await dest.readText('keep.md')).toBe('stay')
+  })
+
+  it('stores a broad-folder refusal on cloneError', async () => {
+    const calls: string[] = []
+    setGitBackendForTests(recordingClone(calls))
+    setCloneParentForTests('/Users/stride')
+    register(VaultService)
+    register(GitService)
+    const git = resolve(GitService)
+    git.setCloneUrl('https://example.test/Desktop.git')
+    await git.cloneRemote()
+    expect(calls).toEqual([])
+    expect(git.cloneError).toBe(DEDICATED_ERROR)
+  })
 })
+
+function setControlValue(element: HTMLInputElement, value: string) {
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
+  setter?.call(element, value)
+  element.dispatchEvent(new Event('input', { bubbles: true }))
+  element.dispatchEvent(new Event('change', { bubbles: true }))
+}
+
+function recordingClone(calls: string[], available = true): GitBackend {
+  return {
+    ...recordingGit(calls),
+    available,
+    clone: (remote, dest) => {
+      calls.push(`clone ${remote} ${dest}`)
+      return Promise.resolve()
+    },
+  }
+}
 
 function recordingGit(calls: string[]): GitBackend {
   return {

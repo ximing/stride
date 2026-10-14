@@ -84,6 +84,7 @@ export const UpdateBanner = observer(function UpdateBanner() {
 
 const Chooser = observer(function Chooser() {
   const vault = useService(VaultService)
+  const git = useService(GitService)
   return (
     <section className="chooser" data-testid="vault-surface">
       <div className="chooser-copy">
@@ -108,7 +109,28 @@ const Chooser = observer(function Chooser() {
           <button className="primary" type="button" data-testid="clone-sample" onClick={() => void vault.cloneSampleVault()}>
             Clone sample
           </button>
+          <input
+            data-testid="git-clone-url"
+            value={git.cloneUrl}
+            onChange={(event) => git.setCloneUrl(event.target.value)}
+          />
+          <button
+            className="primary"
+            type="button"
+            data-testid="git-clone"
+            disabled={git.surface === 'unavailable'}
+            onClick={() => {
+              if (git.surface === 'unavailable') return
+              void git.cloneRemote()
+            }}
+          >
+            Clone
+          </button>
         </div>
+        {git.surface === 'unavailable' && (
+          <p data-testid="git-clone-unavailable">git clone needs the desktop app</p>
+        )}
+        {git.cloneError && <p className="error" data-testid="git-clone-error">{git.cloneError}</p>}
         {vault.error && <p className="error">{vault.error}</p>}
       </form>
     </section>

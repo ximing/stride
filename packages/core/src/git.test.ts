@@ -2,12 +2,15 @@ import { describe, expect, it } from 'vitest'
 import { MemoryFileSystem, unavailableGit, type GitBackend } from '@stride/platform'
 import { DEDICATED_ERROR, isBroadPersonalRoot } from './roots.ts'
 import {
+  assertCloneDestEmpty,
   gitAddRemote,
+  gitClone,
   gitCommit,
   gitPull,
   gitResolve,
   gitStatus,
   initGit,
+  repoNameFromUrl,
   isNoUpstream,
   mergeBaseSharesHistory,
   VAULT_GITIGNORE,
@@ -170,6 +173,52 @@ describe('gitPull', () => {
     }
     await expect(gitPull(files, git)).rejects.toThrow('Not a git repository')
     expect(pulls).toEqual([])
+  })
+})
+
+describe('gitClone', () => {
+  it('refuses the home directory and a Desktop basename without calling clone', async () => {
+    const home = '/Users/someone'
+    const git = fakeGit()
+    const calls: string[] = []
+    git.clone = (remote, dest) => {
+      calls.push(`${remote} ${dest}`)
+      return Promise.resolve()
+    }
+    await expect(gitClone(git, 'https://example.test/notes.git', home, home)).rejects.toThrow(DEDICATED_ERROR)
+    await expect(gitClone(git, 'https://example.test/notes.git', `${home}/Desktop`, home)).rejects.toThrow(DEDICATED_ERROR)
+    await expect(gitClone(git, 'https://example.test/notes.git', '/tmp/Documents', home)).rejects.toThrow(DEDICATED_ERROR)
+    await expect(gitClone(git, 'https://example.test/notes.git', '/tmp/Downloads', home)).rejects.toThrow(DEDICATED_ERROR)
+    expect(calls).toEqual([])
+    await gitClone(git, '  https://example.test/notes.git  ', `${home}/notes`, home)
+    expect(calls).toEqual(['https://example.test/notes.git /Users/someone/notes'])
+  })
+
+  it('does not clone an empty URL', async () => {
+    const git = fakeGit()
+    const calls: string[] = []
+    git.clone = () => {
+      calls.push('clone')
+      return Promise.resolve()
+    }
+    await expect(gitClone(git, '', '/tmp/notes', '/Users/someone')).rejects.toThrow('Remote URL is empty')
+    await expect(gitClone(git, '   ', '/tmp/notes', '/Users/someone')).rejects.toThrow('Remote URL is empty')
+    expect(calls).toEqual([])
+  })
+
+  it('strips a trailing .git from the repository name', () => {
+    expect(repoNameFromUrl('https://github.com/ximing/stride.git')).toBe('stride')
+    expect(() => repoNameFromUrl('   ')).toThrow('Remote URL has no repository name')
+    expect(() => repoNameFromUrl('https://example.test/..')).toThrow('Remote URL has no repository name')
+    expect(() => repoNameFromUrl('https://example.test/.')).toThrow('Remote URL has no repository name')
+  })
+
+  it('rejects a non-empty destination and does not remove the file', async () => {
+    const files = new MemoryFileSystem('/tmp/occupied')
+    await files.writeText('keep.md', 'stay')
+    await expect(assertCloneDestEmpty(files)).rejects.toThrow('Destination is not empty')
+    expect(await files.readText('keep.md')).toBe('stay')
+    await assertCloneDestEmpty(new MemoryFileSystem('/tmp/empty-dest'))
   })
 })
 
