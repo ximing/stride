@@ -21,6 +21,7 @@ import { useEditorState } from '@tiptap/react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { Mark } from '../ui/icon'
 import { applyLink, runFormat, unsetLink, type FormatName } from './extensions'
+import { addTableColumn, addTableRow, deleteTableColumn, deleteTableRow } from './table'
 
 type ActiveKey =
   | 'bold'
@@ -37,6 +38,7 @@ type ActiveKey =
   | 'code'
   | 'codeBlock'
   | 'hr'
+  | 'table'
 
 type ActiveState = Record<ActiveKey, boolean>
 
@@ -64,6 +66,7 @@ const IDLE: ActiveState = {
   code: false,
   codeBlock: false,
   hr: false,
+  table: false,
 }
 
 export const editorTools: ToolSpec[] = [
@@ -148,6 +151,7 @@ export function EditorToolbar({
         code: current.isActive('code'),
         codeBlock: current.isActive('codeBlock'),
         hr: current.isActive('horizontalRule'),
+        table: current.isActive('table'),
       }
     },
   }) ?? IDLE
@@ -224,6 +228,50 @@ export function EditorToolbar({
         >
           Wikilink
         </button>
+        {active.table && (
+          <>
+            <button
+              type="button"
+              className="editor-tool editor-tool-text"
+              data-testid="table-add-row"
+              aria-label="添加行"
+              onMouseDown={keepSelection}
+              onClick={() => addTableRow(editor)}
+            >
+              添加行
+            </button>
+            <button
+              type="button"
+              className="editor-tool editor-tool-text"
+              data-testid="table-del-row"
+              aria-label="删除行"
+              onMouseDown={keepSelection}
+              onClick={() => deleteTableRow(editor)}
+            >
+              删除行
+            </button>
+            <button
+              type="button"
+              className="editor-tool editor-tool-text"
+              data-testid="table-add-column"
+              aria-label="添加列"
+              onMouseDown={keepSelection}
+              onClick={() => addTableColumn(editor)}
+            >
+              添加列
+            </button>
+            <button
+              type="button"
+              className="editor-tool editor-tool-text"
+              data-testid="table-del-column"
+              aria-label="删除列"
+              onMouseDown={keepSelection}
+              onClick={() => deleteTableColumn(editor)}
+            >
+              删除列
+            </button>
+          </>
+        )}
         {linkForm && (
           <form className="wikilink-draft" onSubmit={submitLink}>
             <input

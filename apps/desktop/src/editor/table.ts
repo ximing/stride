@@ -1,0 +1,39 @@
+import type { Editor } from '@tiptap/core'
+import { Table } from '@tiptap/extension-table'
+import { TableCell } from '@tiptap/extension-table-cell'
+import { TableHeader } from '@tiptap/extension-table-header'
+import { TableRow } from '@tiptap/extension-table-row'
+
+export function tableExtensions() {
+  return [
+    Table.configure({ resizable: false }),
+    TableRow,
+    TableHeader,
+    TableCell,
+  ]
+}
+
+export const tableSlashCommand = {
+  id: 'table',
+  title: '表格',
+  keywords: 'table 表格',
+  run(editor: Editor) {
+    editor.commands.insertTable({ rows: 3, cols: 3, withHeaderRow: true })
+  },
+}
+
+export function addTableRow(editor: Editor) {
+  return editor.commands.addRowAfter()
+}
+
+export function deleteTableRow(editor: Editor) {
+  return editor.commands.deleteRow()
+}
+
+export function addTableColumn(editor: Editor) {
+  return editor.commands.addColumnAfter()
+}
+
+export function deleteTableColumn(editor: Editor) {
+  return editor.commands.deleteColumn()
+}

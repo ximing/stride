@@ -4,10 +4,12 @@ import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import StarterKit from '@tiptap/starter-kit'
 import { registerSlashCommand, slashMenu } from './slash'
+import { tableExtensions, tableSlashCommand } from './table'
 import { createTaskExtensions, taskSlashCommand } from './task'
 import { createWikilinkNode, createWikilinkSuggestionExtension } from './wikilink'
 
 registerSlashCommand(taskSlashCommand)
+registerSlashCommand(tableSlashCommand)
 
 export type FormatName =
   | 'bold'
@@ -58,6 +60,7 @@ export function createEditorExtensions(options: {
     createWikilinkSuggestionExtension(getNotes),
     ...createTaskExtensions(),
     slashMenu,
+    ...tableExtensions(),
   ]
 }
 
