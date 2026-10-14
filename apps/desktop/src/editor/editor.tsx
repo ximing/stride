@@ -6,6 +6,7 @@ import { observer, useService } from '@rabjs/react'
 import { VaultService } from '../services/vault.service'
 import { createEditorExtensions } from './extensions'
 import { plainTextSelection } from './search-jump'
+import { EditorFind } from './find-bar'
 import { EditorToolbar } from './toolbar'
 import { resolveWikilinkClick } from './wikilink'
 
@@ -82,6 +83,7 @@ export const NoteEditor = observer(function NoteEditor() {
 
   return (
     <div data-testid="editor" className="editor">
+      <EditorFind editor={editor} />
       <EditorToolbar editor={editor} openLinkRef={openLinkRef} />
       <EditorContent editor={editor} />
     </div>

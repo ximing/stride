@@ -6,6 +6,7 @@ import Placeholder from '@tiptap/extension-placeholder'
 import StarterKit from '@tiptap/starter-kit'
 import { codeBlockExtension } from './codeblock'
 import { calloutNode, calloutSlashCommand, highlightInputExtension } from './callout'
+import { findHighlightExtension } from './find'
 import { createImageExtension, imageSlashCommand } from './image'
 import { registerSlashCommand, slashMenu } from './slash'
 import { tableExtensions, tableSlashCommand } from './table'
@@ -72,6 +73,7 @@ export function createEditorExtensions(options: {
     highlightInputExtension,
     createImageExtension({ getFs: options.getFs ?? (() => null) }),
     codeBlockExtension,
+    findHighlightExtension,
   ]
 }
 

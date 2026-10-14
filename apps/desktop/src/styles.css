@@ -579,6 +579,44 @@ textarea {
   color: inherit;
 }
 
+.find-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-bottom: 0.6rem;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  background: var(--paper);
+}
+
+.find-bar input {
+  width: auto;
+  flex: 1 1 7rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0.25rem 0;
+}
+
+.find-bar button {
+  width: auto;
+  padding: 0.2rem 0.7rem;
+}
+
+.find-count {
+  flex: none;
+  min-width: 2.4rem;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.editor .find-hit {
+  background: #f3d27a;
+  border-radius: 2px;
+}
+
 .wikilink-menu {
   position: fixed;
   z-index: 30;
