@@ -3,6 +3,7 @@ import { parseNote, serializeNote, type TipTapNode } from '@stride/core/note'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createEditorExtensions } from './extensions'
 import { filterSlashCommands, moveSlashSelection, slashCommands } from './slash'
+import { taskSlashCommand } from './task'
 
 const layoutBox = () => ({
   x: 0,
@@ -92,6 +93,7 @@ describe('slash menu', () => {
       'quote',
       'code',
       'hr',
+      'task',
     ])
     for (const query of ['code', '代码']) {
       const ids = filterSlashCommands(query).map((item) => item.id)
@@ -111,6 +113,23 @@ describe('slash menu', () => {
     items[index].run(editor)
     expect(items[index].id).toBe('h3')
     expect(hasNode(editor.getJSON(), 'heading', 3)).toBe(true)
+    expect(texts(editor.getJSON())).not.toContain('/')
+  })
+
+  it('filters 任务 to the task command and inserts a task list', () => {
+    expect(filterSlashCommands('任务').map((item) => item.id)).toContain('task')
+    const registered = slashCommands.find((item) => item.id === 'task')
+    expect(registered).toMatchObject({
+      id: 'task',
+      title: '任务列表',
+      keywords: 'task todo 任务 待办',
+    })
+
+    const editor = createEditor()
+    editor.commands.insertContent('/')
+    dropSlash(editor)
+    taskSlashCommand.run(editor)
+    expect(hasNode(editor.getJSON(), 'taskList')).toBe(true)
     expect(texts(editor.getJSON())).not.toContain('/')
   })
 

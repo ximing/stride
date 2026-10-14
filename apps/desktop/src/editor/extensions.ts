@@ -3,9 +3,11 @@ import Highlight from '@tiptap/extension-highlight'
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import StarterKit from '@tiptap/starter-kit'
-import { slashMenu } from './slash'
-import { createTaskExtensions } from './task'
+import { registerSlashCommand, slashMenu } from './slash'
+import { createTaskExtensions, taskSlashCommand } from './task'
 import { createWikilinkNode, createWikilinkSuggestionExtension } from './wikilink'
+
+registerSlashCommand(taskSlashCommand)
 
 export type FormatName =
   | 'bold'
