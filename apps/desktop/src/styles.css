@@ -587,3 +587,37 @@ textarea {
 .editor .ProseMirror li[data-type='taskItem'] .task-list-block {
   margin-top: 0.15rem;
 }
+
+.slash-menu {
+  position: fixed;
+  z-index: 30;
+  min-width: 11rem;
+  max-width: 18rem;
+  max-height: 16rem;
+  overflow: auto;
+  padding: 0.3rem;
+  background: var(--paper);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 0.6rem;
+  box-shadow: 0 8px 20px rgba(28, 23, 18, 0.08);
+}
+
+.slash-menu-item,
+.slash-menu-empty {
+  padding: 0.4rem 0.65rem;
+  border-radius: 0.4rem;
+}
+
+.slash-menu-item {
+  cursor: pointer;
+}
+
+.slash-menu [role="option"][aria-selected="true"] {
+  background: color-mix(in srgb, var(--moss) 18%, var(--paper));
+  color: var(--moss);
+}
+
+.slash-menu-empty {
+  color: var(--muted);
+}

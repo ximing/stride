@@ -3,6 +3,7 @@ import Highlight from '@tiptap/extension-highlight'
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import StarterKit from '@tiptap/starter-kit'
+import { slashMenu } from './slash'
 import { createTaskExtensions } from './task'
 
 export type FormatName =
@@ -64,6 +65,7 @@ export function createEditorExtensions(options: { onModK: () => boolean }) {
     linkKeymap,
     Placeholder.configure({ placeholder: 'Write in the vault…' }),
     ...createTaskExtensions(),
+    slashMenu,
   ]
 }
 
