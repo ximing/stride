@@ -9,6 +9,7 @@ import { notePath, readNoteFile } from '../../../../packages/core/src/vault'
 import { App, Rail } from '../app'
 import { ChatService, GitService, SettingsService, UpdateService } from './panels.service'
 import { FolderService } from './folder.service'
+import { ListFilterService } from './list-filter.service'
 import { VAULT_REGISTRY_KEY, VaultService } from './vault.service'
 
 function sample(id: string, title: string): StrideNote {
@@ -42,6 +43,7 @@ describe('VaultService', () => {
     localStorage.removeItem(VAULT_REGISTRY_KEY)
     vi.useRealTimers()
     vi.unstubAllGlobals()
+    resolve(ListFilterService).clear()
   })
 
   it('re-renders an observer when the service changes', async () => {
@@ -642,6 +644,40 @@ describe('VaultService', () => {
     expect(new Set(vault.vaults.map((entry) => entry.id)).size).toBe(2)
     expect(vault.vaults.every((entry) => entry.label === 'memory-vault')).toBe(true)
     expect(localStorage.getItem(VAULT_REGISTRY_KEY)).toBeNull()
+    vault.cancelPending()
+  })
+
+  it('clears the list filter when another vault opens', async () => {
+    useMemoryFixture()
+    register(VaultService)
+    register(FolderService)
+    const vault = resolve(VaultService)
+    const listFilter = resolve(ListFilterService)
+    await vault.openFromDraft()
+    await vault.createNote()
+    vault.updateTitle('Field notes')
+    await vault.flush()
+    listFilter.setQuery('zephyrhide')
+    expect(vault.visibleNotes.some((note) => note.title === 'Field notes')).toBe(true)
+    expect(listFilter.apply(vault.visibleNotes)).toEqual([])
+
+    vault.updateDoc({
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'keep-filter' }] }],
+    })
+    await vault.flush()
+    vault.searchQuery = 'keep-filter'
+    await vault.runSearch()
+    expect(listFilter.query).toBe('zephyrhide')
+
+    await vault.cloneSampleVault()
+    expect(vault.error).toBe('')
+    expect(listFilter.query).toBe('')
+    expect(listFilter.apply(vault.visibleNotes).map((note) => note.title).sort()).toEqual([
+      'Ada Lovelace',
+      'Sample project',
+      'Welcome',
+    ])
     vault.cancelPending()
   })
 

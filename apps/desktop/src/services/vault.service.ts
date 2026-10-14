@@ -51,6 +51,7 @@ import {
   readNoteFile,
   saveNote,
 } from '../../../../packages/core/src/vault'
+import { ListFilterService } from './list-filter.service'
 
 const COLLAPSED_TYPES_KEY = 'stride:collapsed-types'
 
@@ -809,6 +810,10 @@ export class VaultService extends Service {
     await this.upsertIndexed(saved)
   }
 
+  private get listFilterService() {
+    return this.resolve(ListFilterService)
+  }
+
   private async openBackend(backend: FileSystemBackend) {
     await recoverRename(backend)
     const opened = await openVault(backend, HOME_DIR)
@@ -833,6 +838,7 @@ export class VaultService extends Service {
     this.searchHits = []
     this.searchQuery = ''
     this.searchMode = ''
+    this.listFilterService.clear()
     this.renameFromHeading = renameFromHeading
     this.advanceInbox = advanceInbox
     this.resetPropertyEditor()
