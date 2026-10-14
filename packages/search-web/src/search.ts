@@ -17,6 +17,7 @@ import {
   type SearchHit,
   type SearchQuery,
 } from '@stride/platform'
+import { loadPackagedJiebaDict, type JiebaDict } from './dict.ts'
 
 const COLLECTION = 'notes'
 const TEXT_FIELD = 'text'
@@ -32,6 +33,8 @@ export interface VaneSession {
 }
 
 export type VaneFactory = (opts?: VaneWorkerOpts) => Promise<VaneSession>
+
+export type JiebaDictLoader = () => Promise<JiebaDict>
 
 function dbPathForVault(vaultKey: string): string {
   if (vaultKey.length === 0) throw new PlatformError('escape', 'vaultKey is empty')
@@ -150,13 +153,28 @@ class VaneSearchBackend implements SearchBackend {
   }
 }
 
-export function createVaneSearchOpener(factory: VaneFactory, vfs: VfsKind): SearchBackendOpener {
+export function createVaneSearchOpener(
+  factory: VaneFactory,
+  vfs: VfsKind,
+  loadDict: JiebaDictLoader = loadPackagedJiebaDict,
+): SearchBackendOpener {
   return {
     async open(options): Promise<SearchBackend> {
       const dbPath = dbPathForVault(options.vaultKey)
-      // Omit dictData and dictUrl so createVane uses its CDN dictionary.
-      // A failed fetch falls back to cjk_bigram; jieba still runs when the dict loads.
-      const vane = await factory({ vfs, dbPath })
+      let loaded: JiebaDict
+      try {
+        loaded = await loadDict()
+      } catch (error) {
+        if (error instanceof PlatformError) throw error
+        const detail = error instanceof Error ? error.message : String(error)
+        throw new PlatformError('io', `Failed to load jieba dictionary: ${detail}`)
+      }
+      if (loaded.dictData.byteLength === 0 || !/^[0-9a-f]{16}$/.test(loaded.dictSha256)) {
+        throw new PlatformError('io', 'Jieba dictionary is empty or its sha256 prefix is invalid')
+      }
+      // createVane transfers the buffer. slice keeps a shared copy usable and sends only these bytes.
+      const dictData = loaded.dictData.slice()
+      const vane = await factory({ vfs, dbPath, dictData, dictSha256: loaded.dictSha256 })
       try {
         await vane.open(dbPath, { autoCommit: 'off', persistence: 'persistent' })
         const col = await vane.collection(COLLECTION, schemaFor(options.dim), {

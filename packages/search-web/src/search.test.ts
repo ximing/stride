@@ -1,7 +1,9 @@
+import { readFile } from 'node:fs/promises'
+import { createRequire } from 'node:module'
 import { createVane } from '@vane-rs/web'
 import type { Doc, Hit, Schema, SearchQuery as VaneQuery, VaneWorkerOpts } from '@vane-rs/web'
 import { PlatformError, type SearchBackend, type SearchBackendOpener } from '@stride/platform'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, describe, expect, it } from 'vitest'
 import { createVaneSearchOpener, type VaneFactory, type VaneSession, vaneWebSearchOpener } from './index.ts'
 
 interface MemoryOptions {
@@ -16,18 +18,79 @@ interface OpenedSchema {
   vfs?: string
 }
 
+interface JiebaDictBytes {
+  dictData: Uint8Array
+  dictSha256: string
+}
+
+const require = createRequire(import.meta.url)
+
+function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
+  if (left.byteLength !== right.byteLength) return false
+  for (let i = 0; i < left.byteLength; i += 1) {
+    if (left[i] !== right[i]) return false
+  }
+  return true
+}
+
+function hexOf(bytes: Uint8Array): string {
+  let hex = ''
+  for (const byte of bytes) hex += byte.toString(16).padStart(2, '0')
+  return hex
+}
+
+function packageFile(specifier: string): string {
+  return require.resolve(specifier)
+}
+
+let packagedDict: Promise<JiebaDictBytes> | undefined
+
+function loadPackagedDictForTest(): Promise<JiebaDictBytes> {
+  packagedDict ??= readPackagedDict()
+  return packagedDict
+}
+
+// Vitest rewrites `?url` to a `/@fs/` path. Node fetch cannot read it; map only that prefix back to the package file.
+const nativeFetch = globalThis.fetch.bind(globalThis)
+globalThis.fetch = async (input: RequestInfo | URL, init?: RequestInit) => {
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url
+  if (url.startsWith('/@fs/')) {
+    const path = decodeURIComponent(url.slice('/@fs'.length).split('?')[0] ?? '')
+    const bytes = await readFile(path)
+    return new Response(bytes)
+  }
+  return nativeFetch(input, init)
+}
+
+afterAll(() => {
+  globalThis.fetch = nativeFetch
+})
+
+async function readPackagedDict(): Promise<JiebaDictBytes> {
+  const dictData = new Uint8Array(await readFile(packageFile('@vane-rs/dict-zh/dict.bin')))
+  const prefix = new Uint8Array(await readFile(packageFile('@vane-rs/dict-zh/sha256_prefix.bin')))
+  const dictSha256 = hexOf(prefix)
+  if (dictData.byteLength === 0 || !/^[0-9a-f]{16}$/.test(dictSha256)) {
+    throw new Error(`packaged jieba dictionary is unusable (${dictData.byteLength} bytes, sha ${dictSha256})`)
+  }
+  return { dictData, dictSha256 }
+}
+
 function createMemoryVane(options: MemoryOptions = {}): {
   factory: VaneFactory
   opened: OpenedSchema[]
   queries: VaneQuery[]
   added: Doc[]
+  workerOpts: VaneWorkerOpts[]
 } {
   const stores = new Map<string, Map<string, Doc>>()
   const opened: OpenedSchema[] = []
   const queries: VaneQuery[] = []
   const added: Doc[] = []
+  const workerOpts: VaneWorkerOpts[] = []
 
   const factory: VaneFactory = (opts?: VaneWorkerOpts) => {
+    if (opts) workerOpts.push(opts)
     const dbPath = opts?.dbPath ?? 'vane.db'
     const key = `${opts?.vfs ?? 'memory'}\0${dbPath}`
     const docs = stores.get(key) ?? new Map<string, Doc>()
@@ -97,7 +160,7 @@ function createMemoryVane(options: MemoryOptions = {}): {
     return Promise.resolve(session)
   }
 
-  return { factory, opened, queries, added }
+  return { factory, opened, queries, added, workerOpts }
 }
 
 const backends: SearchBackend[] = []
@@ -143,6 +206,17 @@ describe('vane web search', () => {
     expect(memory.opened[0]?.schema.fields).toEqual([{ name: 'text', type: 'text' }])
     expect(memory.opened[0]?.dbPath).toMatch(/^[A-Za-z0-9._-]+$/)
     expect(memory.opened[0]?.vfs).toBe('memory')
+    const dict = memory.workerOpts[0]?.dictData
+    expect(dict).toBeInstanceOf(Uint8Array)
+    const bytes = dict as Uint8Array
+    const packaged = await loadPackagedDictForTest()
+    expect(bytes.byteLength).toBeGreaterThan(0)
+    expect(bytes.byteLength).toBe(packaged.dictData.byteLength)
+    expect(sameBytes(bytes, packaged.dictData)).toBe(true)
+    expect(memory.workerOpts[0]?.dictSha256).toMatch(/^[0-9a-f]{16}$/)
+    expect(memory.workerOpts[0]?.dictSha256).toBe(packaged.dictSha256)
+    expect(memory.workerOpts[0]?.dictUrl).toBeUndefined()
+    console.info(`dictData.byteLength=${bytes.byteLength} dictSha256=${memory.workerOpts[0]?.dictSha256}`)
   })
 
   it('builds the snippet from the local copy when hit fields are empty', async () => {
@@ -264,6 +338,20 @@ describe('vane web search', () => {
     await expect(opener.open({ vaultKey: '', dim: 0 })).rejects.toMatchObject({ code: 'escape' })
   })
 
+  it('throws PlatformError and does not open vane when the dictionary cannot be loaded', async () => {
+    let called = false
+    const factory: VaneFactory = async () => {
+      called = true
+      throw new Error('factory should not run')
+    }
+    const opener = createVaneSearchOpener(factory, 'memory', async () => {
+      throw new Error('dict missing')
+    })
+    await expect(opener.open({ vaultKey: 'vault-dict', dim: 0 })).rejects.toBeInstanceOf(PlatformError)
+    await expect(opener.open({ vaultKey: 'vault-dict', dim: 0 })).rejects.toMatchObject({ code: 'io' })
+    expect(called).toBe(false)
+  })
+
   it('exposes an opfs opener', () => {
     expect(typeof vaneWebSearchOpener().open).toBe('function')
   })
@@ -274,6 +362,7 @@ describe('vane web search', () => {
     try {
       backend = await opener.open({ vaultKey: 'wasm-real', dim: 0 })
     } catch (error) {
+      if (error instanceof PlatformError) throw error
       const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
       console.error(`REAL_WASM_UNAVAILABLE: ${message}`)
       return
