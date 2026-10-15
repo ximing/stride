@@ -118,7 +118,7 @@ export const codeBlockExtension = CodeBlockLowlight.extend({
         overlay.innerHTML = html
         if (html) {
           code.style.color = 'transparent'
-          code.style.caretColor = 'var(--ink)'
+          code.style.caretColor = 'var(--sd-fg)'
         } else {
           code.style.color = ''
           code.style.caretColor = ''

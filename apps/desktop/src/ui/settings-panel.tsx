@@ -1,14 +1,39 @@
+import { Desktop, Moon, Sun } from '@phosphor-icons/react'
 import { observer, useService } from '@rabjs/react'
 import { LLM_PROVIDERS, catalogBaseUrl, catalogModelSuggestions } from '@stride/core'
 import { SettingsService, UpdateService } from '../services/panels.service'
+import { ThemeService } from '../services/theme.service'
+import { THEME_MODES, type ThemeMode } from '../services/theme'
+import { Mark } from './icon'
+
+const THEME_ICONS: Record<ThemeMode, typeof Sun> = { light: Sun, dark: Moon, system: Desktop }
+const THEME_LABELS: Record<ThemeMode, string> = { light: 'Light', dark: 'Dark', system: 'System' }
 
 export const SettingsPanel = observer(function SettingsPanel() {
   const settings = useService(SettingsService)
   const updates = useService(UpdateService)
+  const theme = useService(ThemeService)
   const selected = settings.form.llmConfigs.find((config) => config.id === settings.selectedLlmId)
   return (
     <div>
       <h2>Settings</h2>
+      <div className="field">
+        <span>Theme</span>
+        <div className="theme-picker" role="group" aria-label="Theme">
+          {THEME_MODES.map((mode) => (
+            <button
+              key={mode}
+              type="button"
+              data-testid={`theme-${mode}`}
+              aria-pressed={theme.mode === mode}
+              onClick={() => theme.setTheme(mode)}
+            >
+              <Mark icon={THEME_ICONS[mode]} size={16} />
+              {THEME_LABELS[mode]}
+            </button>
+          ))}
+        </div>
+      </div>
       <label className="field"><span>Embedding endpoint</span>
         <input value={settings.form.embedding.endpoint} onChange={(event) => settings.patchEmbedding({ endpoint: event.target.value })} />
       </label>

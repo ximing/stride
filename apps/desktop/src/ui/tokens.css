@@ -1,46 +1,120 @@
-/* Light is the base. system follows prefers-color-scheme; dark is explicit. */
+/* Single source of truth for Stride design tokens.
+   - The :root blocks drive the app (styles.css consumes the same --sd-* tokens).
+   - The .sd-preview scopes carry the same tokens for the /dev/components preview,
+     whose data-theme switcher is independent of the app theme.
+   light is the base; [data-theme="dark"] overrides; "system" means NO data-theme
+   attribute on :root, so the prefers-color-scheme media query applies and tracks
+   OS changes with no JS listener. */
 
+/* Theme-independent tokens. */
+:root {
+  --sd-radius: 6px;
+  --sd-radius-lg: 10px;
+  --sd-dot-gray: #b7aa9b;
+  --sd-dot-blue: #7ea0c4;
+  --sd-dot-teal: #6eaea4;
+  --sd-dot-green: #8fbfa4;
+  --sd-dot-orange: #d08a4c;
+  --sd-dot-purple: #b39bc9;
+  --sd-dot-red: #e7aea6;
+  --sd-dot-pink: #e3a3b5;
+  --sd-dot-yellow: #e0c27a;
+  --sd-font-sans: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+  --sd-font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  --sd-font-mono: "IBM Plex Mono", ui-monospace, monospace;
+}
+
+:root,
+:root[data-theme="light"],
 .sd-preview,
 .sd-preview[data-theme="light"],
 .sd-preview[data-theme="system"] {
   color-scheme: light;
-  --bg: #f2eee6;
-  --bg-elevated: #faf8f3;
-  --fg: #2a241c;
-  --muted: #645a4f;
-  --border: #d0c5b6;
-  --accent: #1f5c40;
-  --danger: #7c2f29;
-  --overlay: rgba(32, 26, 20, 0.36);
-  --shadow: 0 18px 44px rgba(42, 36, 28, 0.12), 0 1px 2px rgba(42, 36, 28, 0.08);
+  --sd-bg: #f2eee6;
+  --sd-bg-elevated: #faf8f3;
+  --sd-fg: #2a241c;
+  --sd-muted: #645a4f;
+  --sd-border: #d0c5b6;
+  --sd-accent: #1f5c40;
+  --sd-danger: #7c2f29;
+  --sd-overlay: rgba(32, 26, 20, 0.36);
+  --sd-shadow: 0 18px 44px rgba(42, 36, 28, 0.12), 0 1px 2px rgba(42, 36, 28, 0.08);
+  --sd-mark: #f3e2a8;
+  --sd-mark-strong: #f3d27a;
+  --sd-syntax-keyword: #1f5c40;
+  --sd-syntax-string: #8c5220;
+  --sd-syntax-number: #6d4fa3;
+  --sd-syntax-comment: #645a4f;
+  --sd-syntax-function: #2f5f8a;
+  --sd-syntax-attr: #2c6e66;
+  --sd-diff-add: #2e6b4e;
+  --sd-diff-del: #7c2f29;
+  --sd-diff-hunk: #645a4f;
 }
 
+:root[data-theme="dark"],
 .sd-preview[data-theme="dark"] {
   color-scheme: dark;
-  --bg: #1c1814;
-  --bg-elevated: #27221c;
-  --fg: #f3eee6;
-  --muted: #b5a494;
-  --border: #463e36;
-  --accent: #8fbfa4;
-  --danger: #e7aea6;
-  --overlay: rgba(8, 6, 4, 0.64);
-  --shadow: 0 18px 48px rgba(6, 4, 2, 0.5), 0 1px 2px rgba(6, 4, 2, 0.4);
+  --sd-bg: #1c1814;
+  --sd-bg-elevated: #27221c;
+  --sd-fg: #f3eee6;
+  --sd-muted: #b5a494;
+  --sd-border: #463e36;
+  --sd-accent: #8fbfa4;
+  --sd-danger: #e7aea6;
+  --sd-overlay: rgba(8, 6, 4, 0.64);
+  --sd-shadow: 0 18px 48px rgba(6, 4, 2, 0.5), 0 1px 2px rgba(6, 4, 2, 0.4);
+  --sd-mark: #6b5a2e;
+  --sd-mark-strong: #7a6536;
+  --sd-syntax-keyword: #8fbfa4;
+  --sd-syntax-string: #d9a06a;
+  --sd-syntax-number: #bfa7d8;
+  --sd-syntax-comment: #b5a494;
+  --sd-syntax-function: #93b4d4;
+  --sd-syntax-attr: #8cc4ba;
+  --sd-diff-add: #8fbfa4;
+  --sd-diff-del: #e7aea6;
+  --sd-diff-hunk: #b5a494;
 }
 
 @media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]),
   .sd-preview[data-theme="system"] {
     color-scheme: dark;
-    --bg: #1c1814;
-    --bg-elevated: #27221c;
-    --fg: #f3eee6;
-    --muted: #b5a494;
-    --border: #463e36;
-    --accent: #8fbfa4;
-    --danger: #e7aea6;
-    --overlay: rgba(8, 6, 4, 0.64);
-    --shadow: 0 18px 48px rgba(6, 4, 2, 0.5), 0 1px 2px rgba(6, 4, 2, 0.4);
+    --sd-bg: #1c1814;
+    --sd-bg-elevated: #27221c;
+    --sd-fg: #f3eee6;
+    --sd-muted: #b5a494;
+    --sd-border: #463e36;
+    --sd-accent: #8fbfa4;
+    --sd-danger: #e7aea6;
+    --sd-overlay: rgba(8, 6, 4, 0.64);
+    --sd-shadow: 0 18px 48px rgba(6, 4, 2, 0.5), 0 1px 2px rgba(6, 4, 2, 0.4);
+    --sd-mark: #6b5a2e;
+    --sd-mark-strong: #7a6536;
+    --sd-syntax-keyword: #8fbfa4;
+    --sd-syntax-string: #d9a06a;
+    --sd-syntax-number: #bfa7d8;
+    --sd-syntax-comment: #b5a494;
+    --sd-syntax-function: #93b4d4;
+    --sd-syntax-attr: #8cc4ba;
+    --sd-diff-add: #8fbfa4;
+    --sd-diff-del: #e7aea6;
+    --sd-diff-hunk: #b5a494;
   }
+}
+
+/* Short legacy aliases consumed by the preview component styles below. */
+.sd-preview {
+  --bg: var(--sd-bg);
+  --bg-elevated: var(--sd-bg-elevated);
+  --fg: var(--sd-fg);
+  --muted: var(--sd-muted);
+  --border: var(--sd-border);
+  --accent: var(--sd-accent);
+  --danger: var(--sd-danger);
+  --overlay: var(--sd-overlay);
+  --shadow: var(--sd-shadow);
 }
 
 .sd-preview,

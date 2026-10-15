@@ -2,6 +2,25 @@ import { useState } from 'react'
 import type { GitChange } from '../../../../packages/core/src/git-changes.ts'
 import { Modal, ModalContent } from './modal'
 
+function diffLineClass(line: string): string {
+  if (line.startsWith('@@')) return 'diff-line diff-hunk'
+  if (line.startsWith('+') && !line.startsWith('+++')) return 'diff-line diff-add'
+  if (line.startsWith('-') && !line.startsWith('---')) return 'diff-line diff-del'
+  return 'diff-line'
+}
+
+/** Renders a unified diff with add/del/hunk line colors. textContent is preserved verbatim. */
+function DiffLines({ diff }: { diff: string }) {
+  const lines = diff.split('\n')
+  return (
+    <>
+      {lines.map((line, index) => (
+        <span key={index} className={diffLineClass(line)}>{index === 0 ? line : `\n${line}`}</span>
+      ))}
+    </>
+  )
+}
+
 export function GitPanelView(props: {
   surface: 'unavailable' | 'disabled' | 'blocked' | 'needs-init' | 'ready'
   branch: string
@@ -105,7 +124,7 @@ export function GitPanelView(props: {
               </div>
             ))
           )}
-          <pre className="diff" data-testid="git-diff">{props.diff}</pre>
+          <pre className="diff" data-testid="git-diff"><DiffLines diff={props.diff} /></pre>
           <div className="editor-tools">
             <button type="button" data-testid="git-history" onClick={() => props.onLoadHistory?.()}>History</button>
           </div>
