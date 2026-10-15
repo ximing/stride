@@ -1,6 +1,5 @@
 import type { Icon } from '@phosphor-icons/react'
 import { ChatCircle } from '@phosphor-icons/react/ChatCircle'
-import { GearSix } from '@phosphor-icons/react/GearSix'
 import { GitBranch } from '@phosphor-icons/react/GitBranch'
 import { ListBullets } from '@phosphor-icons/react/ListBullets'
 import { CaretLineRight } from '@phosphor-icons/react/CaretLineRight'
@@ -12,7 +11,6 @@ import { ChatPanel } from './chat-panel'
 import { GitPanel } from './git-panel-host'
 import { Mark } from './icon'
 import { PropertiesPanel } from './properties-panel'
-import { SettingsPanel } from './settings-panel'
 import { TocPanel } from './toc-panel'
 
 const PANEL_TABS: { id: RightPanelTab; label: string; icon: Icon }[] = [
@@ -20,7 +18,6 @@ const PANEL_TABS: { id: RightPanelTab; label: string; icon: Icon }[] = [
   { id: 'toc', label: 'Outline', icon: ListBullets },
   { id: 'git', label: 'Git', icon: GitBranch },
   { id: 'chat', label: 'Agent', icon: ChatCircle },
-  { id: 'settings', label: 'Settings', icon: GearSix },
 ]
 
 const TabButton = observer(function TabButton({ tab, collapsed }: { tab: (typeof PANEL_TABS)[number]; collapsed: boolean }) {
@@ -87,7 +84,6 @@ export const RightPanel = observer(function RightPanel() {
         {layout.rightPanelTab === 'toc' && <TocPanel />}
         {layout.rightPanelTab === 'git' && <GitPanel />}
         {layout.rightPanelTab === 'chat' && <ChatPanel />}
-        {layout.rightPanelTab === 'settings' && <SettingsPanel />}
       </div>
     </div>
   )

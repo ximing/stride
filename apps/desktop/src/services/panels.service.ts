@@ -57,6 +57,10 @@ interface PublicSettings {
   autoGitEnabled: boolean
   autoGitIdleSeconds: number
   autoGitBlurSeconds: number
+  appearance: AppSettings['appearance']
+  editor: AppSettings['editor']
+  updates: AppSettings['updates']
+  privacy: AppSettings['privacy']
 }
 
 const emptySettings = (): PublicSettings => ({
@@ -68,6 +72,10 @@ const emptySettings = (): PublicSettings => ({
   autoGitEnabled: false,
   autoGitIdleSeconds: 0,
   autoGitBlurSeconds: 0,
+  appearance: { noteWidth: 'standard', fontSize: 15 },
+  editor: { autosaveDebounceMs: 350 },
+  updates: { channel: 'stable', autoCheck: true },
+  privacy: { telemetryEnabled: false },
 })
 
 const GIT_BROWSER = 'Git is not available in the browser'
@@ -1333,6 +1341,10 @@ export class SettingsService extends Service {
         autoGitEnabled: this.form.autoGitEnabled,
         autoGitIdleSeconds: this.form.autoGitIdleSeconds,
         autoGitBlurSeconds: this.form.autoGitBlurSeconds,
+        appearance: { ...this.form.appearance },
+        editor: { ...this.form.editor },
+        updates: { ...this.form.updates },
+        privacy: { ...this.form.privacy },
       }
       const fs = await settingsFile()
       await writeSettings(fs, SETTINGS_FILE, settings, secrets)
@@ -1370,6 +1382,10 @@ export class SettingsService extends Service {
         autoGitEnabled: settings.autoGitEnabled,
         autoGitIdleSeconds: settings.autoGitIdleSeconds,
         autoGitBlurSeconds: settings.autoGitBlurSeconds,
+        appearance: settings.appearance,
+        editor: settings.editor,
+        updates: settings.updates,
+        privacy: settings.privacy,
       }
       this.notice = ''
       after = this.embeddingRuntime()
@@ -1469,6 +1485,10 @@ export class SettingsService extends Service {
         autoGitEnabled: settings.autoGitEnabled,
         autoGitIdleSeconds: settings.autoGitIdleSeconds,
         autoGitBlurSeconds: settings.autoGitBlurSeconds,
+        appearance: settings.appearance,
+        editor: settings.editor,
+        updates: settings.updates,
+        privacy: settings.privacy,
       }
       this.notice = ''
     } catch (error) {

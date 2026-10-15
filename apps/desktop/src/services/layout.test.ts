@@ -131,12 +131,21 @@ describe('LayoutService', () => {
       ...DEFAULT_LAYOUT_STATE,
       sidebarWidth: 210,
       rightPanelCollapsed: true,
-      rightPanelTab: 'settings',
+      rightPanelTab: 'chat',
     })
     const layout = new LayoutService()
     expect(layout.sidebarWidth).toBe(210)
     expect(layout.rightPanelCollapsed).toBe(true)
-    expect(layout.rightPanelTab).toBe('settings')
+    expect(layout.rightPanelTab).toBe('chat')
+  })
+
+  it('falls back to the default tab when stored state names the retired settings tab', () => {
+    // Pre-T7.1 layouts may persist rightPanelTab: 'settings'; the settings page
+    // is a full-screen overlay now, so the stored value sanitizes away.
+    localStorage.setItem(LAYOUT_STORAGE_KEY, JSON.stringify({ ...DEFAULT_LAYOUT_STATE, rightPanelTab: 'settings' }))
+    expect(readLayoutState(localStorage).rightPanelTab).toBe(DEFAULT_LAYOUT_STATE.rightPanelTab)
+    const layout = new LayoutService()
+    expect(layout.rightPanelTab).toBe(DEFAULT_LAYOUT_STATE.rightPanelTab)
   })
 
   it('selecting a tab expands a collapsed right panel', () => {

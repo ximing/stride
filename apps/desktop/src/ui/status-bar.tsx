@@ -1,9 +1,10 @@
-import { GitBranch, House, MagnifyingGlass, Sparkle } from '@phosphor-icons/react'
+import { GearSix, GitBranch, House, MagnifyingGlass, Sparkle } from '@phosphor-icons/react'
 import { observer, useService } from '@rabjs/react'
 import { syncState } from '@stride/core'
 import type { GitSurface, SyncState } from '@stride/core'
 import { LayoutService } from '../services/layout.service'
 import { GitService } from '../services/panels.service'
+import { SettingsPageService } from '../services/settings-page.service'
 import { VaultService } from '../services/vault.service'
 import { APP_VERSION } from '../version'
 import { Mark } from './icon'
@@ -59,6 +60,7 @@ export const StatusBar = observer(function StatusBar() {
   const vault = useService(VaultService)
   const git = useService(GitService)
   const layout = useService(LayoutService)
+  const settingsPage = useService(SettingsPageService)
   return (
     <footer className="statusbar" data-testid="statusbar">
       <span className="statusbar-item">
@@ -99,6 +101,17 @@ export const StatusBar = observer(function StatusBar() {
       >
         <Mark icon={Sparkle} size={13} />
         Ask AI
+      </button>
+      <button
+        type="button"
+        className="statusbar-item statusbar-action"
+        data-testid="statusbar-settings"
+        aria-label="Settings"
+        title="Settings"
+        onClick={() => settingsPage.show()}
+      >
+        <Mark icon={GearSix} size={13} />
+        Settings
       </button>
       <span className="statusbar-item statusbar-version" data-testid="statusbar-version">v{APP_VERSION}</span>
     </footer>

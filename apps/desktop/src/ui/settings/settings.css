@@ -1,0 +1,161 @@
+/* Settings page overlay (T7.1). All colors come from tokens.css (--sd-*), so
+   light and dark both hold. Sits above the workspace (overlays peak at 50,
+   toasts at 60 in styles.css) and below toasts. */
+
+.settings-page {
+  position: fixed;
+  inset: 0;
+  z-index: 55;
+  display: grid;
+  grid-template-columns: 232px 1fr;
+  background: var(--sd-bg);
+  color: var(--sd-fg);
+  outline: none;
+}
+
+.settings-title {
+  position: absolute;
+  top: 0;
+  left: 0;
+  padding: 18px 20px 10px;
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sd-muted);
+}
+
+.settings-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.settings-nav {
+  grid-row: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 52px 10px 16px;
+  border-right: 1px solid var(--sd-border);
+  background: var(--sd-bg);
+  overflow-y: auto;
+}
+
+.settings-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 7px 10px;
+  border: none;
+  border-radius: var(--sd-radius);
+  background: transparent;
+  color: var(--sd-fg);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-nav-item:hover {
+  background: var(--sd-bg-elevated);
+}
+
+.settings-nav-item[aria-current='page'] {
+  background: var(--sd-bg-elevated);
+  color: var(--sd-accent);
+  font-weight: 600;
+}
+
+.settings-content {
+  grid-row: 1;
+  padding: 20px 28px 28px;
+  overflow-y: auto;
+}
+
+.settings-content-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.settings-section-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.settings-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+  background: var(--sd-bg-elevated);
+  color: var(--sd-muted);
+  cursor: pointer;
+}
+
+.settings-close:hover:not(:disabled) {
+  color: var(--sd-fg);
+}
+
+/* Shortcuts section (read-only, manifest-driven). */
+
+.settings-shortcuts {
+  max-width: 640px;
+}
+
+.settings-shortcut-group + .settings-shortcut-group {
+  margin-top: 20px;
+}
+
+.settings-shortcut-heading {
+  margin: 0 0 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sd-muted);
+}
+
+.settings-shortcut-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-lg);
+  background: var(--sd-bg-elevated);
+  overflow: hidden;
+}
+
+.settings-shortcut-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 7px 12px;
+  font-size: 13px;
+}
+
+.settings-shortcut-row + .settings-shortcut-row {
+  border-top: 1px solid var(--sd-border);
+}
+
+.settings-shortcut-kbd {
+  font-family: var(--sd-font-mono);
+  font-size: 12px;
+  color: var(--sd-muted);
+}
+
+.settings-shortcut-none {
+  color: var(--sd-muted);
+}

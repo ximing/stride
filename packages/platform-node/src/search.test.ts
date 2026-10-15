@@ -4,7 +4,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { once } from 'node:events'
 import { afterEach, describe, expect, it } from 'vitest'
-import { EmbeddingClient, maskSecret, noteIndex, saveNote, searchNotes, settingsContainRawKey, writeSettings, type AppSettings } from '@stride/core'
+import { EmbeddingClient, defaultSettings, maskSecret, noteIndex, saveNote, searchNotes, settingsContainRawKey, writeSettings, type AppSettings } from '@stride/core'
 import { NodeFileSystem, NodeSecretsStore, openVaneSearch } from './index.ts'
 
 const dirs: string[] = []
@@ -93,6 +93,7 @@ describe('vane search', () => {
 
     const settingsFile = path.join(dir, 'settings.json')
     const settings: AppSettings = {
+      ...defaultSettings(),
       embedding,
       llmConfigs: [{ id: 'c1', name: 'OpenAI', provider: 'openai', model: 'm', baseUrl: endpoint, apiKey: key, isDefault: true }],
       releasesUrl: '',

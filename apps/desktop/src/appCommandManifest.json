@@ -113,10 +113,10 @@
     },
     {
       "id": "view.tab.settings",
-      "title": "Show Settings Panel",
+      "title": "Open Settings",
+      "shortcut": "Mod+,",
       "section": "View",
-      "enabledWhen": "vaultReady",
-      "keywords": ["设置"]
+      "keywords": ["设置", "preferences"]
     },
     {
       "id": "view.saveCurrent",

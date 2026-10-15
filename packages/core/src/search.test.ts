@@ -120,6 +120,7 @@ describe('search notes', () => {
     const secrets = new MemorySecretsStore()
     const key = 'sk-stride-embed-test-key'
     const settings: AppSettings = {
+      ...defaultSettings(),
       embedding: { endpoint: 'http://127.0.0.1/v1', model: 'fixture-embed', apiKey: key, dim: 4 },
       llmConfigs: [{ id: 'c1', name: 'OpenAI', provider: 'openai', model: 'm', baseUrl: 'http://127.0.0.1/v1', apiKey: key, isDefault: true }],
       releasesUrl: '',

@@ -16,6 +16,28 @@ export interface LlmSettings {
   apiKey: string
 }
 
+export type NoteWidth = 'narrow' | 'standard' | 'wide'
+
+export interface AppearanceSettings {
+  noteWidth: NoteWidth
+  fontSize: number
+}
+
+export interface EditorSettings {
+  autosaveDebounceMs: number
+}
+
+export type UpdateChannel = 'stable' | 'beta'
+
+export interface UpdatesSettings {
+  channel: UpdateChannel
+  autoCheck: boolean
+}
+
+export interface PrivacySettings {
+  telemetryEnabled: boolean
+}
+
 export interface AppSettings {
   embedding: EmbeddingSettings
   llmConfigs: LlmConfig[]
@@ -25,6 +47,10 @@ export interface AppSettings {
   autoGitEnabled: boolean
   autoGitIdleSeconds: number
   autoGitBlurSeconds: number
+  appearance: AppearanceSettings
+  editor: EditorSettings
+  updates: UpdatesSettings
+  privacy: PrivacySettings
 }
 
 interface SealedLlmConfig {
@@ -47,6 +73,10 @@ interface SealedSettings {
   autoGitEnabled: boolean
   autoGitIdleSeconds: number
   autoGitBlurSeconds: number
+  appearance: AppearanceSettings
+  editor: EditorSettings
+  updates: UpdatesSettings
+  privacy: PrivacySettings
 }
 
 interface ParsedLlmConfig {
@@ -70,6 +100,10 @@ interface ParsedSettings {
   autoGitEnabled?: unknown
   autoGitIdleSeconds?: unknown
   autoGitBlurSeconds?: unknown
+  appearance?: { noteWidth?: unknown; fontSize?: unknown }
+  editor?: { autosaveDebounceMs?: unknown }
+  updates?: { channel?: unknown; autoCheck?: unknown }
+  privacy?: { telemetryEnabled?: unknown }
 }
 
 export interface PublicLlmConfig {
@@ -92,6 +126,69 @@ export function normalizeAutoGitSeconds(value: unknown): number {
   return value
 }
 
+const NOTE_WIDTHS: readonly NoteWidth[] = ['narrow', 'standard', 'wide']
+const UPDATE_CHANNELS: readonly UpdateChannel[] = ['stable', 'beta']
+
+export function defaultAppearanceSettings(): AppearanceSettings {
+  return { noteWidth: 'standard', fontSize: 15 }
+}
+
+export function defaultEditorSettings(): EditorSettings {
+  return { autosaveDebounceMs: 350 }
+}
+
+export function defaultUpdatesSettings(): UpdatesSettings {
+  return { channel: 'stable', autoCheck: true }
+}
+
+export function defaultPrivacySettings(): PrivacySettings {
+  return { telemetryEnabled: false }
+}
+
+export function normalizeNoteWidth(value: unknown): NoteWidth {
+  return typeof value === 'string' && (NOTE_WIDTHS as readonly string[]).includes(value)
+    ? (value as NoteWidth)
+    : 'standard'
+}
+
+export function normalizeFontSize(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return 15
+  return value
+}
+
+export function normalizeAutosaveDebounceMs(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) return 350
+  return value
+}
+
+export function normalizeUpdateChannel(value: unknown): UpdateChannel {
+  return typeof value === 'string' && (UPDATE_CHANNELS as readonly string[]).includes(value)
+    ? (value as UpdateChannel)
+    : 'stable'
+}
+
+function readAppearance(parsed: ParsedSettings['appearance']): AppearanceSettings {
+  return {
+    noteWidth: normalizeNoteWidth(parsed?.noteWidth),
+    fontSize: normalizeFontSize(parsed?.fontSize),
+  }
+}
+
+function readEditor(parsed: ParsedSettings['editor']): EditorSettings {
+  return { autosaveDebounceMs: normalizeAutosaveDebounceMs(parsed?.autosaveDebounceMs) }
+}
+
+function readUpdates(parsed: ParsedSettings['updates']): UpdatesSettings {
+  return {
+    channel: normalizeUpdateChannel(parsed?.channel),
+    autoCheck: parsed?.autoCheck !== false,
+  }
+}
+
+function readPrivacy(parsed: ParsedSettings['privacy']): PrivacySettings {
+  return { telemetryEnabled: parsed?.telemetryEnabled === true }
+}
+
 export function defaultSettings(): AppSettings {
   return {
     embedding: { endpoint: '', model: '', apiKey: '', dim: 4 },
@@ -102,6 +199,10 @@ export function defaultSettings(): AppSettings {
     autoGitEnabled: false,
     autoGitIdleSeconds: 0,
     autoGitBlurSeconds: 0,
+    appearance: defaultAppearanceSettings(),
+    editor: defaultEditorSettings(),
+    updates: defaultUpdatesSettings(),
+    privacy: defaultPrivacySettings(),
   }
 }
 
@@ -201,6 +302,16 @@ async function sealAll(secrets: SecretsStore, settings: AppSettings): Promise<Se
     autoGitEnabled: settings.autoGitEnabled === true,
     autoGitIdleSeconds: normalizeAutoGitSeconds(settings.autoGitIdleSeconds),
     autoGitBlurSeconds: normalizeAutoGitSeconds(settings.autoGitBlurSeconds),
+    appearance: {
+      noteWidth: normalizeNoteWidth(settings.appearance?.noteWidth),
+      fontSize: normalizeFontSize(settings.appearance?.fontSize),
+    },
+    editor: { autosaveDebounceMs: normalizeAutosaveDebounceMs(settings.editor?.autosaveDebounceMs) },
+    updates: {
+      channel: normalizeUpdateChannel(settings.updates?.channel),
+      autoCheck: settings.updates?.autoCheck !== false,
+    },
+    privacy: { telemetryEnabled: settings.privacy?.telemetryEnabled === true },
   }
 }
 
@@ -213,6 +324,10 @@ export function publicSettings(settings: AppSettings): {
   autoGitEnabled: boolean
   autoGitIdleSeconds: number
   autoGitBlurSeconds: number
+  appearance: AppearanceSettings
+  editor: EditorSettings
+  updates: UpdatesSettings
+  privacy: PrivacySettings
 } {
   return {
     embedding: {
@@ -236,6 +351,16 @@ export function publicSettings(settings: AppSettings): {
     autoGitEnabled: settings.autoGitEnabled === true,
     autoGitIdleSeconds: normalizeAutoGitSeconds(settings.autoGitIdleSeconds),
     autoGitBlurSeconds: normalizeAutoGitSeconds(settings.autoGitBlurSeconds),
+    appearance: {
+      noteWidth: normalizeNoteWidth(settings.appearance?.noteWidth),
+      fontSize: normalizeFontSize(settings.appearance?.fontSize),
+    },
+    editor: { autosaveDebounceMs: normalizeAutosaveDebounceMs(settings.editor?.autosaveDebounceMs) },
+    updates: {
+      channel: normalizeUpdateChannel(settings.updates?.channel),
+      autoCheck: settings.updates?.autoCheck !== false,
+    },
+    privacy: { telemetryEnabled: settings.privacy?.telemetryEnabled === true },
   }
 }
 
@@ -276,6 +401,10 @@ export async function readSettings(
     autoGitEnabled: parsed.autoGitEnabled === true,
     autoGitIdleSeconds: normalizeAutoGitSeconds(parsed.autoGitIdleSeconds),
     autoGitBlurSeconds: normalizeAutoGitSeconds(parsed.autoGitBlurSeconds),
+    appearance: readAppearance(parsed.appearance),
+    editor: readEditor(parsed.editor),
+    updates: readUpdates(parsed.updates),
+    privacy: readPrivacy(parsed.privacy),
   }
 }
 

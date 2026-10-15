@@ -11,6 +11,7 @@ import { NoteListService } from './note-list.service'
 import { GitService } from './panels.service'
 import { QuickOpenService } from './quick-open.service'
 import { SearchPanelService } from './search-panel.service'
+import { SettingsPageService } from './settings-page.service'
 import { TabsService } from './tabs.service'
 import { VaultService } from './vault.service'
 import { ViewsService } from './views.service'
@@ -161,6 +162,11 @@ export class CommandService extends Service {
         run: () => this.resolve(LayoutService).setRightPanelTab(tab),
       })
     }
+    // Settings is a full-screen overlay (T7.1), not a right-panel tab anymore.
+    this.registerHandler('view.tab.settings', {
+      available: () => has(SettingsPageService),
+      run: () => this.resolve(SettingsPageService).show(),
+    })
     this.registerHandler('ai.ask', {
       run: () => this.resolve(LayoutService).setRightPanelTab('chat'),
     })

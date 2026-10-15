@@ -12,6 +12,7 @@ import { QuickOpen } from './ui/quick-open'
 import { ResizeHandle } from './ui/resize-handle'
 import { PanelRail, RightPanel } from './ui/right-panel'
 import { SearchPanel } from './ui/search-panel'
+import { SettingsPage } from './ui/settings/settings-page'
 import { Rail } from './ui/sidebar'
 import { StatusBar } from './ui/status-bar'
 import { TabStrip } from './ui/tab-strip'
@@ -228,6 +229,7 @@ const App = observer(function App() {
     <TooltipProvider>
       {vault.phase === 'chooser' ? <Chooser /> : <Workspace />}
       <CommandPalette />
+      <SettingsPage />
     </TooltipProvider>
   )
 })

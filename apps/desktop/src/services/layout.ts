@@ -1,7 +1,9 @@
 // Pure layout-state logic: shape, defaults, clamping, and localStorage
 // (de)serialization. No rabjs or DOM dependencies so it stays unit-testable.
 
-export type RightPanelTab = 'properties' | 'toc' | 'git' | 'chat' | 'settings'
+// 'settings' used to be a right-panel tab; since T7.1 settings is a full-screen
+// overlay. Stored layouts that still name it sanitize back to the default tab.
+export type RightPanelTab = 'properties' | 'toc' | 'git' | 'chat'
 
 export interface LayoutState {
   sidebarWidth: number
@@ -22,7 +24,7 @@ export const COLUMN_LIMITS = {
 
 export type ResizableColumn = keyof typeof COLUMN_LIMITS
 
-export const RIGHT_PANEL_TABS: readonly RightPanelTab[] = ['properties', 'toc', 'git', 'chat', 'settings']
+export const RIGHT_PANEL_TABS: readonly RightPanelTab[] = ['properties', 'toc', 'git', 'chat']
 
 export const DEFAULT_LAYOUT_STATE: LayoutState = {
   sidebarWidth: 232,

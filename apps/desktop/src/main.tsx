@@ -11,6 +11,7 @@ import { ListFilterService } from './services/list-filter.service'
 import { NoteListService } from './services/note-list.service'
 import { QuickOpenService } from './services/quick-open.service'
 import { SearchPanelService } from './services/search-panel.service'
+import { SettingsPageService } from './services/settings-page.service'
 import { TabsService } from './services/tabs.service'
 import { applyStoredTheme } from './services/theme'
 import { ThemeService } from './services/theme.service'
@@ -44,6 +45,7 @@ if (showComponents) {
   register(LayoutService)
   register(QuickOpenService)
   register(SearchPanelService)
+  register(SettingsPageService)
   register(CommandService)
   register(CommandPaletteService)
   register(FolderService)

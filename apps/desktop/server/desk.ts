@@ -242,6 +242,10 @@ export class Desk {
       autoGitEnabled: current.autoGitEnabled,
       autoGitIdleSeconds: current.autoGitIdleSeconds,
       autoGitBlurSeconds: current.autoGitBlurSeconds,
+      appearance: current.appearance,
+      editor: current.editor,
+      updates: current.updates,
+      privacy: current.privacy,
     }
     await writeSettings(this.configFs, this.settingsName, next, this.secrets)
     this.settings = next

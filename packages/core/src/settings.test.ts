@@ -8,6 +8,87 @@ import {
   writeSettings,
 } from './settings.ts'
 
+describe('settings page sections schema (T7.1)', () => {
+  it('ships defaults for appearance, editor, updates, and privacy', () => {
+    const defaults = defaultSettings()
+    expect(defaults.appearance).toEqual({ noteWidth: 'standard', fontSize: 15 })
+    expect(defaults.editor).toEqual({ autosaveDebounceMs: 350 })
+    expect(defaults.updates).toEqual({ channel: 'stable', autoCheck: true })
+    expect(defaults.privacy).toEqual({ telemetryEnabled: false })
+  })
+
+  it('fills defaults when an old settings JSON lacks the new sections', async () => {
+    const files = new MemoryFileSystem('/virtual/settings')
+    const secrets = new MemorySecretsStore()
+    await files.writeText('legacy.json', JSON.stringify({
+      embedding: { endpoint: '', model: '', keySeal: '', keyMask: '', dim: 4 },
+      llmConfigs: [],
+      releasesUrl: '',
+      gitEnabled: true,
+    }))
+    const loaded = await readSettings(files, 'legacy.json', secrets)
+    expect(loaded.appearance).toEqual(defaultSettings().appearance)
+    expect(loaded.editor).toEqual(defaultSettings().editor)
+    expect(loaded.updates).toEqual(defaultSettings().updates)
+    expect(loaded.privacy).toEqual(defaultSettings().privacy)
+  })
+
+  it('round-trips the new sections through write/read without losing fields', async () => {
+    const files = new MemoryFileSystem('/virtual/settings')
+    const secrets = new MemorySecretsStore()
+    const settings = defaultSettings()
+    settings.appearance = { noteWidth: 'wide', fontSize: 18 }
+    settings.editor = { autosaveDebounceMs: 800 }
+    settings.updates = { channel: 'beta', autoCheck: false }
+    settings.privacy = { telemetryEnabled: true }
+    await writeSettings(files, 'roundtrip.json', settings, secrets)
+    const raw = JSON.parse(await files.readText('roundtrip.json'))
+    expect(raw.appearance).toEqual({ noteWidth: 'wide', fontSize: 18 })
+    expect(raw.editor).toEqual({ autosaveDebounceMs: 800 })
+    expect(raw.updates).toEqual({ channel: 'beta', autoCheck: false })
+    expect(raw.privacy).toEqual({ telemetryEnabled: true })
+    const loaded = await readSettings(files, 'roundtrip.json', secrets)
+    expect(loaded.appearance).toEqual(settings.appearance)
+    expect(loaded.editor).toEqual(settings.editor)
+    expect(loaded.updates).toEqual(settings.updates)
+    expect(loaded.privacy).toEqual(settings.privacy)
+    // Public view carries the same non-secret sections.
+    const pub = publicSettings(loaded)
+    expect(pub.appearance).toEqual(settings.appearance)
+    expect(pub.editor).toEqual(settings.editor)
+    expect(pub.updates).toEqual(settings.updates)
+    expect(pub.privacy).toEqual(settings.privacy)
+  })
+
+  it('falls back to defaults for malformed section values', async () => {
+    const files = new MemoryFileSystem('/virtual/settings')
+    const secrets = new MemorySecretsStore()
+    await files.writeText('bad.json', JSON.stringify({
+      appearance: { noteWidth: 'huge', fontSize: -3 },
+      editor: { autosaveDebounceMs: 'fast' },
+      updates: { channel: 'nightly', autoCheck: 'yes' },
+      privacy: { telemetryEnabled: 'no' },
+    }))
+    const loaded = await readSettings(files, 'bad.json', secrets)
+    expect(loaded.appearance).toEqual({ noteWidth: 'standard', fontSize: 15 })
+    expect(loaded.editor).toEqual({ autosaveDebounceMs: 350 })
+    expect(loaded.updates).toEqual({ channel: 'stable', autoCheck: true })
+    expect(loaded.privacy).toEqual({ telemetryEnabled: false })
+  })
+
+  it('keeps explicit opt-outs: autoCheck false and telemetryEnabled true survive', async () => {
+    const files = new MemoryFileSystem('/virtual/settings')
+    const secrets = new MemorySecretsStore()
+    await files.writeText('flags.json', JSON.stringify({
+      updates: { channel: 'beta', autoCheck: false },
+      privacy: { telemetryEnabled: true },
+    }))
+    const loaded = await readSettings(files, 'flags.json', secrets)
+    expect(loaded.updates).toEqual({ channel: 'beta', autoCheck: false })
+    expect(loaded.privacy).toEqual({ telemetryEnabled: true })
+  })
+})
+
 describe('llm settings', () => {
   it('migrates a legacy sealed llm record and collapses extra defaults', async () => {
     const files = new MemoryFileSystem('/virtual/settings')
@@ -60,17 +141,13 @@ describe('llm settings', () => {
     const keyA = 'sk-stride-llm-alpha-key'
     const keyB = 'sk-stride-llm-beta-key'
     await writeSettings(files, 'two.json', {
+      ...defaultSettings(),
       embedding: { endpoint: '', model: '', apiKey: '', dim: 4 },
       llmConfigs: [
         { id: 'a', name: 'A', provider: 'openai', model: 'gpt-4o-mini', baseUrl: '', apiKey: keyA, isDefault: true },
         { id: 'b', name: 'B', provider: 'deepseek', model: 'deepseek-chat', baseUrl: 'https://api.deepseek.com', apiKey: keyB, isDefault: false },
       ],
       releasesUrl: '',
-      gitEnabled: true,
-      autoSyncMinutes: 0,
-      autoGitEnabled: false,
-      autoGitIdleSeconds: 0,
-      autoGitBlurSeconds: 0,
     }, secrets)
     const text = await files.readText('two.json')
     expect(text.includes(keyA)).toBe(false)
