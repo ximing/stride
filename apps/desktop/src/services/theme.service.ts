@@ -1,4 +1,5 @@
 import { has, register, Service } from '@rabjs/react'
+import { applyStoredAppearance } from './appearance'
 import {
   applyStoredTheme,
   applyTheme,
@@ -41,3 +42,8 @@ export class ThemeService extends Service {
 
 // Tests mount the workspace without main.tsx, so the global service must exist on import.
 if (!has(ThemeService)) register(ThemeService)
+
+// Note width / font size follow the same pre-paint pattern as applyStoredTheme()
+// in main.tsx: this module is imported there at module scope, so the stored
+// appearance lands on <html> before the first render and never flashes defaults.
+applyStoredAppearance()

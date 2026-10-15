@@ -17,6 +17,14 @@ body {
   color: var(--sd-fg);
 }
 
+/* Note appearance variables (Settings > Appearance). Defaults match the
+   AppearanceSettings defaults in core; services/appearance.ts overrides them
+   as inline properties on <html>, so changes apply instantly with no restart. */
+:root {
+  --sd-note-font-size: 15px;
+  --sd-note-max-width: 44rem;
+}
+
 ::selection {
   background: var(--sd-accent);
   color: var(--sd-bg);
@@ -887,6 +895,8 @@ select {
   align-items: baseline;
   gap: 0.75rem;
   flex-wrap: wrap;
+  /* Keep the title row aligned with the note column width below. */
+  max-width: var(--sd-note-max-width);
 }
 
 .note-title {
@@ -918,11 +928,16 @@ select {
   accent-color: var(--sd-accent);
 }
 
+.editor {
+  /* Note width setting: caps the editor column (toolbar + content). */
+  max-width: var(--sd-note-max-width);
+}
+
 .editor .ProseMirror {
   min-height: 50vh;
   outline: none;
   font-family: var(--sd-font-serif);
-  font-size: 1.12rem;
+  font-size: var(--sd-note-font-size);
   line-height: 1.6;
 }
 

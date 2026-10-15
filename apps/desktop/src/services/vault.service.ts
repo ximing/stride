@@ -241,6 +241,11 @@ export class VaultService extends Service {
   private rebuildDone: Promise<void> = Promise.resolve()
   private openQueue: Promise<void> = Promise.resolve()
   private docTimer: ReturnType<typeof setTimeout> | null = null
+  // Autosave debounce (ms). Settings > Editor pushes the configured value via
+  // setAutosaveDebounceMs; schedule() also re-syncs it lazily from
+  // SettingsService so a value persisted in a previous session applies even
+  // when the settings page was never opened.
+  private autosaveDebounceMs = 350
   private pendingId = ''
   private retryDelay = 1000
   private renaming = false
@@ -593,6 +598,13 @@ export class VaultService extends Service {
       await writeRenameFromHeading(this.fs, enabled)
     } catch (error) {
       this.error = errorText(error)
+    }
+  }
+
+  /** Settings > Editor pushes the autosave debounce here; the next edit's timer uses it. */
+  setAutosaveDebounceMs(value: number) {
+    if (typeof value === 'number' && Number.isFinite(value) && value >= 0) {
+      this.autosaveDebounceMs = value
     }
   }
 
@@ -1363,9 +1375,18 @@ export class VaultService extends Service {
     if (this.docTimer) clearTimeout(this.docTimer)
     this.docTimer = setTimeout(() => {
       void this.flush()
-    }, 350)
-    void import('./panels.service').then(({ GitService }) => {
+    }, this.autosaveDebounceMs)
+    void import('./panels.service').then(({ GitService, SettingsService }) => {
       if (has(GitService)) this.resolve(GitService).noteActivity()
+      // Lazy re-sync of the configured debounce. Value read only — form is a
+      // reactive proxy, so never compare object identities here.
+      if (has(SettingsService)) {
+        const editor = this.resolve(SettingsService).form.editor
+        const ms = editor ? editor.autosaveDebounceMs : Number.NaN
+        if (Number.isFinite(ms) && ms >= 0 && ms !== this.autosaveDebounceMs) {
+          this.autosaveDebounceMs = ms
+        }
+      }
     })
   }
 

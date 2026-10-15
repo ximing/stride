@@ -1,0 +1,28 @@
+/* Privacy settings section (T7.2). Colors come from the --sd-* tokens. */
+
+.privacy-section {
+  max-width: 560px;
+}
+
+.privacy-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.privacy-toggle input {
+  width: auto;
+  margin: 0;
+  accent-color: var(--sd-accent);
+}
+
+.privacy-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--sd-muted);
+}
+
+.privacy-section .error {
+  margin: 8px 0 0;
+  font-size: 12px;
+}

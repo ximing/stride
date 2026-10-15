@@ -1,0 +1,47 @@
+/* Appearance settings section (T7.2). Colors come from the --sd-* tokens in
+   ui/tokens.css; segmented controls reuse the .theme-picker styles in
+   styles.css. */
+
+.appearance-section {
+  max-width: 560px;
+}
+
+.appearance-group + .appearance-group {
+  margin-top: 22px;
+}
+
+.appearance-heading {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sd-muted);
+}
+
+.appearance-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--sd-muted);
+}
+
+.appearance-fontsize {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--sd-muted);
+}
+
+.appearance-fontsize input {
+  width: 5.5rem;
+  padding: 4px 8px;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+  background: var(--sd-bg-elevated);
+  color: var(--sd-fg);
+}
+
+.appearance-section .error {
+  margin: 8px 0 0;
+  font-size: 12px;
+}
