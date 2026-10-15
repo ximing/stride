@@ -1,6 +1,8 @@
+import { ListBullets } from '@phosphor-icons/react'
 import type { Editor } from '@tiptap/core'
 import { observer, useService } from '@rabjs/react'
 import { VaultService } from '../services/vault.service'
+import { EmptyState } from './empty-state'
 import { tocItems, type TocItem } from './toc'
 
 function focusTitle() {
@@ -32,8 +34,34 @@ function openItem(item: TocItem) {
 export const TocPanel = observer(function TocPanel() {
   const vault = useService(VaultService)
   const note = vault.active
-  if (!note) return <div data-testid="toc-panel"><p className="empty-note">Select a note.</p></div>
+  if (!note) {
+    return (
+      <div data-testid="toc-panel">
+        <EmptyState
+          compact
+          icon={ListBullets}
+          title="Select a note"
+          body="The outline of the open note shows here."
+          testId="toc-empty"
+        />
+      </div>
+    )
+  }
   const items = tocItems(note.title, note.doc)
+  // tocItems always leads with the title (level 1); only title means no headings.
+  if (items.length <= 1) {
+    return (
+      <div data-testid="toc-panel">
+        <EmptyState
+          compact
+          icon={ListBullets}
+          title="No headings in this note."
+          body="Add headings to build an outline."
+          testId="toc-empty-headings"
+        />
+      </div>
+    )
+  }
   return (
     <div data-testid="toc-panel">
       {items.map((item, index) => (

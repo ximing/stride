@@ -5,6 +5,7 @@ import { FolderService } from '../services/folder.service'
 import { ListFilterService } from '../services/list-filter.service'
 import { TabsService } from '../services/tabs.service'
 import { VaultService } from '../services/vault.service'
+import { EmptyState } from './empty-state'
 
 // A vault-scale folder can hold thousands of notes; the tree renders at most
 // this many links per folder and summarizes the rest. Keeps sidebar DOM size
@@ -212,12 +213,20 @@ export const FolderTree = observer(function FolderTree() {
     [vault.notes, vault.searchHits, vault.searchQuery, vault.listFilter, listFilter.query],
   )
   const paths = folderService.folders
+  const treeEmpty = paths.length === 0 && notes.length === 0
 
   return (
     <div className="folder-tree" data-testid="folder-root" onDragOver={allowDrop} onDrop={(event) => drop(event, '')}>
       <button type="button" data-testid="new-folder" onClick={() => setCreating(true)}>
         New folder
       </button>
+      {treeEmpty && (
+        <EmptyState
+          compact
+          title={listFilter.query.trim() !== '' || vault.searchQuery.trim() !== '' ? 'No notes match the current filter.' : 'No notes yet.'}
+          testId="folder-tree-empty"
+        />
+      )}
       {creating && (
         <div className="folder-create">
           <input

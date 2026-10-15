@@ -1,7 +1,9 @@
+import { ChatCircle } from '@phosphor-icons/react'
 import { observer, useService } from '@rabjs/react'
 import { ChatService } from '../services/panels.service'
 import { VaultService } from '../services/vault.service'
 import { ChatMarkdown } from './chat-markdown'
+import { EmptyState } from './empty-state'
 
 export const ChatPanel = observer(function ChatPanel() {
   const chat = useService(ChatService)
@@ -24,6 +26,15 @@ export const ChatPanel = observer(function ChatPanel() {
         <button type="button" data-testid="chat-new" onClick={() => chat.newSession()}>New</button>
       </div>
       <div className="chat-messages" data-testid="chat-messages">
+        {session && session.messages.length === 0 ? (
+          <EmptyState
+            compact
+            icon={ChatCircle}
+            title="Ask the agent"
+            body="Ask about the open note, or anything in your vault."
+            testId="chat-empty"
+          />
+        ) : null}
         {session?.messages.map((message, index) => (
           <div key={`${message.role}-${index}`} className="chat-message">
             <strong>{message.role}</strong>
@@ -45,7 +56,7 @@ export const ChatPanel = observer(function ChatPanel() {
           </div>
         ))}
       </div>
-      {chat.error && <p className="error">{chat.error}</p>}
+      {chat.error && <p className="error" data-testid="chat-error" role="alert">{chat.error}</p>}
       <div className="chat-compose">
         <div className="chat-mode">
           <button type="button" data-testid="chat-mode-safe" aria-pressed={vault.agentMode === 'safe'} onClick={() => { void vault.setAgentMode('safe') }}>Safe</button>

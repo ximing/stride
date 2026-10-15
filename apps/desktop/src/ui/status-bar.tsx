@@ -72,10 +72,24 @@ export const StatusBar = observer(function StatusBar() {
         </span>
       ) : null}
       <GitStatusBadge />
-      <span className="statusbar-item" data-testid="index-status">
-        <Mark icon={MagnifyingGlass} size={13} />
-        {indexStatusLabel(vault.indexPhase, vault.indexDone, vault.indexTotal)}
-      </span>
+      {vault.indexPhase === 'error' ? (
+        <button
+          type="button"
+          className="statusbar-item statusbar-action statusbar-index-error"
+          data-testid="index-status"
+          title="索引失败,点击重建"
+          onClick={() => vault.retryIndex()}
+        >
+          <Mark icon={MagnifyingGlass} size={13} />
+          {indexStatusLabel(vault.indexPhase, vault.indexDone, vault.indexTotal)}
+          <span data-testid="index-retry">重试</span>
+        </button>
+      ) : (
+        <span className="statusbar-item" data-testid="index-status">
+          <Mark icon={MagnifyingGlass} size={13} />
+          {indexStatusLabel(vault.indexPhase, vault.indexDone, vault.indexTotal)}
+        </span>
+      )}
       <span className="statusbar-spacer" />
       <button
         type="button"

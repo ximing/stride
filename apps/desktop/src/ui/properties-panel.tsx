@@ -1,9 +1,11 @@
+import { SlidersHorizontal } from '@phosphor-icons/react'
 import { observer, useService } from '@rabjs/react'
 import { relationsOf, resolveNote, type NoteRelations } from '@stride/core/graph'
 import { bodyWikilinks, isArchived, isHiddenProperty, propertyKind, type StrideNote } from '@stride/core/note'
 import { useState } from 'react'
 import { TabsService } from '../services/tabs.service'
 import { VaultService } from '../services/vault.service'
+import { EmptyState } from './empty-state'
 import { Modal, ModalClose, ModalContent } from './modal'
 
 function unresolvedRelations(
@@ -33,7 +35,17 @@ export const PropertiesPanel = observer(function PropertiesPanel() {
   const tabs = useService(TabsService)
   const note = vault.active
   const [deleteOpen, setDeleteOpen] = useState(false)
-  if (!note) return <p className="empty-note">Select a note.</p>
+  if (!note) {
+    return (
+      <EmptyState
+        compact
+        icon={SlidersHorizontal}
+        title="Select a note"
+        body="Properties, relationships and backlinks show here."
+        testId="properties-empty"
+      />
+    )
+  }
   const graph = vault.graph
   const relations = relationsOf(graph, note.id)
   const unresolved = unresolvedRelations(note, graph.notes, relations.outgoing)
@@ -173,7 +185,9 @@ export const PropertiesPanel = observer(function PropertiesPanel() {
         <button type="submit" data-testid="add-property">Add field</button>
       </form>
       <h2>Relationships</h2>
-      {relations.shown.length === 0 && unresolved.length === 0 && <p className="meta">No relationships yet.</p>}
+      {relations.shown.length === 0 && unresolved.length === 0 && (
+        <EmptyState compact title="No relationships yet." testId="relationships-empty" />
+      )}
       {relations.shown.map((link) => {
         const label = `${link.derived ? `${link.field} (derived)` : link.field}: ${link.label}`
         if (!link.targetId) {
@@ -202,7 +216,7 @@ export const PropertiesPanel = observer(function PropertiesPanel() {
         </p>
       ))}
       <h2>Backlinks</h2>
-      {relations.backlinks.length === 0 && <p className="meta">No backlinks.</p>}
+      {relations.backlinks.length === 0 && <EmptyState compact title="No backlinks." testId="backlinks-empty" />}
       {relations.backlinks.map((link) => (
         <button
           key={`${link.sourceId}-${link.via}`}

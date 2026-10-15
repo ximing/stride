@@ -1298,6 +1298,11 @@ export class SettingsService extends Service {
     return this.load()
   }
 
+  // Settings panel skeleton gate: true while the first read is in flight.
+  get isLoading(): boolean {
+    return this.loadTask !== null
+  }
+
   async save() {
     const secrets = await this.openSecrets()
     if (!secrets) return

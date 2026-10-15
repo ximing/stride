@@ -1,8 +1,10 @@
+import { MagnifyingGlass, Note } from '@phosphor-icons/react'
 import { observer, useService } from '@rabjs/react'
 import { useEffect, useRef } from 'react'
 import { CommandService } from '../services/command.service'
 import { QuickOpenService, quickOpenResults } from '../services/quick-open.service'
 import { VaultService } from '../services/vault.service'
+import { EmptyState } from './empty-state'
 
 export const QuickOpen = observer(function QuickOpen() {
   const vault = useService(VaultService)
@@ -83,7 +85,22 @@ export const QuickOpen = observer(function QuickOpen() {
           onChange={(event) => service.setQuery(event.target.value)}
         />
         {results.length === 0 ? (
-          <p className="quick-open-empty">没有匹配的笔记</p>
+          service.query.trim() === '' ? (
+            <EmptyState
+              compact
+              icon={Note}
+              title="还没有笔记"
+              body="先新建一篇笔记，再用 Cmd+P 快速跳转。"
+              testId="quick-open-empty"
+            />
+          ) : (
+            <EmptyState
+              compact
+              icon={MagnifyingGlass}
+              title="没有匹配的笔记"
+              testId="quick-open-empty"
+            />
+          )
         ) : (
           <div ref={listRef} className="quick-open-list" role="listbox" aria-label="笔记">
             {results.map((note, index) => (

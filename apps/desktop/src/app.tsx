@@ -1,3 +1,4 @@
+import { Notebook } from '@phosphor-icons/react'
 import { observer, useService } from '@rabjs/react'
 import { useEffect } from 'react'
 import { NoteEditor } from './editor'
@@ -5,6 +6,7 @@ import { LayoutService } from './services/layout.service'
 import { GitService, SettingsService, UpdateService } from './services/panels.service'
 import { VaultService } from './services/vault.service'
 import { CommandPalette } from './ui/command-palette'
+import { EmptyState } from './ui/empty-state'
 import { NoteList } from './ui/note-list'
 import { QuickOpen } from './ui/quick-open'
 import { ResizeHandle } from './ui/resize-handle'
@@ -90,7 +92,7 @@ const Chooser = observer(function Chooser() {
           <p data-testid="git-clone-unavailable">git clone needs the desktop app</p>
         )}
         {git.cloneError && <p className="error" data-testid="git-clone-error">{git.cloneError}</p>}
-        {vault.error && <p className="error">{vault.error}</p>}
+        {vault.error && <p className="error" data-testid="vault-error" role="alert">{vault.error}</p>}
       </form>
     </section>
   )
@@ -158,6 +160,16 @@ const Workspace = observer(function Workspace() {
                         ? '保存失败'
                         : ''}
                 </span>
+                {vault.saveStatus === 'error' && (
+                  <button
+                    type="button"
+                    className="save-retry"
+                    data-testid="save-retry"
+                    onClick={() => { void vault.flush() }}
+                  >
+                    重试
+                  </button>
+                )}
                 <label className="rename-toggle">
                   <input
                     type="checkbox"
@@ -171,12 +183,18 @@ const Workspace = observer(function Workspace() {
               <NoteEditor key={note.id} />
             </>
           ) : (
-            <div className="empty-note">
-              <p>No note selected.</p>
-              <p className="meta">Pick a note from the list, or create a new one.</p>
-            </div>
+            <EmptyState
+              icon={Notebook}
+              title="No note selected"
+              body="Pick a note from the list, or create a new one."
+              actionLabel="New note"
+              actionTestId="stage-new-note"
+              onAction={() => vault.createNote()}
+              className="sd-empty-state-stage"
+              testId="stage-empty"
+            />
           )}
-          {vault.error && <p className="error">{vault.error}</p>}
+          {vault.error && <p className="error" data-testid="vault-error" role="alert">{vault.error}</p>}
           {vault.broad && <p className="meta">This folder is a broad personal root. Git init stays off unless it is already a dedicated vault.</p>}
         </main>
         {layout.rightPanelCollapsed ? (

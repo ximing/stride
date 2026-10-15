@@ -1,6 +1,7 @@
 import { ReactRenderer } from '@tiptap/react'
 import type { SuggestionKeyDownProps, SuggestionProps } from '@tiptap/suggestion'
 import { useLayoutEffect, useRef } from 'react'
+import { EmptyState } from '../ui/empty-state'
 import { moveSlashSelection, type SlashCommand } from './slash'
 
 type SlashMenuProps = {
@@ -29,7 +30,7 @@ export function SlashMenu({ items, selected, command, clientRect }: SlashMenuPro
   return (
     <div ref={rootRef} data-testid="slash-menu" className="slash-menu" role="listbox">
       {items.length === 0 ? (
-        <div className="slash-menu-empty">没有匹配</div>
+        <EmptyState compact title="没有匹配" testId="slash-menu-empty" />
       ) : (
         items.map((item, index) => {
           const isSelected = index === selected

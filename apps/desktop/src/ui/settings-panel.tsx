@@ -4,6 +4,7 @@ import { LLM_PROVIDERS, catalogBaseUrl, catalogModelSuggestions } from '@stride/
 import { SettingsService, UpdateService } from '../services/panels.service'
 import { ThemeService } from '../services/theme.service'
 import { THEME_MODES, type ThemeMode } from '../services/theme'
+import { Skeleton } from './empty-state'
 import { Mark } from './icon'
 
 const THEME_ICONS: Record<ThemeMode, typeof Sun> = { light: Sun, dark: Moon, system: Desktop }
@@ -14,6 +15,14 @@ export const SettingsPanel = observer(function SettingsPanel() {
   const updates = useService(UpdateService)
   const theme = useService(ThemeService)
   const selected = settings.form.llmConfigs.find((config) => config.id === settings.selectedLlmId)
+  if (settings.isLoading) {
+    return (
+      <div>
+        <h2>Settings</h2>
+        <Skeleton rows={4} testId="settings-loading" />
+      </div>
+    )
+  }
   return (
     <div>
       <h2>Settings</h2>

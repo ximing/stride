@@ -625,7 +625,8 @@ describe('VaultService', () => {
     await act(async () => {
       vault.indexPhase = 'error'
     })
-    expect(host.querySelector('[data-testid="index-status"]')?.textContent).toBe('索引失败')
+    expect(host.querySelector('[data-testid="index-status"]')?.textContent).toContain('索引失败')
+    expect(host.querySelector('[data-testid="index-retry"]')).not.toBeNull()
     await act(async () => {
       vault.indexPhase = 'ready'
     })

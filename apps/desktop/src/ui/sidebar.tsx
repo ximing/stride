@@ -15,6 +15,7 @@ import { typeSidebarLabel } from '../../../../packages/core/src/types'
 import { TabsService } from '../services/tabs.service'
 import { VaultService } from '../services/vault.service'
 import { ViewsService } from '../services/views.service'
+import { EmptyState } from './empty-state'
 import { FolderTree } from './folder-tree'
 import { Mark } from './icon'
 import { ViewEditorModal } from './view-editor'
@@ -61,6 +62,9 @@ const SavedViews = observer(function SavedViews() {
   const [dropTarget, setDropTarget] = useState('')
   return (
     <>
+      {views.views.length === 0 && (
+        <EmptyState compact title="No saved views yet." testId="views-empty" />
+      )}
       {views.views.map((item) => (
         <div
           className="view-row"
@@ -144,6 +148,9 @@ export const Rail = observer(function Rail() {
       )}
       <SavedViews />
       <div className="group-label">Types</div>
+      {typeDocs.length === 0 && fallbackTypes.length === 0 && (
+        <EmptyState compact title="No types yet." testId="types-empty" />
+      )}
       {typeDocs.map((note) => {
         const icon = typeIconKey(note)
         const color = typeColorKey(note)
@@ -195,7 +202,7 @@ export const Rail = observer(function Rail() {
       {showInstances && (
         <div className="type-instances" data-testid="type-instances">
           <div className="group-label">Instances</div>
-          {vault.typeInstances.length === 0 && <p>No instances yet.</p>}
+          {vault.typeInstances.length === 0 && <EmptyState compact title="No instances yet." testId="instances-empty" />}
           {vault.typeInstances.map((note) => (
             <button
               key={note.id}

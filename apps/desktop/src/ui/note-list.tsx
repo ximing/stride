@@ -1,13 +1,14 @@
-import { ArrowsDownUp, MagnifyingGlass, X } from '@phosphor-icons/react'
+import { ArrowsDownUp, Bookmark, MagnifyingGlass, Note, Tray, X } from '@phosphor-icons/react'
 import { observer, raw, useService } from '@rabjs/react'
 import { plainText, type StrideNote } from '@stride/core/note'
-import { memo, useEffect, useMemo, useRef, useState } from 'react'
+import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { typeSidebarLabel } from '../../../../packages/core/src/types'
 import { ListFilterService } from '../services/list-filter.service'
 import { sortNotes, virtualWindow, type ListSort, type ListSortKey } from '../services/note-list'
 import { NoteListService } from '../services/note-list.service'
 import { VaultService } from '../services/vault.service'
 import { ViewsService } from '../services/views.service'
+import { EmptyState } from './empty-state'
 import { Mark } from './icon'
 import { Menu, MenuContent, MenuItem, MenuTrigger } from './menu'
 import { Modal, ModalClose, ModalContent } from './modal'
@@ -337,11 +338,60 @@ export const NoteList = observer(function NoteList() {
   const orderedIds = useMemo(() => notes.map((note) => note.id), [notes])
   const win = virtualWindow(notes.length, scrollTop, viewport)
   const rows = notes.slice(win.start, win.end)
-  const emptyText = notes.length > 0
-    ? ''
-    : listFilter.query.trim() !== ''
-      ? `No notes match “${listFilter.query.trim()}”.`
-      : 'No notes here.'
+
+  // One empty state per way the list can be empty; the most specific wins.
+  const filterQuery = listFilter.query.trim()
+  let emptyState: ReactNode = null
+  if (notes.length === 0) {
+    if (filterQuery !== '') {
+      emptyState = (
+        <EmptyState
+          compact
+          icon={MagnifyingGlass}
+          title={`No notes match “${filterQuery}”.`}
+          actionLabel="清空过滤"
+          actionTestId="note-list-empty-clear"
+          onAction={() => listFilter.clear()}
+          testId="note-list-empty-filter"
+        />
+      )
+    } else if (vault.searchQuery.trim() !== '') {
+      emptyState = (
+        <EmptyState
+          compact
+          icon={MagnifyingGlass}
+          title={`No results for “${vault.searchQuery.trim()}”.`}
+          body="Try different keywords, or check the index status in the status bar."
+          testId="note-list-empty-search"
+        />
+      )
+    } else if (activeView) {
+      emptyState = (
+        <EmptyState
+          compact
+          icon={Bookmark}
+          title={`Nothing matches “${activeView.view.name}” yet.`}
+          body="Notes appear here when they satisfy this view's filters."
+          testId="note-list-empty-view"
+        />
+      )
+    } else if (vault.notes.length === 0) {
+      emptyState = (
+        <EmptyState
+          compact
+          icon={Note}
+          title="No notes yet"
+          body="Create your first note to get started."
+          actionLabel="New note"
+          actionTestId="note-list-empty-new"
+          onAction={() => vault.createNote()}
+          testId="note-list-empty-vault"
+        />
+      )
+    } else {
+      emptyState = <EmptyState compact icon={Tray} title="No notes here." testId="note-list-empty" />
+    }
+  }
 
   return (
     <div
@@ -367,7 +417,7 @@ export const NoteList = observer(function NoteList() {
         ref={scrollRef}
         onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
       >
-        {emptyText !== '' && <p className="note-list-empty">{emptyText}</p>}
+        {emptyState}
         {win.topPad > 0 && <div className="note-list-spacer" style={{ height: win.topPad }} />}
         {rows.map((note) => {
           const chipType = chipTypeOf(note)

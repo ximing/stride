@@ -778,10 +778,11 @@ select {
   padding: 0.15rem 0.25rem;
 }
 
-.note-list-empty {
-  margin: 0.6rem 0.45rem;
-  color: var(--sd-muted);
-  font-size: 0.88rem;
+.note-list .sd-empty-state {
+  align-items: flex-start;
+  text-align: left;
+  margin: 0.2rem 0.45rem;
+  padding: 0.85rem 0.75rem;
 }
 
 /* ---------- column resize handles ---------- */
@@ -1188,6 +1189,18 @@ select {
   color: var(--sd-accent);
 }
 
+.statusbar-index-error {
+  color: var(--sd-danger);
+}
+
+.statusbar-index-error:hover:not(:disabled) {
+  color: var(--sd-danger);
+}
+
+.statusbar-index-error [data-testid="index-retry"] {
+  text-decoration: underline;
+}
+
 .statusbar-version {
   font-variant-numeric: tabular-nums;
 }
@@ -1233,16 +1246,87 @@ select {
   background: var(--sd-bg-elevated);
 }
 
-/* ---------- empty states ---------- */
+/* ---------- empty / loading / error states ---------- */
 
-.empty-note {
-  margin-top: 18vh;
-  color: var(--sd-muted);
+.sd-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  padding: 2.25rem 1.25rem;
   text-align: center;
+  color: var(--sd-muted);
 }
 
-.empty-note p {
-  margin: 0.2rem 0;
+.sd-empty-state-compact {
+  padding: 0.85rem 0.75rem;
+}
+
+.sd-empty-state-icon {
+  display: inline-flex;
+  color: var(--sd-muted);
+  opacity: 0.75;
+}
+
+.sd-empty-state-title {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--sd-fg);
+}
+
+.sd-empty-state-compact .sd-empty-state-title {
+  font-size: 0.84rem;
+  color: var(--sd-muted);
+}
+
+.sd-empty-state-body {
+  margin: 0;
+  font-size: 0.8rem;
+  max-width: 26rem;
+}
+
+.sd-empty-state-action {
+  margin-top: 0.45rem;
+  width: auto;
+}
+
+.sd-empty-state[data-tone="error"] .sd-empty-state-icon,
+.sd-empty-state[data-tone="error"] .sd-empty-state-title {
+  color: var(--sd-danger);
+}
+
+/* The editor stage placeholder fills the whole column. */
+.sd-empty-state-stage {
+  flex: 1;
+  min-height: 40vh;
+}
+
+.sd-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 0.5rem 0.15rem;
+}
+
+.sd-skeleton-row {
+  height: 0.8rem;
+  border-radius: var(--sd-radius);
+  background: color-mix(in srgb, var(--sd-muted) 18%, transparent);
+  animation: sd-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.sd-skeleton-row:nth-child(2) {
+  width: 82%;
+}
+
+.sd-skeleton-row:nth-child(3) {
+  width: 64%;
+}
+
+@keyframes sd-skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
 }
 
 /* ---------- folder tree ---------- */
@@ -1562,8 +1646,7 @@ select {
   box-shadow: var(--sd-shadow);
 }
 
-.slash-menu-item,
-.slash-menu-empty {
+.slash-menu-item {
   padding: 0.4rem 0.65rem;
   border-radius: var(--sd-radius);
 }
@@ -1577,8 +1660,9 @@ select {
   color: var(--sd-accent);
 }
 
-.slash-menu-empty {
-  color: var(--sd-muted);
+.slash-menu .sd-empty-state {
+  padding: 0.4rem 0.65rem;
+  align-items: flex-start;
 }
 
 .editor .ProseMirror .callout-block {
@@ -1671,6 +1755,35 @@ select {
 
 .save-status:empty {
   display: none;
+}
+
+.save-retry {
+  width: auto;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.78rem;
+  color: var(--sd-danger);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+}
+
+.git-error-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.git-error-row .error {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
+.git-error-row .save-retry {
+  flex: none;
+}
+
+.save-retry:hover {
+  border-color: var(--sd-danger);
 }
 
 .save-status.is-error { color: var(--sd-danger); }
@@ -1834,12 +1947,6 @@ select {
   color: inherit;
   padding: 0 0.12em;
   border-radius: 3px;
-}
-
-.quick-open-empty,
-.search-panel-empty {
-  margin: 0.75rem 0.15rem 0.2rem;
-  color: var(--sd-muted);
 }
 
 /* ---------- command palette ---------- */

@@ -1135,6 +1135,19 @@ export class VaultService extends Service {
     })
   }
 
+  // Status bar retry entry after a failed index rebuild. Pure presentation
+  // support: re-runs the same rebuild pipeline against the current notes.
+  retryIndex() {
+    if (this.phase !== 'ready' || !this.rebuilder || this.indexPhase !== 'error') return
+    this.rebuildEpoch += 1
+    const epoch = this.rebuildEpoch
+    const snapshot = this.notes.map((note) => ({ id: note.id, text: indexText(note) }))
+    this.indexDone = 0
+    this.indexTotal = snapshot.length
+    this.indexPhase = snapshot.length > 0 ? 'rebuilding' : 'ready'
+    this.rebuildDone = snapshot.length > 0 ? this.startRebuild(epoch, snapshot) : Promise.resolve()
+  }
+
   private memoryFixtureRoot(): MemoryFileSystem {
     this.memoryRoot ??= new MemoryFileSystem('memory-vault')
     return this.memoryRoot

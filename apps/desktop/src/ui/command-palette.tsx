@@ -1,9 +1,11 @@
+import { MagnifyingGlass } from '@phosphor-icons/react'
 import { observer, useService } from '@rabjs/react'
 import { Fragment, useEffect, useRef } from 'react'
 import { paletteItemSection, paletteItemTitle, type PaletteItem } from '../services/command-palette'
 import { CommandPaletteService } from '../services/command-palette.service'
 import { CommandService } from '../services/command.service'
 import { formatShortcut } from '../services/commands'
+import { EmptyState } from './empty-state'
 
 function itemTestId(item: PaletteItem): string {
   if (item.kind === 'command' || item.kind === 'instance') return 'command-item'
@@ -99,6 +101,15 @@ export const CommandPalette = observer(function CommandPalette() {
           onChange={(event) => service.setQuery(event.target.value)}
         />
         <div ref={listRef} className="command-palette-list" role="listbox" aria-label="命令与笔记">
+          {items.length === 0 && (
+            <EmptyState
+              compact
+              icon={MagnifyingGlass}
+              title="没有匹配的命令或笔记"
+              body="换个关键词试试;输入问题可向 AI 提问。"
+              testId="command-palette-empty"
+            />
+          )}
           {items.map((item, index) => {
             const section = paletteItemSection(item)
             let header = null

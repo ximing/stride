@@ -1,8 +1,10 @@
+import { MagnifyingGlass } from '@phosphor-icons/react'
 import { observer, useService } from '@rabjs/react'
 import { useEffect, useRef, type ReactNode } from 'react'
 import { CommandService } from '../services/command.service'
 import { SearchPanelService } from '../services/search-panel.service'
 import { VaultService } from '../services/vault.service'
+import { EmptyState, Skeleton } from './empty-state'
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
@@ -107,7 +109,24 @@ export const SearchPanel = observer(function SearchPanel() {
           onChange={(event) => { void service.setQuery(event.target.value) }}
         />
         {results.length === 0 ? (
-          <p className="search-panel-empty">没有匹配的笔记</p>
+          service.query.trim() === '' ? (
+            <EmptyState
+              compact
+              icon={MagnifyingGlass}
+              title="输入关键词开始搜索"
+              body="支持标题与全文;索引状态见底部状态栏。"
+              testId="search-panel-hint"
+            />
+          ) : service.pending ? (
+            <Skeleton rows={3} testId="search-panel-loading" />
+          ) : (
+            <EmptyState
+              compact
+              icon={MagnifyingGlass}
+              title="没有匹配的笔记"
+              testId="search-panel-empty"
+            />
+          )
         ) : (
           <div ref={listRef} className="search-panel-list" role="listbox" aria-label="搜索结果">
             {results.map((hit, index) => (

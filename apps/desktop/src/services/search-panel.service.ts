@@ -15,6 +15,8 @@ export class SearchPanelService extends Service {
   query = ''
   selected = 0
   results: RankedHit[] = []
+  // True while a ranked query is in flight; drives the panel skeleton.
+  pending = false
 
   private ticket = 0
 
@@ -97,8 +99,10 @@ export class SearchPanelService extends Service {
     const ticket = ++this.ticket
     if (!query.trim()) {
       this.results = []
+      this.pending = false
       return
     }
+    this.pending = true
     try {
       const hits = await this.vault.queryRanked(query)
       if (ticket !== this.ticket) return
@@ -107,6 +111,8 @@ export class SearchPanelService extends Service {
     } catch {
       if (ticket !== this.ticket) return
       this.results = []
+    } finally {
+      if (ticket === this.ticket) this.pending = false
     }
   }
 }

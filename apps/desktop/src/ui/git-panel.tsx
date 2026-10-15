@@ -1,5 +1,7 @@
+import { CheckCircle, GitBranch, WarningCircle } from '@phosphor-icons/react'
 import { useState } from 'react'
 import type { GitChange } from '../../../../packages/core/src/git-changes.ts'
+import { EmptyState } from './empty-state'
 import { Modal, ModalContent } from './modal'
 
 function diffLineClass(line: string): string {
@@ -50,6 +52,7 @@ export function GitPanelView(props: {
   onRestoreHistory?: () => void
   browserNeedsInit?: boolean
   error?: string
+  onRetryError?: () => void
   onCommitOpenChange?: (open: boolean) => void
   conflicts?: readonly string[]
   onKeepSide?: (path: string, side: 'ours' | 'theirs') => void
@@ -70,19 +73,33 @@ export function GitPanelView(props: {
       ) : null}
       {props.surface === 'unavailable' && (
         <>
-          <p data-testid="git-unavailable">Git is not available in the browser</p>
+          <EmptyState
+            compact
+            icon={WarningCircle}
+            title="Git is not available in the browser"
+            testId="git-unavailable"
+          />
           {props.browserNeedsInit ? (
             <p data-testid="git-needs-init">This vault is not a Git repository. Initialize it in the desktop app.</p>
           ) : null}
         </>
       )}
-      {props.surface === 'disabled' && <p data-testid="git-disabled">Git is turned off.</p>}
-      {props.surface === 'blocked' && <p data-testid="git-blocked">{props.notice}</p>}
+      {props.surface === 'disabled' && (
+        <EmptyState compact icon={GitBranch} title="Git is turned off." testId="git-disabled" />
+      )}
+      {props.surface === 'blocked' && (
+        <EmptyState compact tone="error" icon={WarningCircle} title={props.notice} testId="git-blocked" />
+      )}
       {props.surface === 'needs-init' && (
-        <>
-          <p>This vault is not a Git repository.</p>
-          <button type="button" data-testid="git-init" onClick={() => props.onInit()}>Initialize Git</button>
-        </>
+        <EmptyState
+          compact
+          icon={GitBranch}
+          title="This vault is not a Git repository."
+          actionLabel="Initialize Git"
+          actionTestId="git-init"
+          onAction={() => props.onInit()}
+          testId="git-needs-init-surface"
+        />
       )}
       {props.surface === 'ready' && (
         <>
@@ -104,7 +121,7 @@ export function GitPanelView(props: {
             <button type="button" data-testid="git-push" onClick={() => props.onPush()}>Push</button>
           </div>
           {props.changes.length === 0 ? (
-            <p data-testid="git-clean">Working tree clean</p>
+            <EmptyState compact icon={CheckCircle} title="Working tree clean" testId="git-clean" />
           ) : (
             props.changes.map((change) => (
               <div
@@ -252,7 +269,16 @@ export function GitPanelView(props: {
           </ModalContent>
         </Modal>
       ) : null}
-      {props.error ? <p className="error" data-testid="git-error">{props.error}</p> : null}
+      {props.error ? (
+        <div className="git-error-row">
+          <p className="error" data-testid="git-error" role="alert">{props.error}</p>
+          {props.onRetryError ? (
+            <button type="button" className="save-retry" data-testid="git-error-retry" onClick={() => props.onRetryError?.()}>
+              重试
+            </button>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   )
 }

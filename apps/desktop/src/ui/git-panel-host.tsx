@@ -47,6 +47,7 @@ export const GitPanel = observer(function GitPanel() {
       onRestoreHistory={() => { void git.restoreHistory() }}
       conflicts={git.conflicts}
       onKeepSide={(path, side) => { void git.keepSide(path, side) }}
+      onRetryError={() => { void git.refresh() }}
       onCommitOpenChange={(open) => {
         if (!open) git.abortSuggest()
       }}

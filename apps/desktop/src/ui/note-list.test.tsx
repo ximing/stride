@@ -234,7 +234,7 @@ describe('NoteList', () => {
       vault.notes = []
     })
     expect(host!.querySelector('[data-testid="note-list-item"]')).toBeNull()
-    expect(host!.querySelector('.note-list-empty')).not.toBeNull()
+    expect(host!.querySelector('[data-testid="note-list-empty-vault"]')).not.toBeNull()
     expect(host!.querySelector('[data-testid="note-list-count"]')?.textContent).toBe('0')
   })
 
@@ -250,7 +250,7 @@ describe('NoteList', () => {
     await act(async () => {
       setInputValue(input, 'zzz')
     })
-    expect(host!.querySelector('.note-list-empty')?.textContent).toBe('No notes match “zzz”.')
+    expect(host!.querySelector('[data-testid="note-list-empty-filter"]')?.textContent).toContain('No notes match “zzz”.')
   })
 
   it('renders type and status chips; plain notes get no type chip', async () => {
