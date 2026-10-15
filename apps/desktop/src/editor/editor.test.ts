@@ -276,7 +276,8 @@ describe('editor formats', () => {
     }
     expect(document.querySelector('[data-testid="toolbar-bold"]')?.getAttribute('aria-label')).toBe('粗体 ⌘B')
     expect(document.querySelector('[data-testid="toolbar-highlight"]')?.getAttribute('aria-label')).toBe('高亮 ⌘⇧H')
-    expect(document.querySelector('[data-testid="toolbar-link"]')?.getAttribute('aria-label')).toBe('链接 ⌘K')
+    // ⌘K is the command palette app-wide (T6.2); the link bubble keeps no shortcut hint.
+    expect(document.querySelector('[data-testid="toolbar-link"]')?.getAttribute('aria-label')).toBe('链接')
 
     const before = editor.getJSON()
     await act(async () => {

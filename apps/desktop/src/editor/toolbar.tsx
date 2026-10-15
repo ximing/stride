@@ -78,7 +78,7 @@ export const editorTools: ToolSpec[] = [
   { id: 'ordered', label: '有序列表 ⌘⇧7', icon: ListNumbers, bubble: true, active: 'ordered', format: 'ordered' },
   { id: 'task', label: '任务列表', icon: CheckSquare, bubble: false, active: 'task', format: 'task' },
   { id: 'quote', label: '引用 ⌘⇧B', icon: Quotes, bubble: true, active: 'quote', format: 'quote' },
-  { id: 'link', label: '链接 ⌘K', icon: LinkIcon, bubble: true, active: 'link' },
+  { id: 'link', label: '链接', icon: LinkIcon, bubble: true, active: 'link' },
   { id: 'highlight', label: '高亮 ⌘⇧H', icon: Highlighter, bubble: true, active: 'highlight', format: 'highlight' },
   { id: 'strike', label: '删除线 ⌘⇧S', icon: TextStrikethrough, bubble: false, active: 'strike', format: 'strike' },
   { id: 'code', label: '行内代码 ⌘E', icon: Code, bubble: false, active: 'code', format: 'code' },

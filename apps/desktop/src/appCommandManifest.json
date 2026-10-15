@@ -1,0 +1,111 @@
+{
+  "version": 1,
+  "commands": [
+    {
+      "id": "file.newNote",
+      "title": "New Note",
+      "shortcut": "Mod+N",
+      "section": "File",
+      "enabledWhen": "vaultReady",
+      "keywords": ["create", "note", "新建", "笔记"]
+    },
+    {
+      "id": "file.newInstance",
+      "title": "New Note of Type",
+      "section": "File",
+      "enabledWhen": "vaultReady",
+      "keywords": ["type", "instance", "类型", "实例"]
+    },
+    {
+      "id": "file.save",
+      "title": "Save Note Now",
+      "shortcut": "Mod+S",
+      "section": "File",
+      "enabledWhen": "hasActiveNote",
+      "keywords": ["flush", "write", "保存"]
+    },
+    {
+      "id": "nav.quickOpen",
+      "title": "Quick Open",
+      "shortcut": "Mod+P",
+      "section": "Navigate",
+      "keywords": ["jump", "go to", "快速打开"]
+    },
+    {
+      "id": "app.commandPalette",
+      "title": "Command Palette",
+      "shortcut": "Mod+K",
+      "section": "App",
+      "keywords": ["commands", "命令", "面板"]
+    },
+    {
+      "id": "edit.find",
+      "title": "Find in Note",
+      "shortcut": "Mod+F",
+      "section": "Search",
+      "enabledWhen": "hasActiveNote",
+      "keywords": ["replace", "查找", "替换"]
+    },
+    {
+      "id": "search.global",
+      "title": "Search Vault",
+      "shortcut": "Mod+Shift+F",
+      "section": "Search",
+      "keywords": ["bm25", "全库", "搜索"]
+    },
+    {
+      "id": "view.toggleSidebar",
+      "title": "Toggle Sidebar",
+      "section": "View",
+      "keywords": ["rail", "侧边栏"]
+    },
+    {
+      "id": "view.toggleRightPanel",
+      "title": "Toggle Right Panel",
+      "section": "View",
+      "keywords": ["inspector", "右面板"]
+    },
+    {
+      "id": "view.tab.properties",
+      "title": "Show Properties Panel",
+      "section": "View",
+      "enabledWhen": "vaultReady",
+      "keywords": ["属性"]
+    },
+    {
+      "id": "view.tab.toc",
+      "title": "Show Outline Panel",
+      "section": "View",
+      "enabledWhen": "vaultReady",
+      "keywords": ["toc", "大纲"]
+    },
+    {
+      "id": "view.tab.git",
+      "title": "Show Git Panel",
+      "section": "View",
+      "enabledWhen": "vaultReady",
+      "keywords": ["history", "历史"]
+    },
+    {
+      "id": "view.tab.chat",
+      "title": "Show Agent Panel",
+      "section": "View",
+      "enabledWhen": "vaultReady",
+      "keywords": ["chat", "ai", "对话"]
+    },
+    {
+      "id": "view.tab.settings",
+      "title": "Show Settings Panel",
+      "section": "View",
+      "enabledWhen": "vaultReady",
+      "keywords": ["设置"]
+    },
+    {
+      "id": "ai.ask",
+      "title": "Ask AI…",
+      "section": "AI",
+      "enabledWhen": "vaultReady",
+      "keywords": ["chat", "agent", "提问"]
+    }
+  ]
+}

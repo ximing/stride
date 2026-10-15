@@ -1,11 +1,11 @@
 import type { Editor } from '@tiptap/core'
 import { bindServices, observer, useService } from '@rabjs/react'
 import { useEffect, useRef } from 'react'
+import { CommandService } from '../services/command.service'
 import {
   FindService,
   clearFindHighlight,
   findTextMatches,
-  isFindShortcut,
   matchIndex,
   replaceAllMatches,
   replaceOneMatch,
@@ -19,6 +19,7 @@ function countLabel(count: number, index: number): string {
 
 const FindBar = observer(function FindBar({ editor }: { editor: Editor }) {
   const service = useService(FindService)
+  const commands = useService(CommandService)
   const inputRef = useRef<HTMLInputElement>(null)
   // Bumped on editor updates so the count follows the document, not only the query.
   const revision = service.revision
@@ -46,6 +47,19 @@ const FindBar = observer(function FindBar({ editor }: { editor: Editor }) {
     if (current) selectMatch(editor, current)
   }, [editor, service, service.open])
 
+  // The manifest owns Mod+F; the find handler lives here because FindService
+  // is bound to this component and the input ref is local.
+  useEffect(
+    () =>
+      commands.registerHandler('edit.find', {
+        run: () => {
+          if (service.open) inputRef.current?.focus()
+          else service.show()
+        },
+      }),
+    [commands, service],
+  )
+
   useEffect(() => {
     const step = (delta: number) => {
       const found = findTextMatches(editor.state.doc, service.query)
@@ -56,13 +70,8 @@ const FindBar = observer(function FindBar({ editor }: { editor: Editor }) {
       if (match) selectMatch(editor, match)
     }
     const onKeyDown = (event: KeyboardEvent) => {
-      if (isFindShortcut(event)) {
-        event.preventDefault()
-        event.stopPropagation()
-        if (service.open) inputRef.current?.focus()
-        else service.show()
-        return
-      }
+      // Shortcut bindings come from the command manifest; the dispatcher runs them.
+      if (commands.dispatchKeydown(event)) return
       if (!service.open || event.isComposing) return
       const target = event.target instanceof Element ? event.target : null
       if (event.key === 'Enter' && target?.closest('[data-testid="find-bar"]')) {
@@ -72,14 +81,14 @@ const FindBar = observer(function FindBar({ editor }: { editor: Editor }) {
         return
       }
       if (event.key !== 'Escape') return
-      if (target?.closest('[data-testid="search-panel"], [data-testid="quick-open"]')) return
+      if (target?.closest('[data-testid="search-panel"], [data-testid="quick-open"], [data-testid="command-palette"]')) return
       event.preventDefault()
       event.stopPropagation()
       service.close()
     }
     window.addEventListener('keydown', onKeyDown, true)
     return () => window.removeEventListener('keydown', onKeyDown, true)
-  }, [editor, service])
+  }, [editor, service, commands])
 
   function revealQuery(value: string) {
     service.setQuery(value)

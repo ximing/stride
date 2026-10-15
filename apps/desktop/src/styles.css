@@ -1385,7 +1385,8 @@ select {
 /* ---------- quick open / search panel overlays ---------- */
 
 .quick-open-backdrop,
-.search-panel-backdrop {
+.search-panel-backdrop,
+.command-palette-backdrop {
   position: fixed;
   inset: 0;
   z-index: 60;
@@ -1397,7 +1398,8 @@ select {
 }
 
 .quick-open,
-.search-panel {
+.search-panel,
+.command-palette {
   width: min(32rem, calc(100vw - 2rem));
   max-height: min(28rem, calc(100vh - 8rem));
   display: flex;
@@ -1410,20 +1412,23 @@ select {
   padding: 0.85rem;
 }
 
-.search-panel {
+.search-panel,
+.command-palette {
   width: min(36rem, calc(100vw - 2rem));
   max-height: min(32rem, calc(100vh - 8rem));
 }
 
 .quick-open-title,
-.search-panel-title {
+.search-panel-title,
+.command-palette-title {
   margin: 0 0 0.55rem;
   font-size: 0.95rem;
   font-weight: 600;
 }
 
 .quick-open-input,
-.search-panel-input {
+.search-panel-input,
+.command-palette-input {
   border: 1px solid var(--sd-border);
   border-radius: var(--sd-radius);
   background: var(--sd-bg);
@@ -1432,7 +1437,8 @@ select {
 }
 
 .quick-open-input:focus,
-.search-panel-input:focus {
+.search-panel-input:focus,
+.command-palette-input:focus {
   border-color: var(--sd-accent);
 }
 
@@ -1507,6 +1513,52 @@ select {
 .quick-open-empty,
 .search-panel-empty {
   margin: 0.75rem 0.15rem 0.2rem;
+  color: var(--sd-muted);
+}
+
+/* ---------- command palette ---------- */
+
+.command-palette-list {
+  margin-top: 0.55rem;
+  overflow: auto;
+  max-height: 22rem;
+}
+
+.command-palette-section {
+  margin: 0.6rem 0.15rem 0.25rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.04em;
+  color: var(--sd-muted);
+}
+
+.command-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: var(--sd-radius);
+  background: transparent;
+  color: inherit;
+  padding: 0.4rem 0.55rem;
+}
+
+.command-item[aria-selected="true"],
+.command-item:hover:not(:disabled) {
+  background: var(--sd-bg);
+  border-color: var(--sd-border);
+}
+
+.command-item:disabled {
+  color: var(--sd-muted);
+}
+
+.command-item-shortcut {
+  flex: none;
+  font-family: var(--sd-font-mono);
+  font-size: 0.72rem;
   color: var(--sd-muted);
 }
 

@@ -1,6 +1,7 @@
 import { observer, useService } from '@rabjs/react'
 import { useEffect, useRef, type ReactNode } from 'react'
-import { isSearchPanelShortcut, SearchPanelService } from '../services/search-panel.service'
+import { CommandService } from '../services/command.service'
+import { SearchPanelService } from '../services/search-panel.service'
 import { VaultService } from '../services/vault.service'
 
 function escapeRegExp(value: string): string {
@@ -29,6 +30,7 @@ function markQuery(snippet: string, query: string) {
 export const SearchPanel = observer(function SearchPanel() {
   const vault = useService(VaultService)
   const service = useService(SearchPanelService)
+  const commands = useService(CommandService)
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const results = service.open ? service.results : []
@@ -38,13 +40,8 @@ export const SearchPanel = observer(function SearchPanel() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (isSearchPanelShortcut(event)) {
-        event.preventDefault()
-        event.stopPropagation()
-        if (service.open) inputRef.current?.focus()
-        else service.show()
-        return
-      }
+      // Shortcut bindings come from the command manifest; the dispatcher runs them.
+      if (commands.dispatchKeydown(event)) return
       if (!service.open || event.isComposing) return
       if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         event.preventDefault()
@@ -66,7 +63,7 @@ export const SearchPanel = observer(function SearchPanel() {
     }
     window.addEventListener('keydown', onKeyDown, true)
     return () => window.removeEventListener('keydown', onKeyDown, true)
-  }, [service])
+  }, [service, commands])
 
   useEffect(() => {
     if (!service.open) return

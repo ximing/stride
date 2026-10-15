@@ -4,6 +4,7 @@ import { NoteEditor } from './editor'
 import { LayoutService } from './services/layout.service'
 import { GitService, SettingsService, UpdateService } from './services/panels.service'
 import { VaultService } from './services/vault.service'
+import { CommandPalette } from './ui/command-palette'
 import { NoteList } from './ui/note-list'
 import { QuickOpen } from './ui/quick-open'
 import { ResizeHandle } from './ui/resize-handle'
@@ -200,8 +201,14 @@ const Workspace = observer(function Workspace() {
 
 const App = observer(function App() {
   const vault = useService(VaultService)
-  if (vault.phase === 'chooser') return <Chooser />
-  return <Workspace />
+  // The palette mounts above both phases so Mod+K works from the chooser too;
+  // manifest enabledWhen conditions gate what is runnable there.
+  return (
+    <>
+      {vault.phase === 'chooser' ? <Chooser /> : <Workspace />}
+      <CommandPalette />
+    </>
+  )
 })
 
 export { App }

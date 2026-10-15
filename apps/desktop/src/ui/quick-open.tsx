@@ -1,17 +1,13 @@
 import { observer, useService } from '@rabjs/react'
 import { useEffect, useRef } from 'react'
+import { CommandService } from '../services/command.service'
 import { QuickOpenService, quickOpenResults } from '../services/quick-open.service'
 import { VaultService } from '../services/vault.service'
-
-function isQuickOpenShortcut(event: KeyboardEvent): boolean {
-  if (event.shiftKey || event.altKey) return false
-  if (!event.metaKey && !event.ctrlKey) return false
-  return event.key === 'p' || event.key === 'P'
-}
 
 export const QuickOpen = observer(function QuickOpen() {
   const vault = useService(VaultService)
   const service = useService(QuickOpenService)
+  const commands = useService(CommandService)
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const results = service.open ? quickOpenResults(vault.notes, service.query) : []
@@ -19,15 +15,10 @@ export const QuickOpen = observer(function QuickOpen() {
   const selectedId = selectedIndex >= 0 ? results[selectedIndex].id : ''
 
   useEffect(() => {
-    // Capture on window so Cmd/Ctrl+P still opens while the editor is focused, and the browser does not print.
+    // Capture on window so Mod+P still opens while the editor is focused, and the browser does not print.
     const onKeyDown = (event: KeyboardEvent) => {
-      if (isQuickOpenShortcut(event)) {
-        event.preventDefault()
-        event.stopPropagation()
-        if (service.open) inputRef.current?.focus()
-        else service.show()
-        return
-      }
+      // Shortcut bindings come from the command manifest; the dispatcher runs them.
+      if (commands.dispatchKeydown(event)) return
       if (!service.open || event.isComposing) return
       if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
         event.preventDefault()
@@ -49,7 +40,7 @@ export const QuickOpen = observer(function QuickOpen() {
     }
     window.addEventListener('keydown', onKeyDown, true)
     return () => window.removeEventListener('keydown', onKeyDown, true)
-  }, [service])
+  }, [service, commands])
 
   useEffect(() => {
     if (!service.open) return

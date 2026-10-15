@@ -3,6 +3,8 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { App } from './app'
 import { ChatService, GitService, SettingsService, UpdateService } from './services/panels.service'
+import { CommandPaletteService } from './services/command-palette.service'
+import { CommandService } from './services/command.service'
 import { FolderService } from './services/folder.service'
 import { LayoutService } from './services/layout.service'
 import { ListFilterService } from './services/list-filter.service'
@@ -28,6 +30,8 @@ if (showComponents) {
   register(LayoutService)
   register(QuickOpenService)
   register(SearchPanelService)
+  register(CommandService)
+  register(CommandPaletteService)
   register(FolderService)
   register(GitService)
   register(SettingsService)
