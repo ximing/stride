@@ -2,6 +2,7 @@ import { has, register, Service } from '@rabjs/react'
 import { buildPaletteItems, type PaletteItem } from './command-palette'
 import { CommandService } from './command.service'
 import { LayoutService } from './layout.service'
+import { closeOtherOverlays } from './overlays'
 import { ChatService } from './panels.service'
 import { TabsService } from './tabs.service'
 import { VaultService } from './vault.service'
@@ -31,6 +32,7 @@ export class CommandPaletteService extends Service {
 
   show() {
     if (this.open) return
+    closeOtherOverlays('commandPalette', () => this.close())
     this.query = ''
     this.selected = 0
     this.open = true

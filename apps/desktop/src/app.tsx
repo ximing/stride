@@ -13,6 +13,7 @@ import { SearchPanel } from './ui/search-panel'
 import { Rail } from './ui/sidebar'
 import { StatusBar } from './ui/status-bar'
 import { TabStrip } from './ui/tab-strip'
+import { TooltipProvider } from './ui/tooltip'
 import { TopBar } from './ui/topbar'
 
 // Re-exports keep existing test imports (`from '../app'`) stable.
@@ -206,10 +207,10 @@ const App = observer(function App() {
   // The palette mounts above both phases so Mod+K works from the chooser too;
   // manifest enabledWhen conditions gate what is runnable there.
   return (
-    <>
+    <TooltipProvider>
       {vault.phase === 'chooser' ? <Chooser /> : <Workspace />}
       <CommandPalette />
-    </>
+    </TooltipProvider>
   )
 })
 

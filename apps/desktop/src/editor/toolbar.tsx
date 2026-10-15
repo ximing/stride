@@ -19,6 +19,7 @@ import {
 import { BubbleMenu } from '@tiptap/react/menus'
 import { useEditorState } from '@tiptap/react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { formatShortcut } from '../services/commands'
 import { Mark } from '../ui/icon'
 import { applyLink, runFormat, unsetLink, type FormatName } from './extensions'
 import { addTableColumn, addTableRow, deleteTableColumn, deleteTableRow } from './table'
@@ -45,6 +46,8 @@ type ActiveState = Record<ActiveKey, boolean>
 type ToolSpec = {
   id: string
   label: string
+  /** Editing chord from the TipTap keymap, rendered via formatShortcut — never a hard-coded "⌘" string. */
+  keys?: string
   icon: Icon
   bubble: boolean
   active: ActiveKey
@@ -70,21 +73,26 @@ const IDLE: ActiveState = {
 }
 
 export const editorTools: ToolSpec[] = [
-  { id: 'bold', label: '粗体 ⌘B', icon: TextB, bubble: true, active: 'bold', format: 'bold' },
-  { id: 'italic', label: '斜体 ⌘I', icon: TextItalic, bubble: true, active: 'italic', format: 'italic' },
-  { id: 'h2', label: 'H2 ⌘⌥2', icon: TextHTwo, bubble: true, active: 'h2', format: 'h2' },
-  { id: 'h3', label: 'H3 ⌘⌥3', icon: TextHThree, bubble: true, active: 'h3', format: 'h3' },
-  { id: 'bullet', label: '无序列表 ⌘⇧8', icon: ListBullets, bubble: true, active: 'bullet', format: 'bullet' },
-  { id: 'ordered', label: '有序列表 ⌘⇧7', icon: ListNumbers, bubble: true, active: 'ordered', format: 'ordered' },
+  { id: 'bold', label: '粗体', keys: 'Mod+B', icon: TextB, bubble: true, active: 'bold', format: 'bold' },
+  { id: 'italic', label: '斜体', keys: 'Mod+I', icon: TextItalic, bubble: true, active: 'italic', format: 'italic' },
+  { id: 'h2', label: 'H2', keys: 'Mod+Alt+2', icon: TextHTwo, bubble: true, active: 'h2', format: 'h2' },
+  { id: 'h3', label: 'H3', keys: 'Mod+Alt+3', icon: TextHThree, bubble: true, active: 'h3', format: 'h3' },
+  { id: 'bullet', label: '无序列表', keys: 'Mod+Shift+8', icon: ListBullets, bubble: true, active: 'bullet', format: 'bullet' },
+  { id: 'ordered', label: '有序列表', keys: 'Mod+Shift+7', icon: ListNumbers, bubble: true, active: 'ordered', format: 'ordered' },
   { id: 'task', label: '任务列表', icon: CheckSquare, bubble: false, active: 'task', format: 'task' },
-  { id: 'quote', label: '引用 ⌘⇧B', icon: Quotes, bubble: true, active: 'quote', format: 'quote' },
+  { id: 'quote', label: '引用', keys: 'Mod+Shift+B', icon: Quotes, bubble: true, active: 'quote', format: 'quote' },
   { id: 'link', label: '链接', icon: LinkIcon, bubble: true, active: 'link' },
-  { id: 'highlight', label: '高亮 ⌘⇧H', icon: Highlighter, bubble: true, active: 'highlight', format: 'highlight' },
-  { id: 'strike', label: '删除线 ⌘⇧S', icon: TextStrikethrough, bubble: false, active: 'strike', format: 'strike' },
-  { id: 'code', label: '行内代码 ⌘E', icon: Code, bubble: false, active: 'code', format: 'code' },
+  { id: 'highlight', label: '高亮', keys: 'Mod+Shift+H', icon: Highlighter, bubble: true, active: 'highlight', format: 'highlight' },
+  { id: 'strike', label: '删除线', keys: 'Mod+Shift+S', icon: TextStrikethrough, bubble: false, active: 'strike', format: 'strike' },
+  { id: 'code', label: '行内代码', keys: 'Mod+E', icon: Code, bubble: false, active: 'code', format: 'code' },
   { id: 'code-block', label: '代码块', icon: CodeBlock, bubble: false, active: 'codeBlock', format: 'codeBlock' },
   { id: 'hr', label: '分隔线', icon: Minus, bubble: false, active: 'hr', format: 'hr' },
 ]
+
+/** Tooltip/aria label with the platform-rendered chord appended. */
+export function toolLabel(tool: ToolSpec): string {
+  return tool.keys ? `${tool.label} ${formatShortcut(tool.keys)}` : tool.label
+}
 
 type LinkForm = {
   href: string
@@ -209,7 +217,7 @@ export function EditorToolbar({
           <ToolButton
             key={tool.id}
             testId={`toolbar-${tool.id}`}
-            label={tool.label}
+            label={toolLabel(tool)}
             pressed={active[tool.active]}
             icon={tool.icon}
             onClick={() => runTool(tool)}
@@ -320,7 +328,7 @@ export function EditorToolbar({
           <ToolButton
             key={tool.id}
             testId={`bubble-${tool.id}`}
-            label={tool.label}
+            label={toolLabel(tool)}
             pressed={active[tool.active]}
             icon={tool.icon}
             onClick={() => runTool(tool)}

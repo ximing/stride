@@ -35,7 +35,6 @@ export const NoteEditor = observer(function NoteEditor() {
   }
   const extensions = useMemo(
     () => createEditorExtensions({
-      onModK: () => openLinkRef.current(),
       getNotes: () => getNotesRef.current(),
       onOpen: (target) => onOpenRef.current(target),
       getFs: () => fsRef.current,

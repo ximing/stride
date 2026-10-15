@@ -40,7 +40,7 @@ describe('code block', () => {
 
   function createEditor() {
     editor = new Editor({
-      extensions: createEditorExtensions({ onModK: () => true }),
+      extensions: createEditorExtensions(),
       content: { type: 'doc', content: [{ type: 'paragraph' }] },
     })
   }

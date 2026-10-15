@@ -1,5 +1,5 @@
 import type { FileSystemBackend } from '@stride/platform'
-import { Extension, type Editor } from '@tiptap/core'
+import type { Editor } from '@tiptap/core'
 import Highlight from '@tiptap/extension-highlight'
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
@@ -33,23 +33,18 @@ export type FormatName =
   | 'highlight'
   | 'hr'
 
+// The editor keymap (StarterKit & friends) owns editing chords only. It must
+// never bind a chord the app command manifest owns — the manifest dispatcher
+// listens on window capture and would shadow the editor binding. That is why
+// there is no Mod-k link shortcut here: Mod+K is the command palette app-wide
+// (T6.2), and the link form opens via the toolbar instead.
 export function createEditorExtensions(options: {
-  onModK: () => boolean
   getNotes?: () => { id: string; title: string }[]
   onOpen?: (target: string) => void
   getFs?: () => FileSystemBackend | null
-}) {
+} = {}) {
   // StarterKit already registers Link. A second copy clashes on the name.
   // trailingNode stays on.
-  const linkKeymap = Extension.create({
-    name: 'linkKeymap',
-    addKeyboardShortcuts() {
-      return {
-        'Mod-k': () => options.onModK(),
-      }
-    },
-  })
-
   const getNotes = options.getNotes ?? (() => [])
   const onOpen = options.onOpen ?? (() => {})
 
@@ -62,7 +57,6 @@ export function createEditorExtensions(options: {
       HTMLAttributes: {},
     }),
     Highlight.configure({ multicolor: false }),
-    linkKeymap,
     Placeholder.configure({ placeholder: 'Write in the vault…' }),
     createWikilinkNode({ getNotes, onOpen }),
     createWikilinkSuggestionExtension(getNotes),

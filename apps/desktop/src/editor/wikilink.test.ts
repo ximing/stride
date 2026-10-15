@@ -41,7 +41,6 @@ const notes: WikilinkSourceNote[] = [
 function createEditor(source: WikilinkSourceNote[] = notes): Editor {
   const editor = new Editor({
     extensions: createEditorExtensions({
-      onModK: () => true,
       getNotes: () => source.filter((note) => note.type !== 'Type').map((note) => ({ id: note.id, title: note.title })),
       onOpen: () => {},
     }),

@@ -29,6 +29,7 @@
       "title": "Quick Open",
       "shortcut": "Mod+P",
       "section": "Navigate",
+      "enabledWhen": "vaultReady",
       "keywords": ["jump", "go to", "快速打开"]
     },
     {
@@ -67,6 +68,7 @@
       "title": "Search Vault",
       "shortcut": "Mod+Shift+F",
       "section": "Search",
+      "enabledWhen": "vaultReady",
       "keywords": ["bm25", "全库", "搜索"]
     },
     {

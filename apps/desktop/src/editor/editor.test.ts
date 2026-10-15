@@ -31,6 +31,7 @@ if (typeof Range !== 'undefined' && typeof Range.prototype.getBoundingClientRect
   }
 }
 import { afterEach, describe, expect, it } from 'vitest'
+import { formatShortcut } from '../services/commands'
 import { applyLink, createEditorExtensions, runFormat, unsetLink, type FormatName } from './extensions'
 import { EditorToolbar, editorTools } from './toolbar'
 
@@ -38,9 +39,9 @@ const editors: Editor[] = []
 const roots: Root[] = []
 const hosts: HTMLElement[] = []
 
-function createEditor(content?: JSONContent, onModK: () => boolean = () => true): Editor {
+function createEditor(content?: JSONContent): Editor {
   const editor = new Editor({
-    extensions: createEditorExtensions({ onModK }),
+    extensions: createEditorExtensions(),
     content: content ?? {
       type: 'doc',
       content: [{ type: 'paragraph', content: [{ type: 'text', text: 'hello' }] }],
@@ -125,16 +126,18 @@ describe('editor formats', () => {
     expect(editorTools.some((tool) => tool.id === 'h1' || tool.format === 'h1' || tool.label.includes('H1'))).toBe(false)
   })
 
-  it('calls the Mod-k handler and does not insert a link by itself', () => {
-    let calls = 0
-    const editor = createEditor(undefined, () => {
-      calls += 1
-      return true
-    })
+  it('leaves Mod-k unbound because the command palette owns it app-wide', () => {
+    // The manifest dispatcher captures Mod+K on window before the editor would
+    // ever see it, so an editor Mod-k binding would be dead code (removed in
+    // T6.3). The link form opens via the toolbar instead; this pins the editor
+    // keymap to never reclaim the palette's chord. (commands.keyboardShortcut
+    // always returns true in TipTap v3, so probe the keymap handlers directly.)
+    const editor = createEditor()
     selectHello(editor)
     const before = editor.getJSON()
-    expect(editor.commands.keyboardShortcut('Mod-k')).toBe(true)
-    expect(calls).toBe(1)
+    const event = new KeyboardEvent('keydown', { key: 'k', metaKey: true, cancelable: true })
+    const handled = editor.view.someProp('handleKeyDown', (run) => run(editor.view, event))
+    expect(handled).toBeFalsy()
     expect(editor.isActive('link')).toBe(false)
     expect(editor.getJSON()).toEqual(before)
   })
@@ -222,7 +225,7 @@ describe('editor formats', () => {
   it('renders toolbar and bubble controls and opens one link form', async () => {
     const openLinkRef: { current: () => boolean } = { current: () => true }
     const editor = new Editor({
-      extensions: createEditorExtensions({ onModK: () => openLinkRef.current() }),
+      extensions: createEditorExtensions(),
       content: {
         type: 'doc',
         content: [{ type: 'paragraph', content: [{ type: 'text', text: 'hello' }] }],
@@ -274,14 +277,14 @@ describe('editor formats', () => {
     for (const id of ['bubble-strike', 'bubble-code', 'bubble-code-block', 'bubble-hr', 'bubble-wikilink']) {
       expect(document.querySelector(`[data-testid="${id}"]`), id).toBeNull()
     }
-    expect(document.querySelector('[data-testid="toolbar-bold"]')?.getAttribute('aria-label')).toBe('粗体 ⌘B')
-    expect(document.querySelector('[data-testid="toolbar-highlight"]')?.getAttribute('aria-label')).toBe('高亮 ⌘⇧H')
-    // ⌘K is the command palette app-wide (T6.2); the link bubble keeps no shortcut hint.
+    expect(document.querySelector('[data-testid="toolbar-bold"]')?.getAttribute('aria-label')).toBe(`粗体 ${formatShortcut('Mod+B')}`)
+    expect(document.querySelector('[data-testid="toolbar-highlight"]')?.getAttribute('aria-label')).toBe(`高亮 ${formatShortcut('Mod+Shift+H')}`)
+    // Mod+K is the command palette app-wide (T6.2); the link bubble keeps no shortcut hint.
     expect(document.querySelector('[data-testid="toolbar-link"]')?.getAttribute('aria-label')).toBe('链接')
 
     const before = editor.getJSON()
     await act(async () => {
-      editor.commands.keyboardShortcut('Mod-k')
+      ;(document.querySelector('[data-testid="toolbar-link"]') as HTMLButtonElement).click()
     })
     const href = document.querySelector('[data-testid="link-href"]') as HTMLInputElement | null
     expect(href).not.toBeNull()

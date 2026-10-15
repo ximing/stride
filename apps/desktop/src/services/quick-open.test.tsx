@@ -112,6 +112,7 @@ describe('quick open keyboard', () => {
     register(QuickOpenService)
     const vault = resolve(VaultService)
     const quick = resolve(QuickOpenService)
+    vault.phase = 'ready'
     vault.notes = notes
     vault.activeId = notes[0]?.id ?? ''
     host = document.createElement('div')

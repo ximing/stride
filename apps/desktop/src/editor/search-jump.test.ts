@@ -33,7 +33,7 @@ const editors: Editor[] = []
 
 function createEditor(content: JSONContent): Editor {
   const editor = new Editor({
-    extensions: createEditorExtensions({ onModK: () => true }),
+    extensions: createEditorExtensions(),
     content,
   })
   editors.push(editor)

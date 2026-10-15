@@ -124,6 +124,14 @@ describe('command service', () => {
     expect(commands.dispatchKeydown(blocked)).toBe(false)
     expect(blocked.defaultPrevented).toBe(false)
 
+    // Quick open is vault-scoped too: in the chooser its overlay is not even
+    // mounted, so the shortcut must not fire (T6.3 audit gap fix).
+    const chooserQuickOpen = new KeyboardEvent('keydown', { key: 'p', metaKey: true, cancelable: true })
+    expect(commands.dispatchKeydown(chooserQuickOpen)).toBe(false)
+    expect(chooserQuickOpen.defaultPrevented).toBe(false)
+    expect(quick.open).toBe(false)
+
+    vault.phase = 'ready'
     const open = new KeyboardEvent('keydown', { key: 'p', metaKey: true, cancelable: true })
     expect(commands.dispatchKeydown(open)).toBe(true)
     expect(open.defaultPrevented).toBe(true)
@@ -293,6 +301,36 @@ describe('command palette', () => {
     expect(resolve(LayoutService).rightPanelCollapsed).toBe(false)
     expect(resolve(ChatService).draft).toBe('总结本周')
     expect(palette.open).toBe(false)
+  })
+
+  it('keeps overlays mutually exclusive: opening one closes the others', async () => {
+    await mount([note('alpha', 'Alpha')])
+    const palette = resolve(CommandPaletteService)
+    const quick = resolve(QuickOpenService)
+    const search = resolve(SearchPanelService)
+
+    // Palette → quick open: a Mod+P with the palette open switches overlays
+    // instead of stacking two dialogs.
+    await act(async () => {
+      palette.show()
+      press({ key: 'p', metaKey: true })
+    })
+    expect(quick.open).toBe(true)
+    expect(palette.open).toBe(false)
+
+    // Quick open → search panel.
+    await act(async () => {
+      press({ key: 'f', metaKey: true, shiftKey: true })
+    })
+    expect(search.open).toBe(true)
+    expect(quick.open).toBe(false)
+
+    // Search panel → palette via Mod+K (toggle opens because it was closed).
+    await act(async () => {
+      press({ key: 'k', metaKey: true })
+    })
+    expect(palette.open).toBe(true)
+    expect(search.open).toBe(false)
   })
 
   it('keeps dispatcher, palette, and manifest on one source of truth', async () => {

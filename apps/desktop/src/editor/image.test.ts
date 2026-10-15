@@ -36,7 +36,6 @@ const editors: Editor[] = []
 function createEditor(fs: MemoryFileSystem): Editor {
   const editor = new Editor({
     extensions: createEditorExtensions({
-      onModK: () => true,
       getFs: () => fs,
     }),
     content: { type: 'doc', content: [{ type: 'paragraph' }] },

@@ -1,9 +1,12 @@
 import { Sidebar as SidebarIcon } from '@phosphor-icons/react'
 import { observer, useService } from '@rabjs/react'
 import { useState } from 'react'
+import { CommandService } from '../services/command.service'
+import { commandShortcut } from '../services/commands'
 import { LayoutService } from '../services/layout.service'
 import { VaultService } from '../services/vault.service'
 import { Mark } from './icon'
+import { Tooltip, TooltipContent, TooltipTrigger } from './tooltip'
 
 export const VaultSwitcher = observer(function VaultSwitcher() {
   const vault = useService(VaultService)
@@ -45,6 +48,9 @@ export const VaultSwitcher = observer(function VaultSwitcher() {
 export const TopBar = observer(function TopBar() {
   const vault = useService(VaultService)
   const layout = useService(LayoutService)
+  const commands = useService(CommandService)
+  // Shortcut hint reads the manifest via commandShortcut — no hard-coded chord.
+  const searchKeys = commandShortcut(commands.commands, 'search.global')
   return (
     <header className="topbar">
       <button
@@ -62,7 +68,12 @@ export const TopBar = observer(function TopBar() {
         <VaultSwitcher />
       </div>
       <form className="search" onSubmit={(event) => { event.preventDefault(); void vault.runSearch() }}>
-        <input data-testid="vault-search" value={vault.searchQuery} onChange={(event) => { vault.searchQuery = event.target.value }} placeholder="Search the vault" />
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <input data-testid="vault-search" value={vault.searchQuery} onChange={(event) => { vault.searchQuery = event.target.value }} placeholder="Search the vault" />
+          </TooltipTrigger>
+          {searchKeys ? <TooltipContent>全库搜索面板 {searchKeys}</TooltipContent> : null}
+        </Tooltip>
         <button type="submit" data-testid="run-search">Search</button>
         {vault.searchQuery.trim() !== '' && (
           <button type="button" onClick={() => vault.clearSearch()}>Clear</button>

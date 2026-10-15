@@ -1,5 +1,6 @@
 import { Service } from '@rabjs/react'
 import { isArchived, type StrideNote } from '@stride/core/note'
+import { closeOtherOverlays } from './overlays'
 import { TabsService } from './tabs.service'
 import { VaultService } from './vault.service'
 
@@ -70,6 +71,7 @@ export class QuickOpenService extends Service {
 
   show() {
     if (this.open) return
+    closeOtherOverlays('quickOpen', () => this.close())
     this.query = ''
     this.selected = 0
     this.open = true

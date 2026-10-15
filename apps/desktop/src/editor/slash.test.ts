@@ -35,7 +35,7 @@ const editors: Editor[] = []
 
 function createEditor(): Editor {
   const editor = new Editor({
-    extensions: createEditorExtensions({ onModK: () => true }),
+    extensions: createEditorExtensions(),
     content: { type: 'doc', content: [{ type: 'paragraph' }] },
   })
   editors.push(editor)

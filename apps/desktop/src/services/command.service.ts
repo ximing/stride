@@ -94,6 +94,11 @@ export class CommandService extends Service {
   /**
    * Unified shortcut dispatcher: event → manifest match → enabled check → run.
    * Safe to call from several capture listeners; only the first one acts.
+   *
+   * Focus semantics: manifest chords are all Mod-based application commands, so
+   * they fire no matter what element (input, textarea, editor) has focus — see
+   * the policy comment in commands.ts. Overlay-local keys (arrows/Enter/Escape)
+   * never reach this dispatcher as bindings; each overlay handles them itself.
    */
   dispatchKeydown(event: KeyboardEvent): boolean {
     if (event.defaultPrevented) return false

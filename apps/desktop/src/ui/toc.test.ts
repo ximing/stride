@@ -56,7 +56,7 @@ describe('tocItems', () => {
       ],
     }
     const editor = new Editor({
-      extensions: createEditorExtensions({ onModK: () => true }),
+      extensions: createEditorExtensions(),
       content: stripLeadingH1(doc),
     })
     try {

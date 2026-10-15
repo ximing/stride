@@ -2,6 +2,24 @@
 // and palette filtering. No rabjs or service dependencies so it stays
 // unit-testable. `appCommandManifest.json` is the single source of truth for
 // commands, shortcuts, and the command palette.
+//
+// Adding a shortcut takes three steps (pinned by command-matrix.test.ts):
+//   1. Add the manifest entry (id, title, section, shortcut, enabledWhen).
+//   2. Register its handler — CommandService.registerBuiltinHandlers, or the
+//      owning component via registerHandler when a local closure is needed.
+//   3. Extend the matrix test if the command needs a new enabledWhen condition
+//      (COMMAND_CONDITIONS + CommandService.conditions).
+//
+// Input-focus semantics (also pinned by the matrix test):
+//   - Every manifest shortcut carries Mod, so app commands fire globally —
+//     inside text inputs and the editor included. Typing is never hijacked
+//     because bare-key (modifier-less) shortcuts are policy-forbidden here.
+//   - The TipTap editor keymap owns editing chords (Mod+B, Mod+Alt+2, …).
+//     Those chords must never overlap a manifest chord; the dispatcher listens
+//     on window capture and wins any overlap, which would silently kill the
+//     editor binding.
+//   - Overlay-local keys (arrows, Enter, Escape) are handled by each overlay's
+//     own listener after dispatchKeydown passes, and only while it is open.
 
 export interface AppCommand {
   id: string
@@ -196,4 +214,13 @@ export function formatShortcut(shortcut: string, platform: 'mac' | 'other' = det
   if (parsed.shift) parts.push('Shift')
   parts.push(key)
   return parts.join('+')
+}
+
+/**
+ * Formatted shortcut for a command id, or null when it has none. UI tooltips
+ * and labels must go through this so shortcut text always reads the manifest.
+ */
+export function commandShortcut(commands: readonly AppCommand[], id: string): string | null {
+  const shortcut = commands.find((command) => command.id === id)?.shortcut
+  return shortcut ? formatShortcut(shortcut) : null
 }

@@ -51,6 +51,7 @@ describe('search panel confirm', () => {
     register(SearchPanelService)
     const vault = resolve(VaultService)
     const panel = resolve(SearchPanelService)
+    vault.phase = 'ready'
     vault.notes = notes
     vault.activeId = notes[0]?.id ?? ''
     Object.assign(vault, { index: null })

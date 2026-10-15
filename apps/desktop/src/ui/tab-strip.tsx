@@ -1,7 +1,7 @@
 import { X } from '@phosphor-icons/react'
 import { observer, useService } from '@rabjs/react'
 import { CommandService } from '../services/command.service'
-import { formatShortcut } from '../services/commands'
+import { commandShortcut } from '../services/commands'
 import { TabsService } from '../services/tabs.service'
 import { VaultService } from '../services/vault.service'
 import { Mark } from './icon'
@@ -17,8 +17,8 @@ export const TabStrip = observer(function TabStrip() {
   const commands = useService(CommandService)
   if (vault.phase !== 'ready' || tabs.tabs.length === 0) return null
   // Tooltip shortcut text comes from the manifest, never a hard-coded chord.
-  const closeShortcut = commands.commands.find((command) => command.id === 'tab.close')?.shortcut
-  const closeLabel = closeShortcut ? `Close tab (${formatShortcut(closeShortcut)})` : 'Close tab'
+  const closeKeys = commandShortcut(commands.commands, 'tab.close')
+  const closeLabel = closeKeys ? `Close tab (${closeKeys})` : 'Close tab'
   return (
     <div className="tab-strip" data-testid="tab-strip" role="tablist" aria-label="Open notes">
       {tabs.tabs.map((tab) => {

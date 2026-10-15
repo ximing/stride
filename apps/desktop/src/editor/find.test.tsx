@@ -49,7 +49,7 @@ const hosts: HTMLElement[] = []
 
 function createEditor(content: JSONContent, onUpdate?: () => void): Editor {
   const editor = new Editor({
-    extensions: createEditorExtensions({ onModK: () => true }),
+    extensions: createEditorExtensions(),
     content,
     ...(onUpdate ? { onUpdate } : {}),
   })

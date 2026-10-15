@@ -1,5 +1,6 @@
 import { Service } from '@rabjs/react'
 import { type RankedHit } from '../../../../packages/core/src/search-rank'
+import { closeOtherOverlays } from './overlays'
 import { TabsService } from './tabs.service'
 import { VaultService } from './vault.service'
 
@@ -27,6 +28,7 @@ export class SearchPanelService extends Service {
 
   show() {
     if (this.open) return
+    closeOtherOverlays('searchPanel', () => this.close())
     this.ticket += 1
     this.query = ''
     this.selected = 0
