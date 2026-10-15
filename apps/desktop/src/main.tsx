@@ -4,6 +4,7 @@ import { createRoot } from 'react-dom/client'
 import { App } from './app'
 import { ChatService, GitService, SettingsService, UpdateService } from './services/panels.service'
 import { FolderService } from './services/folder.service'
+import { LayoutService } from './services/layout.service'
 import { ListFilterService } from './services/list-filter.service'
 import { QuickOpenService } from './services/quick-open.service'
 import { SearchPanelService } from './services/search-panel.service'
@@ -24,6 +25,7 @@ if (showComponents) {
 } else {
   register(VaultService)
   register(ListFilterService)
+  register(LayoutService)
   register(QuickOpenService)
   register(SearchPanelService)
   register(FolderService)

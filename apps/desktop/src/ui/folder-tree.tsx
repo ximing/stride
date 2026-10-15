@@ -177,20 +177,6 @@ export const FolderTree = observer(function FolderTree() {
 
   return (
     <div className="folder-tree" data-testid="folder-root" onDragOver={allowDrop} onDrop={(event) => drop(event, '')}>
-      <div className="list-filter">
-        <input
-          className="list-filter-input"
-          data-testid="list-filter"
-          placeholder="过滤标题或属性"
-          value={listFilter.query}
-          onChange={(event) => listFilter.setQuery(event.target.value)}
-        />
-        {listFilter.query.trim() !== '' && (
-          <button type="button" className="list-filter-clear" data-testid="list-filter-clear" onClick={() => listFilter.clear()}>
-            清空
-          </button>
-        )}
-      </div>
       <button type="button" data-testid="new-folder" onClick={() => setCreating(true)}>
         New folder
       </button>

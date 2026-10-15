@@ -199,6 +199,8 @@ export class VaultService extends Service {
   fs: FileSystemBackend | null = null
   vaults: VaultRecord[] = []
   activeVaultId = ''
+  // File mtimes keyed by note id. Derived for the note list's relative dates.
+  noteMtimes: Record<string, number> = {}
   // Signature passed to the last successful opener.open. Save compares against this.
   indexSignature: IndexSignature = { endpoint: '', model: '', dim: 0, active: false }
   private index: NoteIndex | null = null
@@ -555,6 +557,14 @@ export class VaultService extends Service {
       if (this.pendingId === change.fromId) this.pendingId = change.toId
     }
     await this.removeIndexed(moved.map((change) => change.fromId))
+    const remapped = { ...this.noteMtimes }
+    for (const change of moved) {
+      if (change.fromId in remapped) {
+        remapped[change.toId] = remapped[change.fromId]!
+        delete remapped[change.fromId]
+      }
+    }
+    this.noteMtimes = remapped
     const docs = []
     for (const change of moved) {
       const note = this.notes.find((item) => item.id === change.toId)
@@ -609,6 +619,12 @@ export class VaultService extends Service {
         this.notes = this.notes.map((note) => (note.id === fromId ? renamed : note))
         if (this.activeId === fromId) this.activeId = nextId
         if (this.pendingId === fromId) this.pendingId = nextId
+        if (fromId in this.noteMtimes) {
+          const mtimes = { ...this.noteMtimes }
+          mtimes[nextId] = mtimes[fromId]!
+          delete mtimes[fromId]
+          this.noteMtimes = mtimes
+        }
         await this.removeIndexed([fromId])
         await this.upsertIndexed(renamed)
       }
@@ -901,6 +917,7 @@ export class VaultService extends Service {
       this.saveStatus = 'saved'
       this.error = ''
       this.replace(saved)
+      this.noteMtimes = { ...this.noteMtimes, [saved.id]: Date.now() }
       await this.upsertIndexed(saved)
     })
   }
@@ -972,7 +989,32 @@ export class VaultService extends Service {
     this.phase = 'ready'
     this.rebuildDone = snapshot.length > 0 ? this.startRebuild(epoch, snapshot) : Promise.resolve()
     this.error = ''
+    void this.refreshMtimes(epoch, opened.notes)
     await this.rememberVault(backend)
+  }
+
+  // Best-effort mtime harvest for the note list. Never blocks or fails an open.
+  // Guard on the open epoch only: `this.fs` reads back as a reactive proxy, so
+  // comparing it against the raw backend reference would always mismatch.
+  private async refreshMtimes(epoch: number, notes: StrideNote[]) {
+    const fs = this.fs
+    if (!fs) return
+    const entries = await Promise.all(
+      notes.map(async (note) => {
+        try {
+          const stat = await fs.stat(notePath(note.id))
+          return [note.id, stat?.mtimeMs ?? 0] as const
+        } catch {
+          return [note.id, 0] as const
+        }
+      }),
+    )
+    if (epoch !== this.rebuildEpoch) return
+    const mtimes: Record<string, number> = {}
+    for (const [id, mtime] of entries) {
+      if (mtime > 0) mtimes[id] = mtime
+    }
+    this.noteMtimes = mtimes
   }
 
   private startRebuild(epoch: number, docs: { id: string; text: string }[]): Promise<void> {
@@ -1256,6 +1298,11 @@ export class VaultService extends Service {
       await fs.remove(notePath(current.id))
       await this.removeIndexed([current.id])
       this.notes = this.notes.filter((note) => note.id !== current.id)
+      if (current.id in this.noteMtimes) {
+        const mtimes = { ...this.noteMtimes }
+        delete mtimes[current.id]
+        this.noteMtimes = mtimes
+      }
       this.activeId = this.visibleNotes[0]?.id ?? ''
       this.docEpoch += 1
       this.resetPropertyEditor()

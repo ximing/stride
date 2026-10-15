@@ -166,48 +166,44 @@ describe('folder tree', () => {
       vault.notes = [meeting, other]
     })
 
-    const input = host.querySelector<HTMLInputElement>('[data-testid="list-filter"]')
-    expect(input).not.toBeNull()
-    expect(input?.placeholder).toBe('过滤标题或属性')
+    // The filter input lives in the note list header (T6.1); the tree keeps
+    // applying the shared ListFilterService query.
+    const listFilter = resolve(ListFilterService)
     expect(noteTitles(host)).toEqual(['会议纪要', 'Shopping'])
-    expect(host.querySelector('[data-testid="list-filter-clear"]')).toBeNull()
 
     await act(async () => {
-      setInputValue(input!, '纪要')
-    })
-    expect(noteTitles(host)).toEqual(['会议纪要'])
-    expect(host.querySelector('[data-testid="list-filter-clear"]')).not.toBeNull()
-
-    await act(async () => {
-      setInputValue(input!, '进行')
+      listFilter.setQuery('纪要')
     })
     expect(noteTitles(host)).toEqual(['会议纪要'])
 
     await act(async () => {
-      setInputValue(input!, '12')
+      listFilter.setQuery('进行')
     })
     expect(noteTitles(host)).toEqual(['会议纪要'])
 
     await act(async () => {
-      setInputValue(input!, '待办')
+      listFilter.setQuery('12')
     })
     expect(noteTitles(host)).toEqual(['会议纪要'])
 
     await act(async () => {
-      setInputValue(input!, 'FALSE')
+      listFilter.setQuery('待办')
+    })
+    expect(noteTitles(host)).toEqual(['会议纪要'])
+
+    await act(async () => {
+      listFilter.setQuery('FALSE')
     })
     expect(noteTitles(host)).toEqual(['Shopping'])
 
     await act(async () => {
-      setInputValue(input!, 'secret')
+      listFilter.setQuery('secret')
     })
     expect(noteTitles(host)).toEqual([])
 
     await act(async () => {
-      host.querySelector<HTMLButtonElement>('[data-testid="list-filter-clear"]')?.click()
+      listFilter.clear()
     })
-    expect(input?.value).toBe('')
     expect(noteTitles(host)).toEqual(['会议纪要', 'Shopping'])
-    expect(host.querySelector('[data-testid="list-filter-clear"]')).toBeNull()
   })
 })
