@@ -7,6 +7,7 @@ import {
 } from './commands'
 import { RIGHT_PANEL_TABS } from './layout'
 import { LayoutService } from './layout.service'
+import { NoteListService } from './note-list.service'
 import { GitService } from './panels.service'
 import { QuickOpenService } from './quick-open.service'
 import { SearchPanelService } from './search-panel.service'
@@ -51,6 +52,7 @@ export class CommandService extends Service {
     gitReady: () => has(GitService) && this.resolve(GitService).surface === 'ready',
     canGoBack: () => has(TabsService) && this.resolve(TabsService).canGoBack,
     canGoForward: () => has(TabsService) && this.resolve(TabsService).canGoForward,
+    hasListSelection: () => has(NoteListService) && this.resolve(NoteListService).hasMultiSelection,
   }
 
   constructor() {
@@ -178,6 +180,27 @@ export class CommandService extends Service {
     this.registerHandler('tab.close', {
       available: () => has(TabsService),
       run: () => this.resolve(TabsService).closeActiveTab(),
+    })
+    // Batch list operations. Delete/retype open the same UI affordances the
+    // batch bar drives (confirm modal / type menu), so the palette never
+    // bypasses a confirmation.
+    this.registerHandler('list.archiveSelected', {
+      available: () => has(NoteListService),
+      run: () => {
+        void this.resolve(NoteListService).archiveSelected()
+      },
+    })
+    this.registerHandler('list.deleteSelected', {
+      available: () => has(NoteListService),
+      run: () => {
+        this.resolve(NoteListService).confirmingDelete = true
+      },
+    })
+    this.registerHandler('list.retypeSelected', {
+      available: () => has(NoteListService),
+      run: () => {
+        this.resolve(NoteListService).retypeOpen = true
+      },
     })
     // 'app.commandPalette' is registered by the CommandPalette component and
     // 'edit.find' by the editor find bar, because they need component closures.

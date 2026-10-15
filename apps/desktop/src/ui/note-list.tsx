@@ -1,11 +1,15 @@
-import { MagnifyingGlass, X } from '@phosphor-icons/react'
-import { observer, useService } from '@rabjs/react'
+import { ArrowsDownUp, MagnifyingGlass, X } from '@phosphor-icons/react'
+import { observer, raw, useService } from '@rabjs/react'
 import { plainText, type StrideNote } from '@stride/core/note'
+import { memo, useEffect, useMemo, useRef, useState } from 'react'
 import { typeSidebarLabel } from '../../../../packages/core/src/types'
 import { ListFilterService } from '../services/list-filter.service'
-import { TabsService } from '../services/tabs.service'
+import { sortNotes, virtualWindow, type ListSort, type ListSortKey } from '../services/note-list'
+import { NoteListService } from '../services/note-list.service'
 import { VaultService } from '../services/vault.service'
 import { Mark } from './icon'
+import { Menu, MenuContent, MenuItem, MenuTrigger } from './menu'
+import { Modal, ModalClose, ModalContent } from './modal'
 
 /** Body plain text, whitespace-collapsed and truncated for list rows. */
 export function noteSnippet(note: StrideNote, maxLength = 96): string {
@@ -42,6 +46,37 @@ export function noteListTitle(vault: VaultService): string {
   return vault.listFilter
 }
 
+const TYPE_COLORS = new Set(['gray', 'blue', 'teal', 'green', 'orange', 'purple', 'red', 'pink', 'yellow'])
+
+function propertyText(value: StrideNote['properties'][string] | undefined): string {
+  if (typeof value === 'string') return value
+  if (Array.isArray(value)) return value[0] ?? ''
+  return ''
+}
+
+function typeDocColor(doc: StrideNote): string {
+  const key = propertyText(doc.properties._color).trim().toLowerCase()
+  return TYPE_COLORS.has(key) ? key : 'gray'
+}
+
+interface TypeChipInfo {
+  color: string
+  label: string
+}
+
+/**
+ * type-title → chip info map. Derived once per notes change: with 10k notes,
+ * per-row `typeDocuments.find` calls turn every scroll frame into O(rows × n).
+ */
+function buildTypeInfo(vault: VaultService): Map<string, TypeChipInfo> {
+  const map = new Map<string, TypeChipInfo>()
+  for (const doc of vault.typeDocuments) {
+    // The chip label mirrors the sidebar: `_sidebar_label` when set.
+    map.set(doc.title, { color: typeDocColor(doc), label: typeSidebarLabel(doc) })
+  }
+  return map
+}
+
 export const ListFilterInput = observer(function ListFilterInput() {
   const listFilter = useService(ListFilterService)
   return (
@@ -69,38 +104,279 @@ export const ListFilterInput = observer(function ListFilterInput() {
   )
 })
 
-export const NoteList = observer(function NoteList() {
-  const vault = useService(VaultService)
-  const listFilter = useService(ListFilterService)
-  const tabs = useService(TabsService)
-  const notes = listFilter.apply(vault.visibleNotes)
+const SORT_LABELS: Record<ListSortKey, Record<ListSort['dir'], string>> = {
+  mtime: { desc: 'Modified: newest first', asc: 'Modified: oldest first' },
+  title: { asc: 'Title A–Z', desc: 'Title Z–A' },
+  created: { desc: 'Created: newest first', asc: 'Created: oldest first' },
+}
+
+const SORT_ORDER: { key: ListSortKey; dir: ListSort['dir'] }[] = [
+  { key: 'mtime', dir: 'desc' },
+  { key: 'mtime', dir: 'asc' },
+  { key: 'title', dir: 'asc' },
+  { key: 'title', dir: 'desc' },
+  { key: 'created', dir: 'desc' },
+  { key: 'created', dir: 'asc' },
+]
+
+const SortMenu = observer(function SortMenu() {
+  const list = useService(NoteListService)
   return (
-    <div className="note-list" data-testid="note-list">
-      <header className="note-list-head">
-        <h2 className="note-list-title" data-testid="note-list-title">{noteListTitle(vault)}</h2>
-        <span className="note-list-count" data-testid="note-list-count">{notes.length}</span>
-      </header>
-      <ListFilterInput />
-      <div className="note-list-items">
-        {notes.length === 0 && <p className="note-list-empty">No notes here.</p>}
-        {notes.map((note) => (
-          <button
-            key={note.id}
-            type="button"
-            className="note-list-item"
-            data-testid="note-list-item"
-            data-note-id={note.id}
-            aria-current={vault.activeId === note.id ? 'true' : undefined}
-            onClick={() => tabs.openNote(note.id)}
-          >
-            <span className="note-list-item-title">{note.title || 'Untitled'}</span>
-            <span className="note-list-item-meta">
-              <span className="note-list-item-date">{relativeDay(vault.noteMtimes[note.id] ?? 0, Date.now())}</span>
-              <span className="note-list-item-snippet">{noteSnippet(note)}</span>
-            </span>
-          </button>
-        ))}
-      </div>
+    <Menu>
+      <MenuTrigger className="note-list-sort" data-testid="note-list-sort" aria-label="Sort notes">
+        <Mark icon={ArrowsDownUp} size={14} />
+      </MenuTrigger>
+      <MenuContent align="end">
+        {SORT_ORDER.map(({ key, dir }) => {
+          const active = list.sort.key === key && list.sort.dir === dir
+          return (
+            <MenuItem
+              key={`${key}-${dir}`}
+              data-testid={`sort-${key}-${dir}`}
+              aria-checked={active}
+              onSelect={() => list.setSort({ key, dir })}
+            >
+              <span className="menu-check">{active ? '✓' : ''}</span>
+              {SORT_LABELS[key][dir]}
+            </MenuItem>
+          )
+        })}
+      </MenuContent>
+    </Menu>
+  )
+})
+
+const BatchBar = observer(function BatchBar() {
+  const vault = useService(VaultService)
+  const list = useService(NoteListService)
+  const types = vault.sidebarTypes
+  return (
+    <div className="note-list-batch" data-testid="note-list-batch">
+      <span className="note-list-batch-count" data-testid="note-list-batch-count">
+        {list.selectionCount} selected
+      </span>
+      <button type="button" data-testid="batch-archive" onClick={() => void list.archiveSelected()}>
+        Archive
+      </button>
+      <Menu open={list.retypeOpen} onOpenChange={(open) => { list.retypeOpen = open }}>
+        <MenuTrigger className="note-list-batch-retype" data-testid="batch-retype">
+          Type
+        </MenuTrigger>
+        <MenuContent>
+          {types.length === 0 && <MenuItem disabled>No types yet</MenuItem>}
+          {types.map((type) => (
+            <MenuItem
+              key={type.id}
+              data-testid={`batch-retype-${type.title}`}
+              onSelect={() => void list.retypeSelected(type.title)}
+            >
+              {typeSidebarLabel(type)}
+            </MenuItem>
+          ))}
+        </MenuContent>
+      </Menu>
+      <button
+        type="button"
+        className="note-list-batch-delete"
+        data-testid="batch-delete"
+        onClick={() => { list.confirmingDelete = true }}
+      >
+        Delete
+      </button>
+      <button
+        type="button"
+        className="note-list-batch-clear"
+        data-testid="batch-clear"
+        aria-label="Clear selection"
+        onClick={() => list.clearSelection()}
+      >
+        <Mark icon={X} size={13} />
+      </button>
     </div>
   )
 })
+
+const BatchDeleteModal = observer(function BatchDeleteModal() {
+  const list = useService(NoteListService)
+  return (
+    <Modal open={list.confirmingDelete} onOpenChange={(open) => { list.confirmingDelete = open }}>
+      <ModalContent
+        title="Delete notes"
+        description={`Delete ${list.selectionCount} notes permanently? This cannot be undone.`}
+      >
+        <button
+          type="button"
+          data-testid="confirm-delete"
+          onClick={() => { void list.deleteSelected() }}
+        >
+          Delete
+        </button>
+        <ModalClose data-testid="cancel-delete">Cancel</ModalClose>
+      </ModalContent>
+    </Modal>
+  )
+})
+
+interface NoteRowProps {
+  note: StrideNote
+  dateLabel: string
+  typeTitle: string
+  typeColor: string
+  typeLabel: string
+  status: string
+  active: boolean
+  selected: boolean
+  onRowClick: (id: string, mods: { shift: boolean; mod: boolean }) => void
+}
+
+// memo keeps scroll re-renders cheap: rows whose props did not change bail out.
+const NoteRow = memo(function NoteRow({
+  note,
+  dateLabel,
+  typeTitle,
+  typeColor,
+  typeLabel,
+  status,
+  active,
+  selected,
+  onRowClick,
+}: NoteRowProps) {
+  return (
+    <button
+      type="button"
+      className="note-list-item"
+      data-testid="note-list-item"
+      data-note-id={note.id}
+      aria-current={active ? 'true' : undefined}
+      data-selected={selected ? 'true' : undefined}
+      onClick={(event) => onRowClick(note.id, { shift: event.shiftKey, mod: event.metaKey || event.ctrlKey })}
+    >
+      <span className="note-list-item-title">{note.title || 'Untitled'}</span>
+      <span className="note-list-item-meta">
+        <span className="note-list-item-date">{dateLabel}</span>
+        {typeTitle !== '' && (
+          <span className="note-chip" data-testid="note-chip-type" data-type={typeTitle}>
+            <span className={`type-dot type-dot-${typeColor}`} />
+            <span className="note-chip-label">{typeLabel}</span>
+          </span>
+        )}
+        {status !== '' && (
+          <span className="note-chip note-chip-status" data-testid="note-chip-status">{status}</span>
+        )}
+        <span className="note-list-item-snippet">{noteSnippet(note)}</span>
+      </span>
+    </button>
+  )
+})
+
+/** Default type ('note') gets no chip; everything else does. */
+function chipTypeOf(note: StrideNote): string {
+  const type = note.type.trim()
+  return type !== '' && type.toLowerCase() !== 'note' ? type : ''
+}
+
+export const NoteList = observer(function NoteList() {
+  const vault = useService(VaultService)
+  const listFilter = useService(ListFilterService)
+  const list = useService(NoteListService)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const [scrollTop, setScrollTop] = useState(0)
+  const [viewport, setViewport] = useState(0)
+
+  // Measure the scroll viewport. jsdom has no ResizeObserver/layout, so fall
+  // back to a nominal viewport that renders a full window in tests.
+  useEffect(() => {
+    const element = scrollRef.current
+    if (!element) return
+    setViewport(element.clientHeight || 600)
+    if (typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => {
+      setViewport(element.clientHeight || 600)
+    })
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
+
+  // Switching filter dimension or sort resets the scroll position (never persisted).
+  useEffect(() => {
+    const element = scrollRef.current
+    if (element) element.scrollTop = 0
+    setScrollTop(0)
+  }, [vault.listFilter, vault.searchQuery, vault.searchHits, listFilter.query, list.sort, list.scrollEpoch])
+
+  // Filter + sort only recompute when the underlying data changes, not on
+  // scroll. ListFilterService.apply scans raw (non-proxy) notes internally —
+  // proxied property reads at 10k notes cost hundreds of ms per keystroke.
+  // Reactivity is preserved because every vault mutation replaces `notes`
+  // (and `noteMtimes`) by identity, which is a memo dep.
+  const notes = useMemo(
+    () => sortNotes(listFilter.apply(vault.visibleNotes), list.sort, raw(vault.noteMtimes)),
+    [vault.notes, vault.searchHits, vault.searchQuery, vault.listFilter, listFilter.query, list.sort, vault.noteMtimes],
+  )
+  const typeInfo = useMemo(() => buildTypeInfo(vault), [vault.notes])
+  const title = useMemo(
+    () => noteListTitle(vault),
+    [vault.searchQuery, vault.searchHits, vault.listFilter, typeInfo],
+  )
+  const orderedIds = useMemo(() => notes.map((note) => note.id), [notes])
+  const win = virtualWindow(notes.length, scrollTop, viewport)
+  const rows = notes.slice(win.start, win.end)
+  const emptyText = notes.length > 0
+    ? ''
+    : listFilter.query.trim() !== ''
+      ? `No notes match “${listFilter.query.trim()}”.`
+      : 'No notes here.'
+
+  return (
+    <div
+      className="note-list"
+      data-testid="note-list"
+      onKeyDown={(event) => {
+        if (event.key === 'Escape' && list.selectionCount > 0) {
+          list.clearSelection()
+          event.stopPropagation()
+        }
+      }}
+    >
+      <header className="note-list-head">
+        <h2 className="note-list-title" data-testid="note-list-title">{title}</h2>
+        <span className="note-list-count" data-testid="note-list-count">{notes.length}</span>
+        <SortMenu />
+      </header>
+      <ListFilterInput />
+      {list.hasMultiSelection && <BatchBar />}
+      <div
+        className="note-list-items"
+        data-testid="note-list-items"
+        ref={scrollRef}
+        onScroll={(event) => setScrollTop(event.currentTarget.scrollTop)}
+      >
+        {emptyText !== '' && <p className="note-list-empty">{emptyText}</p>}
+        {win.topPad > 0 && <div className="note-list-spacer" style={{ height: win.topPad }} />}
+        {rows.map((note) => {
+          const chipType = chipTypeOf(note)
+          const chip = chipType !== '' ? typeInfo.get(chipType) : undefined
+          return (
+            <NoteRow
+              key={note.id}
+              note={note}
+              dateLabel={relativeDay(vault.noteMtimes[note.id] ?? 0, Date.now())}
+              typeTitle={chipType}
+              typeColor={chip?.color ?? 'gray'}
+              typeLabel={chip?.label ?? chipType}
+              status={propertyText(note.properties.status).trim()}
+              active={vault.activeId === note.id}
+              selected={list.isSelected(note.id)}
+              onRowClick={(id, mods) => list.clickNote(id, mods, orderedIds)}
+            />
+          )
+        })}
+        {win.bottomPad > 0 && <div className="note-list-spacer" style={{ height: win.bottomPad }} />}
+      </div>
+      <BatchDeleteModal />
+    </div>
+  )
+})
+
+// Row height lives with the pure windowing math; re-exported for tests.
+export { NOTE_ROW_HEIGHT } from '../services/note-list'

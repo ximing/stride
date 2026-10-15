@@ -1,4 +1,4 @@
-import { has, Service } from '@rabjs/react'
+import { has, raw, Service } from '@rabjs/react'
 import { buildGraph, hasOutgoingRelationship, type VaultGraph } from '@stride/core/graph'
 import {
   applyBody,
@@ -57,6 +57,7 @@ import {
   saveNote,
 } from '../../../../packages/core/src/vault'
 import { ListFilterService } from './list-filter.service'
+import { NoteListService } from './note-list.service'
 import { TabsService } from './tabs.service'
 
 const COLLAPSED_TYPES_KEY = 'stride:collapsed-types'
@@ -89,6 +90,21 @@ const embeddingClient = new EmbeddingClient((input, init) => globalThis.fetch(in
 
 function isMemoryFixture(): boolean {
   return new URLSearchParams(window.location.search).get('fixture') === 'memory'
+}
+
+// Dev-only: `?fixture=memory&seed=N` programmatically fills the in-memory vault
+// with N notes for performance testing. Compile-time gated so the generator is
+// dead-code-eliminated from production builds.
+function memoryFixtureSeedCount(): number {
+  try {
+    if (!import.meta.env.DEV) return 0
+    const raw = new URLSearchParams(window.location.search).get('seed')
+    const count = Number(raw)
+    if (!Number.isFinite(count) || count <= 0) return 0
+    return Math.min(Math.floor(count), 50_000)
+  } catch {
+    return 0
+  }
 }
 
 function errorText(error: unknown): string {
@@ -135,6 +151,19 @@ function writeCollapsedTypes(titles: string[]) {
 function hasTauriInternals(): boolean {
   return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 }
+
+// Cross-render derivation caches, keyed by the raw notes array. VaultService
+// replaces `notes` immutably on every mutation, so array identity is a
+// complete change signal and WeakMap entries die with the array. Computing
+// over raw notes keeps 10k-note scans off the reactive tracking bus — at
+// fixture scale, per-key reaction registration (not the scan itself)
+// dominated CPU profiles of vault open.
+const graphCache = new WeakMap<StrideNote[], VaultGraph>()
+const typeDocCache = new WeakMap<StrideNote[], StrideNote[]>()
+const visibleCache = new WeakMap<
+  StrideNote[],
+  { hits: { id: string; score: number }[]; query: string; filter: string; result: StrideNote[] }
+>()
 
 function createVaultId(): string {
   const randomUUID = globalThis.crypto?.randomUUID
@@ -249,11 +278,25 @@ export class VaultService extends Service {
   }
 
   get graph(): VaultGraph {
-    return buildGraph(this.notes)
+    const notes = this.notes // tracked read: identity changes on every mutation
+    const key = raw(notes)
+    let graph = graphCache.get(key)
+    if (!graph) {
+      graph = buildGraph(key)
+      graphCache.set(key, graph)
+    }
+    return graph
   }
 
   get typeDocuments(): StrideNote[] {
-    return this.notes.filter((note) => isTypeDocument(note)).sort(compareTypeDocuments)
+    const notes = this.notes // tracked read
+    const key = raw(notes)
+    let docs = typeDocCache.get(key)
+    if (!docs) {
+      docs = key.filter((note) => isTypeDocument(note)).sort(compareTypeDocuments)
+      typeDocCache.set(key, docs)
+    }
+    return docs
   }
 
   get sidebarTypes(): StrideNote[] {
@@ -284,14 +327,30 @@ export class VaultService extends Service {
   }
 
   get visibleNotes(): StrideNote[] {
-    const listed = (notes: StrideNote[]) => notes.filter((note) => !isTypeDocument(note) && !isArchived(note))
-    if (this.searchHits.length && this.searchQuery.trim()) {
-      const ids = new Set(this.searchHits.map((hit) => hit.id))
-      return listed(this.notes.filter((note) => ids.has(note.id)))
+    // Tracked reads: every input of the derivation. Arrays are replaced
+    // immutably, so identity captures hits changes; the rest are primitives.
+    const hits = this.searchHits
+    const query = this.searchQuery
+    const filter = this.listFilter
+    const key = raw(this.notes)
+    const cached = visibleCache.get(key)
+    if (cached && cached.hits === raw(hits) && cached.query === query && cached.filter === filter) {
+      return cached.result
     }
-    if (this.listFilter === 'inbox') return listed(this.graph.inbox)
-    if (this.listFilter !== 'all') return listed(this.graph.byType.get(this.listFilter) ?? [])
-    return listed(this.notes)
+    const listed = (notes: readonly StrideNote[]) => notes.filter((note) => !isTypeDocument(note) && !isArchived(note))
+    let result: StrideNote[]
+    if (hits.length && query.trim()) {
+      const ids = new Set(hits.map((hit) => hit.id))
+      result = listed(key.filter((note) => ids.has(note.id)))
+    } else if (filter === 'inbox') {
+      result = listed(this.graph.inbox)
+    } else if (filter !== 'all') {
+      result = listed(this.graph.byType.get(filter) ?? [])
+    } else {
+      result = listed(key)
+    }
+    visibleCache.set(key, { hits: raw(hits), query, filter, result })
+    return result
   }
 
   async restoreOpened() {
@@ -317,6 +376,7 @@ export class VaultService extends Service {
     this.error = ''
     try {
       const backend = isMemoryFixture() ? this.memoryFixtureRoot() : await pickVaultBackend()
+      await this.seedMemoryFixture(backend)
       await this.openBackend(backend)
     } catch (error) {
       this.error = errorText(error)
@@ -999,6 +1059,9 @@ export class VaultService extends Service {
     // Tabs restore the per-vault scene only now: activeVaultId became final in
     // rememberVault, so earlier activeId reactions belong to the old vault.
     if (has(TabsService)) this.resolve(TabsService).onVaultOpened()
+    // Same handover for the list: load this vault's persisted sort and drop any
+    // selection left over from the previous vault.
+    if (has(NoteListService)) this.resolve(NoteListService).onVaultOpened()
   }
 
   // Best-effort mtime harvest for the note list. Never blocks or fails an open.
@@ -1054,6 +1117,22 @@ export class VaultService extends Service {
   private memoryFixtureRoot(): MemoryFileSystem {
     this.memoryRoot ??= new MemoryFileSystem('memory-vault')
     return this.memoryRoot
+  }
+
+  // Dev-only perf fixture: fill a fresh memory vault with N generated notes.
+  // Skips when the vault already holds enough notes (a reopened fixture vault).
+  // The DEV gate is compile-time: production builds drop the dynamic import.
+  private async seedMemoryFixture(backend: FileSystemBackend) {
+    if (!import.meta.env.DEV) return
+    if (!(backend instanceof MemoryFileSystem)) return
+    const count = memoryFixtureSeedCount()
+    if (count === 0) return
+    const existing = await listNoteFiles(backend)
+    if (existing.length >= count) return
+    const started = performance.now()
+    const { writeFixtureNotes } = await import('../dev/fixture-notes')
+    await writeFixtureNotes(backend, count)
+    console.info(`[fixture] seeded ${count} notes in ${(performance.now() - started).toFixed(0)}ms`)
   }
 
   private ensureRegistry() {
@@ -1300,20 +1379,78 @@ export class VaultService extends Service {
 
   async deleteActiveNote() {
     const current = this.active
+    if (!current || !this.fs) return
+    await this.deleteNotes([current.id])
+  }
+
+  /** Batch archive: set `archived: true` on each note and save. Thin loop over saveNote. */
+  async archiveNotes(ids: string[]) {
+    await this.mutateNotes(ids, (note) => ({
+      ...note,
+      properties: { ...note.properties, archived: true },
+    }))
+  }
+
+  /** Batch retype: set `type` on each note and save. Thin loop over saveNote. */
+  async retypeNotes(ids: string[], type: string) {
+    const nextType = type.trim()
+    if (!nextType) return
+    await this.mutateNotes(ids, (note) => ({ ...note, type: nextType }))
+  }
+
+  /**
+   * Shared per-note mutate+save for batch operations. Lands any pending
+   * debounced save first so a scheduled flush cannot overwrite the mutation.
+   * Index text (title + body) is untouched by archive/retype, so no reindex.
+   */
+  private async mutateNotes(ids: string[], mutate: (note: StrideNote) => StrideNote) {
     const fs = this.fs
-    if (!current || !fs) return
+    if (!fs || ids.length === 0) return
+    const wanted = new Set(ids)
     try {
-      await fs.remove(notePath(current.id))
-      await this.removeIndexed([current.id])
-      this.notes = this.notes.filter((note) => note.id !== current.id)
-      if (current.id in this.noteMtimes) {
-        const mtimes = { ...this.noteMtimes }
-        delete mtimes[current.id]
-        this.noteMtimes = mtimes
+      await this.flush()
+      const saved: StrideNote[] = []
+      for (const note of this.notes) {
+        if (!wanted.has(note.id)) continue
+        saved.push(await saveNote(fs, noteForSave(mutate(note))))
       }
-      this.activeId = this.visibleNotes[0]?.id ?? ''
+      if (saved.length === 0) return
+      const byId = new Map(saved.map((note) => [note.id, note]))
+      this.notes = this.notes.map((note) => byId.get(note.id) ?? note)
+      const now = Date.now()
+      const mtimes = { ...this.noteMtimes }
+      for (const note of saved) mtimes[note.id] = now
+      this.noteMtimes = mtimes
       this.docEpoch += 1
-      this.resetPropertyEditor()
+    } catch (error) {
+      this.error = errorText(error)
+    }
+  }
+
+  /** Batch delete: remove files, drop from the index, fix the active selection. */
+  async deleteNotes(ids: string[]) {
+    const fs = this.fs
+    if (!fs || ids.length === 0) return
+    const wanted = new Set(ids)
+    try {
+      await this.flush()
+      // A failed flush leaves a retry timer that would resurrect a deleted file.
+      if (this.pendingId && wanted.has(this.pendingId)) this.cancelPending()
+      const removed: string[] = []
+      for (const id of wanted) {
+        await fs.remove(notePath(id))
+        removed.push(id)
+      }
+      await this.removeIndexed(removed)
+      this.notes = this.notes.filter((note) => !wanted.has(note.id))
+      const mtimes = { ...this.noteMtimes }
+      for (const id of removed) delete mtimes[id]
+      this.noteMtimes = mtimes
+      if (wanted.has(this.activeId)) {
+        this.activeId = this.visibleNotes[0]?.id ?? ''
+        this.resetPropertyEditor()
+      }
+      this.docEpoch += 1
     } catch (error) {
       this.error = errorText(error)
     }

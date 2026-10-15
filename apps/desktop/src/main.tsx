@@ -8,6 +8,7 @@ import { CommandService } from './services/command.service'
 import { FolderService } from './services/folder.service'
 import { LayoutService } from './services/layout.service'
 import { ListFilterService } from './services/list-filter.service'
+import { NoteListService } from './services/note-list.service'
 import { QuickOpenService } from './services/quick-open.service'
 import { SearchPanelService } from './services/search-panel.service'
 import { TabsService } from './services/tabs.service'
@@ -29,6 +30,7 @@ if (showComponents) {
   register(VaultService)
   register(TabsService)
   register(ListFilterService)
+  register(NoteListService)
   register(LayoutService)
   register(QuickOpenService)
   register(SearchPanelService)

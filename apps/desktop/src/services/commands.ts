@@ -37,7 +37,7 @@ export interface AppCommandManifest {
 }
 
 /** Condition ids a manifest `enabledWhen` may reference. CommandService implements all of them. */
-export const COMMAND_CONDITIONS = ['vaultReady', 'hasActiveNote', 'gitReady', 'canGoBack', 'canGoForward'] as const
+export const COMMAND_CONDITIONS = ['vaultReady', 'hasActiveNote', 'gitReady', 'canGoBack', 'canGoForward', 'hasListSelection'] as const
 
 const MODIFIER_TOKENS = new Set(['Mod', 'Ctrl', 'Alt', 'Shift'])
 

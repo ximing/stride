@@ -86,7 +86,7 @@ describe('shortcut matrix', () => {
 
   it('keeps every enabledWhen condition implemented by CommandService', () => {
     expect(new Set(COMMAND_CONDITIONS)).toEqual(
-      new Set(['vaultReady', 'hasActiveNote', 'gitReady', 'canGoBack', 'canGoForward']),
+      new Set(['vaultReady', 'hasActiveNote', 'gitReady', 'canGoBack', 'canGoForward', 'hasListSelection']),
     )
     // Behavioral spot-check: with no vault open, every conditioned command is disabled.
     register(VaultService)

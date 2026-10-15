@@ -204,6 +204,27 @@
       "section": "AI",
       "enabledWhen": "vaultReady",
       "keywords": ["chat", "agent", "提问"]
+    },
+    {
+      "id": "list.archiveSelected",
+      "title": "Archive Selected Notes",
+      "section": "List",
+      "enabledWhen": "hasListSelection",
+      "keywords": ["batch", "archive", "归档", "批量"]
+    },
+    {
+      "id": "list.deleteSelected",
+      "title": "Delete Selected Notes…",
+      "section": "List",
+      "enabledWhen": "hasListSelection",
+      "keywords": ["batch", "delete", "删除", "批量"]
+    },
+    {
+      "id": "list.retypeSelected",
+      "title": "Change Type of Selected Notes…",
+      "section": "List",
+      "enabledWhen": "hasListSelection",
+      "keywords": ["batch", "type", "retype", "类型", "批量"]
     }
   ]
 }

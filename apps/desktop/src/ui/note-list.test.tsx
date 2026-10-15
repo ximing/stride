@@ -7,6 +7,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { initializeVault } from '../../../../packages/core/src/seed'
 import { createVaultNote } from '../../../../packages/core/src/vault'
 import { ListFilterService } from '../services/list-filter.service'
+import { DEFAULT_LIST_SORT, LIST_STORAGE_KEY, NOTE_ROW_HEIGHT } from '../services/note-list'
+import { NoteListService } from '../services/note-list.service'
 import { VaultService } from '../services/vault.service'
 import { NoteList, noteListTitle, noteSnippet, relativeDay } from './note-list'
 
@@ -35,12 +37,15 @@ function noteWithBody(id: string, title: string, body: string) {
   return note
 }
 
-async function mountNoteList(): Promise<{ vault: VaultService }> {
+async function mountNoteList(): Promise<{ vault: VaultService; list: NoteListService }> {
   useMemoryFixture()
   vi.stubGlobal('showDirectoryPicker', vi.fn())
   register(VaultService)
   if (!has(ListFilterService)) register(ListFilterService)
   resolve(ListFilterService).clear()
+  const list = resolve(NoteListService)
+  list.clearSelection()
+  list.sort = { ...DEFAULT_LIST_SORT }
   const vault = resolve(VaultService)
   vault.cancelPending()
   host = document.createElement('div')
@@ -49,12 +54,21 @@ async function mountNoteList(): Promise<{ vault: VaultService }> {
   await act(async () => {
     root?.render(<NoteList />)
   })
-  return { vault }
+  return { vault, list }
 }
 
 function itemTitles(): string[] {
   return [...host!.querySelectorAll('[data-testid="note-list-item"] .note-list-item-title')]
     .map((node) => node.textContent ?? '')
+}
+
+function renderedItems(): HTMLElement[] {
+  return [...host!.querySelectorAll<HTMLElement>('[data-testid="note-list-item"]')]
+}
+
+function clickRow(id: string, mods: { shiftKey?: boolean; metaKey?: boolean } = {}) {
+  const row = host!.querySelector<HTMLElement>(`[data-note-id="${id}"]`)!
+  row.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, ...mods }))
 }
 
 describe('noteSnippet', () => {
@@ -143,8 +157,13 @@ describe('NoteList', () => {
     host?.remove()
     host = undefined
     resolve(ListFilterService).clear()
+    const list = resolve(NoteListService)
+    list.clearSelection()
+    list.sort = { ...DEFAULT_LIST_SORT }
+    localStorage.removeItem(LIST_STORAGE_KEY)
     window.history.replaceState(null, '', '/')
     vi.unstubAllGlobals()
+    vi.restoreAllMocks()
     try {
       resolve(VaultService).cancelPending()
     } catch {
@@ -217,5 +236,177 @@ describe('NoteList', () => {
     expect(host!.querySelector('[data-testid="note-list-item"]')).toBeNull()
     expect(host!.querySelector('.note-list-empty')).not.toBeNull()
     expect(host!.querySelector('[data-testid="note-list-count"]')?.textContent).toBe('0')
+  })
+
+  it('says when the inline filter matches nothing', async () => {
+    const { vault } = await mountNoteList()
+    await act(async () => {
+      vault.listFilter = 'all'
+      vault.searchQuery = ''
+      vault.searchHits = []
+      vault.notes = [noteWithBody('a', 'Alpha', 'body')]
+    })
+    const input = host!.querySelector<HTMLInputElement>('[data-testid="list-filter"]')!
+    await act(async () => {
+      setInputValue(input, 'zzz')
+    })
+    expect(host!.querySelector('.note-list-empty')?.textContent).toBe('No notes match “zzz”.')
+  })
+
+  it('renders type and status chips; plain notes get no type chip', async () => {
+    const { vault } = await mountNoteList()
+    const typeDoc = createNote('type-project', 'Project')
+    typeDoc.type = 'Type'
+    typeDoc.properties = { _color: 'blue', _sidebar_label: 'Projects' }
+    const typed = noteWithBody('p1', 'Launch plan', 'body')
+    typed.type = 'Project'
+    typed.properties = { status: 'Open' }
+    const plain = noteWithBody('n1', 'Loose note', 'body')
+    await act(async () => {
+      vault.listFilter = 'all'
+      vault.searchQuery = ''
+      vault.searchHits = []
+      vault.notes = [typeDoc, typed, plain]
+    })
+    const chip = host!.querySelector('[data-note-id="p1"] [data-testid="note-chip-type"]')!
+    expect(chip.querySelector('.type-dot')?.className).toContain('type-dot-blue')
+    expect(chip.querySelector('.note-chip-label')?.textContent).toBe('Projects')
+    expect(host!.querySelector('[data-note-id="p1"] [data-testid="note-chip-status"]')?.textContent).toBe('Open')
+    expect(host!.querySelector('[data-note-id="n1"] [data-testid="note-chip-type"]')).toBeNull()
+    expect(host!.querySelector('[data-note-id="n1"] [data-testid="note-chip-status"]')).toBeNull()
+  })
+
+  it('multi-selects with Mod+click and Shift+click, clears with Esc', async () => {
+    const { vault, list } = await mountNoteList()
+    await act(async () => {
+      vault.listFilter = 'all'
+      vault.searchQuery = ''
+      vault.searchHits = []
+      vault.notes = [noteWithBody('a', 'A', 'x'), noteWithBody('b', 'B', 'x'), noteWithBody('c', 'C', 'x')]
+    })
+    expect(host!.querySelector('[data-testid="note-list-batch"]')).toBeNull()
+
+    await act(async () => { clickRow('a') })
+    expect(list.selectedIds).toEqual(['a'])
+    expect(vault.activeId).toBe('a')
+    expect(host!.querySelector('[data-testid="note-list-batch"]')).toBeNull()
+
+    await act(async () => { clickRow('c', { metaKey: true }) })
+    expect(list.selectedIds).toEqual(['a', 'c'])
+    expect(host!.querySelector('[data-testid="note-list-batch-count"]')?.textContent).toBe('2 selected')
+    expect(host!.querySelector('[data-note-id="a"]')?.getAttribute('data-selected')).toBe('true')
+    expect(host!.querySelector('[data-note-id="b"]')?.getAttribute('data-selected')).toBeNull()
+
+    // Shift+click ranges from the anchor (a) over the rendered order.
+    await act(async () => { clickRow('a') })
+    await act(async () => { clickRow('c', { shiftKey: true }) })
+    expect(list.selectedIds).toEqual(['a', 'b', 'c'])
+
+    await act(async () => {
+      host!.querySelector('[data-note-id="b"]')!.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }),
+      )
+    })
+    expect(list.selectedIds).toEqual([])
+    expect(host!.querySelector('[data-testid="note-list-batch"]')).toBeNull()
+  })
+
+  it('batch-archives the selection through the vault', async () => {
+    const { vault, list } = await mountNoteList()
+    await act(async () => {
+      await vault.openFromDraft()
+      await vault.createNote()
+      await vault.createNote()
+    })
+    const ids = vault.notes.map((note) => note.id)
+    expect(ids.length).toBe(2)
+    await act(async () => { clickRow(ids[0]!) })
+    await act(async () => { clickRow(ids[1]!, { metaKey: true }) })
+    expect(list.hasMultiSelection).toBe(true)
+
+    await act(async () => {
+      host!.querySelector<HTMLButtonElement>('[data-testid="batch-archive"]')!.click()
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, 0))
+    })
+    expect(vault.notes.every((note) => note.properties.archived === true)).toBe(true)
+    expect(renderedItems().length).toBe(0)
+    expect(list.selectionCount).toBe(0)
+  })
+
+  it('batch-deletes the selection after modal confirmation', async () => {
+    const { vault, list } = await mountNoteList()
+    await act(async () => {
+      await vault.openFromDraft()
+      await vault.createNote()
+      await vault.createNote()
+    })
+    const ids = vault.notes.map((note) => note.id)
+    await act(async () => { clickRow(ids[0]!) })
+    await act(async () => { clickRow(ids[1]!, { metaKey: true }) })
+
+    await act(async () => {
+      host!.querySelector<HTMLButtonElement>('[data-testid="batch-delete"]')!.click()
+    })
+    expect(list.confirmingDelete).toBe(true)
+
+    await act(async () => {
+      document.querySelector<HTMLButtonElement>('[data-testid="confirm-delete"]')!.click()
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, 0))
+    })
+    expect(vault.notes.length).toBe(0)
+    expect(list.confirmingDelete).toBe(false)
+    expect(list.selectionCount).toBe(0)
+  })
+
+  it('sorts by title through the header sort menu', async () => {
+    const { vault } = await mountNoteList()
+    await act(async () => {
+      vault.listFilter = 'all'
+      vault.searchQuery = ''
+      vault.searchHits = []
+      vault.notes = [noteWithBody('a', 'banana', 'x'), noteWithBody('b', 'Apple', 'x')]
+      vault.noteMtimes = {}
+    })
+    expect(itemTitles()).toEqual(['banana', 'Apple'])
+
+    await act(async () => {
+      host!.querySelector<HTMLElement>('[data-testid="note-list-sort"]')!.dispatchEvent(
+        new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }),
+      )
+    })
+    const item = document.querySelector<HTMLElement>('[data-testid="sort-title-asc"]')
+    expect(item).not.toBeNull()
+    await act(async () => {
+      item!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
+    })
+    expect(itemTitles()).toEqual(['Apple', 'banana'])
+  })
+
+  it('renders only a window of rows and moves it on scroll', async () => {
+    vi.spyOn(HTMLElement.prototype, 'clientHeight', 'get').mockReturnValue(NOTE_ROW_HEIGHT * 2)
+    const { vault } = await mountNoteList()
+    const notes = Array.from({ length: 100 }, (_, index) => noteWithBody(`n${index}`, `Note ${index}`, 'x'))
+    const mtimes: Record<string, number> = {}
+    notes.forEach((note, index) => { mtimes[note.id] = (100 - index) * 1000 })
+    await act(async () => {
+      vault.listFilter = 'all'
+      vault.searchQuery = ''
+      vault.searchHits = []
+      vault.notes = notes
+      vault.noteMtimes = mtimes
+    })
+    // 2 visible rows + 6 overscan below: 8 DOM rows for 100 notes.
+    expect(renderedItems().length).toBe(8)
+    expect(renderedItems()[0]!.dataset.noteId).toBe('n0')
+
+    const scroller = host!.querySelector<HTMLElement>('[data-testid="note-list-items"]')!
+    await act(async () => {
+      scroller.scrollTop = NOTE_ROW_HEIGHT * 50
+      scroller.dispatchEvent(new Event('scroll', { bubbles: true }))
+    })
+    const rendered = renderedItems()
+    expect(rendered.length).toBe(14) // 6 above + 2 visible + 6 below
+    expect(rendered[0]!.dataset.noteId).toBe('n44')
+    expect(rendered[rendered.length - 1]!.dataset.noteId).toBe('n57')
   })
 })

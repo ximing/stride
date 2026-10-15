@@ -4,6 +4,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Rail } from '../app'
+import { FOLDER_NOTE_RENDER_CAP } from './folder-tree'
 import { FolderService } from '../services/folder.service'
 import { ListFilterService } from '../services/list-filter.service'
 import { VaultService } from '../services/vault.service'
@@ -205,5 +206,18 @@ describe('folder tree', () => {
       listFilter.clear()
     })
     expect(noteTitles(host)).toEqual(['会议纪要', 'Shopping'])
+  })
+
+  it('caps rendered note links per folder and summarizes the overflow', async () => {
+    const { host, vault } = await mountRail()
+    await act(async () => {
+      vault.listFilter = 'all'
+      vault.searchQuery = ''
+      vault.searchHits = []
+      vault.notes = Array.from({ length: FOLDER_NOTE_RENDER_CAP + 5 }, (_, index) =>
+        createNote(`cap-${index}`, `Cap note ${index}`))
+    })
+    expect(host.querySelectorAll('[data-testid="note-link"]').length).toBe(FOLDER_NOTE_RENDER_CAP)
+    expect(host.querySelector('[data-testid="folder-overflow"]')?.textContent).toContain('5 more')
   })
 })

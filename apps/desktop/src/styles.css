@@ -519,6 +519,13 @@ select {
   font-size: 0.85rem;
 }
 
+.folder-overflow {
+  color: var(--sd-muted);
+  margin: 0.2rem 0 0.4rem;
+  padding: 0 0.45rem;
+  font-size: 0.8rem;
+}
+
 /* ---------- note list column ---------- */
 
 .note-list-col {
@@ -567,12 +574,23 @@ select {
   padding: 0.25rem 0.5rem 1rem;
 }
 
+.note-list-spacer {
+  flex: none;
+  pointer-events: none;
+}
+
 .note-list-item {
   display: flex;
   flex-direction: column;
   align-items: stretch;
+  justify-content: center;
   gap: 0.12rem;
   width: 100%;
+  /* Fixed height is a hard contract with the virtual-scroll window math
+     (NOTE_ROW_HEIGHT in services/note-list.ts). Keep them in sync. */
+  height: 66px;
+  box-sizing: border-box;
+  overflow: hidden;
   padding: 0.5rem 0.45rem;
   border: 1px solid transparent;
   border-radius: var(--sd-radius);
@@ -590,6 +608,11 @@ select {
   border-color: var(--sd-border);
 }
 
+.note-list-item[data-selected="true"] {
+  background: var(--sd-bg-elevated);
+  border-color: var(--sd-accent);
+}
+
 .note-list-item-title {
   font-family: var(--sd-font-serif);
   font-size: 1rem;
@@ -601,10 +624,13 @@ select {
 
 .note-list-item-meta {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
   font-size: 0.78rem;
   color: var(--sd-muted);
   line-height: 1.35;
+  overflow: hidden;
+  white-space: nowrap;
 }
 
 .note-list-item-date {
@@ -616,6 +642,96 @@ select {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.note-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  flex: none;
+  max-width: 7rem;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--sd-border);
+  border-radius: 99px;
+  font-size: 0.7rem;
+  line-height: 1.3;
+  color: var(--sd-muted);
+  overflow: hidden;
+}
+
+.note-chip .type-dot {
+  width: 0.4rem;
+  height: 0.4rem;
+}
+
+.note-chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-chip-status {
+  color: var(--sd-fg);
+}
+
+.note-list-sort {
+  margin-left: auto;
+  border-color: transparent;
+  color: var(--sd-muted);
+  padding: 0.15rem 0.3rem;
+  border-radius: var(--sd-radius);
+  display: inline-flex;
+}
+
+.note-list-sort:hover:not(:disabled) {
+  background: var(--sd-bg-elevated);
+  border-color: transparent;
+  color: var(--sd-fg);
+}
+
+.menu-check {
+  display: inline-block;
+  width: 1rem;
+  color: var(--sd-accent);
+}
+
+.note-list-batch {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.85rem;
+  background: var(--sd-bg-elevated);
+  border-top: 1px solid var(--sd-border);
+  border-bottom: 1px solid var(--sd-border);
+  font-size: 0.8rem;
+  color: var(--sd-muted);
+}
+
+.note-list-batch-count {
+  margin-right: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.note-list-batch button {
+  border-color: transparent;
+  color: var(--sd-fg);
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--sd-radius);
+  font-size: 0.8rem;
+}
+
+.note-list-batch button:hover:not(:disabled) {
+  border-color: var(--sd-border);
+}
+
+.note-list-batch .note-list-batch-delete {
+  color: var(--sd-danger);
+}
+
+.note-list-batch .note-list-batch-clear {
+  color: var(--sd-muted);
+  display: inline-flex;
+  padding: 0.15rem 0.25rem;
 }
 
 .note-list-empty {

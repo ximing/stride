@@ -1,10 +1,15 @@
 import { observer, useService } from '@rabjs/react'
-import { useEffect, useState, type DragEvent } from 'react'
+import { useEffect, useMemo, useState, type DragEvent } from 'react'
 import type { StrideNote } from '@stride/core/note'
 import { FolderService } from '../services/folder.service'
 import { ListFilterService } from '../services/list-filter.service'
 import { TabsService } from '../services/tabs.service'
 import { VaultService } from '../services/vault.service'
+
+// A vault-scale folder can hold thousands of notes; the tree renders at most
+// this many links per folder and summarizes the rest. Keeps sidebar DOM size
+// bounded regardless of vault size (the note list column is the full browser).
+export const FOLDER_NOTE_RENDER_CAP = 200
 
 function parentOf(id: string): string {
   const index = id.lastIndexOf('/')
@@ -40,6 +45,34 @@ function NoteLink({ note, active, onSelect }: { note: StrideNote; active: boolea
     >
       {note.title}
     </button>
+  )
+}
+
+/** Capped note links for one folder level, with a muted overflow summary. */
+function FolderNotes({
+  notes,
+  parent,
+  activeId,
+  onSelect,
+}: {
+  notes: readonly StrideNote[]
+  parent: string
+  activeId: string
+  onSelect: (id: string) => void
+}) {
+  const inFolder = notesIn(notes, parent)
+  const shown = inFolder.length > FOLDER_NOTE_RENDER_CAP ? inFolder.slice(0, FOLDER_NOTE_RENDER_CAP) : inFolder
+  return (
+    <>
+      {shown.map((note) => (
+        <NoteLink key={note.id} note={note} active={activeId === note.id} onSelect={() => onSelect(note.id)} />
+      ))}
+      {inFolder.length > shown.length && (
+        <p className="folder-overflow" data-testid="folder-overflow">
+          … {inFolder.length - shown.length} more notes here
+        </p>
+      )}
+    </>
   )
 }
 
@@ -123,9 +156,7 @@ function FolderBlock({
             onDelete={onDelete}
           />
         ))}
-        {notesIn(notes, path).map((note) => (
-          <NoteLink key={note.id} note={note} active={activeId === note.id} onSelect={() => onSelect(note.id)} />
-        ))}
+        <FolderNotes notes={notes} parent={path} activeId={activeId} onSelect={onSelect} />
       </div>
     </div>
   )
@@ -174,7 +205,12 @@ export const FolderTree = observer(function FolderTree() {
     if (!vault.error) setRenaming('')
   }
 
-  const notes = listFilter.apply(vault.visibleNotes)
+  // Memoized: re-filtering 10k notes per keystroke is only paid when the
+  // query or the underlying notes actually change, not on unrelated renders.
+  const notes = useMemo(
+    () => listFilter.apply(vault.visibleNotes),
+    [vault.notes, vault.searchHits, vault.searchQuery, vault.listFilter, listFilter.query],
+  )
   const paths = folderService.folders
 
   return (
@@ -217,9 +253,7 @@ export const FolderTree = observer(function FolderTree() {
           onDelete={(path) => void folderService.deleteFolder(path)}
         />
       ))}
-      {notesIn(notes, '').map((note) => (
-        <NoteLink key={note.id} note={note} active={vault.activeId === note.id} onSelect={() => tabs.openNote(note.id)} />
-      ))}
+      <FolderNotes notes={notes} parent="" activeId={vault.activeId} onSelect={(id) => tabs.openNote(id)} />
     </div>
   )
 })
