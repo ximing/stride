@@ -13,6 +13,7 @@ import { QuickOpenService } from './services/quick-open.service'
 import { SearchPanelService } from './services/search-panel.service'
 import { TabsService } from './services/tabs.service'
 import { VaultService } from './services/vault.service'
+import { ViewsService } from './services/views.service'
 import './styles.css'
 
 const componentsPath = window.location.pathname
@@ -28,6 +29,7 @@ if (showComponents) {
   })
 } else {
   register(VaultService)
+  register(ViewsService)
   register(TabsService)
   register(ListFilterService)
   register(NoteListService)

@@ -519,6 +519,95 @@ select {
   font-size: 0.85rem;
 }
 
+/* ---------- saved views (rail) ---------- */
+
+.view-row {
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+  border-radius: var(--sd-radius);
+}
+
+.rail .view-row button {
+  width: auto;
+}
+
+.rail .view-row button[data-testid="view-link"] {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+}
+
+.rail .view-row .view-edit {
+  flex: none;
+  width: 1.6rem;
+  padding: 0.2rem 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sd-muted);
+}
+
+.rail .view-row .view-edit:hover {
+  color: var(--sd-fg);
+}
+
+.view-row[data-drop-target="true"] {
+  box-shadow: inset 0 2px 0 var(--sd-accent);
+}
+
+.view-icon {
+  flex: none;
+}
+
+.view-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  margin-top: 0.6rem;
+}
+
+.view-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.view-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.view-filter-row .sd-field-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.view-filter-remove {
+  flex: none;
+  width: 1.6rem;
+  color: var(--sd-muted);
+}
+
+.view-filter-remove:hover {
+  color: var(--sd-fg);
+}
+
+.view-editor-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+
+.menu-hint {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.75rem;
+  color: var(--sd-muted);
+}
+
 .folder-overflow {
   color: var(--sd-muted);
   margin: 0.2rem 0 0.4rem;

@@ -7,6 +7,7 @@ import { ListFilterService } from '../services/list-filter.service'
 import { sortNotes, virtualWindow, type ListSort, type ListSortKey } from '../services/note-list'
 import { NoteListService } from '../services/note-list.service'
 import { VaultService } from '../services/vault.service'
+import { ViewsService } from '../services/views.service'
 import { Mark } from './icon'
 import { Menu, MenuContent, MenuItem, MenuTrigger } from './menu'
 import { Modal, ModalClose, ModalContent } from './modal'
@@ -121,14 +122,25 @@ const SORT_ORDER: { key: ListSortKey; dir: ListSort['dir'] }[] = [
 
 const SortMenu = observer(function SortMenu() {
   const list = useService(NoteListService)
+  const views = useService(ViewsService)
+  // A view with its own sort wins over the manual `stride:list` sort. Picking a
+  // sort here still only writes `stride:list` — the view file changes only via
+  // the view editor's Save, never implicitly from the list header.
+  const viewSort = views.activeView?.view.sort ?? null
+  const effective = viewSort ?? list.sort
   return (
     <Menu>
       <MenuTrigger className="note-list-sort" data-testid="note-list-sort" aria-label="Sort notes">
         <Mark icon={ArrowsDownUp} size={14} />
       </MenuTrigger>
       <MenuContent align="end">
+        {viewSort && (
+          <div className="menu-hint" data-testid="sort-view-hint">
+            Sorting set by view “{views.activeView?.view.name}”
+          </div>
+        )}
         {SORT_ORDER.map(({ key, dir }) => {
-          const active = list.sort.key === key && list.sort.dir === dir
+          const active = effective.key === key && effective.dir === dir
           return (
             <MenuItem
               key={`${key}-${dir}`}
@@ -279,6 +291,7 @@ export const NoteList = observer(function NoteList() {
   const vault = useService(VaultService)
   const listFilter = useService(ListFilterService)
   const list = useService(NoteListService)
+  const views = useService(ViewsService)
   const scrollRef = useRef<HTMLDivElement>(null)
   const [scrollTop, setScrollTop] = useState(0)
   const [viewport, setViewport] = useState(0)
@@ -302,21 +315,24 @@ export const NoteList = observer(function NoteList() {
     const element = scrollRef.current
     if (element) element.scrollTop = 0
     setScrollTop(0)
-  }, [vault.listFilter, vault.searchQuery, vault.searchHits, listFilter.query, list.sort, list.scrollEpoch])
+  }, [vault.listFilter, vault.searchQuery, vault.searchHits, listFilter.query, list.sort, list.scrollEpoch, views.views])
 
   // Filter + sort only recompute when the underlying data changes, not on
   // scroll. ListFilterService.apply scans raw (non-proxy) notes internally —
   // proxied property reads at 10k notes cost hundreds of ms per keystroke.
   // Reactivity is preserved because every vault mutation replaces `notes`
-  // (and `noteMtimes`) by identity, which is a memo dep.
+  // (and `noteMtimes`) by identity, which is a memo dep. `views.views` is the
+  // dep for view-definition changes (rename/edit/reorder all replace it).
+  const activeView = views.activeView
+  const effectiveSort: ListSort = activeView?.view.sort ?? list.sort
   const notes = useMemo(
-    () => sortNotes(listFilter.apply(vault.visibleNotes), list.sort, raw(vault.noteMtimes)),
-    [vault.notes, vault.searchHits, vault.searchQuery, vault.listFilter, listFilter.query, list.sort, vault.noteMtimes],
+    () => sortNotes(listFilter.apply(vault.visibleNotes), effectiveSort, raw(vault.noteMtimes)),
+    [vault.notes, vault.searchHits, vault.searchQuery, vault.listFilter, listFilter.query, effectiveSort, vault.noteMtimes, views.views],
   )
   const typeInfo = useMemo(() => buildTypeInfo(vault), [vault.notes])
   const title = useMemo(
-    () => noteListTitle(vault),
-    [vault.searchQuery, vault.searchHits, vault.listFilter, typeInfo],
+    () => activeView?.view.name ?? noteListTitle(vault),
+    [activeView, vault.searchQuery, vault.searchHits, vault.listFilter, typeInfo, views.views],
   )
   const orderedIds = useMemo(() => notes.map((note) => note.id), [notes])
   const win = virtualWindow(notes.length, scrollTop, viewport)

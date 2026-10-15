@@ -38,6 +38,7 @@ import { writeSampleNotes } from '../../../../packages/core/src/sample'
 import { initializeVault } from '../../../../packages/core/src/seed'
 import { compareTypeDocuments, isTypeVisible, nextTypeOrder, templateBody } from '../../../../packages/core/src/types'
 import { recoverRename, rewriteVaultLinks } from '../../../../packages/core/src/rename-tx'
+import { applyViewFilter, VIEW_FILTER_PREFIX, type SavedView } from '../../../../packages/core/src/views'
 import {
   readAdvanceInbox,
   readAgentMode,
@@ -59,6 +60,7 @@ import {
 import { ListFilterService } from './list-filter.service'
 import { NoteListService } from './note-list.service'
 import { TabsService } from './tabs.service'
+import { ViewsService } from './views.service'
 
 const COLLAPSED_TYPES_KEY = 'stride:collapsed-types'
 const EMBED_BATCH = 16
@@ -162,7 +164,7 @@ const graphCache = new WeakMap<StrideNote[], VaultGraph>()
 const typeDocCache = new WeakMap<StrideNote[], StrideNote[]>()
 const visibleCache = new WeakMap<
   StrideNote[],
-  { hits: { id: string; score: number }[]; query: string; filter: string; result: StrideNote[] }
+  { hits: { id: string; score: number }[]; query: string; filter: string; view: SavedView | null; result: StrideNote[] }
 >()
 
 function createVaultId(): string {
@@ -332,9 +334,16 @@ export class VaultService extends Service {
     const hits = this.searchHits
     const query = this.searchQuery
     const filter = this.listFilter
+    // A saved view joins the cache key by raw identity: ViewsService replaces
+    // view objects on every reload, so an edited view invalidates the cache,
+    // and raw() keeps the key stable across per-access proxies.
+    const resolved = filter.startsWith(VIEW_FILTER_PREFIX)
+      ? this.viewsService?.byFile(filter.slice(VIEW_FILTER_PREFIX.length))?.view ?? null
+      : null
+    const view = resolved ? raw(resolved) : null
     const key = raw(this.notes)
     const cached = visibleCache.get(key)
-    if (cached && cached.hits === raw(hits) && cached.query === query && cached.filter === filter) {
+    if (cached && cached.hits === raw(hits) && cached.query === query && cached.filter === filter && cached.view === view) {
       return cached.result
     }
     const listed = (notes: readonly StrideNote[]) => notes.filter((note) => !isTypeDocument(note) && !isArchived(note))
@@ -344,12 +353,16 @@ export class VaultService extends Service {
       result = listed(key.filter((note) => ids.has(note.id)))
     } else if (filter === 'inbox') {
       result = listed(this.graph.inbox)
-    } else if (filter !== 'all') {
+    } else if (view) {
+      // Saved view: its own base (Type docs always out; archived only when the
+      // view opts in), then the view's type/property conditions.
+      result = applyViewFilter(key, view)
+    } else if (filter !== 'all' && !filter.startsWith(VIEW_FILTER_PREFIX)) {
       result = listed(this.graph.byType.get(filter) ?? [])
     } else {
       result = listed(key)
     }
-    visibleCache.set(key, { hits: raw(hits), query, filter, result })
+    visibleCache.set(key, { hits: raw(hits), query, filter, view, result })
     return result
   }
 
@@ -991,6 +1004,11 @@ export class VaultService extends Service {
     return this.resolve(ListFilterService)
   }
 
+  // Saved views are optional: tests that never import views.service leave it unregistered.
+  private get viewsService(): ViewsService | null {
+    return has(ViewsService) ? this.resolve(ViewsService) : null
+  }
+
   openClonedVault(backend: FileSystemBackend): Promise<void> {
     this.openedClonePath = backend.rootLabel
     return this.openBackend(backend)
@@ -1062,6 +1080,9 @@ export class VaultService extends Service {
     // Same handover for the list: load this vault's persisted sort and drop any
     // selection left over from the previous vault.
     if (has(NoteListService)) this.resolve(NoteListService).onVaultOpened()
+    // Saved views scan `views/*.json` and subscribe to fs watch events (git pull
+    // refresh). Awaited so the sidebar is populated before open resolves.
+    if (has(ViewsService)) await this.resolve(ViewsService).onVaultOpened()
   }
 
   // Best-effort mtime harvest for the note list. Never blocks or fails an open.

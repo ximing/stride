@@ -13,6 +13,7 @@ import { QuickOpenService } from './quick-open.service'
 import { SearchPanelService } from './search-panel.service'
 import { TabsService } from './tabs.service'
 import { VaultService } from './vault.service'
+import { ViewsService } from './views.service'
 
 export interface CommandHandler {
   run: () => void
@@ -201,6 +202,15 @@ export class CommandService extends Service {
       run: () => {
         this.resolve(NoteListService).retypeOpen = true
       },
+    })
+    // Saved views: the palette opens the same editor modal the sidebar drives.
+    this.registerHandler('view.saveCurrent', {
+      available: () => has(ViewsService),
+      run: () => this.resolve(ViewsService).openNewEditor(),
+    })
+    this.registerHandler('view.showAllNotes', {
+      available: () => has(VaultService),
+      run: () => this.resolve(VaultService).setFilter('all'),
     })
     // 'app.commandPalette' is registered by the CommandPalette component and
     // 'edit.find' by the editor find bar, because they need component closures.

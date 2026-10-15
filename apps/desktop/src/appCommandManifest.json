@@ -119,6 +119,20 @@
       "keywords": ["设置"]
     },
     {
+      "id": "view.saveCurrent",
+      "title": "Save Current List as View…",
+      "section": "View",
+      "enabledWhen": "vaultReady",
+      "keywords": ["view", "filter", "save", "视图", "保存"]
+    },
+    {
+      "id": "view.showAllNotes",
+      "title": "Show All Notes",
+      "section": "View",
+      "enabledWhen": "vaultReady",
+      "keywords": ["all", "filter", "view", "全部", "笔记"]
+    },
+    {
       "id": "tab.select1",
       "title": "Switch to Tab 1",
       "shortcut": "Mod+1",
