@@ -1,5 +1,6 @@
 import { Service } from '@rabjs/react'
 import { type RankedHit } from '../../../../packages/core/src/search-rank'
+import { TabsService } from './tabs.service'
 import { VaultService } from './vault.service'
 
 export function isSearchPanelShortcut(event: KeyboardEvent): boolean {
@@ -18,6 +19,10 @@ export class SearchPanelService extends Service {
 
   private get vault() {
     return this.resolve(VaultService)
+  }
+
+  private get tabs() {
+    return this.resolve(TabsService)
   }
 
   show() {
@@ -70,7 +75,7 @@ export class SearchPanelService extends Service {
 
   private chooseHit(hit: RankedHit) {
     const title = this.vault.notes.find((note) => note.id === hit.id)?.title ?? ''
-    this.vault.select(hit.id)
+    this.tabs.openNote(hit.id)
     this.close()
     if (hit.source === 'title') {
       const start = hit.offset

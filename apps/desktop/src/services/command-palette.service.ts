@@ -3,6 +3,7 @@ import { buildPaletteItems, type PaletteItem } from './command-palette'
 import { CommandService } from './command.service'
 import { LayoutService } from './layout.service'
 import { ChatService } from './panels.service'
+import { TabsService } from './tabs.service'
 import { VaultService } from './vault.service'
 
 export class CommandPaletteService extends Service {
@@ -84,7 +85,7 @@ export class CommandPaletteService extends Service {
     }
     if (item.kind === 'note') {
       this.close()
-      this.vault.select(item.noteId)
+      this.resolve(TabsService).openNote(item.noteId)
       return
     }
     // AI placeholder: hand the query to the chat panel as a draft.

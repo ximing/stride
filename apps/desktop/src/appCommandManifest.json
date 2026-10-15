@@ -32,6 +32,22 @@
       "keywords": ["jump", "go to", "快速打开"]
     },
     {
+      "id": "nav.goBack",
+      "title": "Go Back",
+      "shortcut": "Mod+[",
+      "section": "Navigate",
+      "enabledWhen": "canGoBack",
+      "keywords": ["history", "back", "后退", "返回"]
+    },
+    {
+      "id": "nav.goForward",
+      "title": "Go Forward",
+      "shortcut": "Mod+]",
+      "section": "Navigate",
+      "enabledWhen": "canGoForward",
+      "keywords": ["history", "forward", "前进"]
+    },
+    {
       "id": "app.commandPalette",
       "title": "Command Palette",
       "shortcut": "Mod+K",
@@ -99,6 +115,86 @@
       "section": "View",
       "enabledWhen": "vaultReady",
       "keywords": ["设置"]
+    },
+    {
+      "id": "tab.select1",
+      "title": "Switch to Tab 1",
+      "shortcut": "Mod+1",
+      "section": "Tabs",
+      "enabledWhen": "vaultReady",
+      "keywords": ["tab", "标签"]
+    },
+    {
+      "id": "tab.select2",
+      "title": "Switch to Tab 2",
+      "shortcut": "Mod+2",
+      "section": "Tabs",
+      "enabledWhen": "vaultReady",
+      "keywords": ["tab", "标签"]
+    },
+    {
+      "id": "tab.select3",
+      "title": "Switch to Tab 3",
+      "shortcut": "Mod+3",
+      "section": "Tabs",
+      "enabledWhen": "vaultReady",
+      "keywords": ["tab", "标签"]
+    },
+    {
+      "id": "tab.select4",
+      "title": "Switch to Tab 4",
+      "shortcut": "Mod+4",
+      "section": "Tabs",
+      "enabledWhen": "vaultReady",
+      "keywords": ["tab", "标签"]
+    },
+    {
+      "id": "tab.select5",
+      "title": "Switch to Tab 5",
+      "shortcut": "Mod+5",
+      "section": "Tabs",
+      "enabledWhen": "vaultReady",
+      "keywords": ["tab", "标签"]
+    },
+    {
+      "id": "tab.select6",
+      "title": "Switch to Tab 6",
+      "shortcut": "Mod+6",
+      "section": "Tabs",
+      "enabledWhen": "vaultReady",
+      "keywords": ["tab", "标签"]
+    },
+    {
+      "id": "tab.select7",
+      "title": "Switch to Tab 7",
+      "shortcut": "Mod+7",
+      "section": "Tabs",
+      "enabledWhen": "vaultReady",
+      "keywords": ["tab", "标签"]
+    },
+    {
+      "id": "tab.select8",
+      "title": "Switch to Tab 8",
+      "shortcut": "Mod+8",
+      "section": "Tabs",
+      "enabledWhen": "vaultReady",
+      "keywords": ["tab", "标签"]
+    },
+    {
+      "id": "tab.select9",
+      "title": "Switch to Tab 9",
+      "shortcut": "Mod+9",
+      "section": "Tabs",
+      "enabledWhen": "vaultReady",
+      "keywords": ["tab", "标签"]
+    },
+    {
+      "id": "tab.close",
+      "title": "Close Tab",
+      "shortcut": "Mod+W",
+      "section": "Tabs",
+      "enabledWhen": "hasActiveNote",
+      "keywords": ["close", "tab", "关闭", "标签"]
     },
     {
       "id": "ai.ask",

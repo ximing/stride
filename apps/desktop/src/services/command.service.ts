@@ -10,6 +10,7 @@ import { LayoutService } from './layout.service'
 import { GitService } from './panels.service'
 import { QuickOpenService } from './quick-open.service'
 import { SearchPanelService } from './search-panel.service'
+import { TabsService } from './tabs.service'
 import { VaultService } from './vault.service'
 
 export interface CommandHandler {
@@ -22,6 +23,16 @@ function focusOverlayInput(selector: string) {
   if (typeof document === 'undefined') return
   document.querySelector<HTMLInputElement>(selector)?.focus()
 }
+
+function isDesktopRuntime(): boolean {
+  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+}
+
+// Mod+W is the macOS window-close accelerator and Tauri's default menu claims it
+// before the webview can act, so the tab.close *shortcut* is disabled on desktop.
+// The command itself stays runnable (palette) and tabs still close via the strip's
+// × button or middle click. Dispatcher-layer gate, per T6.4.
+const DESKTOP_DISABLED_SHORTCUTS = new Set(['tab.close'])
 
 /**
  * Single runtime registry for the app command manifest. Handlers only forward
@@ -38,6 +49,8 @@ export class CommandService extends Service {
     vaultReady: () => has(VaultService) && this.resolve(VaultService).phase === 'ready',
     hasActiveNote: () => has(VaultService) && this.resolve(VaultService).active !== null,
     gitReady: () => has(GitService) && this.resolve(GitService).surface === 'ready',
+    canGoBack: () => has(TabsService) && this.resolve(TabsService).canGoBack,
+    canGoForward: () => has(TabsService) && this.resolve(TabsService).canGoForward,
   }
 
   constructor() {
@@ -86,6 +99,8 @@ export class CommandService extends Service {
     if (event.defaultPrevented) return false
     const command = commandForKeyEvent(this.commands, event)
     if (!command || !this.isRunnable(command)) return false
+    // See DESKTOP_DISABLED_SHORTCUTS: the OS/Tauri menu owns these chords on desktop.
+    if (DESKTOP_DISABLED_SHORTCUTS.has(command.id) && isDesktopRuntime()) return false
     event.preventDefault()
     event.stopPropagation()
     this.execute(command.id)
@@ -140,6 +155,24 @@ export class CommandService extends Service {
     }
     this.registerHandler('ai.ask', {
       run: () => this.resolve(LayoutService).setRightPanelTab('chat'),
+    })
+    this.registerHandler('nav.goBack', {
+      available: () => has(TabsService),
+      run: () => this.resolve(TabsService).goBack(),
+    })
+    this.registerHandler('nav.goForward', {
+      available: () => has(TabsService),
+      run: () => this.resolve(TabsService).goForward(),
+    })
+    for (let index = 1; index <= 9; index += 1) {
+      this.registerHandler(`tab.select${index}`, {
+        available: () => has(TabsService),
+        run: () => this.resolve(TabsService).selectTabAt(index - 1),
+      })
+    }
+    this.registerHandler('tab.close', {
+      available: () => has(TabsService),
+      run: () => this.resolve(TabsService).closeActiveTab(),
     })
     // 'app.commandPalette' is registered by the CommandPalette component and
     // 'edit.find' by the editor find bar, because they need component closures.

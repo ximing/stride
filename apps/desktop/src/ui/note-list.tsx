@@ -3,6 +3,7 @@ import { observer, useService } from '@rabjs/react'
 import { plainText, type StrideNote } from '@stride/core/note'
 import { typeSidebarLabel } from '../../../../packages/core/src/types'
 import { ListFilterService } from '../services/list-filter.service'
+import { TabsService } from '../services/tabs.service'
 import { VaultService } from '../services/vault.service'
 import { Mark } from './icon'
 
@@ -71,6 +72,7 @@ export const ListFilterInput = observer(function ListFilterInput() {
 export const NoteList = observer(function NoteList() {
   const vault = useService(VaultService)
   const listFilter = useService(ListFilterService)
+  const tabs = useService(TabsService)
   const notes = listFilter.apply(vault.visibleNotes)
   return (
     <div className="note-list" data-testid="note-list">
@@ -89,7 +91,7 @@ export const NoteList = observer(function NoteList() {
             data-testid="note-list-item"
             data-note-id={note.id}
             aria-current={vault.activeId === note.id ? 'true' : undefined}
-            onClick={() => vault.select(note.id)}
+            onClick={() => tabs.openNote(note.id)}
           >
             <span className="note-list-item-title">{note.title || 'Untitled'}</span>
             <span className="note-list-item-meta">

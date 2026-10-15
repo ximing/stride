@@ -12,6 +12,7 @@ import { PanelRail, RightPanel } from './ui/right-panel'
 import { SearchPanel } from './ui/search-panel'
 import { Rail } from './ui/sidebar'
 import { StatusBar } from './ui/status-bar'
+import { TabStrip } from './ui/tab-strip'
 import { TopBar } from './ui/topbar'
 
 // Re-exports keep existing test imports (`from '../app'`) stable.
@@ -133,6 +134,7 @@ const Workspace = observer(function Workspace() {
         </section>
         <ResizeHandle column="noteList" label="Resize note list" />
         <main className="stage">
+          <TabStrip />
           {note ? (
             <>
               <div className="stage-head">

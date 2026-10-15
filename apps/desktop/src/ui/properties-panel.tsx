@@ -2,6 +2,7 @@ import { observer, useService } from '@rabjs/react'
 import { relationsOf, resolveNote, type NoteRelations } from '@stride/core/graph'
 import { bodyWikilinks, isArchived, isHiddenProperty, propertyKind, type StrideNote } from '@stride/core/note'
 import { useState } from 'react'
+import { TabsService } from '../services/tabs.service'
 import { VaultService } from '../services/vault.service'
 import { Modal, ModalClose, ModalContent } from './modal'
 
@@ -29,6 +30,7 @@ function unresolvedRelations(
 
 export const PropertiesPanel = observer(function PropertiesPanel() {
   const vault = useService(VaultService)
+  const tabs = useService(TabsService)
   const note = vault.active
   const [deleteOpen, setDeleteOpen] = useState(false)
   if (!note) return <p className="empty-note">Select a note.</p>
@@ -188,7 +190,7 @@ export const PropertiesPanel = observer(function PropertiesPanel() {
             className="meta relation-row"
             data-testid="relation-link"
             data-target={link.targetId}
-            onClick={() => vault.select(link.targetId)}
+            onClick={() => tabs.openNote(link.targetId)}
           >
             {label}
           </button>
@@ -209,7 +211,7 @@ export const PropertiesPanel = observer(function PropertiesPanel() {
           data-testid="backlink"
           data-source={link.sourceId}
           onClick={() => {
-            if (link.sourceId) vault.select(link.sourceId)
+            if (link.sourceId) tabs.openNote(link.sourceId)
           }}
         >
           {graph.byId.get(link.sourceId)?.title} · {link.via}

@@ -1,4 +1,4 @@
-import { Service } from '@rabjs/react'
+import { has, resolve, Service } from '@rabjs/react'
 import {
   createFolder as createFolderOnDisk,
   deleteFolder as deleteFolderOnDisk,
@@ -6,10 +6,20 @@ import {
   moveNotePath,
   renameFolder as renameFolderOnDisk,
 } from '../../../../packages/core/src/folders'
+import { TabsService } from './tabs.service'
 import { VaultService } from './vault.service'
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
+}
+
+// Tabs keep per-tab history keyed by note id; folder renames/moves rewrite those
+// ids in the same sync segment as the notes/activeId remap, so the TabsService
+// convergence microtask never mistakes a move for a deletion.
+function notifyTabsRemap(changes: { fromId: string; toId: string }[]) {
+  if (!has(TabsService)) return
+  const tabs = resolve(TabsService)
+  for (const change of changes) tabs.remapNoteId(change.fromId, change.toId)
 }
 
 export class FolderService extends Service {
@@ -64,6 +74,7 @@ export class FolderService extends Service {
         return id === note.id ? note : { ...note, id }
       })
       this.vault.activeId = nextId(this.vault.activeId)
+      notifyTabsRemap(changes)
       this.vault.docEpoch += 1
       this.vault.error = ''
       await this.vault.syncMovedIds(changes)
@@ -99,6 +110,7 @@ export class FolderService extends Service {
         this.vault.notes = this.vault.notes.map((note) => (note.id === fromId ? { ...note, id: toId } : note))
         if (this.vault.activeId === fromId) this.vault.activeId = toId
         this.vault.retargetTitleBaseline(fromId, toId)
+        notifyTabsRemap([{ fromId, toId }])
         await this.vault.syncMovedIds([{ fromId, toId }])
       }
       this.vault.docEpoch += 1

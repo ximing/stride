@@ -10,6 +10,7 @@ import { LayoutService } from './services/layout.service'
 import { ListFilterService } from './services/list-filter.service'
 import { QuickOpenService } from './services/quick-open.service'
 import { SearchPanelService } from './services/search-panel.service'
+import { TabsService } from './services/tabs.service'
 import { VaultService } from './services/vault.service'
 import './styles.css'
 
@@ -26,6 +27,7 @@ if (showComponents) {
   })
 } else {
   register(VaultService)
+  register(TabsService)
   register(ListFilterService)
   register(LayoutService)
   register(QuickOpenService)

@@ -14,6 +14,7 @@ import { LayoutService } from './layout.service'
 import { ChatService } from './panels.service'
 import { QuickOpenService } from './quick-open.service'
 import { SearchPanelService } from './search-panel.service'
+import { TabsService } from './tabs.service'
 import { VaultService } from './vault.service'
 
 function note(id: string, title: string, type = 'note'): StrideNote {
@@ -295,11 +296,21 @@ describe('command palette', () => {
   })
 
   it('keeps dispatcher, palette, and manifest on one source of truth', async () => {
-    const { palette } = await mount([note('alpha', 'Alpha')])
+    const { palette } = await mount([note('alpha', 'Alpha'), note('beta', 'Beta'), note('gamma', 'Gamma')])
     const commands = resolve(CommandService)
     await act(async () => {
       palette.show()
     })
+
+    // nav.goBack/nav.goForward are gated on the active tab's history, so give it
+    // a past and a future: a → b → c, then one step back.
+    const tabs = resolve(TabsService)
+    tabs.openNote('alpha')
+    tabs.followLink('beta')
+    tabs.followLink('gamma')
+    tabs.goBack()
+    expect(tabs.canGoBack).toBe(true)
+    expect(tabs.canGoForward).toBe(true)
 
     // Palette ⇐ manifest: every manifest command renders as a palette item
     // (file.newInstance expands into per-type entries when types exist),

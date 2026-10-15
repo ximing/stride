@@ -1,5 +1,6 @@
 import { Service } from '@rabjs/react'
 import { isArchived, type StrideNote } from '@stride/core/note'
+import { TabsService } from './tabs.service'
 import { VaultService } from './vault.service'
 
 export const QUICK_OPEN_LIMIT = 50
@@ -59,6 +60,10 @@ export class QuickOpenService extends Service {
     return this.resolve(VaultService)
   }
 
+  private get tabs() {
+    return this.resolve(TabsService)
+  }
+
   get results(): StrideNote[] {
     return quickOpenResults(this.vault.notes, this.query)
   }
@@ -100,7 +105,7 @@ export class QuickOpenService extends Service {
   }
 
   choose(id: string) {
-    this.vault.select(id)
+    this.tabs.openNote(id)
     this.close()
   }
 }

@@ -10,6 +10,7 @@ import { User } from '@phosphor-icons/react/User'
 import { observer, useService } from '@rabjs/react'
 import type { StrideNote } from '@stride/core/note'
 import { typeSidebarLabel } from '../../../../packages/core/src/types'
+import { TabsService } from '../services/tabs.service'
 import { VaultService } from '../services/vault.service'
 import { FolderTree } from './folder-tree'
 import { Mark } from './icon'
@@ -45,6 +46,7 @@ function typeColorKey(note: StrideNote): string {
 
 export const Rail = observer(function Rail() {
   const vault = useService(VaultService)
+  const tabs = useService(TabsService)
   const typeDocs = vault.sidebarTypes
   const fallbackTypes = vault.typeDocuments.length === 0 ? [...vault.graph.byType.keys()] : []
   const showInstances = vault.active?.type === 'Type'
@@ -82,7 +84,7 @@ export const Rail = observer(function Rail() {
               className={vault.listFilter === note.title ? 'active' : ''}
               onClick={() => {
                 vault.setFilter(note.title)
-                vault.select(note.id)
+                tabs.openNote(note.id)
               }}
             >
               <span className={`type-dot type-dot-${color}`} />
@@ -126,7 +128,7 @@ export const Rail = observer(function Rail() {
               type="button"
               data-testid="instance-link"
               className={vault.activeId === note.id ? 'active' : ''}
-              onClick={() => vault.select(note.id)}
+              onClick={() => tabs.openNote(note.id)}
             >
               {note.title}
             </button>

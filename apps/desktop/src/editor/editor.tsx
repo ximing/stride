@@ -3,6 +3,7 @@ import { isArchived, plainText, stripLeadingH1 } from '@stride/core/note'
 import { EditorContent, useEditor } from '@tiptap/react'
 import { useEffect, useMemo, useRef } from 'react'
 import { observer, useService } from '@rabjs/react'
+import { TabsService } from '../services/tabs.service'
 import { VaultService } from '../services/vault.service'
 import { createEditorExtensions } from './extensions'
 import { plainTextSelection } from './search-jump'
@@ -14,6 +15,7 @@ const emptyDoc = { type: 'doc', content: [{ type: 'paragraph' }] }
 
 export const NoteEditor = observer(function NoteEditor() {
   const vault = useService(VaultService)
+  const tabs = useService(TabsService)
   const note = vault.active
   const notes = vault.notes
   const openLinkRef = useRef<() => boolean>(() => true)
@@ -26,7 +28,9 @@ export const NoteEditor = observer(function NoteEditor() {
     .map((item) => ({ id: item.id, title: item.title }))
   onOpenRef.current = (target) => {
     const action = resolveWikilinkClick(notes, target)
-    if (action.type === 'select') vault.select(action.id)
+    // Wikilinks navigate inside the active tab (pushing its history); every
+    // other entry point goes through TabsService.openNote.
+    if (action.type === 'select') tabs.followLink(action.id)
     else void vault.createLinkedNote(action.title)
   }
   const extensions = useMemo(

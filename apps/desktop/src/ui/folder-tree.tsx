@@ -3,6 +3,7 @@ import { useEffect, useState, type DragEvent } from 'react'
 import type { StrideNote } from '@stride/core/note'
 import { FolderService } from '../services/folder.service'
 import { ListFilterService } from '../services/list-filter.service'
+import { TabsService } from '../services/tabs.service'
 import { VaultService } from '../services/vault.service'
 
 function parentOf(id: string): string {
@@ -134,6 +135,7 @@ export const FolderTree = observer(function FolderTree() {
   const vault = useService(VaultService)
   const folderService = useService(FolderService)
   const listFilter = useService(ListFilterService)
+  const tabs = useService(TabsService)
   const [creating, setCreating] = useState(false)
   const [name, setName] = useState('')
   const [renaming, setRenaming] = useState('')
@@ -207,7 +209,7 @@ export const FolderTree = observer(function FolderTree() {
           activeId={vault.activeId}
           renaming={renaming}
           draft={draft}
-          onSelect={(id) => vault.select(id)}
+          onSelect={(id) => tabs.openNote(id)}
           onDrop={drop}
           onStartRename={startRename}
           onDraft={setDraft}
@@ -216,7 +218,7 @@ export const FolderTree = observer(function FolderTree() {
         />
       ))}
       {notesIn(notes, '').map((note) => (
-        <NoteLink key={note.id} note={note} active={vault.activeId === note.id} onSelect={() => vault.select(note.id)} />
+        <NoteLink key={note.id} note={note} active={vault.activeId === note.id} onSelect={() => tabs.openNote(note.id)} />
       ))}
     </div>
   )

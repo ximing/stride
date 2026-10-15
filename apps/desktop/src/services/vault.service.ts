@@ -57,6 +57,7 @@ import {
   saveNote,
 } from '../../../../packages/core/src/vault'
 import { ListFilterService } from './list-filter.service'
+import { TabsService } from './tabs.service'
 
 const COLLAPSED_TYPES_KEY = 'stride:collapsed-types'
 const EMBED_BATCH = 16
@@ -618,6 +619,10 @@ export class VaultService extends Service {
         const renamed: StrideNote = { ...latest, id: nextId }
         this.notes = this.notes.map((note) => (note.id === fromId ? renamed : note))
         if (this.activeId === fromId) this.activeId = nextId
+        // Tabs track note ids in their per-tab history; rewrite before any reaction
+        // flush could mistake the rename for a deletion. Same sync segment as the
+        // id remap above, so the TabsService convergence microtask sees final state.
+        if (has(TabsService)) this.resolve(TabsService).remapNoteId(fromId, nextId)
         if (this.pendingId === fromId) this.pendingId = nextId
         if (fromId in this.noteMtimes) {
           const mtimes = { ...this.noteMtimes }
@@ -991,6 +996,9 @@ export class VaultService extends Service {
     this.error = ''
     void this.refreshMtimes(epoch, opened.notes)
     await this.rememberVault(backend)
+    // Tabs restore the per-vault scene only now: activeVaultId became final in
+    // rememberVault, so earlier activeId reactions belong to the old vault.
+    if (has(TabsService)) this.resolve(TabsService).onVaultOpened()
   }
 
   // Best-effort mtime harvest for the note list. Never blocks or fails an open.
