@@ -1,11 +1,20 @@
 import { observer, useService } from '@rabjs/react'
 import { useEffect, useMemo, useState, type DragEvent } from 'react'
 import type { StrideNote } from '@stride/core/note'
+import {
+  buildFolderMenu,
+  buildFolderNoteMenu,
+  buildTreeRootMenu,
+  type ContextMenuEntry,
+} from '../services/context-menu'
 import { FolderService } from '../services/folder.service'
 import { ListFilterService } from '../services/list-filter.service'
+import { NoteListService } from '../services/note-list.service'
 import { TabsService } from '../services/tabs.service'
 import { VaultService } from '../services/vault.service'
+import { ContextMenu } from './context-menu'
 import { EmptyState } from './empty-state'
+import { Modal, ModalClose, ModalContent } from './modal'
 
 // A vault-scale folder can hold thousands of notes; the tree renders at most
 // this many links per folder and summarizes the rest. Keeps sidebar DOM size
@@ -30,7 +39,27 @@ function allowDrop(event: DragEvent<HTMLElement>) {
   event.stopPropagation()
 }
 
-function NoteLink({ note, active, onSelect }: { note: StrideNote; active: boolean; onSelect: () => void }) {
+function clipboardWrite(): boolean {
+  return typeof navigator !== 'undefined' && typeof navigator.clipboard?.writeText === 'function'
+}
+
+interface TreeMenuState {
+  x: number
+  y: number
+  items: ContextMenuEntry[]
+}
+
+function NoteLink({
+  note,
+  active,
+  onSelect,
+  onMenu,
+}: {
+  note: StrideNote
+  active: boolean
+  onSelect: () => void
+  onMenu: (id: string, x: number, y: number) => void
+}) {
   return (
     <button
       type="button"
@@ -39,6 +68,11 @@ function NoteLink({ note, active, onSelect }: { note: StrideNote; active: boolea
       draggable
       className={active ? 'active' : ''}
       onClick={onSelect}
+      onContextMenu={(event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        onMenu(note.id, event.clientX, event.clientY)
+      }}
       onDragStart={(event) => {
         event.dataTransfer.setData('text/plain', note.id)
         event.dataTransfer.effectAllowed = 'move'
@@ -55,18 +89,26 @@ function FolderNotes({
   parent,
   activeId,
   onSelect,
+  onMenu,
 }: {
   notes: readonly StrideNote[]
   parent: string
   activeId: string
   onSelect: (id: string) => void
+  onMenu: (id: string, x: number, y: number) => void
 }) {
   const inFolder = notesIn(notes, parent)
   const shown = inFolder.length > FOLDER_NOTE_RENDER_CAP ? inFolder.slice(0, FOLDER_NOTE_RENDER_CAP) : inFolder
   return (
     <>
       {shown.map((note) => (
-        <NoteLink key={note.id} note={note} active={activeId === note.id} onSelect={() => onSelect(note.id)} />
+        <NoteLink
+          key={note.id}
+          note={note}
+          active={activeId === note.id}
+          onSelect={() => onSelect(note.id)}
+          onMenu={onMenu}
+        />
       ))}
       {inFolder.length > shown.length && (
         <p className="folder-overflow" data-testid="folder-overflow">
@@ -84,12 +126,18 @@ interface FolderBlockProps {
   activeId: string
   renaming: string
   draft: string
+  creatingIn: string
+  createDraft: string
   onSelect: (id: string) => void
   onDrop: (event: DragEvent<HTMLElement>, destFolder: string) => void
   onStartRename: (path: string) => void
   onDraft: (value: string) => void
   onRename: (path: string) => void
   onDelete: (path: string) => void
+  onFolderMenu: (path: string, x: number, y: number) => void
+  onNoteMenu: (id: string, x: number, y: number) => void
+  onCreateDraft: (value: string) => void
+  onCreateIn: (path: string) => void
 }
 
 function FolderBlock({
@@ -99,12 +147,18 @@ function FolderBlock({
   activeId,
   renaming,
   draft,
+  creatingIn,
+  createDraft,
   onSelect,
   onDrop,
   onStartRename,
   onDraft,
   onRename,
   onDelete,
+  onFolderMenu,
+  onNoteMenu,
+  onCreateDraft,
+  onCreateIn,
 }: FolderBlockProps) {
   const label = path.split('/').pop() ?? path
   return (
@@ -114,6 +168,11 @@ function FolderBlock({
       data-path={path}
       onDragOver={allowDrop}
       onDrop={(event) => onDrop(event, path)}
+      onContextMenu={(event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        onFolderMenu(path, event.clientX, event.clientY)
+      }}
     >
       <div className="folder-row-main">
         {renaming === path ? (
@@ -140,6 +199,25 @@ function FolderBlock({
         </button>
       </div>
       <div className="folder-children">
+        {creatingIn === path && (
+          <div className="folder-create">
+            <input
+              data-testid="folder-child-name"
+              value={createDraft}
+              aria-label={`New folder inside ${label}`}
+              onChange={(event) => onCreateDraft(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === 'Enter') {
+                  event.preventDefault()
+                  onCreateIn(path)
+                }
+              }}
+            />
+            <button type="button" data-testid="create-folder-child" onClick={() => onCreateIn(path)}>
+              Create
+            </button>
+          </div>
+        )}
         {childFolders(paths, path).map((child) => (
           <FolderBlock
             key={child}
@@ -149,15 +227,21 @@ function FolderBlock({
             activeId={activeId}
             renaming={renaming}
             draft={draft}
+            creatingIn={creatingIn}
+            createDraft={createDraft}
             onSelect={onSelect}
             onDrop={onDrop}
             onStartRename={onStartRename}
             onDraft={onDraft}
             onRename={onRename}
             onDelete={onDelete}
+            onFolderMenu={onFolderMenu}
+            onNoteMenu={onNoteMenu}
+            onCreateDraft={onCreateDraft}
+            onCreateIn={onCreateIn}
           />
         ))}
-        <FolderNotes notes={notes} parent={path} activeId={activeId} onSelect={onSelect} />
+        <FolderNotes notes={notes} parent={path} activeId={activeId} onSelect={onSelect} onMenu={onNoteMenu} />
       </div>
     </div>
   )
@@ -168,10 +252,15 @@ export const FolderTree = observer(function FolderTree() {
   const folderService = useService(FolderService)
   const listFilter = useService(ListFilterService)
   const tabs = useService(TabsService)
+  const noteList = useService(NoteListService)
   const [creating, setCreating] = useState(false)
   const [name, setName] = useState('')
   const [renaming, setRenaming] = useState('')
   const [draft, setDraft] = useState('')
+  const [creatingIn, setCreatingIn] = useState('')
+  const [createDraft, setCreateDraft] = useState('')
+  const [deleting, setDeleting] = useState('')
+  const [menu, setMenu] = useState<TreeMenuState | null>(null)
 
   useEffect(() => {
     void folderService.loadFolders()
@@ -193,6 +282,16 @@ export const FolderTree = observer(function FolderTree() {
     }
   }
 
+  async function submitCreateIn(path: string) {
+    const child = createDraft.trim()
+    if (!child) return
+    await folderService.createFolder(`${path}/${child}`)
+    if (!vault.error) {
+      setCreateDraft('')
+      setCreatingIn('')
+    }
+  }
+
   function startRename(path: string) {
     setRenaming(path)
     setDraft(path.split('/').pop() ?? path)
@@ -206,6 +305,48 @@ export const FolderTree = observer(function FolderTree() {
     if (!vault.error) setRenaming('')
   }
 
+  // Right-click menus. Note rows reuse the note-list selection so the shared
+  // delete-confirm modal (owned by NoteList) shows the right count — one
+  // confirmation flow for every surface.
+  function openFolderMenu(path: string, x: number, y: number) {
+    const items = buildFolderMenu(
+      { path },
+      {
+        newNoteHere: (folder) => void folderService.createNoteInFolder(folder),
+        newFolderInside: (folder) => {
+          setCreatingIn(folder)
+          setCreateDraft('')
+        },
+        renameFolder: (folder) => startRename(folder),
+        deleteFolder: (folder) => setDeleting(folder),
+      },
+    )
+    setMenu({ x, y, items })
+  }
+
+  function openNoteMenu(id: string, x: number, y: number) {
+    const items = buildFolderNoteMenu(
+      { noteId: id, clipboard: clipboardWrite() },
+      {
+        open: (noteId) => tabs.openNote(noteId),
+        copyWikilink: (noteId) => {
+          const title = vault.notes.find((note) => note.id === noteId)?.title ?? ''
+          if (title) void navigator.clipboard?.writeText(`[[${title}]]`)
+        },
+        archive: (noteId) => void vault.archiveNotes([noteId]),
+        deleteNote: (noteId) => {
+          noteList.selectForMenu(noteId)
+          noteList.confirmingDelete = true
+        },
+      },
+    )
+    setMenu({ x, y, items })
+  }
+
+  function openRootMenu(x: number, y: number) {
+    setMenu({ x, y, items: buildTreeRootMenu({ newFolder: () => setCreating(true) }) })
+  }
+
   // Memoized: re-filtering 10k notes per keystroke is only paid when the
   // query or the underlying notes actually change, not on unrelated renders.
   const notes = useMemo(
@@ -214,9 +355,19 @@ export const FolderTree = observer(function FolderTree() {
   )
   const paths = folderService.folders
   const treeEmpty = paths.length === 0 && notes.length === 0
+  const deletingLabel = deleting.split('/').pop() ?? deleting
 
   return (
-    <div className="folder-tree" data-testid="folder-root" onDragOver={allowDrop} onDrop={(event) => drop(event, '')}>
+    <div
+      className="folder-tree"
+      data-testid="folder-root"
+      onDragOver={allowDrop}
+      onDrop={(event) => drop(event, '')}
+      onContextMenu={(event) => {
+        event.preventDefault()
+        openRootMenu(event.clientX, event.clientY)
+      }}
+    >
       <button type="button" data-testid="new-folder" onClick={() => setCreating(true)}>
         New folder
       </button>
@@ -254,15 +405,40 @@ export const FolderTree = observer(function FolderTree() {
           activeId={vault.activeId}
           renaming={renaming}
           draft={draft}
+          creatingIn={creatingIn}
+          createDraft={createDraft}
           onSelect={(id) => tabs.openNote(id)}
           onDrop={drop}
           onStartRename={startRename}
           onDraft={setDraft}
           onRename={(path) => void commitRename(path)}
-          onDelete={(path) => void folderService.deleteFolder(path)}
+          onDelete={(path) => setDeleting(path)}
+          onFolderMenu={openFolderMenu}
+          onNoteMenu={openNoteMenu}
+          onCreateDraft={setCreateDraft}
+          onCreateIn={(path) => void submitCreateIn(path)}
         />
       ))}
-      <FolderNotes notes={notes} parent="" activeId={vault.activeId} onSelect={(id) => tabs.openNote(id)} />
+      <FolderNotes notes={notes} parent="" activeId={vault.activeId} onSelect={(id) => tabs.openNote(id)} onMenu={openNoteMenu} />
+      <Modal open={deleting !== ''} onOpenChange={(open) => { if (!open) setDeleting('') }}>
+        <ModalContent
+          title="Delete folder"
+          description={`Delete folder “${deletingLabel}”? The folder must be empty of notes.`}
+        >
+          <button
+            type="button"
+            data-testid="confirm-delete-folder"
+            onClick={() => {
+              void folderService.deleteFolder(deleting)
+              setDeleting('')
+            }}
+          >
+            Delete
+          </button>
+          <ModalClose data-testid="cancel-delete-folder">Cancel</ModalClose>
+        </ModalContent>
+      </Modal>
+      {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}
     </div>
   )
 })

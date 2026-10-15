@@ -101,6 +101,18 @@ export class FolderService extends Service {
     }
   }
 
+  /**
+   * "New Note Here" from the folder context menu: create at the root via the
+   * usual path (which selects the note), then move the file into `path` with
+   * the same remap machinery as drag-and-drop. Empty path is a plain create.
+   */
+  async createNoteInFolder(path: string) {
+    await this.vault.createNote()
+    const id = this.vault.activeId
+    if (!id || !path) return
+    await this.moveNote(id, path)
+  }
+
   async moveNote(fromId: string, destFolder: string) {
     const fs = this.vault.fs
     if (!fs) return

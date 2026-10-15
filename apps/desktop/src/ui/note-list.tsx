@@ -3,11 +3,15 @@ import { observer, raw, useService } from '@rabjs/react'
 import { plainText, type StrideNote } from '@stride/core/note'
 import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { typeSidebarLabel } from '../../../../packages/core/src/types'
+import { CommandService } from '../services/command.service'
+import { buildNoteListMenu, type ContextMenuEntry } from '../services/context-menu'
 import { ListFilterService } from '../services/list-filter.service'
 import { sortNotes, virtualWindow, type ListSort, type ListSortKey } from '../services/note-list'
 import { NoteListService } from '../services/note-list.service'
+import { TabsService } from '../services/tabs.service'
 import { VaultService } from '../services/vault.service'
 import { ViewsService } from '../services/views.service'
+import { ContextMenu } from './context-menu'
 import { EmptyState } from './empty-state'
 import { Mark } from './icon'
 import { Menu, MenuContent, MenuItem, MenuTrigger } from './menu'
@@ -240,6 +244,7 @@ interface NoteRowProps {
   active: boolean
   selected: boolean
   onRowClick: (id: string, mods: { shift: boolean; mod: boolean }) => void
+  onRowMenu: (id: string, x: number, y: number) => void
 }
 
 // memo keeps scroll re-renders cheap: rows whose props did not change bail out.
@@ -253,6 +258,7 @@ const NoteRow = memo(function NoteRow({
   active,
   selected,
   onRowClick,
+  onRowMenu,
 }: NoteRowProps) {
   return (
     <button
@@ -263,6 +269,11 @@ const NoteRow = memo(function NoteRow({
       aria-current={active ? 'true' : undefined}
       data-selected={selected ? 'true' : undefined}
       onClick={(event) => onRowClick(note.id, { shift: event.shiftKey, mod: event.metaKey || event.ctrlKey })}
+      onContextMenu={(event) => {
+        event.preventDefault()
+        event.stopPropagation()
+        onRowMenu(note.id, event.clientX, event.clientY)
+      }}
     >
       <span className="note-list-item-title">{note.title || 'Untitled'}</span>
       <span className="note-list-item-meta">
@@ -288,14 +299,36 @@ function chipTypeOf(note: StrideNote): string {
   return type !== '' && type.toLowerCase() !== 'note' ? type : ''
 }
 
+/** Right-click rename: open the note, then focus/select the stage title input. */
+function focusNoteTitle() {
+  window.setTimeout(() => {
+    const input = document.querySelector<HTMLInputElement>('[data-testid="note-title"]')
+    input?.focus()
+    input?.select()
+  }, 0)
+}
+
+function clipboardWrite(): boolean {
+  return typeof navigator !== 'undefined' && typeof navigator.clipboard?.writeText === 'function'
+}
+
+interface RowMenuState {
+  x: number
+  y: number
+  items: ContextMenuEntry[]
+}
+
 export const NoteList = observer(function NoteList() {
   const vault = useService(VaultService)
   const listFilter = useService(ListFilterService)
   const list = useService(NoteListService)
   const views = useService(ViewsService)
+  const tabs = useService(TabsService)
+  const commands = useService(CommandService)
   const scrollRef = useRef<HTMLDivElement>(null)
   const [scrollTop, setScrollTop] = useState(0)
   const [viewport, setViewport] = useState(0)
+  const [rowMenu, setRowMenu] = useState<RowMenuState | null>(null)
 
   // Measure the scroll viewport. jsdom has no ResizeObserver/layout, so fall
   // back to a nominal viewport that renders a full window in tests.
@@ -393,6 +426,34 @@ export const NoteList = observer(function NoteList() {
     }
   }
 
+  // Right-click selects the row first (menus act on the selection), then the
+  // builder decides single vs batch from the resulting selection. Batch items
+  // execute through CommandService, so menu, palette, and manifest stay同源.
+  function openRowMenu(id: string, x: number, y: number) {
+    list.selectForMenu(id)
+    const multi = list.selectedIds.length > 1 && list.selectedIds.includes(id)
+    const items = buildNoteListMenu(
+      { noteId: id, multi, clipboard: clipboardWrite(), commands: commands.commands },
+      {
+        open: (noteId) => tabs.openNote(noteId),
+        rename: (noteId) => {
+          tabs.openNote(noteId)
+          focusNoteTitle()
+        },
+        copyWikilink: (noteId) => {
+          const title = vault.notes.find((note) => note.id === noteId)?.title ?? ''
+          if (title) void navigator.clipboard?.writeText(`[[${title}]]`)
+        },
+        archive: (noteId) => void vault.archiveNotes([noteId]),
+        deleteNote: () => { list.confirmingDelete = true },
+        archiveSelected: () => commands.execute('list.archiveSelected'),
+        deleteSelected: () => commands.execute('list.deleteSelected'),
+        retypeSelected: () => commands.execute('list.retypeSelected'),
+      },
+    )
+    setRowMenu({ x, y, items })
+  }
+
   return (
     <div
       className="note-list"
@@ -434,12 +495,21 @@ export const NoteList = observer(function NoteList() {
               active={vault.activeId === note.id}
               selected={list.isSelected(note.id)}
               onRowClick={(id, mods) => list.clickNote(id, mods, orderedIds)}
+              onRowMenu={openRowMenu}
             />
           )
         })}
         {win.bottomPad > 0 && <div className="note-list-spacer" style={{ height: win.bottomPad }} />}
       </div>
       <BatchDeleteModal />
+      {rowMenu && (
+        <ContextMenu
+          x={rowMenu.x}
+          y={rowMenu.y}
+          items={rowMenu.items}
+          onClose={() => setRowMenu(null)}
+        />
+      )}
     </div>
   )
 })
