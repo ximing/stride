@@ -15,6 +15,7 @@ export const SETTINGS_SECTION_IDS = [
   'updates',
   'privacy',
   'shortcuts',
+  'vault',
 ] as const
 
 export type SettingsSectionId = (typeof SETTINGS_SECTION_IDS)[number]

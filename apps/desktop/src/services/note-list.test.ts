@@ -5,6 +5,8 @@ import {
   DEFAULT_LIST_SORT,
   LIST_STORAGE_KEY,
   NOTE_ROW_HEIGHT,
+  NOTE_ROW_HEIGHT_COMPACT,
+  NOTE_ROW_OVERSCAN,
   noteCreatedMs,
   rangeSelection,
   readVaultSort,
@@ -71,6 +73,19 @@ describe('virtualWindow', () => {
     const win = virtualWindow(10, Number.NaN, Number.NaN)
     expect(win.start).toBe(0)
     expect(win.end).toBe(6)
+  })
+
+  it('honors a compact row height (T7.3 per-vault density)', () => {
+    const win = virtualWindow(10000, 0, 660, NOTE_ROW_OVERSCAN, NOTE_ROW_HEIGHT_COMPACT)
+    expect(win.start).toBe(0)
+    expect(win.end).toBe(Math.ceil(660 / NOTE_ROW_HEIGHT_COMPACT) + 6)
+    expect(win.bottomPad).toBe((10000 - win.end) * NOTE_ROW_HEIGHT_COMPACT)
+
+    // Same scroll pixel offset selects more rows in compact mode.
+    const comfortable = virtualWindow(10000, NOTE_ROW_HEIGHT * 100, 660)
+    const compact = virtualWindow(10000, NOTE_ROW_HEIGHT * 100, 660, NOTE_ROW_OVERSCAN, NOTE_ROW_HEIGHT_COMPACT)
+    expect(compact.start).toBeGreaterThan(comfortable.start)
+    expect(compact.topPad).toBe(compact.start * NOTE_ROW_HEIGHT_COMPACT)
   })
 })
 

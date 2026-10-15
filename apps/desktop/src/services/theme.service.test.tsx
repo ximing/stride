@@ -1,9 +1,5 @@
-import { has, register, resolve } from '@rabjs/react'
-import { act } from 'react'
-import { createRoot } from 'react-dom/client'
+import { resolve } from '@rabjs/react'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { SettingsPanel } from '../ui/settings-panel'
-import { SettingsService, UpdateService } from './panels.service'
 import { THEME_STORAGE_KEY } from './theme'
 import { ThemeService } from './theme.service'
 
@@ -57,62 +53,6 @@ describe('ThemeService', () => {
   })
 })
 
-describe('settings panel theme control', () => {
-  let root: ReturnType<typeof createRoot> | undefined
-  let host: HTMLDivElement | undefined
-
-  beforeEach(() => {
-    localStorage.removeItem(THEME_STORAGE_KEY)
-    document.documentElement.removeAttribute('data-theme')
-    resolve(ThemeService).setTheme('system')
-    if (!has(SettingsService)) register(SettingsService)
-    if (!has(UpdateService)) register(UpdateService)
-  })
-
-  afterEach(() => {
-    act(() => {
-      root?.unmount()
-    })
-    host?.remove()
-    root = undefined
-    host = undefined
-    localStorage.removeItem(THEME_STORAGE_KEY)
-    document.documentElement.removeAttribute('data-theme')
-  })
-
-  it('switches the theme from the settings panel, applying data-theme on <html>', async () => {
-    host = document.createElement('div')
-    document.body.appendChild(host)
-    root = createRoot(host)
-    await act(async () => {
-      root?.render(<SettingsPanel />)
-    })
-
-    const systemButton = host.querySelector<HTMLButtonElement>('[data-testid="theme-system"]')
-    const lightButton = host.querySelector<HTMLButtonElement>('[data-testid="theme-light"]')
-    const darkButton = host.querySelector<HTMLButtonElement>('[data-testid="theme-dark"]')
-    expect(systemButton).not.toBeNull()
-    expect(systemButton?.getAttribute('aria-pressed')).toBe('true')
-    expect(lightButton?.getAttribute('aria-pressed')).toBe('false')
-
-    await act(async () => {
-      darkButton?.click()
-    })
-    expect(document.documentElement.getAttribute('data-theme')).toBe('dark')
-    expect(darkButton?.getAttribute('aria-pressed')).toBe('true')
-    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('dark')
-
-    await act(async () => {
-      lightButton?.click()
-    })
-    expect(document.documentElement.getAttribute('data-theme')).toBe('light')
-    expect(lightButton?.getAttribute('aria-pressed')).toBe('true')
-    expect(darkButton?.getAttribute('aria-pressed')).toBe('false')
-
-    await act(async () => {
-      systemButton?.click()
-    })
-    expect(document.documentElement.hasAttribute('data-theme')).toBe(false)
-    expect(localStorage.getItem(THEME_STORAGE_KEY)).toBe('system')
-  })
-})
+// The settings-UI theme control is covered by the Appearance section test in
+// ui/settings/sections/t72-sections.test.tsx (the old settings-panel.tsx it
+// replaced was deleted in T7.3).

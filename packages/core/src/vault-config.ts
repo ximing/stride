@@ -80,3 +80,72 @@ export async function writeAgentMode(fs: FileSystemBackend, mode: AgentMode): Pr
   const next = { ...(parsed as Record<string, unknown>), agentMode: mode }
   await fs.writeText(VAULT_MARKER, `${JSON.stringify(next, null, 2)}\n`)
 }
+
+// ---------- T7.3 per-vault settings ----------
+// Shared read-modify-write helpers; every writer spreads the existing marker
+// object so unknown fields (and fields owned by other flags) survive a write.
+
+async function readMarker(fs: FileSystemBackend): Promise<Record<string, unknown> | null> {
+  try {
+    const stat = await fs.stat(VAULT_MARKER)
+    if (!stat || stat.kind !== 'file') return null
+    const parsed: unknown = JSON.parse(await fs.readText(VAULT_MARKER))
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+    return parsed as Record<string, unknown>
+  } catch {
+    return null
+  }
+}
+
+async function patchMarker(fs: FileSystemBackend, patch: Record<string, unknown>): Promise<void> {
+  const marker = await readMarker(fs)
+  if (!marker) return
+  await fs.writeText(VAULT_MARKER, `${JSON.stringify({ ...marker, ...patch }, null, 2)}\n`)
+}
+
+export const VAULT_ZOOM_MIN = 0.7
+export const VAULT_ZOOM_MAX = 1.6
+export const VAULT_ZOOM_DEFAULT = 1
+
+/** Zoom is valid only inside [VAULT_ZOOM_MIN, VAULT_ZOOM_MAX]; anything else falls back to 1. */
+export function sanitizeZoom(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) && value >= VAULT_ZOOM_MIN && value <= VAULT_ZOOM_MAX
+    ? value
+    : VAULT_ZOOM_DEFAULT
+}
+
+export async function readZoom(fs: FileSystemBackend): Promise<number> {
+  return sanitizeZoom((await readMarker(fs))?.zoom)
+}
+
+export async function writeZoom(fs: FileSystemBackend, zoom: number): Promise<void> {
+  await patchMarker(fs, { zoom: sanitizeZoom(zoom) })
+}
+
+export type ViewMode = 'comfortable' | 'compact'
+
+export function sanitizeViewMode(value: unknown): ViewMode {
+  return value === 'compact' || value === 'comfortable' ? value : 'comfortable'
+}
+
+export async function readViewMode(fs: FileSystemBackend): Promise<ViewMode> {
+  return sanitizeViewMode((await readMarker(fs))?.viewMode)
+}
+
+export async function writeViewMode(fs: FileSystemBackend, viewMode: ViewMode): Promise<void> {
+  await patchMarker(fs, { viewMode: sanitizeViewMode(viewMode) })
+}
+
+export type GitSetupPreference = 'undecided' | 'enabled' | 'disabled'
+
+export function sanitizeGitSetupPreference(value: unknown): GitSetupPreference {
+  return value === 'enabled' || value === 'disabled' || value === 'undecided' ? value : 'undecided'
+}
+
+export async function readGitSetupPreference(fs: FileSystemBackend): Promise<GitSetupPreference> {
+  return sanitizeGitSetupPreference((await readMarker(fs))?.gitSetupPreference)
+}
+
+export async function writeGitSetupPreference(fs: FileSystemBackend, preference: GitSetupPreference): Promise<void> {
+  await patchMarker(fs, { gitSetupPreference: sanitizeGitSetupPreference(preference) })
+}

@@ -42,10 +42,21 @@ import { applyViewFilter, VIEW_FILTER_PREFIX, type SavedView } from '../../../..
 import {
   readAdvanceInbox,
   readAgentMode,
+  readGitSetupPreference,
   readRenameFromHeading,
+  readViewMode,
+  readZoom,
+  sanitizeGitSetupPreference,
+  sanitizeViewMode,
+  sanitizeZoom,
   writeAdvanceInbox,
   writeAgentMode,
+  writeGitSetupPreference,
   writeRenameFromHeading,
+  writeViewMode,
+  writeZoom,
+  type GitSetupPreference,
+  type ViewMode,
 } from '../../../../packages/core/src/vault-config'
 import {
   createVaultNote,
@@ -59,6 +70,7 @@ import {
 } from '../../../../packages/core/src/vault'
 import { ListFilterService } from './list-filter.service'
 import { NoteListService } from './note-list.service'
+import { applyStageZoom } from './stage-zoom'
 import { TabsService } from './tabs.service'
 import { ViewsService } from './views.service'
 
@@ -223,6 +235,10 @@ export class VaultService extends Service {
   renameFromHeading = true
   agentMode: 'safe' | 'power' = 'safe'
   advanceInbox = true
+  // Per-vault settings (T7.3), all persisted in .stride/vault.json.
+  zoom = 1
+  viewMode: ViewMode = 'comfortable'
+  gitSetupPreference: GitSetupPreference = 'undecided'
   propertyName = ''
   propertyType: PropertyKind = 'string'
   propertyValue = ''
@@ -623,6 +639,41 @@ export class VaultService extends Service {
     if (!this.fs) return
     try {
       await writeAgentMode(this.fs, mode)
+    } catch (error) {
+      this.error = errorText(error)
+    }
+  }
+
+  /** Per-vault editor zoom (T7.3). Illegal values fall back to 1; applies to the stage immediately. */
+  async setZoom(value: number) {
+    const zoom = sanitizeZoom(value)
+    this.zoom = zoom
+    applyStageZoom(zoom)
+    if (!this.fs) return
+    try {
+      await writeZoom(this.fs, zoom)
+    } catch (error) {
+      this.error = errorText(error)
+    }
+  }
+
+  /** Per-vault note-list density (T7.3); NoteList renders from this field. */
+  async setViewMode(mode: ViewMode) {
+    this.viewMode = sanitizeViewMode(mode)
+    if (!this.fs) return
+    try {
+      await writeViewMode(this.fs, this.viewMode)
+    } catch (error) {
+      this.error = errorText(error)
+    }
+  }
+
+  /** Per-vault git setup intent (T7.3). Stored and shown only; git behavior is unchanged. */
+  async setGitSetupPreference(preference: GitSetupPreference) {
+    this.gitSetupPreference = sanitizeGitSetupPreference(preference)
+    if (!this.fs) return
+    try {
+      await writeGitSetupPreference(this.fs, this.gitSetupPreference)
     } catch (error) {
       this.error = errorText(error)
     }
@@ -1047,6 +1098,9 @@ export class VaultService extends Service {
     const renameFromHeading = await readRenameFromHeading(backend)
     const advanceInbox = await readAdvanceInbox(backend)
     const agentMode = await readAgentMode(backend)
+    const zoom = await readZoom(backend)
+    const viewMode = await readViewMode(backend)
+    const gitSetupPreference = await readGitSetupPreference(backend)
     this.rebuildEpoch += 1
     const epoch = this.rebuildEpoch
     const retiring = this.index
@@ -1076,6 +1130,10 @@ export class VaultService extends Service {
     this.renameFromHeading = renameFromHeading
     this.agentMode = agentMode
     this.advanceInbox = advanceInbox
+    this.zoom = zoom
+    this.viewMode = viewMode
+    this.gitSetupPreference = gitSetupPreference
+    applyStageZoom(zoom)
     this.resetPropertyEditor()
     const snapshot = opened.notes.map((note) => ({ id: note.id, text: indexText(note) }))
     this.indexDone = 0

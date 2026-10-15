@@ -696,6 +696,18 @@ select {
   white-space: nowrap;
 }
 
+/* Compact per-vault view mode (T7.3): tighter rows without the snippet line.
+   The height is a hard contract with NOTE_ROW_HEIGHT_COMPACT in
+   services/note-list.ts (virtual-scroll window math). Keep them in sync. */
+.note-list.is-compact .note-list-item {
+  height: 48px;
+  padding: 0.28rem 0.45rem;
+}
+
+.note-list.is-compact .note-list-item-snippet {
+  display: none;
+}
+
 .note-chip {
   display: inline-flex;
   align-items: center;
@@ -820,6 +832,9 @@ select {
   min-width: 320px;
   background: var(--sd-bg-elevated);
   padding: 1.4rem 1.8rem 2.5rem;
+  /* Per-vault zoom (T7.3), set by services/stage-zoom.ts. Engines without CSS
+     zoom support ignore it and render 1x. */
+  zoom: var(--sd-stage-zoom, 1);
 }
 
 /* ---------- tab strip ---------- */

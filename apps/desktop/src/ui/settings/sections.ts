@@ -1,6 +1,5 @@
 // Settings section registry: the single list the page's nav and content area
-// render from, in fixed order. Each section's real form lands in T7.2; until
-// then every section except Shortcuts renders a placeholder.
+// render from, in fixed order. Forms live in ./sections/*.
 
 import type { Icon } from '@phosphor-icons/react'
 import { ArrowClockwise } from '@phosphor-icons/react/ArrowClockwise'
@@ -10,6 +9,7 @@ import { NotePencil } from '@phosphor-icons/react/NotePencil'
 import { Palette } from '@phosphor-icons/react/Palette'
 import { ShieldCheck } from '@phosphor-icons/react/ShieldCheck'
 import { Sparkle } from '@phosphor-icons/react/Sparkle'
+import { Vault } from '@phosphor-icons/react/Vault'
 import { VectorThree } from '@phosphor-icons/react/VectorThree'
 import type { ComponentType } from 'react'
 import type { SettingsSectionId } from '../../services/settings-page.service'
@@ -21,6 +21,7 @@ import { GitSection } from './sections/git'
 import { PrivacySection } from './sections/privacy'
 import { ShortcutsSection } from './sections/shortcuts'
 import { UpdatesSection } from './sections/updates'
+import { VaultSection } from './sections/vault'
 
 export interface SettingsSection {
   id: SettingsSectionId
@@ -38,4 +39,5 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
   { id: 'updates', title: 'Updates', icon: ArrowClockwise, component: UpdatesSection },
   { id: 'privacy', title: 'Privacy', icon: ShieldCheck, component: PrivacySection },
   { id: 'shortcuts', title: 'Keyboard Shortcuts', icon: Keyboard, component: ShortcutsSection },
+  { id: 'vault', title: 'This Vault', icon: Vault, component: VaultSection },
 ]

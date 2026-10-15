@@ -7,6 +7,8 @@ import type { StrideNote } from '@stride/core/note'
 
 /** Fixed row height in px. Must match `.note-list-item { height }` in styles.css. */
 export const NOTE_ROW_HEIGHT = 66
+/** Compact view mode row height. Must match `.note-list.is-compact .note-list-item { height }`. */
+export const NOTE_ROW_HEIGHT_COMPACT = 48
 /** Extra rows rendered above and below the viewport to absorb fast scrolls. */
 export const NOTE_ROW_OVERSCAN = 6
 
@@ -22,30 +24,31 @@ export interface VirtualWindow {
 }
 
 /**
- * Window of rows to render for a scroll position. Row height is fixed, so the
- * window is pure arithmetic; DOM node count stays at viewport/ROW + 2*overscan
- * regardless of `total`.
+ * Window of rows to render for a scroll position. Row height is fixed per view
+ * mode (comfortable/compact), so the window is pure arithmetic; DOM node count
+ * stays at viewport/ROW + 2*overscan regardless of `total`.
  */
 export function virtualWindow(
   total: number,
   scrollTop: number,
   viewportHeight: number,
   overscan: number = NOTE_ROW_OVERSCAN,
+  rowHeight: number = NOTE_ROW_HEIGHT,
 ): VirtualWindow {
   if (total <= 0) return { start: 0, end: 0, topPad: 0, bottomPad: 0 }
   const rawTop = Number.isFinite(scrollTop) ? Math.max(0, scrollTop) : 0
   const viewport = Number.isFinite(viewportHeight) ? Math.max(0, viewportHeight) : 0
   // Browsers clamp scrollTop to the scrollable range; mirror that so a stale
   // scroll position after a list shrink still yields a full window.
-  const top = Math.min(rawTop, Math.max(0, total * NOTE_ROW_HEIGHT - viewport))
-  const start = Math.max(0, Math.floor(top / NOTE_ROW_HEIGHT) - overscan)
-  const lastVisible = Math.ceil((top + viewport) / NOTE_ROW_HEIGHT)
+  const top = Math.min(rawTop, Math.max(0, total * rowHeight - viewport))
+  const start = Math.max(0, Math.floor(top / rowHeight) - overscan)
+  const lastVisible = Math.ceil((top + viewport) / rowHeight)
   const end = Math.min(total, Math.max(lastVisible + overscan, start))
   return {
     start,
     end,
-    topPad: start * NOTE_ROW_HEIGHT,
-    bottomPad: (total - end) * NOTE_ROW_HEIGHT,
+    topPad: start * rowHeight,
+    bottomPad: (total - end) * rowHeight,
   }
 }
 

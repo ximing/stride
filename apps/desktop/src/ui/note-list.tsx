@@ -6,7 +6,7 @@ import { typeSidebarLabel } from '../../../../packages/core/src/types'
 import { CommandService } from '../services/command.service'
 import { buildNoteListMenu, type ContextMenuEntry } from '../services/context-menu'
 import { ListFilterService } from '../services/list-filter.service'
-import { sortNotes, virtualWindow, type ListSort, type ListSortKey } from '../services/note-list'
+import { NOTE_ROW_HEIGHT, NOTE_ROW_HEIGHT_COMPACT, NOTE_ROW_OVERSCAN, sortNotes, virtualWindow, type ListSort, type ListSortKey } from '../services/note-list'
 import { NoteListService } from '../services/note-list.service'
 import { TabsService } from '../services/tabs.service'
 import { VaultService } from '../services/vault.service'
@@ -329,6 +329,9 @@ export const NoteList = observer(function NoteList() {
   const [scrollTop, setScrollTop] = useState(0)
   const [viewport, setViewport] = useState(0)
   const [rowMenu, setRowMenu] = useState<RowMenuState | null>(null)
+  // Per-vault density (T7.3): compact shrinks rows and drops the snippet line.
+  const compact = vault.viewMode === 'compact'
+  const rowHeight = compact ? NOTE_ROW_HEIGHT_COMPACT : NOTE_ROW_HEIGHT
 
   // Measure the scroll viewport. jsdom has no ResizeObserver/layout, so fall
   // back to a nominal viewport that renders a full window in tests.
@@ -344,12 +347,12 @@ export const NoteList = observer(function NoteList() {
     return () => observer.disconnect()
   }, [])
 
-  // Switching filter dimension or sort resets the scroll position (never persisted).
+  // Switching filter dimension, sort, or density resets the scroll position (never persisted).
   useEffect(() => {
     const element = scrollRef.current
     if (element) element.scrollTop = 0
     setScrollTop(0)
-  }, [vault.listFilter, vault.searchQuery, vault.searchHits, listFilter.query, list.sort, list.scrollEpoch, views.views])
+  }, [vault.listFilter, vault.searchQuery, vault.searchHits, listFilter.query, list.sort, list.scrollEpoch, views.views, vault.viewMode])
 
   // Filter + sort only recompute when the underlying data changes, not on
   // scroll. ListFilterService.apply scans raw (non-proxy) notes internally —
@@ -369,7 +372,7 @@ export const NoteList = observer(function NoteList() {
     [activeView, vault.searchQuery, vault.searchHits, vault.listFilter, typeInfo, views.views],
   )
   const orderedIds = useMemo(() => notes.map((note) => note.id), [notes])
-  const win = virtualWindow(notes.length, scrollTop, viewport)
+  const win = virtualWindow(notes.length, scrollTop, viewport, NOTE_ROW_OVERSCAN, rowHeight)
   const rows = notes.slice(win.start, win.end)
 
   // One empty state per way the list can be empty; the most specific wins.
@@ -456,7 +459,7 @@ export const NoteList = observer(function NoteList() {
 
   return (
     <div
-      className="note-list"
+      className={compact ? 'note-list is-compact' : 'note-list'}
       data-testid="note-list"
       onKeyDown={(event) => {
         if (event.key === 'Escape' && list.selectionCount > 0) {

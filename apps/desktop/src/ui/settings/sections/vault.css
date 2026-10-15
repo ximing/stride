@@ -1,0 +1,65 @@
+/* This Vault settings section (T7.3). Colors come from the --sd-* tokens in
+   ui/tokens.css; the density segmented control reuses the .theme-picker
+   styles in styles.css. */
+
+.svault-section {
+  max-width: 560px;
+}
+
+.svault-group + .svault-group {
+  margin-top: 22px;
+}
+
+.svault-heading {
+  margin: 0 0 8px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sd-muted);
+}
+
+.svault-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--sd-muted);
+}
+
+.svault-zoom {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--sd-muted);
+}
+
+.svault-zoom input {
+  width: 5.5rem;
+  padding: 4px 8px;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+  background: var(--sd-bg-elevated);
+  color: var(--sd-fg);
+}
+
+.svault-radios {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.svault-radio {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.svault-radio input {
+  width: auto;
+  margin: 0;
+  accent-color: var(--sd-accent);
+}
+
+.svault-section .error {
+  margin: 8px 0 0;
+  font-size: 12px;
+}

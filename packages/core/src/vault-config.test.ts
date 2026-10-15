@@ -4,10 +4,19 @@ import { markDedicatedVault } from './vault.ts'
 import {
   readAdvanceInbox,
   readAgentMode,
+  readGitSetupPreference,
   readRenameFromHeading,
+  readViewMode,
+  readZoom,
+  sanitizeGitSetupPreference,
+  sanitizeViewMode,
+  sanitizeZoom,
   writeAdvanceInbox,
   writeAgentMode,
+  writeGitSetupPreference,
   writeRenameFromHeading,
+  writeViewMode,
+  writeZoom,
 } from './vault-config.ts'
 
 describe('advanceInbox vault flag', () => {
@@ -91,5 +100,136 @@ describe('agentMode vault flag', () => {
     expect(restored.renameFromHeading).toBe(false)
     expect(restored.agentMode).toBe('safe')
     expect(await readAgentMode(fs)).toBe('safe')
+  })
+})
+
+describe('zoom vault setting (T7.3)', () => {
+  it('defaults to 1 when the marker is missing, broken, or not an object', async () => {
+    expect(await readZoom(new MemoryFileSystem('zoom-missing'))).toBe(1)
+
+    const broken = new MemoryFileSystem('zoom-broken')
+    await broken.writeText('.stride/vault.json', '{')
+    expect(await readZoom(broken)).toBe(1)
+    // A broken marker is left untouched by writes.
+    await writeZoom(broken, 1.2)
+    expect(await broken.readText('.stride/vault.json')).toBe('{')
+
+    const empty = new MemoryFileSystem('zoom-null')
+    await empty.writeText('.stride/vault.json', 'null')
+    expect(await readZoom(empty)).toBe(1)
+  })
+
+  it('falls back to 1 for illegal stored values', async () => {
+    for (const value of ['"big"', '0.5', '2', '-1', 'true', '[1.2]']) {
+      const fs = new MemoryFileSystem(`zoom-illegal-${value}`)
+      await fs.writeText('.stride/vault.json', `{"zoom": ${value}}`)
+      expect(await readZoom(fs)).toBe(1)
+    }
+  })
+
+  it('accepts boundary values and round-trips, merging without dropping fields', async () => {
+    const fs = new MemoryFileSystem('zoom-round')
+    await markDedicatedVault(fs)
+    await writeRenameFromHeading(fs, false)
+    await fs.writeText(
+      '.stride/vault.json',
+      `${JSON.stringify({ ...JSON.parse(await fs.readText('.stride/vault.json')), futureField: { nested: true } }, null, 2)}\n`,
+    )
+
+    await writeZoom(fs, 0.7)
+    expect(await readZoom(fs)).toBe(0.7)
+    await writeZoom(fs, 1.6)
+    expect(await readZoom(fs)).toBe(1.6)
+    await writeZoom(fs, 1.25)
+    expect(await readZoom(fs)).toBe(1.25)
+
+    const marker = JSON.parse(await fs.readText('.stride/vault.json')) as Record<string, unknown>
+    expect(marker.kind).toBe('stride-vault')
+    expect(marker.renameFromHeading).toBe(false)
+    expect(marker.futureField).toEqual({ nested: true })
+    expect(marker.zoom).toBe(1.25)
+  })
+
+  it('sanitizeZoom accepts in-range numbers and rejects everything else', () => {
+    expect(sanitizeZoom(0.7)).toBe(0.7)
+    expect(sanitizeZoom(1.6)).toBe(1.6)
+    expect(sanitizeZoom(1)).toBe(1)
+    expect(sanitizeZoom(0.69)).toBe(1)
+    expect(sanitizeZoom(1.61)).toBe(1)
+    expect(sanitizeZoom(Number.NaN)).toBe(1)
+    expect(sanitizeZoom(Number.POSITIVE_INFINITY)).toBe(1)
+    expect(sanitizeZoom('1.2')).toBe(1)
+    expect(sanitizeZoom(undefined)).toBe(1)
+  })
+})
+
+describe('viewMode vault setting (T7.3)', () => {
+  it('defaults to comfortable when missing, broken, or illegal', async () => {
+    expect(await readViewMode(new MemoryFileSystem('vm-missing'))).toBe('comfortable')
+
+    const broken = new MemoryFileSystem('vm-broken')
+    await broken.writeText('.stride/vault.json', '{')
+    expect(await readViewMode(broken)).toBe('comfortable')
+    await writeViewMode(broken, 'compact')
+    expect(await broken.readText('.stride/vault.json')).toBe('{')
+
+    const illegal = new MemoryFileSystem('vm-illegal')
+    await illegal.writeText('.stride/vault.json', '{"viewMode": "dense"}')
+    expect(await readViewMode(illegal)).toBe('comfortable')
+  })
+
+  it('round-trips compact and preserves other fields', async () => {
+    const fs = new MemoryFileSystem('vm-round')
+    await markDedicatedVault(fs)
+    await writeZoom(fs, 1.2)
+    await writeViewMode(fs, 'compact')
+    expect(await readViewMode(fs)).toBe('compact')
+    const marker = JSON.parse(await fs.readText('.stride/vault.json')) as Record<string, unknown>
+    expect(marker.kind).toBe('stride-vault')
+    expect(marker.zoom).toBe(1.2)
+
+    await writeViewMode(fs, 'comfortable')
+    expect(await readViewMode(fs)).toBe('comfortable')
+    expect(sanitizeViewMode('compact')).toBe('compact')
+    expect(sanitizeViewMode('dense')).toBe('comfortable')
+    expect(sanitizeViewMode(undefined)).toBe('comfortable')
+  })
+})
+
+describe('gitSetupPreference vault setting (T7.3)', () => {
+  it('defaults to undecided when missing, broken, or illegal', async () => {
+    expect(await readGitSetupPreference(new MemoryFileSystem('gp-missing'))).toBe('undecided')
+
+    const broken = new MemoryFileSystem('gp-broken')
+    await broken.writeText('.stride/vault.json', '{')
+    expect(await readGitSetupPreference(broken)).toBe('undecided')
+    await writeGitSetupPreference(broken, 'enabled')
+    expect(await broken.readText('.stride/vault.json')).toBe('{')
+
+    const illegal = new MemoryFileSystem('gp-illegal')
+    await illegal.writeText('.stride/vault.json', '{"gitSetupPreference": "yes"}')
+    expect(await readGitSetupPreference(illegal)).toBe('undecided')
+  })
+
+  it('round-trips enabled/disabled/undecided and preserves other fields', async () => {
+    const fs = new MemoryFileSystem('gp-round')
+    await markDedicatedVault(fs)
+    await writeViewMode(fs, 'compact')
+
+    await writeGitSetupPreference(fs, 'enabled')
+    expect(await readGitSetupPreference(fs)).toBe('enabled')
+    await writeGitSetupPreference(fs, 'disabled')
+    expect(await readGitSetupPreference(fs)).toBe('disabled')
+    await writeGitSetupPreference(fs, 'undecided')
+    expect(await readGitSetupPreference(fs)).toBe('undecided')
+
+    const marker = JSON.parse(await fs.readText('.stride/vault.json')) as Record<string, unknown>
+    expect(marker.kind).toBe('stride-vault')
+    expect(marker.viewMode).toBe('compact')
+    expect(marker.gitSetupPreference).toBe('undecided')
+
+    expect(sanitizeGitSetupPreference('enabled')).toBe('enabled')
+    expect(sanitizeGitSetupPreference('maybe')).toBe('undecided')
+    expect(sanitizeGitSetupPreference(null)).toBe('undecided')
   })
 })
