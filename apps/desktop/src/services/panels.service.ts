@@ -1200,6 +1200,14 @@ export class SettingsService extends Service {
     }
   }
 
+  // Sectioned settings UI: picking a row selects it for editing and drops the
+  // stale probe result from whichever config was tested before.
+  selectLlmConfig(id: string) {
+    if (!this.form.llmConfigs.some((config) => config.id === id)) return
+    this.selectedLlmId = id
+    this.llmTestResult = ''
+  }
+
   setDefaultLlmConfig(id = this.selectedLlmId) {
     if (!id || !this.form.llmConfigs.some((config) => config.id === id)) return
     this.form = {

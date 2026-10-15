@@ -1,0 +1,145 @@
+/* Embedding settings section (T7.2). Tokens only (--sd-*), so light/dark hold. */
+
+.settings-embedding {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 640px;
+}
+
+.settings-embedding-degraded {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--sd-danger);
+  border-radius: var(--sd-radius-lg);
+  background: var(--sd-bg-elevated);
+  color: var(--sd-danger);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.settings-embedding-degraded > :first-child {
+  flex: none;
+  margin-top: 1px;
+}
+
+.settings-embedding-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.settings-embedding-field > span:first-child {
+  color: var(--sd-muted);
+  font-size: 12px;
+}
+
+.settings-embedding-input {
+  padding: 6px 8px;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+  background: var(--sd-bg-elevated);
+  color: var(--sd-fg);
+  font: inherit;
+  font-size: 13px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.settings-embedding-input:focus {
+  outline: none;
+  border-color: var(--sd-accent);
+}
+
+.settings-embedding-input[aria-invalid='true'] {
+  border-color: var(--sd-danger);
+}
+
+.settings-embedding-meta {
+  color: var(--sd-muted);
+  font-size: 12px;
+}
+
+.settings-embedding-note {
+  color: var(--sd-muted);
+  font-size: 12px;
+}
+
+.settings-embedding-error {
+  color: var(--sd-danger);
+  font-size: 12px;
+  margin: 0;
+}
+
+.settings-embedding-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.settings-embedding-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+  background: var(--sd-bg-elevated);
+  color: var(--sd-fg);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.settings-embedding-btn:hover:not(:disabled) {
+  border-color: var(--sd-fg);
+}
+
+.settings-embedding-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.settings-embedding-btn-primary {
+  background: var(--sd-accent);
+  border-color: var(--sd-accent);
+  color: var(--sd-bg);
+}
+
+.settings-embedding-btn-primary:hover:not(:disabled) {
+  border-color: var(--sd-accent);
+  filter: brightness(1.08);
+}
+
+.settings-embedding-test-ok {
+  margin: 0;
+  color: var(--sd-accent);
+  font-size: 12px;
+}
+
+.settings-embedding-test-warn {
+  margin: 0;
+  color: var(--sd-muted);
+  font-size: 12px;
+}
+
+.settings-embedding-test-err {
+  margin: 0;
+  color: var(--sd-danger);
+  font-size: 12px;
+}
+
+.settings-embedding-spin {
+  display: inline-flex;
+  animation: settings-embedding-rotate 0.8s linear infinite;
+}
+
+@keyframes settings-embedding-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}

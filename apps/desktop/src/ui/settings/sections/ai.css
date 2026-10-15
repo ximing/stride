@@ -1,0 +1,209 @@
+/* AI settings section (T7.2). Tokens only (--sd-*), so light/dark both hold. */
+
+.settings-ai {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  max-width: 640px;
+}
+
+.settings-ai-empty {
+  margin: 0;
+  padding: 12px;
+  border: 1px dashed var(--sd-border);
+  border-radius: var(--sd-radius-lg);
+  color: var(--sd-muted);
+  font-size: 13px;
+}
+
+.settings-ai-list {
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-lg);
+  background: var(--sd-bg-elevated);
+  overflow: hidden;
+}
+
+.settings-ai-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 12px;
+  border: none;
+  background: transparent;
+  color: var(--sd-fg);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-ai-row + .settings-ai-row {
+  border-top: 1px solid var(--sd-border);
+}
+
+.settings-ai-row:hover {
+  background: var(--sd-bg);
+}
+
+.settings-ai-row[aria-selected='true'] {
+  background: var(--sd-bg);
+}
+
+.settings-ai-row[aria-selected='true'] .settings-ai-row-name {
+  color: var(--sd-accent);
+}
+
+.settings-ai-row-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.settings-ai-row-provider {
+  color: var(--sd-muted);
+  font-size: 12px;
+}
+
+.settings-ai-row-warning {
+  display: inline-flex;
+  color: var(--sd-danger);
+}
+
+.settings-ai-row-default {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--sd-accent);
+  font-size: 12px;
+}
+
+.settings-ai-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-lg);
+  background: var(--sd-bg-elevated);
+}
+
+.settings-ai-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.settings-ai-field > span:first-child {
+  color: var(--sd-muted);
+  font-size: 12px;
+}
+
+.settings-ai-input {
+  padding: 6px 8px;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+  background: var(--sd-bg);
+  color: var(--sd-fg);
+  font: inherit;
+  font-size: 13px;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.settings-ai-input:focus {
+  outline: none;
+  border-color: var(--sd-accent);
+}
+
+.settings-ai-input[aria-invalid='true'] {
+  border-color: var(--sd-danger);
+}
+
+.settings-ai-meta {
+  color: var(--sd-muted);
+  font-size: 12px;
+}
+
+.settings-ai-error {
+  color: var(--sd-danger);
+  font-size: 12px;
+  margin: 0;
+}
+
+.settings-ai-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.settings-ai-save {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding-top: 4px;
+  border-top: 1px solid var(--sd-border);
+}
+
+.settings-ai-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+  background: var(--sd-bg-elevated);
+  color: var(--sd-fg);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.settings-ai-btn:hover:not(:disabled) {
+  border-color: var(--sd-fg);
+}
+
+.settings-ai-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.settings-ai-btn-primary {
+  background: var(--sd-accent);
+  border-color: var(--sd-accent);
+  color: var(--sd-bg);
+}
+
+.settings-ai-btn-primary:hover:not(:disabled) {
+  border-color: var(--sd-accent);
+  filter: brightness(1.08);
+}
+
+.settings-ai-test-ok {
+  margin: 0;
+  color: var(--sd-accent);
+  font-size: 12px;
+}
+
+.settings-ai-test-err {
+  margin: 0;
+  color: var(--sd-danger);
+  font-size: 12px;
+}
+
+.settings-ai-spin {
+  display: inline-flex;
+  animation: settings-ai-rotate 0.8s linear infinite;
+}
+
+@keyframes settings-ai-rotate {
+  to {
+    transform: rotate(360deg);
+  }
+}
