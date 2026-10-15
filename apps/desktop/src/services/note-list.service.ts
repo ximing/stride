@@ -84,6 +84,17 @@ export class NoteListService extends Service {
     this.vault?.select(id)
   }
 
+  /**
+   * Right-click selection: menus act on the selection, so a right-clicked row
+   * that is not selected becomes the whole selection (without opening the
+   * note). Already-selected rows keep the selection untouched.
+   */
+  selectForMenu(id: string) {
+    if (this.isSelected(id)) return
+    this.selectedIds = [id]
+    this.anchorId = id
+  }
+
   clearSelection() {
     if (this.selectedIds.length === 0 && this.anchorId === '') return
     this.selectedIds = []

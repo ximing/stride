@@ -44,6 +44,22 @@ export function resolveWikilinkClick(notes: readonly WikilinkSourceNote[], targe
   return { type: 'create', title: target }
 }
 
+/**
+ * Wikilink node at a document position (direct hit or the node ending at pos),
+ * mirroring the click plugin's hit test. Used by the editor context menu.
+ */
+export function wikilinkAt(editor: Editor, pos: number): { target: string; alias: string } | null {
+  const { doc } = editor.state
+  const direct = doc.nodeAt(pos)
+  const before = pos > 0 ? doc.nodeAt(pos - 1) : null
+  const node = direct?.type.name === 'wikilink' ? direct : before?.type.name === 'wikilink' ? before : null
+  if (!node) return null
+  const target = typeof node.attrs.target === 'string' ? node.attrs.target.trim() : ''
+  if (!target) return null
+  const alias = typeof node.attrs.alias === 'string' ? node.attrs.alias : ''
+  return { target, alias }
+}
+
 export function runWikilinkCommand(editor: Editor, range: Range, target: string): boolean {
   const title = target.trim()
   if (!title) return false

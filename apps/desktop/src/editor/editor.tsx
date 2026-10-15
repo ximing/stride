@@ -6,6 +6,7 @@ import { observer, useService } from '@rabjs/react'
 import { TabsService } from '../services/tabs.service'
 import { VaultService } from '../services/vault.service'
 import { createEditorExtensions } from './extensions'
+import { useEditorContextMenu } from './editor-context-menu'
 import { plainTextSelection } from './search-jump'
 import { EditorFind } from './find-bar'
 import { EditorToolbar } from './toolbar'
@@ -82,13 +83,22 @@ export const NoteEditor = observer(function NoteEditor() {
     return () => window.removeEventListener('stride-search-jump', onJump)
   }, [editor, vault])
 
+  const editorMenu = useEditorContextMenu({
+    editor,
+    notes,
+    openLinkRef,
+    onOpen: (target) => onOpenRef.current(target),
+    openInNewTab: (id) => tabs.openNote(id),
+  })
+
   if (!note || !editor) return null
 
   return (
-    <div data-testid="editor" className="editor">
+    <div data-testid="editor" className="editor" onContextMenu={editorMenu.onContextMenu}>
       <EditorFind editor={editor} />
       <EditorToolbar editor={editor} openLinkRef={openLinkRef} />
       <EditorContent editor={editor} />
+      {editorMenu.menuElement}
     </div>
   )
 })
