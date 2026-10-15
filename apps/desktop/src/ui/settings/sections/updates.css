@@ -1,0 +1,136 @@
+/* Updates settings section (T7.2). Scoped under .supd so parallel section
+   styles cannot collide. Colors come from tokens.css (--sd-*). */
+
+.supd {
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.supd-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.supd-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.supd-radios {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.supd-radio {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.supd-radio input {
+  accent-color: var(--sd-accent);
+  margin: 2px 0 0;
+}
+
+.supd-radio > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.supd-radio-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.supd-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.supd-check input {
+  accent-color: var(--sd-accent);
+  width: 14px;
+  height: 14px;
+  margin: 0;
+}
+
+.supd-input {
+  width: 320px;
+  max-width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+  background: var(--sd-bg-elevated);
+  color: var(--sd-fg);
+  font: inherit;
+  font-size: 13px;
+}
+
+.supd-input:focus {
+  outline: none;
+  border-color: var(--sd-accent);
+}
+
+.supd-input[aria-invalid='true'] {
+  border-color: var(--sd-danger);
+}
+
+.supd-hint {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--sd-muted);
+}
+
+.supd-error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--sd-danger);
+}
+
+.supd-note {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+  background: var(--sd-bg-elevated);
+  font-size: 12px;
+  color: var(--sd-muted);
+}
+
+.supd-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.supd-save {
+  padding: 6px 14px;
+  border: 1px solid var(--sd-accent);
+  border-radius: var(--sd-radius);
+  background: var(--sd-accent);
+  color: var(--sd-bg);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.supd-save:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.supd-status {
+  margin: 0;
+  font-size: 12px;
+  color: var(--sd-muted);
+}

@@ -1,0 +1,96 @@
+/* Git settings section (T7.2). Scoped under .sgit so parallel section styles
+   cannot collide. Colors come from tokens.css (--sd-*). */
+
+.sgit {
+  max-width: 560px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.sgit-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.sgit-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sgit-input {
+  width: 160px;
+  padding: 6px 8px;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+  background: var(--sd-bg-elevated);
+  color: var(--sd-fg);
+  font: inherit;
+  font-size: 13px;
+}
+
+.sgit-input:focus {
+  outline: none;
+  border-color: var(--sd-accent);
+}
+
+.sgit-input[aria-invalid='true'] {
+  border-color: var(--sd-danger);
+}
+
+.sgit-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.sgit-check input {
+  accent-color: var(--sd-accent);
+  width: 14px;
+  height: 14px;
+  margin: 0;
+}
+
+.sgit-hint {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--sd-muted);
+}
+
+.sgit-error {
+  margin: 0;
+  font-size: 12px;
+  color: var(--sd-danger);
+}
+
+.sgit-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.sgit-save {
+  padding: 6px 14px;
+  border: 1px solid var(--sd-accent);
+  border-radius: var(--sd-radius);
+  background: var(--sd-accent);
+  color: var(--sd-bg);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.sgit-save:hover:not(:disabled) {
+  filter: brightness(1.08);
+}
+
+.sgit-status {
+  margin: 0;
+  font-size: 12px;
+  color: var(--sd-muted);
+}
