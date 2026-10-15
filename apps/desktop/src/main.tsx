@@ -12,9 +12,17 @@ import { NoteListService } from './services/note-list.service'
 import { QuickOpenService } from './services/quick-open.service'
 import { SearchPanelService } from './services/search-panel.service'
 import { TabsService } from './services/tabs.service'
+import { applyStoredTheme } from './services/theme'
+import { ThemeService } from './services/theme.service'
 import { VaultService } from './services/vault.service'
 import { ViewsService } from './services/views.service'
+import './ui/tokens.css'
 import './styles.css'
+
+// Apply the persisted theme synchronously, before the first paint, so the app
+// never flashes the wrong palette (system removes the attribute; light/dark
+// set an explicit override on <html>).
+applyStoredTheme()
 
 const componentsPath = window.location.pathname
 const showComponents = componentsPath === '/dev/components' || componentsPath.startsWith('/dev/components/')
@@ -43,6 +51,7 @@ if (showComponents) {
   register(SettingsService)
   register(ChatService)
   register(UpdateService)
+  register(ThemeService)
 
   void resolve(VaultService).restoreOpened()
   void resolve(SettingsService).load()

@@ -169,6 +169,28 @@ describe('GitPanelView', () => {
     expect(diff?.textContent).toBe('diff --git a/notes/b.stride.json')
   })
 
+  it('colors diff add/del/hunk lines while preserving the text verbatim', async () => {
+    const text = [
+      'diff --git a/notes/a.md b/notes/a.md',
+      '--- a/notes/a.md',
+      '+++ b/notes/a.md',
+      '@@ -1,2 +1,2 @@',
+      '-old line',
+      '+new line',
+      ' context',
+    ].join('\n')
+    await render(<Harness changes={changes} diff={text} />)
+    const diff = host?.querySelector('[data-testid="git-diff"]')
+    expect(diff?.textContent).toBe(text)
+    expect(diff?.querySelector('.diff-del')?.textContent).toBe('\n-old line')
+    expect(diff?.querySelector('.diff-add')?.textContent).toBe('\n+new line')
+    expect(diff?.querySelector('.diff-hunk')?.textContent).toBe('\n@@ -1,2 +1,2 @@')
+    // Header lines that merely start with +/- stay neutral.
+    const neutral = [...(diff?.querySelectorAll('.diff-line') ?? [])]
+    expect(neutral.find((line) => line.textContent?.includes('--- a/notes'))?.className).toBe('diff-line')
+    expect(neutral.find((line) => line.textContent?.includes('+++ b/notes'))?.className).toBe('diff-line')
+  })
+
   it('suggests a message and disables suggest while suggesting', async () => {
     let suggestions = 0
     await render(
