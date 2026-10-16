@@ -56,6 +56,12 @@
       "keywords": ["commands", "命令", "面板"]
     },
     {
+      "id": "app.checkForUpdates",
+      "title": "Check for Updates",
+      "section": "App",
+      "keywords": ["update", "upgrade", "version", "更新", "升级", "检查"]
+    },
+    {
       "id": "edit.find",
       "title": "Find in Note",
       "shortcut": "Mod+F",

@@ -10,6 +10,7 @@
     "dialog:allow-open",
     "keyring:allow-get-password",
     "keyring:allow-set-password",
+    "shell:allow-open",
     {
       "identifier": "shell:allow-execute",
       "allow": [

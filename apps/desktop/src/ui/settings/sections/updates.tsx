@@ -1,8 +1,9 @@
-// Updates settings section (T7.2, FEATURES 9.7). Stores the update channel,
-// the automatic-check switch, and the releases URL through the existing
-// SettingsService form + save() round-trip. The updater itself
-// (tauri-plugin-updater + static latest.json, AD-2) ships in Phase 8 — this
-// section only persists preferences, so edits stay in local drafts until Save.
+// Updates settings section (T7.2, FEATURES 9.7; wired to the real updater in
+// T8.3). Stores the update channel, the automatic-check switch, and the
+// releases URL through the existing SettingsService form + save() round-trip.
+// UpdateService reads the saved form at check time, so channel/URL changes
+// apply to the very next check and the autoCheck switch gates the launch
+// timer as soon as it is saved.
 
 import { observer, useService } from '@rabjs/react'
 import { useState } from 'react'
@@ -10,8 +11,8 @@ import type { UpdateChannel } from '@stride/core'
 import { SettingsService } from '../../../services/panels.service'
 import './updates.css'
 
-// Empty means the built-in default endpoint. Anything else must be a real
-// http(s) URL the updater can poll later.
+// Empty means the channel default feed. Anything else must be a real http(s)
+// URL: either a tauri static latest.json or a GitHub release API URL.
 function validateReleasesUrl(text: string): string {
   const trimmed = text.trim()
   if (trimmed === '') return ''
@@ -101,7 +102,10 @@ export const UpdatesSection = observer(function UpdatesSection() {
           />
           <span className="supd-check-label">Check for updates automatically</span>
         </label>
-        <p className="supd-hint">When on, Stride checks the selected channel at launch.</p>
+        <p className="supd-hint">
+          When on, Stride silently checks the selected channel a few seconds after launch. Applies the moment you
+          save; the next launch obeys the saved value.
+        </p>
       </div>
       <div className="supd-field">
         <label className="supd-label" htmlFor="settings-updates-releases-url-input">
@@ -112,7 +116,7 @@ export const UpdatesSection = observer(function UpdatesSection() {
           className="supd-input"
           type="text"
           autoComplete="off"
-          placeholder="https://github.com/owner/repo/releases"
+          placeholder="https://api.github.com/repos/owner/repo/releases/tags/latest"
           data-testid="settings-updates-releases-url"
           value={releasesUrl}
           aria-invalid={urlError ? true : undefined}
@@ -127,12 +131,16 @@ export const UpdatesSection = observer(function UpdatesSection() {
             {urlError}
           </p>
         ) : (
-          <p className="supd-hint">Where release metadata is fetched from. Leave empty to use the built-in default.</p>
+          <p className="supd-hint">
+            Custom endpoint override (a latest.json or GitHub release API URL). Takes priority over the channel;
+            leave empty to use the channel feed.
+          </p>
         )}
       </div>
       <p className="supd-note" data-testid="settings-updates-note">
-        The updater itself ships in a later release (tauri-plugin-updater with a static latest.json). Until then this
-        section only stores your preferences.
+        Stable polls the built-in release feed with in-app download and install. Beta polls the beta-latest release
+        tag, and a custom URL overrides both; those checks compare versions in-app and hand the download to your
+        browser. Saved changes apply to the next update check.
       </p>
       <div className="supd-actions">
         <button type="button" className="supd-save" data-testid="settings-updates-save" onClick={() => void save()}>

@@ -41,6 +41,7 @@ import {
   type GitSurface,
   type LlmConfig,
   type PublicLlmConfig,
+  type UpdateChannel,
 } from '@stride/core'
 import { appendAssistantDelta, appendToolEnd, appendToolStart, playChatTurn, type ChatSession } from './chat-turn'
 import { chatSystemPrompt, chatVaultHost } from './chat-vault-host'
@@ -1577,8 +1578,20 @@ export interface UpdaterUpdateInfo {
   install(): Promise<void>
 }
 
+// What a single check should poll (T8.3). `endpoint` (the Releases URL
+// setting) overrides everything; otherwise the channel picks the feed.
+export interface UpdateQuery {
+  channel: UpdateChannel
+  endpoint: string
+}
+
+export interface UpdateCheckOptions {
+  /** Manual checks re-offer a version the user dismissed from the banner. */
+  ignoreDismissed?: boolean
+}
+
 export interface UpdaterDriver {
-  check(): Promise<UpdaterUpdateInfo | null>
+  check(query?: UpdateQuery): Promise<UpdaterUpdateInfo | null>
   relaunch(): Promise<void>
 }
 
@@ -1590,6 +1603,105 @@ export function setUpdaterDriverForTests(driver: UpdaterDriver | null) {
 
 const DISMISSED_UPDATE_KEY = 'stride.update.dismissed'
 
+// Channel feeds (T8.3). The stable feed lives in tauri.conf.json
+// (`plugins.updater.endpoints`) and is served by the plugin itself — full
+// signature-verified download + install. The plugin's check() takes no
+// endpoint override, so every non-stable query uses a fetch-based fallback:
+// poll the channel manifest, compare versions in JS.
+//
+// The beta feed is the GitHub *API* URL of the fixed `beta-latest` release
+// tag (the T8.4 pipeline keeps that tag pointing at the newest beta), NOT a
+// latest.json under releases/download/: api.github.com answers with
+// `Access-Control-Allow-Origin: *` so the Tauri webview may fetch it
+// directly (release asset download URLs carry no CORS headers and would be
+// blocked by WKWebView), and one request already returns
+// tag_name/body/published_at/html_url.
+export const BETA_UPDATE_ENDPOINT = 'https://api.github.com/repos/ximing/stride/releases/tags/beta-latest'
+
+// Normalized result of a fallback manifest poll.
+export interface StaticUpdateOffer {
+  version: string
+  currentVersion: string
+  body: string
+  date: string
+  pageUrl: string
+}
+
+// Accepts both the tauri static latest.json shape ({version, notes,
+// pub_date, platforms}) and the GitHub release API shape ({tag_name, body,
+// published_at, html_url}). Returns null when the payload is malformed or
+// does not offer a version newer than `currentVersion` (never downgrades).
+export function parseStaticUpdateManifest(data: unknown, currentVersion: string): StaticUpdateOffer | null {
+  if (!data || typeof data !== 'object') return null
+  const record = data as Record<string, unknown>
+  let version = ''
+  let body = ''
+  let date = ''
+  let pageUrl = ''
+  if (typeof record.tag_name === 'string') {
+    version = record.tag_name
+    body = typeof record.body === 'string' ? record.body : ''
+    date = typeof record.published_at === 'string' ? record.published_at : ''
+    pageUrl = typeof record.html_url === 'string' ? record.html_url : ''
+  } else if (typeof record.version === 'string') {
+    version = record.version
+    body = typeof record.notes === 'string' ? record.notes : typeof record.body === 'string' ? record.body : ''
+    date = typeof record.pub_date === 'string' ? record.pub_date : typeof record.date === 'string' ? record.date : ''
+  } else {
+    return null
+  }
+  if (compareVersions(version, currentVersion) <= 0) return null
+  return { version: version.replace(/^v/, ''), currentVersion, body, date, pageUrl }
+}
+
+// Fallback offer from a runtime-chosen endpoint (beta channel or custom
+// Releases URL). The plugin cannot download from an endpoint it did not
+// poll, so the in-app download hands off to the system browser: download()
+// opens the release page and then throws, which UpdateService treats as a
+// silent failure and returns to idle.
+class StaticUpdateInfo implements UpdaterUpdateInfo {
+  constructor(private readonly offer: StaticUpdateOffer) {}
+
+  get version() {
+    return this.offer.version
+  }
+  get currentVersion() {
+    return this.offer.currentVersion
+  }
+  get body() {
+    return this.offer.body || undefined
+  }
+  get date() {
+    return this.offer.date || undefined
+  }
+
+  async download(): Promise<void> {
+    if (this.offer.pageUrl) {
+      try {
+        const { invoke } = await import('@tauri-apps/api/core')
+        await invoke('plugin:shell|open', { path: this.offer.pageUrl })
+      } catch {
+        // Opening the browser is best-effort (needs the shell:allow-open capability).
+      }
+    }
+    throw new Error('manual download required')
+  }
+
+  async install(): Promise<void> {
+    throw new Error('manual install required')
+  }
+}
+
+async function checkStaticEndpoint(url: string): Promise<UpdaterUpdateInfo | null> {
+  const { getVersion } = await import('@tauri-apps/api/app')
+  const currentVersion = await getVersion()
+  const response = await fetch(url, { headers: { Accept: 'application/vnd.github+json' } })
+  if (!response.ok) return null
+  const data: unknown = await response.json()
+  const offer = parseStaticUpdateManifest(data, currentVersion)
+  return offer ? new StaticUpdateInfo(offer) : null
+}
+
 async function loadUpdaterDriver(): Promise<UpdaterDriver | null> {
   if (updaterDriverForTests) return updaterDriverForTests
   if (!tauriRuntime()) return null
@@ -1598,7 +1710,14 @@ async function loadUpdaterDriver(): Promise<UpdaterDriver | null> {
     import('@tauri-apps/plugin-process'),
   ])
   return {
-    check: () => updater.check(),
+    check: (query) => {
+      const endpoint = query?.endpoint.trim() ?? ''
+      // Custom Releases URL wins; then the beta channel; the default goes
+      // through the plugin's configured (stable) endpoints.
+      if (endpoint) return checkStaticEndpoint(endpoint)
+      if (query?.channel === 'beta') return checkStaticEndpoint(BETA_UPDATE_ENDPOINT)
+      return updater.check()
+    },
     relaunch: () => process.relaunch(),
   }
 }
@@ -1644,7 +1763,23 @@ export class UpdateService extends Service {
     return compareVersions(update.version, update.currentVersion) > 0
   }
 
-  async check() {
+  // Whether any updater can run here at all (Tauri runtime or an injected
+  // test driver). UI hides check-for-updates affordances when false.
+  get updaterSupported(): boolean {
+    return updaterDriverForTests !== null || tauriRuntime()
+  }
+
+  // Read the persisted preference at check time so settings edits apply to
+  // the very next check without restarting anything.
+  private updateQuery(): UpdateQuery {
+    if (has(SettingsService)) {
+      const settings = this.resolve(SettingsService)
+      return { channel: settings.form.updates.channel, endpoint: settings.form.releasesUrl.trim() }
+    }
+    return { channel: 'stable', endpoint: '' }
+  }
+
+  async check(options?: UpdateCheckOptions) {
     if (this.phase === 'checking' || this.phase === 'downloading') return
     const driver = await this.ensureDriver()
     // Outside Tauri (plain browser dev) there is no updater: stay idle.
@@ -1653,7 +1788,7 @@ export class UpdateService extends Service {
     this.error = ''
     let update: UpdaterUpdateInfo | null
     try {
-      update = await driver.check()
+      update = await driver.check(this.updateQuery())
     } catch {
       // Network failures are silent: no banner, no error.
       this.phase = 'idle'
@@ -1663,7 +1798,7 @@ export class UpdateService extends Service {
       this.phase = 'idle'
       return
     }
-    if (this.dismissedVersion() === update.version) {
+    if (!options?.ignoreDismissed && this.dismissedVersion() === update.version) {
       this.phase = 'idle'
       return
     }

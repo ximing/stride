@@ -15,6 +15,7 @@ import { SettingsPageService } from './services/settings-page.service'
 import { TabsService } from './services/tabs.service'
 import { applyStoredTheme } from './services/theme'
 import { ThemeService } from './services/theme.service'
+import { scheduleUpdateAutocheck, UpdateCheckService } from './services/update-check'
 import { VaultService } from './services/vault.service'
 import { ViewsService } from './services/views.service'
 import './ui/tokens.css'
@@ -53,10 +54,15 @@ if (showComponents) {
   register(SettingsService)
   register(ChatService)
   register(UpdateService)
+  register(UpdateCheckService)
   register(ThemeService)
 
   void resolve(VaultService).restoreOpened()
   void resolve(SettingsService).load()
+
+  // T8.3: one silent update check a few seconds after launch; the
+  // updates.autoCheck switch is read when the timer fires.
+  scheduleUpdateAutocheck()
 
   if (import.meta.env.DEV) {
     void import('./inspect-client').then((mod) => mod.startInspectClient()).catch(() => undefined)

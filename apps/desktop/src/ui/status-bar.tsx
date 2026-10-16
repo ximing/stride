@@ -1,10 +1,11 @@
-import { GearSix, GitBranch, House, MagnifyingGlass, Sparkle } from '@phosphor-icons/react'
+import { ArrowsClockwise, GearSix, GitBranch, House, MagnifyingGlass, Sparkle } from '@phosphor-icons/react'
 import { observer, useService } from '@rabjs/react'
 import { syncState } from '@stride/core'
 import type { GitSurface, SyncState } from '@stride/core'
 import { LayoutService } from '../services/layout.service'
 import { GitService } from '../services/panels.service'
 import { SettingsPageService } from '../services/settings-page.service'
+import { UpdateCheckService } from '../services/update-check'
 import { VaultService } from '../services/vault.service'
 import { APP_VERSION } from '../version'
 import { Mark } from './icon'
@@ -61,6 +62,7 @@ export const StatusBar = observer(function StatusBar() {
   const git = useService(GitService)
   const layout = useService(LayoutService)
   const settingsPage = useService(SettingsPageService)
+  const updateCheck = useService(UpdateCheckService)
   return (
     <footer className="statusbar" data-testid="statusbar">
       <span className="statusbar-item">
@@ -93,6 +95,24 @@ export const StatusBar = observer(function StatusBar() {
         </span>
       )}
       <span className="statusbar-spacer" />
+      {updateCheck.supported ? (
+        <button
+          type="button"
+          className="statusbar-item statusbar-action"
+          data-testid="statusbar-update-check"
+          disabled={updateCheck.feedback === 'checking'}
+          title="Check for updates"
+          onClick={() => void updateCheck.manualCheck()}
+        >
+          <Mark icon={ArrowsClockwise} size={13} />
+          {updateCheck.feedback === 'checking' ? '检查中…' : '检查更新'}
+        </button>
+      ) : null}
+      {updateCheck.feedbackText ? (
+        <span className="statusbar-item" data-testid="statusbar-update-feedback">
+          {updateCheck.feedbackText}
+        </span>
+      ) : null}
       <button
         type="button"
         className="statusbar-item statusbar-action"

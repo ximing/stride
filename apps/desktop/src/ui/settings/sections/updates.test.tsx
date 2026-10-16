@@ -99,9 +99,11 @@ describe('updates settings section', () => {
     expect(field('settings-updates-releases-url').value).toBe('https://example.com/releases')
   })
 
-  it('explains that the updater itself ships later', async () => {
+  it('explains how each channel reaches the updater', async () => {
     await mount()
-    expect(document.querySelector('[data-testid="settings-updates-note"]')?.textContent).toContain('later release')
+    const note = document.querySelector('[data-testid="settings-updates-note"]')?.textContent ?? ''
+    expect(note).toContain('beta-latest')
+    expect(note).toContain('next update check')
   })
 
   it('rejects a malformed releases URL and blocks saving', async () => {

@@ -13,6 +13,7 @@ import { QuickOpenService } from './quick-open.service'
 import { SearchPanelService } from './search-panel.service'
 import { SettingsPageService } from './settings-page.service'
 import { TabsService } from './tabs.service'
+import { UpdateCheckService } from './update-check'
 import { VaultService } from './vault.service'
 import { ViewsService } from './views.service'
 
@@ -169,6 +170,14 @@ export class CommandService extends Service {
     })
     this.registerHandler('ai.ask', {
       run: () => this.resolve(LayoutService).setRightPanelTab('chat'),
+    })
+    // Same code path as the status-bar "检查更新" button (T8.3). Hidden when
+    // no updater can run here (plain browser dev).
+    this.registerHandler('app.checkForUpdates', {
+      available: () => has(UpdateCheckService) && this.resolve(UpdateCheckService).supported,
+      run: () => {
+        void this.resolve(UpdateCheckService).manualCheck()
+      },
     })
     this.registerHandler('nav.goBack', {
       available: () => has(TabsService),
