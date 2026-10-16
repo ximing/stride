@@ -9,7 +9,9 @@ const appConfig = JSON.parse(
   readFileSync(join(__dirname, '../../src-tauri/tauri.conf.json'), 'utf8'),
 ) as {
   version: string
-  plugins: { updater: { active: boolean; pubkey: string; endpoints: string[] } }
+  plugins: {
+    updater: { active: boolean; pubkey: string; endpoints: string[]; requireSignedVersion: boolean }
+  }
 }
 
 // Simulates the static manifest T8.4 will publish to
@@ -91,13 +93,21 @@ describe('latest.json endpoint simulation', () => {
     expect(updater.endpoints).toEqual([
       'https://github.com/ximing/stride/releases/latest/download/latest.json',
     ])
-    // minisign public key file content: two base64 lines, no private material.
-    const lines = updater.pubkey.split('\n')
+    // The pubkey is a single base64 line wrapping the two-line minisign public
+    // key file — the format both `tauri build`'s signer and the runtime
+    // updater parse (a raw two-line value with embedded newlines is rejected
+    // by both, so this shape is load-bearing).
+    expect(updater.pubkey).not.toContain('\n')
+    const keyFile = Buffer.from(updater.pubkey, 'base64').toString('utf8')
+    const lines = keyFile.trim().split('\n')
     expect(lines).toHaveLength(2)
-    for (const line of lines) {
-      expect(() => atob(line)).not.toThrow()
-    }
-    expect(atob(lines[0]!)).toContain('minisign public key')
+    expect(lines[0]).toContain('minisign public key')
+    // Line 2 decodes to 'Ed' + 8-byte key id + 32-byte Ed25519 public key.
+    const key = Buffer.from(lines[1]!, 'base64')
+    expect(key).toHaveLength(42)
+    expect(key.subarray(0, 2).toString('utf8')).toBe('Ed')
+    // No private material: the secret key never appears in the repo.
+    expect(updater.requireSignedVersion).toBe(true)
   })
 
   it('parses a served latest.json with a fake higher version and offers it', async () => {

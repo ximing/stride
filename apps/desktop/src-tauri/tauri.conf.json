@@ -32,7 +32,8 @@
     },
     "updater": {
       "active": true,
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVEOTJGNkM5MDcyOEFDNkMK\nUldSc3JDZ0h5ZmFTN1QxWWFKMVdzUVBMNkdQTUVJejhtdEhCRlhvc2NuTnNEblQxS0I3aFQ3TEgK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVEOTJGNkM5MDcyOEFDNkMKUldSc3JDZ0h5ZmFTN1QxWWFKMVdzUVBMNkdQTUVJejhtdEhCRlhvc2NuTnNEblQxS0I3aFQ3TEgK",
+      "requireSignedVersion": true,
       "endpoints": [
         "https://github.com/ximing/stride/releases/latest/download/latest.json"
       ]
@@ -40,6 +41,7 @@
   },
   "bundle": {
     "active": true,
+    "createUpdaterArtifacts": true,
     "targets": ["app"],
     "icon": [
       "icons/32x32.png",

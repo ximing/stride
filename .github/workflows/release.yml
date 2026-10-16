@@ -1,0 +1,134 @@
+# Release pipeline (T8.4): tag push v* -> macOS arm64/x64 builds ->
+# signed updater artifacts -> latest.json -> GitHub Release.
+#
+# Flow: two build jobs produce `Stride_{arch}.app.tar.gz` + `.sig` (minisign,
+# key from repo secrets), the release job assembles the static `latest.json`
+# via scripts/make-latest-json.mjs and attaches everything to the Release for
+# the pushed tag. The app's version is injected from the tag by
+# scripts/set-version.mjs, so the tag is the single source of the version.
+#
+# Security posture: tag-push-only trigger (no PR / fork paths reach the
+# secrets), top-level `permissions` limited to `contents: write` (creating
+# the Release and uploading assets), signing secrets referenced only as env
+# of the single build step, actions pinned to major versions.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    name: build ${{ matrix.rust-target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest # arm64 runner
+            rust-target: aarch64-apple-darwin
+            arch: aarch64
+          - os: macos-15-intel # x64 runner
+            rust-target: x86_64-apple-darwin
+            arch: x64
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: pnpm/action-setup@v4 # reads packageManager from package.json
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust-target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop/src-tauri
+          key: ${{ matrix.rust-target }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Set app version from tag
+        run: node scripts/set-version.mjs "${GITHUB_REF_NAME}"
+
+      - name: Build and sign updater artifacts
+        run: pnpm tauri build --target ${{ matrix.rust-target }}
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+      - name: Verify built version matches tag
+        run: |
+          APP="apps/desktop/src-tauri/target/${{ matrix.rust-target }}/release/bundle/macos/Stride.app"
+          BUILT="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")"
+          WANT="${GITHUB_REF_NAME#v}"
+          if [ "$BUILT" != "$WANT" ]; then
+            echo "built app version $BUILT does not match tag $WANT" >&2
+            exit 1
+          fi
+          echo "built app version: $BUILT"
+
+      - name: Stage per-arch artifacts
+        run: |
+          SRC="apps/desktop/src-tauri/target/${{ matrix.rust-target }}/release/bundle/macos"
+          mkdir dist-release
+          cp "$SRC/Stride.app.tar.gz" "dist-release/Stride_${{ matrix.arch }}.app.tar.gz"
+          cp "$SRC/Stride.app.tar.gz.sig" "dist-release/Stride_${{ matrix.arch }}.app.tar.gz.sig"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: updater-macos-${{ matrix.arch }}
+          path: dist-release/
+          if-no-files-found: error
+
+  release:
+    name: publish latest.json + release assets
+    needs: build-macos
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: updater-macos-*
+          path: dist-release
+          merge-multiple: true
+
+      - name: Generate latest.json
+        run: |
+          # Annotated-tag body becomes the release notes shown in the in-app
+          # update banner (empty for lightweight tags).
+          NOTES="$(git tag -l --format='%(contents:body)' "${GITHUB_REF_NAME}")"
+          node scripts/make-latest-json.mjs \
+            --artifacts dist-release \
+            --tag "${GITHUB_REF_NAME}" \
+            --repo "${GITHUB_REPOSITORY}" \
+            --notes "${NOTES}" \
+            --out dist-release/latest.json
+
+      - name: Create release with updater assets
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: |
+            dist-release/latest.json
+            dist-release/Stride_aarch64.app.tar.gz
+            dist-release/Stride_aarch64.app.tar.gz.sig
+            dist-release/Stride_x64.app.tar.gz
+            dist-release/Stride_x64.app.tar.gz.sig
