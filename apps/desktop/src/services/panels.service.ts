@@ -3,6 +3,7 @@ import {
   EmbeddingClient,
   DEDICATED_ERROR,
   catalogDefaultModel,
+  compareVersions,
   currentBranch,
   effectiveBaseUrl,
   gitAddRemote,
@@ -1556,18 +1557,195 @@ export function resetUiHandoff() {
   uiHandoff = exitTauriWindow
 }
 
+// --- tauri-plugin-updater integration (T8.1) --------------------------------
+
+export type UpdatePhase = 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'error'
+
+export type UpdaterDownloadEvent =
+  | { event: 'Started'; data: { contentLength?: number } }
+  | { event: 'Progress'; data: { chunkLength: number } }
+  | { event: 'Finished' }
+
+// Structural match of the `Update` object returned by
+// `@tauri-apps/plugin-updater`'s check().
+export interface UpdaterUpdateInfo {
+  version: string
+  currentVersion: string
+  body?: string
+  date?: string
+  download(onEvent?: (event: UpdaterDownloadEvent) => void): Promise<void>
+  install(): Promise<void>
+}
+
+export interface UpdaterDriver {
+  check(): Promise<UpdaterUpdateInfo | null>
+  relaunch(): Promise<void>
+}
+
+let updaterDriverForTests: UpdaterDriver | null = null
+
+export function setUpdaterDriverForTests(driver: UpdaterDriver | null) {
+  updaterDriverForTests = driver
+}
+
+const DISMISSED_UPDATE_KEY = 'stride.update.dismissed'
+
+async function loadUpdaterDriver(): Promise<UpdaterDriver | null> {
+  if (updaterDriverForTests) return updaterDriverForTests
+  if (!tauriRuntime()) return null
+  const [updater, process] = await Promise.all([
+    import('@tauri-apps/plugin-updater'),
+    import('@tauri-apps/plugin-process'),
+  ])
+  return {
+    check: () => updater.check(),
+    relaunch: () => process.relaunch(),
+  }
+}
+
 export class UpdateService extends Service {
-  phase: 'idle' | 'available' | 'downloading' | 'ready' = 'idle'
+  phase: UpdatePhase = 'idle'
   progress = 0
   version = ''
   current = ''
   error = ''
+  body = ''
+  date = ''
 
-  async check() {}
+  private pending: UpdaterUpdateInfo | null = null
+  private expectedVersion = ''
+  private driver: UpdaterDriver | null = null
 
-  async download() {}
+  private async ensureDriver(): Promise<UpdaterDriver | null> {
+    if (this.driver) return this.driver
+    const driver = await loadUpdaterDriver()
+    if (driver) this.driver = driver
+    return driver
+  }
 
-  async dismiss() {}
+  private dismissedVersion(): string {
+    try {
+      return globalThis.localStorage?.getItem(DISMISSED_UPDATE_KEY) ?? ''
+    } catch {
+      return ''
+    }
+  }
 
-  async confirm() {}
+  private rememberDismissed(version: string) {
+    try {
+      globalThis.localStorage?.setItem(DISMISSED_UPDATE_KEY, version)
+    } catch {
+      // Storage is best-effort; a forgotten dismissal only means the banner returns.
+    }
+  }
+
+  // The version offered must be newer than the running build: never downgrade.
+  private offersUpgrade(update: UpdaterUpdateInfo): boolean {
+    return compareVersions(update.version, update.currentVersion) > 0
+  }
+
+  async check() {
+    if (this.phase === 'checking' || this.phase === 'downloading') return
+    const driver = await this.ensureDriver()
+    // Outside Tauri (plain browser dev) there is no updater: stay idle.
+    if (!driver) return
+    this.phase = 'checking'
+    this.error = ''
+    let update: UpdaterUpdateInfo | null
+    try {
+      update = await driver.check()
+    } catch {
+      // Network failures are silent: no banner, no error.
+      this.phase = 'idle'
+      return
+    }
+    if (!update || !this.offersUpgrade(update)) {
+      this.phase = 'idle'
+      return
+    }
+    if (this.dismissedVersion() === update.version) {
+      this.phase = 'idle'
+      return
+    }
+    this.pending = update
+    this.expectedVersion = update.version
+    this.version = update.version
+    this.current = update.currentVersion
+    this.body = update.body ?? ''
+    this.date = update.date ?? ''
+    this.progress = 0
+    this.phase = 'available'
+  }
+
+  async download() {
+    if (this.phase !== 'available' || !this.pending) return
+    const update = this.pending
+    this.phase = 'downloading'
+    this.progress = 0
+    this.error = ''
+    let total = 0
+    let received = 0
+    try {
+      await update.download((event) => {
+        if (event.event === 'Started') {
+          total = event.data.contentLength ?? 0
+        } else if (event.event === 'Progress') {
+          received += event.data.chunkLength
+          this.progress = total > 0 ? Math.min(received / total, 1) : 0
+        } else if (event.event === 'Finished') {
+          this.progress = 1
+        }
+      })
+    } catch {
+      // Download failures are silent; a later check re-offers the update.
+      this.pending = null
+      this.progress = 0
+      this.phase = 'idle'
+      return
+    }
+    // Second-pass verification: what we downloaded must still be the version
+    // we announced, and still newer than the running build.
+    if (update.version !== this.expectedVersion || compareVersions(update.version, this.current) <= 0) {
+      this.pending = null
+      this.error = 'Update verification failed'
+      this.phase = 'error'
+      return
+    }
+    this.progress = 1
+    this.phase = 'ready'
+  }
+
+  async dismiss() {
+    if (this.version) this.rememberDismissed(this.version)
+    this.pending = null
+    this.expectedVersion = ''
+    this.version = ''
+    this.body = ''
+    this.date = ''
+    this.progress = 0
+    this.error = ''
+    this.phase = 'idle'
+  }
+
+  async confirm() {
+    if (this.phase !== 'ready' || !this.pending) return
+    const update = this.pending
+    // Final verification before touching the install: refuse downgrades and
+    // any drift from the version the user accepted.
+    if (update.version !== this.expectedVersion || compareVersions(update.version, this.current) <= 0) {
+      this.pending = null
+      this.error = 'Update verification failed'
+      this.phase = 'error'
+      return
+    }
+    const driver = await this.ensureDriver()
+    if (!driver) return
+    try {
+      await update.install()
+      await driver.relaunch()
+    } catch (error) {
+      this.error = errorText(error)
+      this.phase = 'error'
+    }
+  }
 }

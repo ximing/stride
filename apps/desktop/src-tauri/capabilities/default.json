@@ -6,6 +6,7 @@
   "permissions": [
     "core:default",
     "process:default",
+    "updater:default",
     "dialog:allow-open",
     "keyring:allow-get-password",
     "keyring:allow-set-password",

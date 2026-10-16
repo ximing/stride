@@ -17,6 +17,12 @@ tauri-plugin-keyring = "0.1.0"
 tauri-plugin-process = "2"
 tauri-plugin-shell = "2"
 
+# The updater is desktop-only (mobile has its own store-driven update flow).
+[target."cfg(not(any(target_os = \"android\", target_os = \"ios\")))".dependencies]
+# zip/tar support is Windows-only and its crate versions are yanked upstream;
+# macOS updates ship as .app.tar.gz, so the default "zip" feature stays off.
+tauri-plugin-updater = { version = "2.14", default-features = false, features = ["rustls-tls", "system-proxy"] }
+
 [profile.release]
 panic = "abort"
 codegen-units = 1

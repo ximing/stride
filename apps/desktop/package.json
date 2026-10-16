@@ -31,6 +31,7 @@
     "@tauri-apps/api": "^2.8.0",
     "@tauri-apps/plugin-dialog": "^2.3.0",
     "@tauri-apps/plugin-process": "^2.3.0",
+    "@tauri-apps/plugin-updater": "^2.14.0",
     "@tiptap/core": "^3.31.0",
     "@tiptap/extension-code-block-lowlight": "3.31.4",
     "@tiptap/extension-highlight": "3.31.4",

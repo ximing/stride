@@ -29,6 +29,13 @@
     },
     "shell": {
       "open": false
+    },
+    "updater": {
+      "active": true,
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVEOTJGNkM5MDcyOEFDNkMK\nUldSc3JDZ0h5ZmFTN1QxWWFKMVdzUVBMNkdQTUVJejhtdEhCRlhvc2NuTnNEblQxS0I3aFQ3TEgK",
+      "endpoints": [
+        "https://github.com/ximing/stride/releases/latest/download/latest.json"
+      ]
     }
   },
   "bundle": {
