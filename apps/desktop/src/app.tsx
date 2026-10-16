@@ -3,7 +3,7 @@ import { observer, useService } from '@rabjs/react'
 import { useEffect } from 'react'
 import { NoteEditor } from './editor'
 import { LayoutService } from './services/layout.service'
-import { GitService, SettingsService, UpdateService } from './services/panels.service'
+import { GitService, SettingsService } from './services/panels.service'
 import { VaultService } from './services/vault.service'
 import { CommandPalette } from './ui/command-palette'
 import { EmptyState } from './ui/empty-state'
@@ -18,31 +18,12 @@ import { StatusBar } from './ui/status-bar'
 import { TabStrip } from './ui/tab-strip'
 import { TooltipProvider } from './ui/tooltip'
 import { TopBar } from './ui/topbar'
+import { UpdateBanner } from './ui/update-banner'
 
 // Re-exports keep existing test imports (`from '../app'`) stable.
 export { Rail } from './ui/sidebar'
 export { GitStatusBadge } from './ui/status-bar'
-
-export const UpdateBanner = observer(function UpdateBanner() {
-  const updates = useService(UpdateService)
-  if (updates.phase === 'idle' && !updates.error) return null
-  return (
-    <div className="update-banner" data-testid="update-banner">
-      {updates.phase === 'available' && <strong>Update available {updates.version}</strong>}
-      {updates.phase === 'downloading' && <strong>Downloading update</strong>}
-      {updates.phase === 'ready' && <strong>Update ready</strong>}
-      {updates.phase === 'downloading' && (
-        <div className="progress" aria-valuenow={Math.round(updates.progress * 100)}>
-          <span style={{ width: `${Math.round(updates.progress * 100)}%` }} />
-        </div>
-      )}
-      {updates.phase === 'available' && <button type="button" onClick={() => updates.download()}>Download</button>}
-      {updates.phase === 'ready' && <button type="button" onClick={() => updates.confirm()}>Restart</button>}
-      {updates.phase !== 'idle' && <button type="button" onClick={() => updates.dismiss()}>Dismiss</button>}
-      {updates.error && <span className="error">{updates.error}</span>}
-    </div>
-  )
-})
+export { UpdateBanner } from './ui/update-banner'
 
 const Chooser = observer(function Chooser() {
   const vault = useService(VaultService)

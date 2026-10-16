@@ -1,0 +1,123 @@
+/* Update banner (T8.2). Scoped under .ubn so parallel styles cannot collide.
+   Colors come from tokens.css (--sd-*), so light/dark themes just work. The
+   banner sits in the normal layout flow at the top of the shell — it never
+   floats, so it stays below the toast viewport (fixed, z-index 60). */
+
+.ubn {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.65rem;
+  padding: 0.55rem 0.8rem;
+  border-bottom: 1px solid var(--sd-border);
+  background: var(--sd-bg-elevated);
+  font-size: 0.86rem;
+  line-height: 1.4;
+}
+
+.ubn-icon {
+  display: inline-flex;
+  align-items: center;
+  padding-top: 0.1rem;
+  color: var(--sd-accent);
+  flex: none;
+}
+
+.ubn[data-phase='error'] .ubn-icon {
+  color: var(--sd-danger);
+}
+
+.ubn-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.ubn-title {
+  font-weight: 600;
+  color: var(--sd-fg);
+}
+
+.ubn-error {
+  color: var(--sd-danger);
+}
+
+.ubn-meta {
+  font-size: 0.78rem;
+  color: var(--sd-muted);
+}
+
+.ubn-notes {
+  margin-top: 0.2rem;
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+  background: var(--sd-bg);
+  max-height: 9.5rem;
+  overflow-y: auto;
+  font-size: 0.8rem;
+  color: var(--sd-muted);
+}
+
+.ubn-notes p {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.ubn-notes-toggle {
+  padding: 0.15rem 0;
+  border: none;
+  color: var(--sd-accent);
+  font-size: 0.78rem;
+}
+
+.ubn-notes-toggle:hover:not(:disabled) {
+  border: none;
+  text-decoration: underline;
+}
+
+.ubn-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ubn-percent {
+  font-size: 0.78rem;
+  color: var(--sd-muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 2.4rem;
+  text-align: right;
+}
+
+.ubn-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex: none;
+  align-self: center;
+}
+
+.ubn-actions .primary {
+  align-self: auto;
+  white-space: nowrap;
+}
+
+.ubn-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--sd-radius);
+  color: var(--sd-muted);
+}
+
+.ubn-close:hover:not(:disabled) {
+  border-color: var(--sd-border);
+  color: var(--sd-fg);
+}
