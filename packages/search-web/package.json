@@ -13,7 +13,7 @@
   "dependencies": {
     "@stride/platform": "workspace:*",
     "@vane-rs/dict-zh": "2026.8.0",
-    "@vane-rs/web": "file:/Users/ximing/project/mygithub/vane/bindings/web/vane-rs-web-0.4.4.tgz"
+    "@vane-rs/web": "file:./vendor/vane-rs-web-0.4.4.tgz"
   },
   "devDependencies": {
     "typescript": "^5.8.2",
