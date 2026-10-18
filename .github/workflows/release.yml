@@ -101,9 +101,10 @@ jobs:
       - uses: actions/setup-node@v5
         with:
           node-version: 22
-          # No cache settings: this job never installs pnpm (the manifest
-          # script is plain node), and any package-manager cache would try
-          # to resolve pnpm from the lockfile and fail.
+          # This job never installs pnpm (the manifest script is plain node);
+          # setup-node v5 auto-caches the detected package manager and would
+          # fail looking for the pnpm binary the lockfile implies.
+          package-manager-cache: false
 
       - uses: actions/download-artifact@v4
         with:
