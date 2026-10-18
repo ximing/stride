@@ -30,6 +30,11 @@
     "shell": {
       "open": false
     },
+    "deep-link": {
+      "desktop": {
+        "schemes": ["stride"]
+      }
+    },
     "updater": {
       "active": true,
       "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVEOTJGNkM5MDcyOEFDNkMKUldSc3JDZ0h5ZmFTN1QxWWFKMVdzUVBMNkdQTUVJejhtdEhCRlhvc2NuTnNEblQxS0I3aFQ3TEgK",
@@ -42,11 +47,21 @@
   "bundle": {
     "active": true,
     "createUpdaterArtifacts": true,
-    "targets": ["app"],
+    "targets": ["app", "dmg"],
+    "publisher": "Ximing",
+    "category": "public.app-category.productivity",
+    "shortDescription": "Local-first rich-text notes",
+    "longDescription": "Stride is a local-first notes app: a folder of rich-text notes, versioned with git, with search and an AI agent. No account, no server — your notes stay on your machine.",
+    "copyright": "Copyright (c) 2026 Ximing",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
       "icons/icon.png"
-    ]
+    ],
+    "macOS": {
+      "minimumSystemVersion": "10.15"
+    }
   }
 }

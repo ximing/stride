@@ -28,6 +28,7 @@
     "@stride/platform": "workspace:*",
     "@stride/search-web": "workspace:*",
     "@tauri-apps/api": "^2.8.0",
+    "@tauri-apps/plugin-deep-link": "^2.6.2",
     "@tauri-apps/plugin-dialog": "^2.3.0",
     "@tauri-apps/plugin-process": "^2.3.0",
     "@tauri-apps/plugin-updater": "^2.14.0",

@@ -5,6 +5,7 @@ import { App } from './app'
 import { ChatService, GitService, SettingsService, UpdateService } from './services/panels.service'
 import { CommandPaletteService } from './services/command-palette.service'
 import { CommandService } from './services/command.service'
+import { startDeepLinkListener } from './services/deep-link'
 import { FolderService } from './services/folder.service'
 import { LayoutService } from './services/layout.service'
 import { ListFilterService } from './services/list-filter.service'
@@ -63,6 +64,10 @@ if (showComponents) {
   // T8.3: one silent update check a few seconds after launch; the
   // updates.autoCheck switch is read when the timer fires.
   scheduleUpdateAutocheck()
+
+  // T8.6: receive `stride://` deep links (log + DOM event; vault routing is
+  // Phase 9). No-op in a plain browser.
+  startDeepLinkListener()
 
   if (import.meta.env.DEV) {
     void import('./inspect-client').then((mod) => mod.startInspectClient()).catch(() => undefined)
