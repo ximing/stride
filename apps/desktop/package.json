@@ -26,7 +26,6 @@
     "@stride/git-tauri": "workspace:*",
     "@stride/git-web": "workspace:*",
     "@stride/platform": "workspace:*",
-    "@stride/platform-node": "workspace:*",
     "@stride/search-web": "workspace:*",
     "@tauri-apps/api": "^2.8.0",
     "@tauri-apps/plugin-dialog": "^2.3.0",

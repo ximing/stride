@@ -3,8 +3,6 @@ import https from 'node:https'
 import react from '@vitejs/plugin-react'
 import { defineConfig, type Connect, type Plugin } from 'vite'
 
-const apiPort = process.env.STRIDE_API_PORT || '1421'
-
 function llmProxyPlugin(): Plugin {
   const attach = (middlewares: Connect.Server) => {
     middlewares.use('/llm-proxy', (req, res) => {
@@ -62,17 +60,11 @@ export default defineConfig({
     host: '127.0.0.1',
     port: 1420,
     strictPort: true,
-    proxy: {
-      '/api': `http://127.0.0.1:${apiPort}`,
-    },
   },
   preview: {
     host: '127.0.0.1',
     port: 1420,
     strictPort: true,
-    proxy: {
-      '/api': `http://127.0.0.1:${apiPort}`,
-    },
   },
   clearScreen: false,
 })

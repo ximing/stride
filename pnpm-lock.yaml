@@ -49,9 +49,6 @@ importers:
       '@stride/platform':
         specifier: workspace:*
         version: link:../../packages/platform
-      '@stride/platform-node':
-        specifier: workspace:*
-        version: link:../../packages/platform-node
       '@stride/search-web':
         specifier: workspace:*
         version: link:../../packages/search-web
@@ -247,28 +244,6 @@ importers:
 
   packages/platform:
     devDependencies:
-      typescript:
-        specifier: ^5.8.2
-        version: 5.9.3
-      vitest:
-        specifier: ^3.0.5
-        version: 3.2.7(@types/node@22.20.5)(jsdom@26.1.0)(tsx@4.23.15)
-
-  packages/platform-node:
-    dependencies:
-      '@stride/core':
-        specifier: workspace:*
-        version: link:../core
-      '@stride/platform':
-        specifier: workspace:*
-        version: link:../platform
-      '@vane-rs/node':
-        specifier: 0.4.1
-        version: 0.4.1
-    devDependencies:
-      '@types/node':
-        specifier: ^22.13.4
-        version: 22.20.5
       typescript:
         specifier: ^5.8.2
         version: 5.9.3
@@ -1805,30 +1780,6 @@ packages:
 
   '@vane-rs/dict-zh@2026.8.0':
     resolution: {integrity: sha512-H3KALD+Po4EAKSGWK/GvQOWkERy+wag8qtZAQzufO1EfpS30Rn7sM9WgXj7kIcn6kcB435mdzquSstjRjsC89A==}
-
-  '@vane-rs/node-darwin-arm64@0.4.1':
-    resolution: {integrity: sha512-5cAWWA8q5T5AUORf80d5ezCfgqoLCLMDqIS7lcCWGKbEmU42M8zcz2BMoFS7Ckj2eo43aInIr674cmNTH10j4A==}
-    cpu: [arm64]
-    os: [darwin]
-
-  '@vane-rs/node-darwin-x64@0.4.1':
-    resolution: {integrity: sha512-4ogBnJqKON6vLUw8Fp83oJ89jSUnZo4EyQ3TSUqP8uOVZpqSWmqh0T8Kjrg+yh96ezoApu4Df7bvplXVpYZ6YA==}
-    cpu: [x64]
-    os: [darwin]
-
-  '@vane-rs/node-linux-x64-gnu@0.4.1':
-    resolution: {integrity: sha512-TFlRoHWcAoNqhIgvmBrUmvpGU1va7BcgTeq+Pfe6lMi7WKUROqk6Rdbx9wQ1hZOV7txHgXhmaxaKyOGiwZD6og==}
-    cpu: [x64]
-    os: [linux]
-    libc: [glibc]
-
-  '@vane-rs/node-win32-x64-msvc@0.4.1':
-    resolution: {integrity: sha512-fEsDXDTOTAhefHqPrF/M9paYqq7gm9gogStovJodnz+Ac0gA1lANR0DE7a36/tEiXfLaAGebiDiZFsBaqsmfTg==}
-    cpu: [x64]
-    os: [win32]
-
-  '@vane-rs/node@0.4.1':
-    resolution: {integrity: sha512-0rKpNHG1yriaMWy2ge71vKMkiMmkL8jUNNV2c2Fx28qIeRmXd8VgkBINynoUNP7oXiUqLLwMrF3cgvpSvoL7sg==}
 
   '@vane-rs/web@file:../vane/bindings/web/vane-rs-web-0.4.4.tgz':
     resolution: {integrity: sha512-orA4hPC3rX65TNDYDNQQ34TBBqx23WT7FEhJbyfVNhR9KgiDW9T0+GKTk0ECtw7lTP9ammcnFDYPRGyq601b/Q==, tarball: file:../vane/bindings/web/vane-rs-web-0.4.4.tgz}
@@ -4042,25 +3993,6 @@ snapshots:
   '@types/use-sync-external-store@0.0.6': {}
 
   '@vane-rs/dict-zh@2026.8.0': {}
-
-  '@vane-rs/node-darwin-arm64@0.4.1':
-    optional: true
-
-  '@vane-rs/node-darwin-x64@0.4.1':
-    optional: true
-
-  '@vane-rs/node-linux-x64-gnu@0.4.1':
-    optional: true
-
-  '@vane-rs/node-win32-x64-msvc@0.4.1':
-    optional: true
-
-  '@vane-rs/node@0.4.1':
-    optionalDependencies:
-      '@vane-rs/node-darwin-arm64': 0.4.1
-      '@vane-rs/node-darwin-x64': 0.4.1
-      '@vane-rs/node-linux-x64-gnu': 0.4.1
-      '@vane-rs/node-win32-x64-msvc': 0.4.1
 
   '@vane-rs/web@file:../vane/bindings/web/vane-rs-web-0.4.4.tgz':
     optionalDependencies:

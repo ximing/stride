@@ -136,7 +136,7 @@
 | T8.2 ✅ 2026-10-16 | UpdateBanner：release notes + 后台下载进度 + 重启按钮（复用现有 UI 改造） | T8.1 | 全流程演示环境验证 |
 | T8.3 ✅ 2026-10-16 | 启动自动检查 + 手动检查入口 + 通道设置 | T8.1 | 开关生效 |
 | T8.4 ✅ 2026-10-16 | GitHub Actions 发布流水线：macOS arm64/x64 构建、签名、生成 latest.json 发 Release | T8.1 | tag 触发自动发版 |
-| T8.5 | 退役旧 updater（`updater.ts` 进程 handoff 方案）与 Node server | T8.1 | server/ 目录删除，打包自洽 |
+| T8.5 ✅ 2026-10-18 | 退役旧 updater（`updater.ts` 进程 handoff 方案）与 Node server | T8.1 | server/ 目录删除，打包自洽 |
 | T8.6 | 应用图标、bundle 元信息、`stride://` deep link | T8.4 | 安装包完整 |
 
 ## Phase 9 — 打磨
