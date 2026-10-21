@@ -12,8 +12,8 @@
 #   darwin-aarch64  Stride_aarch64.app.tar.gz       (+ .sig)
 #   darwin-x86_64   Stride_x64.app.tar.gz           (+ .sig)
 #   linux-x86_64    Stride_x86_64.AppImage.tar.gz   (+ .sig)
-#   windows-x86_64  Stride_x86_64-setup.nsis.zip    (+ .sig, zip-wrapped NSIS
-#                   installer — unpacked by the updater plugin's `zip` feature)
+#   windows-x86_64  Stride_x86_64-setup.exe         (+ .sig, raw NSIS installer —
+#                   tauri v2 does NOT zip-wrap Windows updater artifacts)
 # make-latest-json.mjs requires all four platforms to be present.
 #
 # Security posture: tag-push-only trigger (no PR / fork paths reach the
@@ -139,10 +139,12 @@ jobs:
         run: |
           BUNDLE="apps/desktop/src-tauri/target/${{ matrix.rust-target }}/release/bundle"
           mkdir dist-release
-          # find (not a fixed dir) because the bundler may emit the zip-wrapped
-          # installer into `nsis/` or `nsis-updater/`
-          cp "$(find "$BUNDLE" -name 'Stride_*-setup.nsis.zip')" "dist-release/Stride_x86_64-setup.nsis.zip"
-          cp "$(find "$BUNDLE" -name 'Stride_*-setup.nsis.zip.sig')" "dist-release/Stride_x86_64-setup.nsis.zip.sig"
+          # find (not a fixed dir) because the bundler may emit the NSIS
+          # installer into `nsis/` or `nsis-updater/`. tauri v2 ships the raw
+          # installer as the updater artifact (no zip wrapper); the plugin
+          # runs it directly.
+          cp "$(find "$BUNDLE" -name 'Stride_*-setup.exe')" "dist-release/Stride_x86_64-setup.exe"
+          cp "$(find "$BUNDLE" -name 'Stride_*-setup.exe.sig')" "dist-release/Stride_x86_64-setup.exe.sig"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -197,5 +199,5 @@ jobs:
             dist-release/Stride_x64.app.tar.gz.sig
             dist-release/Stride_x86_64.AppImage.tar.gz
             dist-release/Stride_x86_64.AppImage.tar.gz.sig
-            dist-release/Stride_x86_64-setup.nsis.zip
-            dist-release/Stride_x86_64-setup.nsis.zip.sig
+            dist-release/Stride_x86_64-setup.exe
+            dist-release/Stride_x86_64-setup.exe.sig

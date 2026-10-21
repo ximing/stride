@@ -9,16 +9,16 @@
 //   Stride_aarch64.app.tar.gz        + .sig   (darwin-aarch64)
 //   Stride_x64.app.tar.gz            + .sig   (darwin-x86_64)
 //   Stride_x86_64.AppImage.tar.gz    + .sig   (linux-x86_64)
-//   Stride_x86_64-setup.nsis.zip     + .sig   (windows-x86_64)
+//   Stride_x86_64-setup.exe          + .sig   (windows-x86_64)
 //
 // (Any filename works as long as it hits one of the MATCHERS rules below and
 // sits next to a `<name>.sig` — tauri's raw output is arch-less and
 // version-stamped, so the pipeline renames it before calling this script.)
 //
-// Windows artifact shape: tauri v2's bundler wraps the NSIS installer in a
-// stored-mode zip (`*-setup.nsis.zip`, see tauri-bundler bundle/updater_bundle.rs)
-// and the plugin unpacks it via its `zip` feature. Linux ships the AppImage as
-// `.AppImage.tar.gz` for the same reason.
+// Windows artifact shape: tauri v2 ships the raw NSIS installer as the
+// updater artifact (no zip wrapper — verified empirically on CI, tauri-cli
+// 2.12: `bundle/nsis/Stride_<ver>_x64-setup.exe` + `.sig`). Linux ships the
+// AppImage as `.AppImage.tar.gz`.
 //
 // All four platforms are REQUIRED: a release ships everywhere or not at all.
 //
@@ -80,7 +80,7 @@ const MATCHERS = [
   },
   {
     platform: 'windows-x86_64',
-    match: (name) => name.endsWith('-setup.nsis.zip') || name.endsWith('.msi.zip') || name.endsWith('.msi') || name.endsWith('-setup.exe'),
+    match: (name) => name.endsWith('-setup.exe') || name.endsWith('.msi'),
   },
 ]
 
@@ -125,7 +125,7 @@ const ARTIFACT_SHAPES = {
   'darwin-aarch64': 'Stride_aarch64.app.tar.gz',
   'darwin-x86_64': 'Stride_x64.app.tar.gz',
   'linux-x86_64': 'Stride_x86_64.AppImage.tar.gz',
-  'windows-x86_64': 'Stride_x86_64-setup.nsis.zip',
+  'windows-x86_64': 'Stride_x86_64-setup.exe',
 }
 
 for (const platform of REQUIRED_PLATFORMS) {
