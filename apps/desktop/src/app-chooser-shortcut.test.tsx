@@ -11,22 +11,18 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it } from 'vitest'
 import { App } from './app'
-import { FolderService } from './services/folder.service'
-import { LayoutService } from './services/layout.service'
-import { ListFilterService } from './services/list-filter.service'
-import { NoteListService } from './services/note-list.service'
-import {
-  ChatService,
-  GitService,
-  resetSecretsStore,
-  setSecretsStore,
-  SettingsService,
-  UpdateService,
-} from './services/panels.service'
-import { SettingsPageService } from './services/settings-page.service'
-import { TabsService } from './services/tabs.service'
-import { VAULT_REGISTRY_KEY, VaultService } from './services/vault.service'
-import { ViewsService } from './services/views.service'
+import { FolderService } from './services/vault/folder.service'
+import { LayoutService } from './services/layout/layout.service'
+import { ListFilterService } from './services/search/list-filter.service'
+import { NoteListService } from './services/notes/note-list.service'
+import { ChatService } from './services/chat/chat.service'
+import { GitService } from './services/git/git.service'
+import { resetSecretsStore, setSecretsStore, SettingsService } from './services/settings/settings.service'
+import { UpdateService } from './services/update/update.service'
+import { SettingsPageService } from './services/settings/settings-page.service'
+import { TabsService } from './services/notes/tabs.service'
+import { VAULT_REGISTRY_KEY, VaultService } from './services/vault/vault.service'
+import { ViewsService } from './services/views/views.service'
 
 describe('settings shortcut from the chooser', () => {
   let host: HTMLDivElement | null = null

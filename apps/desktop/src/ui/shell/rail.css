@@ -1,0 +1,215 @@
+/* ---------- navigation rail ---------- */
+
+.rail-inner {
+  padding: 12px 8px 24px;
+  font-size: 13px;
+}
+
+.rail .rail-new-note.sd-btn {
+  width: 100%;
+  min-height: 36px;
+  height: 36px;
+  justify-content: flex-start;
+  gap: 8px;
+  margin-bottom: 4px;
+  padding: 0 12px;
+  border: 1px solid var(--sd-accent);
+  background: var(--sd-accent);
+  color: var(--sd-bg);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.rail .rail-new-note.sd-btn:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--sd-accent) 88%, var(--sd-fg));
+  background: color-mix(in srgb, var(--sd-accent) 88%, var(--sd-fg));
+  color: var(--sd-bg);
+}
+
+.rail .group-label {
+  margin: 16px 0 4px;
+  padding: 0 8px;
+  color: var(--sd-muted);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.rail .rail-nav-item,
+.rail .view-row button[data-testid="view-link"],
+.rail .type-row button[data-testid="type-link"],
+.rail .folder-tree > button[data-testid="new-folder"],
+.rail .folder-tree button[data-testid="note-link"] {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 32px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--sd-radius);
+  color: var(--sd-fg);
+  font-size: 13px;
+  line-height: 1;
+  text-align: left;
+}
+
+.rail .rail-nav-item:hover:not(:disabled),
+.rail .view-row button[data-testid="view-link"]:hover:not(:disabled),
+.rail .type-row button[data-testid="type-link"]:hover:not(:disabled),
+.rail .folder-tree > button[data-testid="new-folder"]:hover:not(:disabled),
+.rail .folder-tree button[data-testid="note-link"]:hover:not(:disabled) {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--sd-fg) 5%, transparent);
+}
+
+.rail .rail-nav-item.active,
+.rail .view-row button[data-testid="view-link"].active,
+.rail .type-row button[data-testid="type-link"].active,
+.rail .folder-tree button[data-testid="note-link"].active {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--sd-accent) 11%, transparent);
+  color: var(--sd-fg);
+  box-shadow: inset 2px 0 0 var(--sd-accent);
+}
+
+.rail .rail-nav-item.active:hover:not(:disabled),
+.rail .view-row button[data-testid="view-link"].active:hover:not(:disabled),
+.rail .type-row button[data-testid="type-link"].active:hover:not(:disabled),
+.rail .folder-tree button[data-testid="note-link"].active:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sd-accent) 15%, transparent);
+}
+
+.rail-nav-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--sd-muted);
+}
+
+.rail .active .rail-nav-icon,
+.rail .active .type-icon {
+  color: var(--sd-accent);
+}
+
+.rail .rail-quiet-action.sd-btn {
+  width: 100%;
+  min-height: 32px;
+  height: 32px;
+  justify-content: flex-start;
+  gap: 8px;
+  margin-top: 2px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  color: var(--sd-muted);
+  font-size: 13px;
+  font-weight: 400;
+}
+
+.rail .rail-quiet-action.sd-btn:hover:not(:disabled),
+.rail .folder-tree > button[data-testid="new-folder"]:hover:not(:disabled) {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--sd-fg) 5%, transparent);
+  color: var(--sd-fg);
+}
+
+.rail .folder-tree > button[data-testid="new-folder"] {
+  color: var(--sd-muted);
+}
+
+.type-row,
+.view-row {
+  min-height: 32px;
+  gap: 0;
+}
+
+.rail .type-row button[data-testid="type-link"] {
+  flex: 1;
+  gap: 6px;
+  min-width: 0;
+  padding-right: 4px;
+  padding-left: 4px;
+}
+
+.rail .view-row button[data-testid="view-link"] {
+  flex: 1;
+  min-width: 0;
+}
+
+.rail .type-row .type-collapse.sd-icon-button,
+.rail .type-row .type-add.sd-icon-button,
+.rail .view-row .view-edit.sd-icon-button {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  flex: none;
+  padding: 0;
+  border: 1px solid transparent;
+  color: var(--sd-muted);
+}
+
+.rail .type-row .type-collapse.sd-icon-button {
+  order: -1;
+}
+
+.rail .type-row .type-add.sd-icon-button {
+  order: 1;
+}
+
+.rail .type-row .type-collapse.sd-icon-button:hover:not(:disabled),
+.rail .type-row .type-add.sd-icon-button:hover:not(:disabled),
+.rail .view-row .view-edit.sd-icon-button:hover:not(:disabled) {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--sd-fg) 6%, transparent);
+  color: var(--sd-fg);
+}
+
+.rail .type-row .sd-icon-button svg,
+.rail .view-row .sd-icon-button svg {
+  width: 14px;
+  height: 14px;
+}
+
+.type-icon,
+.view-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex: none;
+}
+
+.view-icon {
+  font-size: 14px;
+}
+
+.type-dot {
+  width: 6px;
+  height: 6px;
+}
+
+.advance-inbox {
+  min-height: 32px;
+  gap: 8px;
+  margin: 0;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+.advance-inbox input {
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+.view-row[data-drop-target="true"] {
+  box-shadow: inset 0 2px 0 var(--sd-accent);
+}
+

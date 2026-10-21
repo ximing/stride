@@ -1,0 +1,117 @@
+/* Stride app styles. All colors come from the --sd-* design tokens defined in
+   ui/tokens.css (imported before this file in main.tsx); no hard-coded colors
+   here. Theme switching is attribute-driven on :root (see tokens.css). */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+html {
+  background: var(--sd-bg);
+}
+
+body {
+  min-width: 320px;
+  background: var(--sd-bg);
+  color: var(--sd-fg);
+  font-family: var(--sd-font-sans);
+  font-size: var(--sd-text-md);
+  line-height: 1.45;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Note appearance variables (Settings > Appearance). Defaults match the
+   AppearanceSettings defaults in core; services/appearance/appearance.ts overrides them
+   as inline properties on <html>, so changes apply instantly with no restart. */
+:root {
+  --sd-note-font-size: 15px;
+  --sd-note-max-width: 44rem;
+}
+
+::selection {
+  background: var(--sd-accent-soft);
+  color: var(--sd-fg);
+}
+
+/* Thin, quiet scrollbars everywhere. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--sd-muted) 38%, transparent) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--sd-muted) 32%, transparent);
+  border: 3px solid transparent;
+  background-clip: padding-box;
+  border-radius: var(--sd-radius-pill);
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+button {
+  padding: var(--sd-space-1) var(--sd-space-3);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+  background: transparent;
+  color: inherit;
+  font-size: var(--sd-text-sm);
+  line-height: 1.25;
+  cursor: pointer;
+  transition:
+    background-color var(--sd-motion-hover) var(--sd-ease-standard),
+    border-color var(--sd-motion-hover) var(--sd-ease-standard),
+    color var(--sd-motion-hover) var(--sd-ease-standard);
+}
+
+button:hover:not(:disabled) {
+  border-color: var(--sd-border-strong);
+  background: var(--sd-surface-hover);
+}
+
+button:active:not(:disabled) {
+  background: var(--sd-surface-active);
+}
+
+button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+:focus-visible {
+  outline: 2px solid var(--sd-focus-ring);
+  outline-offset: 2px;
+}
+
+.shell {
+  min-height: 100vh;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--sd-bg);
+  color: var(--sd-fg);
+}
+

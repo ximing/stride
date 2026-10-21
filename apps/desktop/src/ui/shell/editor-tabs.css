@@ -1,0 +1,132 @@
+/* ---------- editor and inspector tabs ---------- */
+
+.tab-strip {
+  align-items: center;
+  gap: 2px;
+  height: 36px;
+  min-height: 36px;
+  padding: 0 8px;
+  background: var(--sd-bg);
+}
+
+.tab {
+  height: 32px;
+  min-width: 96px;
+  max-width: 192px;
+  flex: 0 1 192px;
+  overflow: hidden;
+  border: 1px solid transparent;
+  border-radius: var(--sd-radius) var(--sd-radius) 0 0;
+  color: var(--sd-muted);
+  font-size: 13px;
+}
+
+.tab:hover {
+  background: color-mix(in srgb, var(--sd-fg) 4%, transparent);
+  color: var(--sd-fg);
+}
+
+.tab[aria-selected="true"] {
+  border-color: var(--sd-border);
+  border-bottom-color: var(--sd-bg-elevated);
+  background: var(--sd-bg-elevated);
+  color: var(--sd-fg);
+  box-shadow: inset 0 2px 0 var(--sd-accent);
+}
+
+.tab-main {
+  display: flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 4px 0 10px;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+}
+
+.tab-main:hover:not(:disabled) {
+  border-color: transparent;
+}
+
+.tab-title {
+  font-size: 13px;
+  line-height: 1.2;
+}
+
+.tab-close.sd-icon-button {
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  flex: none;
+  margin-right: 3px;
+  padding: 0;
+  border: 1px solid transparent;
+  color: var(--sd-muted);
+  opacity: 0;
+}
+
+.tab-close.sd-icon-button svg {
+  width: 12px;
+  height: 12px;
+}
+
+.tab:hover .tab-close,
+.tab:focus-within .tab-close,
+.tab[aria-selected="true"] .tab-close,
+.tab-close:focus-visible {
+  opacity: 1;
+}
+
+.tab-close.sd-icon-button:hover:not(:disabled) {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--sd-danger) 10%, transparent);
+  color: var(--sd-danger);
+}
+
+.panel-head {
+  min-height: 44px;
+  gap: 4px;
+  padding: 6px 8px;
+}
+
+.panel-tabs {
+  gap: 2px;
+}
+
+.panel-tab.sd-icon-button {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  color: var(--sd-muted);
+}
+
+.panel-tab.sd-icon-button:hover:not(:disabled) {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--sd-fg) 5%, transparent);
+  color: var(--sd-fg);
+}
+
+.panel-tab.sd-icon-button[aria-selected="true"] {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--sd-accent) 12%, transparent);
+  color: var(--sd-accent);
+  box-shadow: inset 0 -2px 0 var(--sd-accent);
+}
+
+.panel-rail {
+  width: 44px;
+  padding: 8px 0;
+}
+
+.panel-rail .panel-tabs {
+  gap: 4px;
+}
+
+.panel-body {
+  padding: 12px 12px 24px;
+}
+

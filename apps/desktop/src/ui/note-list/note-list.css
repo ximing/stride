@@ -1,0 +1,277 @@
+/* ---------- note list ---------- */
+
+.note-list {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.note-list-head {
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  min-height: 40px;
+  padding: 12px 12px 8px;
+}
+
+.note-list-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  font-size: 16px;
+  font-weight: 500;
+  line-height: 24px;
+  text-overflow: ellipsis;
+}
+
+.note-list-count {
+  flex: none;
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.note-list-sort {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  margin-left: auto;
+  padding: 0;
+}
+
+.list-filter {
+  gap: 4px;
+  min-width: 0;
+  min-height: 32px;
+  margin: 0 12px 8px;
+  padding: 0 2px 0 8px;
+  box-sizing: border-box;
+  background: var(--sd-bg-elevated);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+}
+
+.list-filter:focus-within {
+  border-color: var(--sd-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sd-accent) 18%, transparent);
+}
+
+.list-filter > svg {
+  flex: none;
+}
+
+.list-filter .sd-field {
+  flex: 1 1 auto;
+  gap: 0;
+  width: auto;
+  min-width: 0;
+}
+
+.list-filter .sd-field-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.list-filter .list-filter-input {
+  width: 100%;
+  height: 30px;
+  min-height: 30px;
+  padding: 0;
+  color: var(--sd-fg);
+  font-size: 13px;
+  line-height: 20px;
+  background: transparent;
+  border: 0;
+  box-shadow: none;
+}
+
+.list-filter .list-filter-input:focus,
+.list-filter .list-filter-input:focus-visible {
+  border: 0;
+  outline: none;
+  box-shadow: none;
+}
+
+.list-filter .list-filter-clear {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0;
+  border-color: transparent;
+}
+
+.note-list-batch {
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+  margin: 0 12px 8px;
+  padding: 6px;
+  background: color-mix(in srgb, var(--sd-bg-elevated) 72%, transparent);
+  border: 1px solid var(--sd-border);
+  border-radius: 8px;
+}
+
+.note-list-batch-count {
+  flex: 1 1 72px;
+  min-width: 64px;
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.note-list-batch .sd-btn {
+  flex: none;
+  min-height: 28px;
+  padding: 3px 7px;
+  font-size: 12px;
+}
+
+.note-list-batch .note-list-batch-clear {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+}
+
+.note-list-items {
+  min-width: 0;
+  padding: 4px 8px 16px;
+}
+
+.note-list-item {
+  position: relative;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  height: 66px;
+  margin: 0;
+  padding: 12px 10px;
+  box-sizing: border-box;
+  color: var(--sd-fg);
+  background: transparent;
+  border: 0;
+  border-radius: var(--sd-radius);
+  transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+
+.note-list-item:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sd-fg) 4%, transparent);
+  border-color: transparent;
+}
+
+.note-list-item.is-active {
+  background: color-mix(in srgb, var(--sd-accent) 7%, transparent);
+  border-color: transparent;
+}
+
+.note-list-item.is-selected {
+  background: color-mix(in srgb, var(--sd-accent) 11%, transparent);
+  border-color: transparent;
+  box-shadow: inset 2px 0 0 var(--sd-accent);
+}
+
+.note-list-item.is-selected:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sd-accent) 14%, transparent);
+}
+
+.note-list-item:focus-visible {
+  outline-offset: -2px;
+}
+
+.note-list-item-title {
+  flex: none;
+  min-width: 0;
+  min-height: 20px;
+  color: var(--sd-fg);
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 20px;
+}
+
+.note-list-item.is-active .note-list-item-title,
+.note-list-item.is-selected .note-list-item-title {
+  font-weight: 600;
+}
+
+.note-list-item-meta {
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  height: 18px;
+  min-height: 18px;
+  color: var(--sd-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
+.note-list-item-date {
+  flex: 0 0 62px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.note-chip {
+  flex: 0 1 auto;
+  gap: 4px;
+  min-width: 0;
+  max-width: 88px;
+  height: 18px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  font-size: 12px;
+  line-height: 16px;
+  border: 1px solid color-mix(in srgb, var(--sd-border) 72%, transparent);
+  border-radius: 999px;
+}
+
+.note-chip-status {
+  flex: 0 1 auto;
+  max-width: 72px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.note-chip .type-dot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+}
+
+.note-list-item-snippet {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+/* These two heights include padding and borders. Do not add row margins:
+   virtualWindow() positions every row at exactly 66px or 48px. */
+.note-list.is-compact .note-list-item {
+  gap: 0;
+  height: 48px;
+  padding: 5px 10px;
+}
+
+.note-list .sd-empty-state {
+  min-width: 0;
+  margin: 8px 4px;
+  padding: 16px 8px;
+  overflow-wrap: anywhere;
+}
+
+.menu-check {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+}
+

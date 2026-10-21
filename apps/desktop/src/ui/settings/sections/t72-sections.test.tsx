@@ -8,18 +8,13 @@ import { act, type ReactElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { readNoteFile } from '../../../../../../packages/core/src/vault'
-import { APPEARANCE_STORAGE_KEY } from '../../../services/appearance'
-import { FolderService } from '../../../services/folder.service'
-import {
-  GitService,
-  resetSecretsStore,
-  setSecretsStore,
-  SETTINGS_STORAGE_KEY,
-  SettingsService,
-} from '../../../services/panels.service'
-import { THEME_STORAGE_KEY } from '../../../services/theme'
-import { ThemeService } from '../../../services/theme.service'
-import { VaultService } from '../../../services/vault.service'
+import { APPEARANCE_STORAGE_KEY } from '../../../services/appearance/appearance'
+import { FolderService } from '../../../services/vault/folder.service'
+import { GitService } from '../../../services/git/git.service'
+import { resetSecretsStore, setSecretsStore, SETTINGS_STORAGE_KEY, SettingsService } from '../../../services/settings/settings.service'
+import { THEME_STORAGE_KEY } from '../../../services/appearance/theme'
+import { ThemeService } from '../../../services/appearance/theme.service'
+import { VaultService } from '../../../services/vault/vault.service'
 import { AppearanceSection } from './appearance'
 import { EditorSection } from './editor'
 import { PrivacySection } from './privacy'

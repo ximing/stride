@@ -1,0 +1,146 @@
+/* Input, textarea, select, and checkbox fields */
+.sd-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-1);
+  min-width: 0;
+  color: var(--sd-fg);
+  font-family: var(--sd-font-sans);
+  font-size: var(--sd-text-md);
+}
+
+.sd-field-label {
+  color: var(--sd-muted);
+  font-size: var(--sd-text-xs);
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+.sd-field-input,
+.sd-select-trigger {
+  width: 100%;
+  min-width: 0;
+  min-height: var(--sd-control-md);
+  margin: 0;
+  padding: var(--sd-space-1) var(--sd-space-2);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+  background: var(--sd-surface);
+  color: var(--sd-fg);
+  font-family: var(--sd-font-sans);
+  font-size: var(--sd-text-md);
+  line-height: 1.4;
+  transition:
+    background-color var(--sd-motion-hover) var(--sd-ease-standard),
+    border-color var(--sd-motion-hover) var(--sd-ease-standard),
+    box-shadow var(--sd-motion-hover) var(--sd-ease-standard);
+}
+
+.sd-field-input:hover:not(:disabled),
+.sd-select-trigger:hover:not(:disabled) {
+  border-color: var(--sd-border-strong);
+}
+
+.sd-field-input:focus,
+.sd-select-trigger:focus,
+.sd-select-trigger[data-state="open"] {
+  border-color: var(--sd-accent);
+}
+
+.sd-field-input:focus-visible,
+.sd-select-trigger:focus-visible {
+  outline: 2px solid var(--sd-focus-ring);
+  outline-offset: 2px;
+}
+
+.sd-field-input::placeholder,
+.sd-select-trigger[data-placeholder] {
+  color: var(--sd-muted);
+  opacity: 0.85;
+}
+
+.sd-field-input:disabled,
+.sd-select-trigger:disabled {
+  border-color: var(--sd-border);
+  background: var(--sd-surface-hover);
+  color: var(--sd-muted);
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.sd-field-input-error,
+.sd-field-input-error:focus {
+  border-color: var(--sd-danger);
+}
+
+.sd-field-input-error:focus-visible {
+  outline-color: var(--sd-danger);
+}
+
+.sd-field-textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+.sd-field-hint,
+.sd-field-error {
+  display: block;
+  font-size: var(--sd-text-xs);
+  line-height: 1.35;
+}
+
+.sd-field-hint {
+  color: var(--sd-muted);
+}
+
+.sd-field-error {
+  color: var(--sd-danger);
+}
+
+.sd-checkbox {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: var(--sd-space-2);
+  min-width: 0;
+  color: var(--sd-fg);
+  font-family: var(--sd-font-sans);
+  font-size: var(--sd-text-md);
+  cursor: pointer;
+}
+
+.sd-checkbox-input {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  padding: 0;
+  accent-color: var(--sd-accent);
+  cursor: pointer;
+}
+
+.sd-checkbox-input:focus-visible {
+  outline: 2px solid var(--sd-focus-ring);
+  outline-offset: 2px;
+}
+
+.sd-checkbox-input:disabled {
+  cursor: not-allowed;
+}
+
+.sd-checkbox:has(.sd-checkbox-input:disabled) {
+  color: var(--sd-muted);
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.sd-checkbox-copy {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-1);
+  min-width: 0;
+}
+
+.sd-checkbox-label {
+  line-height: 1.4;
+}
+

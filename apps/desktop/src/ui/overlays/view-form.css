@@ -1,0 +1,68 @@
+/* Saved-view form and action hierarchy. */
+.view-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.view-filters {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.view-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.view-filter-row > .sd-field {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.view-filter-row > .sd-field:has(.view-filter-op) {
+  flex: 0 0 112px;
+}
+
+.view-filter-row .sd-field-input,
+.view-filter-row .view-filter-op {
+  width: 100%;
+  min-width: 0;
+}
+
+.view-filter-remove {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  color: var(--sd-muted);
+}
+
+.view-filter-remove:hover {
+  color: var(--sd-danger);
+}
+
+.view-filter-add {
+  align-self: flex-start;
+}
+
+.view-archived {
+  color: var(--sd-muted);
+  font-size: var(--sd-text-sm);
+}
+
+.view-editor-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 8px;
+  padding-top: 16px;
+  border-top: 1px solid var(--sd-border);
+}
+
+.view-editor-delete {
+  margin-right: auto;
+}
+

@@ -1,0 +1,124 @@
+/* EditorPrompt keeps its original classes while Dialog owns focus and dismissal. */
+.editor-prompt {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: min(400px, calc(100vw - 32px));
+  padding: 20px;
+}
+
+.editor-prompt-title,
+.editor-prompt-copy {
+  margin: 0;
+}
+
+.editor-prompt-title {
+  padding-right: 32px;
+}
+
+.editor-prompt-copy {
+  color: var(--sd-muted);
+  font-size: var(--sd-text-sm);
+}
+
+.editor-prompt-input {
+  width: 100%;
+  min-height: var(--sd-control-md);
+  padding: 4px 8px;
+  color: var(--sd-fg);
+  background: var(--sd-surface);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+}
+
+.editor-prompt-input:focus {
+  border-color: var(--sd-accent);
+}
+
+.editor-prompt-input:focus-visible {
+  outline: 2px solid var(--sd-focus-ring);
+  outline-offset: 2px;
+}
+
+.editor-prompt-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 4px;
+  padding-top: 16px;
+  border-top: 1px solid var(--sd-border);
+}
+
+.editor-prompt-actions .sd-btn {
+  width: auto;
+  min-height: var(--sd-control-md);
+  padding: 6px 12px;
+}
+
+.editor-prompt-extra {
+  margin-right: auto;
+}
+
+@keyframes sd-command-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes sd-command-surface-in {
+  from { opacity: 0; transform: translateY(-8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes sd-menu-in {
+  from { opacity: 0; transform: translateY(-2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes sd-dialog-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes sd-dialog-in {
+  from { opacity: 0; transform: translate(-50%, -48%); }
+  to { opacity: 1; transform: translate(-50%, -50%); }
+}
+
+@media (max-width: 640px) {
+  .sd-command-backdrop {
+    padding: 24px 16px;
+  }
+
+  .sd-command-surface {
+    max-height: calc(100dvh - 48px);
+  }
+
+  .view-filter-row {
+    flex-wrap: wrap;
+  }
+
+  .view-filter-row > .sd-field {
+    flex: 1 1 140px;
+  }
+
+  .view-filter-row > .sd-field:has(.view-filter-op) {
+    flex: 0 1 112px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sd-command-backdrop,
+  .sd-command-surface,
+  .sd-menu,
+  .sd-context-menu,
+  .sd-overlay,
+  .sd-modal {
+    animation: none !important;
+  }
+
+  .sd-command-search,
+  .sd-command-item,
+  .sd-menu-item {
+    transition: none;
+  }
+}

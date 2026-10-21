@@ -1,0 +1,136 @@
+/* ---------- chooser ---------- */
+
+.chooser {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  min-height: 100vh;
+}
+
+.chooser-copy, .chooser-form {
+  padding: 8vh 7vw;
+}
+
+.chooser-copy {
+  background: var(--sd-fg);
+  color: var(--sd-bg);
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.eyebrow {
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  color: color-mix(in srgb, var(--sd-bg) 65%, var(--sd-accent));
+}
+
+.chooser h1, .note-title, .panel h2 {
+  font-family: var(--sd-font-serif);
+  font-weight: 500;
+}
+
+.chooser h1 {
+  font-size: 4.5rem;
+  line-height: 0.9;
+  margin: 0.4rem 0 1rem;
+}
+
+.chooser-form {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.8rem;
+}
+
+.chooser-lead {
+  margin: 0;
+  max-width: 28rem;
+  line-height: 1.5;
+}
+
+.chooser-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.chooser-form label,
+.field > span,
+.panel label:not(.sd-field):not(.sd-checkbox) > span {
+  display: block;
+  margin-bottom: var(--sd-space-1);
+  color: var(--sd-muted);
+  font-size: var(--sd-text-xs);
+  font-weight: 500;
+}
+
+input,
+textarea {
+  width: 100%;
+  padding: var(--sd-space-1) var(--sd-space-2);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+  background: var(--sd-surface);
+  color: var(--sd-fg);
+  transition:
+    background-color var(--sd-motion-hover) var(--sd-ease-standard),
+    border-color var(--sd-motion-hover) var(--sd-ease-standard);
+}
+
+input:hover:not(:disabled),
+textarea:hover:not(:disabled) {
+  border-color: var(--sd-border-strong);
+}
+
+input:focus,
+textarea:focus {
+  border-color: var(--sd-accent);
+  outline: none;
+}
+
+input:focus-visible,
+textarea:focus-visible {
+  outline: 2px solid var(--sd-focus-ring);
+  outline-offset: 2px;
+}
+
+input::placeholder,
+textarea::placeholder {
+  color: var(--sd-muted);
+  opacity: 0.85;
+}
+
+input:disabled,
+textarea:disabled {
+  background: var(--sd-surface-hover);
+  color: var(--sd-muted);
+  cursor: not-allowed;
+}
+
+textarea {
+  min-height: 96px;
+  resize: vertical;
+}
+
+select {
+  font: inherit;
+  color: inherit;
+}
+
+.primary {
+  background: var(--sd-accent);
+  color: var(--sd-bg);
+  border-color: var(--sd-accent);
+  align-self: flex-start;
+}
+
+.primary:hover:not(:disabled) {
+  border-color: var(--sd-accent);
+  filter: brightness(1.08);
+}
+
+.error { color: var(--sd-danger); }
+

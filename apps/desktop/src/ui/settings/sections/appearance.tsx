@@ -18,11 +18,11 @@ import {
   NOTE_WIDTHS,
   writeStoredAppearance,
   type AppearancePrefs,
-} from '../../../services/appearance'
-import { SettingsService } from '../../../services/panels.service'
-import { THEME_MODES, type ThemeMode } from '../../../services/theme'
-import { ThemeService } from '../../../services/theme.service'
-import { Input } from '../../input'
+} from '../../../services/appearance/appearance'
+import { SettingsService } from '../../../services/settings/settings.service'
+import { THEME_MODES, type ThemeMode } from '../../../services/appearance/theme'
+import { ThemeService } from '../../../services/appearance/theme.service'
+import { Input } from '../../primitives/input'
 import { SettingsSegmentedControl } from '../segmented-control'
 import './appearance.css'
 

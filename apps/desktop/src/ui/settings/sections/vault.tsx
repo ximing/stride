@@ -14,9 +14,9 @@ import {
   type GitSetupPreference,
   type ViewMode,
 } from '../../../../../../packages/core/src/vault-config'
-import { VaultService } from '../../../services/vault.service'
-import { Mark } from '../../icon'
-import { Input } from '../../input'
+import { VaultService } from '../../../services/vault/vault.service'
+import { Mark } from '../../primitives/icon'
+import { Input } from '../../primitives/input'
 import { SettingsSegmentedControl } from '../segmented-control'
 import './vault.css'
 

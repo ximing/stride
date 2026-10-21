@@ -1,0 +1,153 @@
+/* ---------- folder tree ---------- */
+
+.folder-tree {
+  min-width: 0;
+  font-size: 13px;
+}
+
+.folder-tree-actions {
+  display: flex;
+  min-width: 0;
+  margin-bottom: 8px;
+}
+
+.folder-tree-actions .sd-btn {
+  width: auto;
+}
+
+.folder-tree .folder-create {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+  min-width: 0;
+  margin: 8px 0;
+  padding: 8px;
+  background: color-mix(in srgb, var(--sd-bg-elevated) 64%, transparent);
+  border: 1px solid var(--sd-border);
+  border-radius: 8px;
+}
+
+.folder-create .sd-field {
+  width: 100%;
+  min-width: 0;
+}
+
+.folder-create .sd-btn {
+  align-self: end;
+  width: auto;
+}
+
+.folder-row {
+  min-width: 0;
+  margin: 2px 0;
+}
+
+.folder-row-main {
+  gap: 4px;
+  min-width: 0;
+  min-height: 32px;
+}
+
+.folder-row-main > .sd-field {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.folder-label {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 6px 4px;
+  line-height: 20px;
+}
+
+.folder-label > svg {
+  flex: none;
+  color: var(--sd-muted);
+}
+
+.folder-label-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-row-actions {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  opacity: 0.65;
+  transition: opacity 120ms ease;
+}
+
+.folder-row:hover .folder-row-actions,
+.folder-row:focus-within .folder-row-actions {
+  opacity: 1;
+}
+
+.folder-children {
+  min-width: 0;
+  margin-left: 12px;
+  padding-left: 4px;
+  border-left: 1px solid color-mix(in srgb, var(--sd-border) 62%, transparent);
+}
+
+.folder-tree .note-link {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-width: 0;
+  min-height: 32px;
+  margin: 1px 0;
+  padding: 6px 8px;
+  overflow: hidden;
+  color: var(--sd-muted);
+  font-size: 13px;
+  line-height: 20px;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--sd-radius);
+}
+
+.folder-tree .note-link > svg {
+  flex: none;
+}
+
+.folder-note-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.folder-tree .note-link:hover:not(:disabled) {
+  color: var(--sd-fg);
+  background: color-mix(in srgb, var(--sd-fg) 4%, transparent);
+  border-color: transparent;
+}
+
+.folder-tree .note-link.is-active {
+  color: var(--sd-fg);
+  background: color-mix(in srgb, var(--sd-accent) 9%, transparent);
+  border-color: transparent;
+  box-shadow: inset 2px 0 0 var(--sd-accent);
+}
+
+.folder-overflow {
+  margin: 4px 8px 8px;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.folder-tree .sd-empty-state {
+  align-items: flex-start;
+  padding: 12px 4px;
+  text-align: left;
+}
+

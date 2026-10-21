@@ -1,0 +1,69 @@
+/* Table menu and color actions. */
+.editor-table-menu {
+  padding: 4px;
+}
+
+.editor-table-menu-sep {
+  margin: 4px 2px;
+  background: var(--sd-border);
+}
+
+.editor-table-menu-item {
+  gap: 12px;
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--sd-radius);
+  background: transparent;
+  color: var(--sd-fg);
+  font-size: 13px;
+}
+
+.editor-table-menu-item:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sd-fg) 6%, transparent);
+}
+
+.editor-table-menu-item.is-on {
+  background: color-mix(in srgb, var(--sd-accent) 13%, transparent);
+  color: var(--sd-accent);
+}
+
+.editor-table-menu-item.is-danger {
+  color: var(--sd-danger);
+}
+
+.editor-table-menu-item.is-danger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sd-danger) 10%, transparent);
+}
+
+.editor-table-menu-item:disabled {
+  opacity: 0.38;
+}
+
+.editor-table-menu-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.editor-table-menu-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+.editor-table-menu-key {
+  color: var(--sd-muted);
+  font-size: 12px;
+}
+
+.editor-table-menu-colors {
+  padding: 4px 6px 2px;
+  color: var(--sd-muted);
+  font-size: 12px;
+}
+

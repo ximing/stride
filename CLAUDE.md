@@ -30,11 +30,15 @@
 
 ## 局部规则与路径规则导航
 
+架构地图（目录和依赖方向）在根 `AGENTS.md`，桌面端细分在 `apps/desktop/AGENTS.md`。
+
 ### 子系统级 `CLAUDE.md`（进入对应目录时按需加载）
 
 - `packages/core/CLAUDE.md`：领域模型、笔记解析、双链图谱、重命名事务、搜索编排、Git 状态机与 Agent 工具集约束
-- `packages/platform/CLAUDE.md`：平台端口契约与測試替身说明（同时指导 `packages/fs-*`、`git-*`、`search-web`、`secrets-*` 适配器边界）
+- `packages/platform/CLAUDE.md`：平台端口契约与测试替身说明（同时指导 `packages/fs-*`、`git-*`、`search-web`、`secrets-*` 适配器边界）
 - `apps/desktop/CLAUDE.md`：桌面/浏览器前端宿主架构、四栏布局、`@rabjs/react` Service 装配与调试通道
+- `apps/desktop/src/services/CLAUDE.md`：Service 按业务域放置，以及和 UI、编辑器的依赖边界
+- `apps/desktop/src/ui/CLAUDE.md`：原语、壳层、业务面板的放置边界和样式入口
 - `apps/desktop/src/editor/CLAUDE.md`：TipTap 3 编辑器扩展、自定义节点序列化往返约束与编辑器内交互规范
 
 ### 横切路径规则 `.claude/rules/*.md`（按文件 glob 命中加载）

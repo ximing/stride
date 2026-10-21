@@ -3,7 +3,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it } from 'vitest'
 import { GitStatusBadge } from './app'
-import { GitService } from './services/panels.service'
+import { GitService } from './services/git/git.service'
 
 describe('git status badge', () => {
   let root: Root | undefined

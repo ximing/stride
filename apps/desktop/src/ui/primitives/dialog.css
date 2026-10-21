@@ -1,0 +1,108 @@
+/* Dialog */
+.sd-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--sd-z-overlay);
+  background: var(--sd-overlay);
+}
+
+.sd-modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  z-index: var(--sd-z-modal);
+  width: min(480px, calc(100vw - var(--sd-space-8)));
+  max-height: min(640px, calc(100vh - var(--sd-space-8)));
+  overflow: auto;
+  transform: translate(-50%, -50%);
+  padding: var(--sd-space-6);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-dialog);
+  background: var(--sd-bg-elevated);
+  color: var(--sd-fg);
+  box-shadow: var(--sd-shadow-lg);
+  font-family: var(--sd-font-sans);
+  font-size: var(--sd-text-md);
+}
+
+.sd-modal-sm {
+  width: min(400px, calc(100vw - var(--sd-space-8)));
+}
+
+.sd-modal-lg {
+  width: min(640px, calc(100vw - var(--sd-space-8)));
+}
+
+.sd-modal-title {
+  margin: 0 var(--sd-space-8) var(--sd-space-2) 0;
+  color: var(--sd-fg);
+  font-family: var(--sd-font-sans);
+  font-size: var(--sd-text-xl);
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.sd-modal-copy {
+  margin: 0 0 var(--sd-space-4);
+  color: var(--sd-muted);
+  font-size: var(--sd-text-md);
+  line-height: 1.5;
+}
+
+.sd-modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--sd-space-2);
+  margin-top: var(--sd-space-5);
+}
+
+.sd-modal .sd-field,
+.sd-popover .sd-field {
+  width: 100%;
+  min-width: 0;
+  flex: none;
+}
+
+.sd-modal-x,
+.sd-toast-close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--sd-control-sm);
+  height: var(--sd-control-sm);
+  margin: 0;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--sd-radius);
+  background: transparent;
+  color: var(--sd-muted);
+  cursor: pointer;
+  transition:
+    background-color var(--sd-motion-hover) var(--sd-ease-standard),
+    color var(--sd-motion-hover) var(--sd-ease-standard);
+}
+
+.sd-modal-x {
+  position: absolute;
+  top: var(--sd-space-3);
+  right: var(--sd-space-3);
+}
+
+.sd-modal-x:hover:not(:disabled),
+.sd-toast-close:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--sd-surface-hover);
+  color: var(--sd-fg);
+}
+
+.sd-modal-x:active:not(:disabled),
+.sd-toast-close:active:not(:disabled) {
+  background: var(--sd-surface-active);
+}
+
+.sd-modal-x:focus-visible,
+.sd-toast-close:focus-visible {
+  outline: 2px solid var(--sd-focus-ring);
+  outline-offset: 2px;
+}
+

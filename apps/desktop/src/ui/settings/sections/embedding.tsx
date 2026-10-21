@@ -10,11 +10,11 @@
 import { observer, useService } from '@rabjs/react'
 import { CircleAlert, CircleCheck, LoaderCircle, TriangleAlert } from 'lucide-react'
 import { useEffect } from 'react'
-import { SettingsService, type EmbeddingRuntime } from '../../../services/panels.service'
-import { VaultService } from '../../../services/vault.service'
-import { Button } from '../../button'
-import { Mark } from '../../icon'
-import { Input } from '../../input'
+import { SettingsService, type EmbeddingRuntime } from '../../../services/settings/settings.service'
+import { VaultService } from '../../../services/vault/vault.service'
+import { Button } from '../../primitives/button'
+import { Mark } from '../../primitives/icon'
+import { Input } from '../../primitives/input'
 import './embedding.css'
 
 function isHttpUrl(value: string): boolean {

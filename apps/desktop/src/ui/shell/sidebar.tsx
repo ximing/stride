@@ -1,0 +1,282 @@
+import { observer, useService } from '@rabjs/react'
+import type { StrideNote } from '@stride/core/note'
+import {
+  Bookmark,
+  Briefcase,
+  Calendar,
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  Files,
+  Folder,
+  Inbox,
+  Pencil,
+  Plus,
+  SquarePen,
+  Star,
+  Tag,
+  User,
+  type LucideIcon,
+} from 'lucide-react'
+import { useState } from 'react'
+import { typeSidebarLabel } from '../../../../../packages/core/src/types'
+import { TabsService } from '../../services/notes/tabs.service'
+import { VaultService } from '../../services/vault/vault.service'
+import { ViewsService } from '../../services/views/views.service'
+import { Button, IconButton } from '../primitives/button'
+import { EmptyState } from '../primitives/empty-state'
+import { FolderTree } from '../folders/folder-tree'
+import { Mark } from '../primitives/icon'
+import { ViewEditorModal } from '../views/view-editor'
+
+/** dataTransfer mime for view-row drags (dataTransfer.types lowercases types). */
+const VIEW_DRAG_MIME = 'application/x-stride-view'
+
+const TYPE_ICONS: Record<string, LucideIcon> = {
+  note: FileText,
+  briefcase: Briefcase,
+  user: User,
+  folder: Folder,
+  star: Star,
+  tag: Tag,
+  calendar: Calendar,
+  bookmark: Bookmark,
+}
+
+const TYPE_COLORS = new Set(['gray', 'blue', 'teal', 'green', 'orange', 'purple', 'red', 'pink', 'yellow'])
+
+function propertyText(value: StrideNote['properties'][string] | undefined): string {
+  if (typeof value === 'string') return value
+  if (Array.isArray(value)) return value[0] ?? ''
+  return ''
+}
+
+function typeIconKey(note: StrideNote): string {
+  const key = propertyText(note.properties._icon).trim().toLowerCase()
+  return key in TYPE_ICONS ? key : 'note'
+}
+
+function typeColorKey(note: StrideNote): string {
+  const key = propertyText(note.properties._color).trim().toLowerCase()
+  return TYPE_COLORS.has(key) ? key : 'gray'
+}
+
+/**
+ * Saved views (`views/*.json`): click activates the view (listFilter becomes
+ * `view:<slug>`), the pencil opens the editor modal, and HTML5 drag reorders
+ * rows (persisted to `.stride/views-order.json` by ViewsService).
+ */
+const SavedViews = observer(function SavedViews() {
+  const views = useService(ViewsService)
+  const [dropTarget, setDropTarget] = useState('')
+  return (
+    <>
+      {views.views.length === 0 && (
+        <EmptyState compact title="No saved views yet." testId="views-empty" />
+      )}
+      {views.views.map((item) => (
+        <div
+          className="view-row"
+          key={item.file}
+          data-testid="view-row"
+          data-view={item.file}
+          data-drop-target={dropTarget === item.file ? 'true' : undefined}
+          draggable
+          onDragStart={(event) => {
+            event.dataTransfer.setData(VIEW_DRAG_MIME, item.file)
+            event.dataTransfer.effectAllowed = 'move'
+          }}
+          onDragOver={(event) => {
+            if (!event.dataTransfer.types.includes(VIEW_DRAG_MIME)) return
+            event.preventDefault()
+            event.dataTransfer.dropEffect = 'move'
+            if (dropTarget !== item.file) setDropTarget(item.file)
+          }}
+          onDrop={(event) => {
+            const dragged = event.dataTransfer.getData(VIEW_DRAG_MIME)
+            event.preventDefault()
+            setDropTarget('')
+            if (dragged) void views.moveView(dragged, item.file)
+          }}
+          onDragEnd={() => setDropTarget('')}
+        >
+          <button
+            type="button"
+            data-testid="view-link"
+            data-view={item.file}
+            className={views.isActive(item.file) ? 'active' : ''}
+            aria-current={views.isActive(item.file) ? 'page' : undefined}
+            onClick={() => views.activate(item.file)}
+          >
+            {item.view.icon ? <span className="view-icon">{item.view.icon}</span> : null}
+            <span className="type-label">{item.view.name}</span>
+          </button>
+          <IconButton
+            icon={Pencil}
+            label={`Edit ${item.view.name}`}
+            className="view-edit"
+            data-testid="view-edit"
+            data-view={item.file}
+            onClick={() => views.openEditor(item.file)}
+          />
+        </div>
+      ))}
+      <Button
+        tone="quiet"
+        size="sm"
+        className="rail-quiet-action"
+        data-testid="new-view"
+        icon={<Mark icon={Plus} size={14} />}
+        onClick={() => views.openNewEditor()}
+      >
+        New view
+      </Button>
+      <ViewEditorModal />
+    </>
+  )
+})
+
+export const Rail = observer(function Rail() {
+  const vault = useService(VaultService)
+  const tabs = useService(TabsService)
+  const typeDocs = vault.sidebarTypes
+  const fallbackTypes = vault.typeDocuments.length === 0 ? [...vault.graph.byType.keys()] : []
+  const showInstances = vault.active?.type === 'Type'
+  return (
+    <div className="rail-inner">
+      <Button
+        tone="primary"
+        size="lg"
+        className="rail-new-note"
+        data-testid="new-note"
+        icon={<Mark icon={SquarePen} size={16} />}
+        onClick={() => vault.createNote()}
+      >
+        New note
+      </Button>
+      <div className="group-label">Views</div>
+      <button
+        type="button"
+        className={vault.listFilter === 'all' ? 'rail-nav-item active' : 'rail-nav-item'}
+        aria-current={vault.listFilter === 'all' ? 'page' : undefined}
+        onClick={() => vault.setFilter('all')}
+      >
+        <span className="rail-nav-icon"><Mark icon={Files} size={16} /></span>
+        <span className="type-label">All</span>
+      </button>
+      <button
+        type="button"
+        className={vault.listFilter === 'inbox' ? 'rail-nav-item active' : 'rail-nav-item'}
+        aria-current={vault.listFilter === 'inbox' ? 'page' : undefined}
+        onClick={() => vault.setFilter('inbox')}
+      >
+        <span className="rail-nav-icon"><Mark icon={Inbox} size={16} /></span>
+        <span className="type-label">Inbox ({vault.inboxCount})</span>
+      </button>
+      {vault.listFilter === 'inbox' && (
+        <label className="advance-inbox">
+          <input
+            type="checkbox"
+            data-testid="advance-inbox"
+            checked={vault.advanceInbox}
+            onChange={(event) => { void vault.setAdvanceInbox(event.target.checked) }}
+          />
+          Advance after organizing
+        </label>
+      )}
+      <SavedViews />
+      <div className="group-label">Types</div>
+      {typeDocs.length === 0 && fallbackTypes.length === 0 && (
+        <EmptyState compact title="No types yet." testId="types-empty" />
+      )}
+      {typeDocs.map((note) => {
+        const icon = typeIconKey(note)
+        const color = typeColorKey(note)
+        const collapsed = vault.collapsedTypes.includes(note.title)
+        const active = vault.listFilter === note.title
+        return (
+          <div className="type-row" key={note.id}>
+            <button
+              type="button"
+              data-testid="type-link"
+              data-type={note.title}
+              data-icon={icon}
+              className={active ? 'active' : ''}
+              aria-current={active ? 'page' : undefined}
+              onClick={() => {
+                vault.setFilter(note.title)
+                tabs.openNote(note.id)
+              }}
+            >
+              <span className={`type-dot type-dot-${color}`} />
+              <span className="type-icon"><Mark icon={TYPE_ICONS[icon] ?? FileText} size={16} /></span>
+              <span className="type-label">{typeSidebarLabel(note)}</span>
+            </button>
+            {collapsed ? null : (
+              <IconButton
+                icon={Plus}
+                label={`New ${note.title}`}
+                className="type-add"
+                data-testid="type-new-instance"
+                data-type={note.title}
+                onClick={() => vault.createInstance(note.title)}
+              />
+            )}
+            <IconButton
+              icon={collapsed ? ChevronRight : ChevronDown}
+              label={collapsed ? `Expand ${note.title}` : `Collapse ${note.title}`}
+              className="type-collapse"
+              data-testid="type-collapse"
+              data-type={note.title}
+              aria-expanded={!collapsed}
+              onClick={() => vault.toggleTypeCollapsed(note.title)}
+            />
+          </div>
+        )
+      })}
+      <Button
+        tone="quiet"
+        size="sm"
+        className="rail-quiet-action"
+        data-testid="new-type"
+        icon={<Mark icon={Plus} size={14} />}
+        onClick={() => vault.createType()}
+      >
+        New type
+      </Button>
+      {showInstances && (
+        <div className="type-instances" data-testid="type-instances">
+          <div className="group-label">Instances</div>
+          {vault.typeInstances.length === 0 && <EmptyState compact title="No instances yet." testId="instances-empty" />}
+          {vault.typeInstances.map((note) => (
+            <button
+              key={note.id}
+              type="button"
+              data-testid="instance-link"
+              className={vault.activeId === note.id ? 'rail-nav-item active' : 'rail-nav-item'}
+              aria-current={vault.activeId === note.id ? 'page' : undefined}
+              onClick={() => tabs.openNote(note.id)}
+            >
+              <span className="rail-nav-icon"><Mark icon={FileText} size={16} /></span>
+              <span className="type-label">{note.title}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      {fallbackTypes.map((type) => (
+        <button
+          key={type}
+          type="button"
+          className={vault.listFilter === type ? 'rail-nav-item active' : 'rail-nav-item'}
+          aria-current={vault.listFilter === type ? 'page' : undefined}
+          onClick={() => vault.setFilter(type)}
+        >
+          <span className="rail-nav-icon"><Mark icon={FileText} size={16} /></span>
+          <span className="type-label">{type}</span>
+        </button>
+      ))}
+      <div className="group-label">Notes</div>
+      <FolderTree />
+    </div>
+  )
+})

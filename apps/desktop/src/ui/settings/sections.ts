@@ -14,7 +14,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import type { ComponentType } from 'react'
-import type { SettingsSectionId } from '../../services/settings-page.service'
+import type { SettingsSectionId } from '../../services/settings/settings-page.service'
 import { AppearanceSection } from './sections/appearance'
 import { AiSection } from './sections/ai'
 import { EditorSection } from './sections/editor'

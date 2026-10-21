@@ -1,5 +1,5 @@
 import manifest from '../../../appCommandManifest.json'
-import { formatShortcut, parseAppCommandManifest, type AppCommand } from '../../../services/commands'
+import { formatShortcut, parseAppCommandManifest, type AppCommand } from '../../../services/commands/commands'
 
 interface ShortcutGroup {
   section: string

@@ -1,0 +1,125 @@
+/* Fixed popovers intentionally do not depend on an .editor ancestor. */
+.editor-toolbar-more,
+.editor-select-menu,
+.editor-color-pop,
+.editor-table-menu,
+.editor-code-menu,
+.wikilink-menu,
+.slash-menu {
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-lg);
+  background: var(--sd-bg-elevated);
+  color: var(--sd-fg);
+  box-shadow: var(--sd-shadow-sm, var(--sd-shadow));
+}
+
+.editor-toolbar-more {
+  gap: 2px;
+  padding: 4px;
+}
+
+.editor-select-menu {
+  gap: 2px;
+  padding: 4px;
+}
+
+.editor-select-menu button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 28px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: var(--sd-radius);
+  background: transparent;
+  color: var(--sd-fg);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.editor-select-menu button:hover:not(:disabled),
+.editor-select-menu button.is-active {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--sd-fg) 6%, transparent);
+  color: var(--sd-fg);
+}
+
+.editor-select-menu button.is-on,
+.editor-select-menu button.is-on.is-active {
+  background: color-mix(in srgb, var(--sd-accent) 13%, transparent);
+  color: var(--sd-accent);
+}
+
+.editor-select-option-check {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  flex: none;
+}
+
+.editor-color-pop {
+  gap: 8px;
+  padding: 8px;
+}
+
+.editor-color-swatches,
+.editor-table-menu-colors {
+  gap: 6px;
+}
+
+.editor-color-swatch {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+  transition: outline-color 120ms ease, transform 120ms ease;
+}
+
+.editor-color-swatch:hover:not(:disabled) {
+  border-color: var(--sd-fg);
+}
+
+.editor-color-swatch.is-on {
+  outline: 2px solid var(--sd-accent);
+  outline-offset: 1px;
+}
+
+.editor-color-custom {
+  color: var(--sd-muted);
+  font-size: 12px;
+}
+
+.editor-color-custom input[type='color'] {
+  width: 32px;
+  height: 24px;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+  background: var(--sd-bg-elevated);
+}
+
+.editor-color-clear,
+.editor-table-menu-clear {
+  min-height: 28px;
+  padding: 2px 8px;
+  border: 1px solid transparent;
+  border-radius: var(--sd-radius);
+  background: transparent;
+  color: var(--sd-muted);
+  font-size: 13px;
+}
+
+.editor-color-clear:hover:not(:disabled),
+.editor-table-menu-clear:hover:not(:disabled) {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--sd-fg) 6%, transparent);
+  color: var(--sd-fg);
+}
+
+.editor-color-clear.is-on,
+.editor-table-menu-clear.is-on {
+  color: var(--sd-accent);
+}
+

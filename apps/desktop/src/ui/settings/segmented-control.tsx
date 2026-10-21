@@ -1,6 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
-import { Button } from '../button'
-import { Mark } from '../icon'
+import { Button } from '../primitives/button'
+import { Mark } from '../primitives/icon'
 
 export interface SettingsSegmentedOption<T extends string> {
   value: T

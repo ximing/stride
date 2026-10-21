@@ -1,0 +1,155 @@
+/* ---------- properties, relationships and outline ---------- */
+
+.properties-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  margin-bottom: 16px;
+}
+
+.properties-panel-head .panel-heading {
+  margin: 0;
+}
+
+.properties-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.properties-panel > .sd-field {
+  margin-bottom: 12px;
+}
+
+.properties-panel > .panel-heading {
+  margin: 20px 0 8px;
+}
+
+.property-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: end;
+  min-width: 0;
+  margin-bottom: 12px;
+}
+
+.property-row .sd-field {
+  width: 100%;
+  min-width: 0;
+}
+
+.property-remove {
+  margin-bottom: 2px;
+}
+
+.property-add-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  margin-top: 16px;
+  padding-top: 4px;
+  border-top: 1px solid var(--sd-border);
+}
+
+.property-add-form .panel-subheading {
+  margin: 0;
+}
+
+.property-add {
+  align-self: flex-start;
+}
+
+.properties-panel .relation-row {
+  min-width: 0;
+  min-height: 32px;
+  margin: 0 0 2px;
+  padding: 6px 8px;
+  overflow-wrap: anywhere;
+  color: var(--sd-fg);
+  font-family: var(--sd-font-sans);
+  font-size: 13px;
+  line-height: 18px;
+  white-space: normal;
+  background: transparent;
+  border: 1px solid transparent;
+}
+
+.properties-panel .relation-row:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sd-fg) 4%, transparent);
+  border-color: transparent;
+}
+
+.properties-panel .relation-meta,
+.properties-panel > .meta {
+  margin: 0 0 6px;
+  padding: 0 8px;
+  overflow-wrap: anywhere;
+  font-family: var(--sd-font-sans);
+  font-size: 12px;
+  white-space: normal;
+}
+
+.toc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.toc-item {
+  min-width: 0;
+  min-height: 32px;
+  margin: 0;
+  padding: 6px 8px;
+  color: var(--sd-fg);
+  font-size: 13px;
+  line-height: 18px;
+  background: transparent;
+  border: 1px solid transparent;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.toc-item:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sd-fg) 4%, transparent);
+  border-color: transparent;
+}
+
+.toc-item[data-level='1'] {
+  color: var(--sd-fg);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.toc-item[data-level='2'] {
+  padding-left: 16px;
+}
+
+.toc-item[data-level='3'] {
+  padding-left: 28px;
+  color: var(--sd-muted);
+}
+
+.properties-panel .sd-empty-state,
+.git-panel .sd-empty-state,
+.chat-panel .sd-empty-state,
+.toc-panel .sd-empty-state {
+  min-width: 0;
+  padding: 16px 8px;
+  overflow-wrap: anywhere;
+}
+
+.sd-empty-state-title,
+.sd-empty-state-body {
+  overflow-wrap: anywhere;
+}
+
+.sd-empty-state-action {
+  max-width: 100%;
+  white-space: normal;
+}
+

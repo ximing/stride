@@ -1,0 +1,55 @@
+/* Content and inspector panels. Component structure stays in TSX; this file
+   owns the final density, alignment and narrow-panel behavior. */
+
+/* ---------- shared panel typography and forms ---------- */
+
+.properties-panel,
+.git-panel,
+.chat-panel,
+.toc-panel {
+  min-width: 0;
+}
+
+.panel-heading {
+  margin: 0 0 12px;
+  color: var(--sd-fg);
+  font-family: var(--sd-font-sans);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 24px;
+  letter-spacing: 0;
+}
+
+.panel-subheading {
+  margin: 16px 0 8px;
+  color: var(--sd-muted);
+  font-family: var(--sd-font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.properties-panel .sd-field,
+.git-panel .sd-field {
+  flex: none;
+  width: 100%;
+  min-width: 0;
+}
+
+.properties-panel .sd-field-label,
+.git-panel .sd-field-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.properties-panel .property-check {
+  width: 16px;
+  height: 16px;
+  min-height: 16px;
+  margin: 4px 0 8px;
+  padding: 0;
+  accent-color: var(--sd-accent);
+}
+

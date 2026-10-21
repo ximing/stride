@@ -1,0 +1,200 @@
+/* Shared overlay surfaces. Colors and elevation come from semantic tokens. */
+
+.sd-command-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--sd-z-overlay);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12vh 16px 32px;
+  background: var(--sd-overlay);
+  animation: sd-command-backdrop-in var(--sd-motion-menu) var(--sd-ease-standard);
+}
+
+.sd-command-surface {
+  display: flex;
+  flex-direction: column;
+  width: min(600px, calc(100vw - 32px));
+  max-height: min(520px, calc(100dvh - 96px));
+  padding: 12px;
+  overflow: hidden;
+  color: var(--sd-fg);
+  background: var(--sd-bg-elevated);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-dialog);
+  box-shadow: var(--sd-shadow-lg);
+  animation: sd-command-surface-in var(--sd-motion-dialog) var(--sd-ease-standard);
+}
+
+.sd-command-title {
+  flex: none;
+  margin: 0 4px 8px;
+  font-size: var(--sd-text-lg);
+  font-weight: 600;
+  line-height: 24px;
+}
+
+.sd-command-search {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 12px;
+  color: var(--sd-muted);
+  background: var(--sd-surface);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+  transition: border-color var(--sd-motion-hover) var(--sd-ease-standard), box-shadow var(--sd-motion-hover) var(--sd-ease-standard);
+}
+
+.sd-command-search:focus-within {
+  border-color: var(--sd-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sd-accent) 24%, transparent);
+}
+
+.sd-command-search > svg {
+  flex: none;
+}
+
+.sd-command-search .sd-command-input {
+  width: 100%;
+  min-width: 0;
+  height: 38px;
+  padding: 0;
+  color: var(--sd-fg);
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+}
+
+.sd-command-search .sd-command-input:focus {
+  border: 0;
+  outline: none;
+}
+
+.sd-command-notice {
+  flex: none;
+  margin: 8px 4px 0;
+  color: var(--sd-muted);
+  font-size: var(--sd-text-xs);
+}
+
+.sd-command-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: 360px;
+  margin: 8px -4px -4px;
+  padding: 4px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.sd-command-section {
+  margin: 8px 8px 4px;
+  color: var(--sd-muted);
+  font-size: var(--sd-text-xs);
+  font-weight: 600;
+  line-height: 16px;
+  letter-spacing: 0.04em;
+}
+
+.sd-command-section:first-child {
+  margin-top: 0;
+}
+
+.sd-command-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: var(--sd-control-md);
+  padding: 6px 8px;
+  color: var(--sd-fg);
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--sd-radius);
+  transition: background-color var(--sd-motion-hover) var(--sd-ease-standard), border-color var(--sd-motion-hover) var(--sd-ease-standard), color var(--sd-motion-hover) var(--sd-ease-standard);
+}
+
+.sd-command-item:hover:not(:disabled) {
+  background: var(--sd-hover);
+  border-color: transparent;
+}
+
+.sd-command-item[aria-selected="true"] {
+  background: var(--sd-selected);
+  border-color: color-mix(in srgb, var(--sd-accent) 22%, transparent);
+  box-shadow: inset 2px 0 0 var(--sd-accent);
+}
+
+.sd-command-item:focus-visible {
+  outline: 2px solid var(--sd-focus-ring);
+  outline-offset: 2px;
+}
+
+.sd-command-item:disabled {
+  color: var(--sd-muted);
+}
+
+.sd-command-item-title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sd-command-kbd,
+.sd-menu-shortcut {
+  flex: none;
+  padding: 0;
+  color: var(--sd-muted);
+  font-family: var(--sd-font-mono);
+  font-size: var(--sd-text-xs);
+  font-weight: 400;
+  line-height: 16px;
+  background: transparent;
+  border: 0;
+}
+
+.search-panel-result.sd-command-item {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  padding-block: 8px;
+}
+
+.search-panel-result-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.search-panel-note-title {
+  font-weight: 600;
+}
+
+.search-panel-score {
+  flex: none;
+  color: var(--sd-muted);
+  font-size: var(--sd-text-xs);
+}
+
+.search-panel-snippet {
+  color: var(--sd-muted);
+  font-size: var(--sd-text-sm);
+  line-height: 1.4;
+}
+
+.search-panel-snippet mark {
+  padding: 0 2px;
+  color: inherit;
+  background: var(--sd-mark);
+  border-radius: 3px;
+}
+

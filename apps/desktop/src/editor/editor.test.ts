@@ -31,9 +31,9 @@ if (typeof Range !== 'undefined' && typeof Range.prototype.getBoundingClientRect
   }
 }
 import { afterEach, describe, expect, it } from 'vitest'
-import { formatShortcut } from '../services/commands'
+import { formatShortcut } from '../services/commands/commands'
 import { applyLink, createEditorExtensions, runFormat, unsetLink, type FormatName } from './extensions'
-import { EditorToolbar, editorTools } from './toolbar'
+import { EditorToolbar, editorTools } from './toolbar/toolbar'
 
 const editors: Editor[] = []
 const roots: Root[] = []
@@ -123,7 +123,7 @@ describe('editor formats', () => {
     expect(JSON.stringify(editor.getJSON())).toContain('horizontalRule')
     expect(runFormat(editor, 'h1' as FormatName)).toBe(false)
     expect(editor.isActive('heading', { level: 1 })).toBe(false)
-    expect(editorTools.some((tool) => tool.id === 'h1' || tool.format === 'h1' || tool.label.includes('H1'))).toBe(false)
+    expect(editorTools.some((tool) => tool.id === 'h1' || String(tool.format) === 'h1' || tool.label.includes('H1'))).toBe(false)
   })
 
   it('leaves Mod-k unbound because the command palette owns it app-wide', () => {

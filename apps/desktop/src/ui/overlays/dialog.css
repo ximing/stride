@@ -1,0 +1,51 @@
+/* Radix dialogs, including EditorPrompt. */
+.sd-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--sd-z-overlay);
+  background: var(--sd-overlay);
+}
+
+.sd-overlay[data-state="open"] {
+  animation: sd-dialog-backdrop-in var(--sd-motion-dialog) var(--sd-ease-standard);
+}
+
+.sd-modal {
+  z-index: var(--sd-z-modal);
+  max-width: calc(100vw - 32px);
+  max-height: calc(100dvh - 32px);
+  color: var(--sd-fg);
+  background: var(--sd-bg-elevated);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-dialog);
+  box-shadow: var(--sd-shadow-lg);
+}
+
+.sd-modal[data-state="open"] {
+  animation: sd-dialog-in var(--sd-motion-dialog) var(--sd-ease-standard);
+}
+
+.sd-modal-title {
+  color: var(--sd-fg);
+  font-size: var(--sd-text-xl);
+  line-height: 1.3;
+}
+
+.sd-modal-copy {
+  color: var(--sd-muted);
+}
+
+.sd-modal-x {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: var(--sd-muted);
+}
+
+.sd-modal-x:hover {
+  color: var(--sd-fg);
+}
+

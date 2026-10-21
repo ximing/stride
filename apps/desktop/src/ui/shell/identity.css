@@ -1,0 +1,214 @@
+/* ---------- identity, vault switcher and global search ---------- */
+
+.topbar {
+  height: 48px;
+  min-height: 48px;
+  gap: 8px;
+  padding: 0 12px;
+  background: var(--sd-bg);
+}
+
+.topbar-icon.sd-icon-button {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  flex: none;
+  padding: 0;
+  border: 1px solid transparent;
+  color: var(--sd-muted);
+}
+
+.topbar-icon.sd-icon-button:hover:not(:disabled),
+.topbar-icon.sd-icon-button[aria-pressed="true"] {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--sd-fg) 5%, transparent);
+  color: var(--sd-fg);
+}
+
+.brand {
+  flex: none;
+  min-width: 0;
+  max-width: 38%;
+  gap: 8px;
+  margin-right: 0;
+}
+
+.wordmark {
+  color: var(--sd-fg);
+  font-family: var(--sd-font-sans);
+  font-size: 16px;
+  font-weight: 650;
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+.vault-switcher {
+  min-width: 0;
+}
+
+.vault-switcher .vault-switcher-trigger.sd-btn {
+  display: flex;
+  width: auto;
+  max-width: 200px;
+  min-height: 32px;
+  height: 32px;
+  justify-content: space-between;
+  gap: 6px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  color: var(--sd-muted);
+  font-size: 13px;
+}
+
+.vault-switcher .vault-switcher-trigger.sd-btn:hover:not(:disabled),
+.vault-switcher .vault-switcher-trigger.sd-btn[aria-expanded="true"] {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--sd-fg) 5%, transparent);
+  color: var(--sd-fg);
+}
+
+.vault-switcher-label,
+.vault-option-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vault-switcher-trigger > svg {
+  flex: none;
+  transition: transform 160ms ease;
+}
+
+.vault-switcher-trigger[aria-expanded="true"] > svg {
+  transform: rotate(180deg);
+}
+
+.vault-switcher-list {
+  top: calc(100% + 4px);
+  gap: 2px;
+  min-width: 208px;
+  max-width: 280px;
+  max-height: 320px;
+  padding: 4px;
+  overflow-y: auto;
+  border-radius: 8px;
+  background: var(--sd-bg-elevated);
+  box-shadow: var(--sd-shadow);
+}
+
+.vault-switcher-list .sd-btn {
+  display: flex;
+  width: 100%;
+  min-height: 32px;
+  height: 32px;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  color: var(--sd-fg);
+  font-size: 13px;
+  text-align: left;
+}
+
+.vault-switcher-list .sd-btn:hover:not(:disabled) {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--sd-fg) 5%, transparent);
+}
+
+.vault-switcher-list .sd-btn.active {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--sd-accent) 12%, transparent);
+}
+
+.vault-switcher-list .sd-btn.active:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sd-accent) 16%, transparent);
+}
+
+.vault-switcher-list .sd-btn > svg {
+  flex: none;
+  color: var(--sd-accent);
+}
+
+.search {
+  flex: 1;
+  min-width: 0;
+  max-width: 640px;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.search-field {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  width: 100%;
+  min-width: 96px;
+  max-width: 320px;
+  height: 32px;
+}
+
+.search .search-field input {
+  width: 100%;
+  height: 32px;
+  min-width: 0;
+  padding: 0 34px 0 32px;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+  background: var(--sd-bg-elevated);
+  color: var(--sd-fg);
+  font-size: 13px;
+  line-height: 30px;
+}
+
+.search .search-field input:focus {
+  border-color: var(--sd-accent);
+}
+
+.search .search-field input:focus-visible {
+  outline: 2px solid var(--sd-accent);
+  outline-offset: 2px;
+}
+
+.search-icon {
+  position: absolute;
+  left: 10px;
+  z-index: 1;
+  display: inline-flex;
+  color: var(--sd-muted);
+  pointer-events: none;
+}
+
+.search-clear.sd-icon-button {
+  position: absolute;
+  right: 3px;
+  width: 26px;
+  height: 26px;
+  min-height: 26px;
+  padding: 0;
+  border: 1px solid transparent;
+  color: var(--sd-muted);
+}
+
+.search-clear.sd-icon-button:hover:not(:disabled) {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--sd-fg) 6%, transparent);
+  color: var(--sd-fg);
+}
+
+.search-submit.sd-btn {
+  flex: none;
+  min-height: 32px;
+  height: 32px;
+}
+
+.search-mode,
+.search-degraded {
+  flex: none;
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+

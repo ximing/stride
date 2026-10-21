@@ -139,7 +139,7 @@ export function isPlaceholderTitle(title: string): boolean {
   return trimmed === '' || trimmed.toLowerCase() === 'untitled'
 }
 
-function isH1(node: TipTapNode | undefined): boolean {
+function isH1(node: TipTapNode | undefined): node is TipTapNode {
   return !!node && node.type === 'heading' && node.attrs?.level === 1
 }
 

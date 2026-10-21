@@ -1,0 +1,43 @@
+/* Slash and wikilink suggestions use the same dense option treatment. */
+.slash-menu,
+.wikilink-menu {
+  padding: 4px;
+}
+
+.slash-menu-item,
+.wikilink-menu button {
+  min-height: 28px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--sd-radius);
+  background: transparent;
+  color: var(--sd-fg);
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.slash-menu-item {
+  display: flex;
+  align-items: center;
+}
+
+.wikilink-menu button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  text-align: left;
+}
+
+.slash-menu-item:hover,
+.wikilink-menu button:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sd-fg) 6%, transparent);
+  color: var(--sd-fg);
+}
+
+.slash-menu [role='option'][aria-selected='true'],
+.wikilink-menu button[aria-selected='true'] {
+  background: color-mix(in srgb, var(--sd-accent) 13%, transparent);
+  color: var(--sd-accent);
+  box-shadow: inset 2px 0 var(--sd-accent);
+}
+

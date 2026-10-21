@@ -1,9 +1,9 @@
 import * as Dialog from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
-import { Button, IconButton } from '../ui/button'
-import { useLayer } from '../ui/layer'
-import { Modal, ModalClose } from '../ui/modal'
+import { Button, IconButton } from '../ui/primitives/button'
+import { useLayer } from '../ui/primitives/layer'
+import { Modal, ModalClose } from '../ui/primitives/modal'
 
 export function EditorPrompt({
   title,

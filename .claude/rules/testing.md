@@ -16,7 +16,7 @@ paths:
 ## 专项契约测试
 
 - **编辑器序列化往返测试**（`apps/desktop/src/editor/roundtrip.test.ts`）：凡新增或修改 TipTap 节点/Mark，必须补充或更新往返测试（含 `fast-check` 属性测试），确保 `TipTap JSON -> 文件序列化 -> 重新解析` 零丢失。
-- **命令与快捷键矩阵审计**（`apps/desktop/src/services/command-matrix.test.ts`）：凡涉及 `appCommandManifest.json`、快捷键或弹层互斥逻辑的修改，必须运行并通过该矩阵测试。
+- **命令与快捷键矩阵审计**（`apps/desktop/src/services/commands/command-matrix.test.ts`）：凡涉及 `appCommandManifest.json`、快捷键或弹层互斥逻辑的修改，必须运行并通过该矩阵测试。
 
 ## 端到端测试（Playwright）
 

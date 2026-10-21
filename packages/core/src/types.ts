@@ -24,7 +24,8 @@ export function compareTypeDocuments(a: StrideNote, b: StrideNote): number {
 
 export function typeSidebarLabel(note: StrideNote): string {
   const raw = note.properties._sidebar_label
-  const text = (Array.isArray(raw) ? raw[0] ?? '' : raw ?? '').trim()
+  const picked = Array.isArray(raw) ? raw[0] ?? '' : raw ?? ''
+  const text = typeof picked === 'string' ? picked.trim() : String(picked).trim()
   return text || note.title
 }
 

@@ -3,9 +3,9 @@
 
 import { has, observer, useService } from '@rabjs/react'
 import { useState } from 'react'
-import { SettingsService } from '../../../services/panels.service'
-import { VaultService } from '../../../services/vault.service'
-import { Input } from '../../input'
+import { SettingsService } from '../../../services/settings/settings.service'
+import { VaultService } from '../../../services/vault/vault.service'
+import { Input } from '../../primitives/input'
 import './editor.css'
 
 const AUTOSAVE_DEBOUNCE_MIN = 100

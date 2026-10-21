@@ -1,0 +1,14 @@
+/* ---------- editor stage fit ---------- */
+
+.stage-head {
+  align-items: center;
+  column-gap: var(--sd-space-3);
+  row-gap: var(--sd-space-1);
+}
+
+.note-title {
+  flex: 0 0 100%;
+  width: 100%;
+  min-width: 0;
+}
+

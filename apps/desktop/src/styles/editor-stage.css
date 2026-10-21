@@ -1,0 +1,12 @@
+/* ---------- editor stage ---------- */
+
+.stage {
+  flex: 1;
+  min-width: 320px;
+  background: var(--sd-surface);
+  padding: 1.4rem 1.8rem 2.5rem;
+  /* Per-vault zoom (T7.3), set by services/layout/stage-zoom.ts. Engines without CSS
+     zoom support ignore it and render 1x. */
+  zoom: var(--sd-stage-zoom, 1);
+}
+

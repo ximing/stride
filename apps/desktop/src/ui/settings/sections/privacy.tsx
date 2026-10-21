@@ -2,7 +2,7 @@
 // in this version; the switch only persists the preference.
 
 import { has, observer, useService } from '@rabjs/react'
-import { SettingsService } from '../../../services/panels.service'
+import { SettingsService } from '../../../services/settings/settings.service'
 import './privacy.css'
 
 const TelemetryToggle = observer(function TelemetryToggle() {

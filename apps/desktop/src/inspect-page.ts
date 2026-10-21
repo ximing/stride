@@ -181,7 +181,7 @@ function currentValue(el: Element): string {
   return ''
 }
 
-function isEditor(el: Element): el is HTMLElement {
+function isEditor(el: Element): boolean {
   return el instanceof HTMLElement && (el.isContentEditable || el.getAttribute('contenteditable') === 'true')
 }
 

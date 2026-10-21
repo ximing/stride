@@ -1,0 +1,134 @@
+/* ---------- topbar ---------- */
+
+.topbar, .update-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.8rem;
+  border-bottom: 1px solid var(--sd-border);
+}
+
+.topbar {
+  min-height: 2.75rem;
+}
+
+.topbar-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--sd-radius);
+  color: var(--sd-muted);
+}
+
+.topbar-icon:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--sd-bg-elevated);
+  color: var(--sd-fg);
+}
+
+.topbar-icon[aria-pressed="true"] {
+  color: var(--sd-fg);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-right: auto;
+}
+
+.wordmark {
+  font-family: var(--sd-font-serif);
+  font-size: 1.3rem;
+}
+
+.vault-switcher {
+  position: relative;
+}
+
+.vault-switcher > button {
+  border-color: transparent;
+  color: var(--sd-muted);
+  padding: 0.3rem 0.55rem;
+}
+
+.vault-switcher > button:hover {
+  border-color: transparent;
+  background: var(--sd-bg-elevated);
+  color: var(--sd-fg);
+}
+
+.vault-switcher-list {
+  position: absolute;
+  top: calc(100% + 0.35rem);
+  left: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 12rem;
+  padding: 0.3rem;
+  background: var(--sd-bg-elevated);
+  border: 1px solid var(--sd-border);
+  border-radius: 8px;
+  box-shadow: var(--sd-shadow);
+}
+
+.vault-switcher-list button {
+  border-color: transparent;
+  text-align: left;
+  border-radius: var(--sd-radius);
+}
+
+.vault-switcher-list button:hover,
+.vault-switcher-list button.active {
+  background: var(--sd-bg);
+  border-color: transparent;
+}
+
+.search {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 16rem;
+}
+
+.search input {
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+  background: var(--sd-bg-elevated);
+  padding: 0.32rem 0.6rem;
+  width: 15rem;
+}
+
+.search input:focus {
+  border-color: var(--sd-accent);
+}
+
+.search button {
+  padding: 0.3rem 0.65rem;
+}
+
+.search-mode, .search-degraded {
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  white-space: nowrap;
+}
+
+.search-mode {
+  text-transform: uppercase;
+  color: var(--sd-muted);
+}
+
+.search-mode:empty {
+  display: none;
+}
+
+.search-degraded {
+  color: var(--sd-danger);
+}
+

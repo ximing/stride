@@ -93,18 +93,18 @@ export function resolveLlm(config: LlmConfig): ResolvedLlm {
   const models = createModels()
   if (llmApi(config.provider) === 'anthropic-messages') {
     const template = anthropicProvider()
-    const listed = template.getAllModels()
+    const listed = template.getAllModels?.() ?? []
     const sample = listed.find((item) => item.id === config.model)
       ?? listed.find((item) => item.id === 'claude-sonnet-4-5')
       ?? listed[0]
     if (!sample) throw new Error('Claude provider has no model template')
-    const model: Model<'anthropic-messages'> = {
+    const model = {
       ...sample,
       id: config.model,
       name: config.model,
       provider: 'claude',
       baseUrl,
-    }
+    } as Model<'anthropic-messages'>
     models.setProvider(createProvider({
       ...template,
       id: 'claude',

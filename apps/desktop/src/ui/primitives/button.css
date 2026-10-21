@@ -1,0 +1,148 @@
+/* Shared Stride primitives. Colors, elevation, motion, and layering are
+   token-driven so the same classes work in the app and .sd-preview. */
+
+/* Buttons */
+.sd-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--sd-space-2);
+  min-width: 0;
+  height: var(--sd-control-md);
+  margin: 0;
+  padding: 0 var(--sd-space-3);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+  background: var(--sd-surface);
+  color: var(--sd-fg);
+  font-family: var(--sd-font-sans);
+  font-size: var(--sd-text-sm);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    background-color var(--sd-motion-hover) var(--sd-ease-standard),
+    border-color var(--sd-motion-hover) var(--sd-ease-standard),
+    color var(--sd-motion-hover) var(--sd-ease-standard),
+    box-shadow var(--sd-motion-hover) var(--sd-ease-standard);
+}
+
+.sd-btn-sm {
+  height: var(--sd-control-sm);
+  padding-inline: var(--sd-space-2);
+  gap: var(--sd-space-1);
+  font-size: var(--sd-text-xs);
+}
+
+.sd-btn-lg {
+  height: var(--sd-control-lg);
+  padding-inline: var(--sd-space-4);
+  font-size: var(--sd-text-md);
+}
+
+.sd-btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+
+.sd-btn-icon > svg,
+.sd-icon-button > svg {
+  display: block;
+}
+
+.sd-btn-primary {
+  border-color: var(--sd-accent);
+  background: var(--sd-accent);
+  color: var(--sd-accent-fg);
+}
+
+.sd-btn-primary:hover:not(:disabled) {
+  border-color: var(--sd-accent-hover);
+  background: var(--sd-accent-hover);
+  color: var(--sd-accent-fg);
+}
+
+.sd-btn-primary:active:not(:disabled) {
+  border-color: var(--sd-accent-active);
+  background: var(--sd-accent-active);
+}
+
+.sd-btn-secondary:hover:not(:disabled) {
+  border-color: var(--sd-border-strong);
+  background: var(--sd-surface-hover);
+}
+
+.sd-btn-secondary:active:not(:disabled) {
+  background: var(--sd-surface-active);
+}
+
+.sd-btn-quiet {
+  border-color: transparent;
+  background: transparent;
+  color: var(--sd-muted);
+}
+
+.sd-btn-quiet:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--sd-surface-hover);
+  color: var(--sd-fg);
+}
+
+.sd-btn-quiet:active:not(:disabled) {
+  background: var(--sd-surface-active);
+}
+
+.sd-btn-danger {
+  border-color: var(--sd-danger);
+  background: var(--sd-surface);
+  color: var(--sd-danger);
+}
+
+.sd-btn-danger:hover:not(:disabled) {
+  border-color: var(--sd-danger);
+  background: var(--sd-danger-soft);
+  color: var(--sd-danger);
+}
+
+.sd-btn-danger:active:not(:disabled) {
+  border-color: var(--sd-danger-hover);
+  background: var(--sd-danger-hover);
+  color: var(--sd-danger-fg);
+}
+
+.sd-btn[aria-pressed="true"],
+.sd-btn[data-state="open"],
+.sd-btn.is-active {
+  border-color: var(--sd-accent);
+  background: var(--sd-accent-soft);
+  color: var(--sd-accent);
+  box-shadow: inset 0 0 0 1px var(--sd-accent);
+}
+
+.sd-btn:focus-visible {
+  outline: 2px solid var(--sd-focus-ring);
+  outline-offset: 2px;
+}
+
+.sd-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.sd-icon-button {
+  width: var(--sd-control-md);
+  padding: 0;
+  flex: none;
+}
+
+.sd-icon-button.sd-btn-sm {
+  width: var(--sd-control-sm);
+}
+
+.sd-icon-button.sd-btn-lg {
+  width: var(--sd-control-lg);
+}
+

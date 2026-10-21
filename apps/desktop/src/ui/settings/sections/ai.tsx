@@ -7,11 +7,11 @@
 import { observer, useService } from '@rabjs/react'
 import { catalogBaseUrl, catalogModelSuggestions, LLM_PROVIDERS, llmProviderInfo, type PublicLlmConfig } from '@stride/core'
 import { CircleAlert, CircleCheck, LoaderCircle, Plus, Star, Trash2 } from 'lucide-react'
-import { SettingsService } from '../../../services/panels.service'
-import { Button } from '../../button'
-import { Mark } from '../../icon'
-import { Input } from '../../input'
-import { Select } from '../../select'
+import { SettingsService } from '../../../services/settings/settings.service'
+import { Button } from '../../primitives/button'
+import { Mark } from '../../primitives/icon'
+import { Input } from '../../primitives/input'
+import { Select } from '../../primitives/select'
 import './ai.css'
 
 export interface LlmFieldErrors {

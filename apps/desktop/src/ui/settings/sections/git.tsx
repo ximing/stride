@@ -7,10 +7,10 @@
 import { observer, useService } from '@rabjs/react'
 import { CircleAlert, CircleCheck } from 'lucide-react'
 import { useState } from 'react'
-import { SettingsService } from '../../../services/panels.service'
-import { Button } from '../../button'
-import { Mark } from '../../icon'
-import { Input } from '../../input'
+import { SettingsService } from '../../../services/settings/settings.service'
+import { Button } from '../../primitives/button'
+import { Mark } from '../../primitives/icon'
+import { Input } from '../../primitives/input'
 import './git.css'
 
 const MAX_AUTO_PULL_MINUTES = 1440

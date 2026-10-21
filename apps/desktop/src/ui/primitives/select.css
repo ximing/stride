@@ -1,0 +1,90 @@
+/* Radix Select */
+.sd-select-field {
+  width: 100%;
+}
+
+.sd-select-trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--sd-space-2);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sd-select-trigger > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sd-select-icon {
+  display: inline-flex;
+  flex: none;
+  color: var(--sd-muted);
+  transition: transform var(--sd-motion-hover) var(--sd-ease-standard);
+}
+
+.sd-select-trigger[data-state="open"] .sd-select-icon {
+  transform: rotate(180deg);
+}
+
+.sd-select-content {
+  z-index: var(--sd-z-dropdown);
+  width: var(--radix-select-trigger-width);
+  min-width: 160px;
+  max-height: var(--radix-select-content-available-height);
+  overflow: hidden;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-panel);
+  background: var(--sd-bg-elevated);
+  color: var(--sd-fg);
+  box-shadow: var(--sd-shadow-sm);
+  transform-origin: var(--radix-select-content-transform-origin);
+}
+
+.sd-select-viewport {
+  padding: var(--sd-space-1);
+}
+
+.sd-select-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  min-height: var(--sd-control-md);
+  padding: var(--sd-space-1) var(--sd-space-8) var(--sd-space-1) var(--sd-space-2);
+  border-radius: var(--sd-radius);
+  color: var(--sd-fg);
+  font-family: var(--sd-font-sans);
+  font-size: var(--sd-text-sm);
+  line-height: 1.35;
+  outline: none;
+  cursor: pointer;
+  user-select: none;
+}
+
+.sd-select-item[data-highlighted] {
+  background: var(--sd-surface-hover);
+}
+
+.sd-select-item[data-state="checked"] {
+  background: var(--sd-accent-soft);
+  color: var(--sd-accent);
+}
+
+.sd-select-item[data-disabled] {
+  color: var(--sd-muted);
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.sd-select-item-indicator {
+  position: absolute;
+  right: var(--sd-space-2);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sd-accent);
+}
+

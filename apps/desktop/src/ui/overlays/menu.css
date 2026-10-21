@@ -1,0 +1,86 @@
+/* Dropdowns and the self-managed context menu share one menu language. */
+.sd-menu {
+  z-index: var(--sd-z-dropdown);
+  min-width: 192px;
+  max-width: calc(100vw - 8px);
+  padding: 4px;
+  color: var(--sd-fg);
+  background: var(--sd-bg-elevated);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-md);
+  box-shadow: var(--sd-shadow-sm);
+}
+
+.sd-menu[data-state="open"],
+.sd-context-menu {
+  animation: sd-menu-in var(--sd-motion-menu) var(--sd-ease-standard);
+}
+
+.sd-menu-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--sd-control-md);
+  padding: 6px 8px;
+  border-radius: var(--sd-radius);
+  outline: none;
+  transition: background-color var(--sd-motion-hover) var(--sd-ease-standard), color var(--sd-motion-hover) var(--sd-ease-standard);
+}
+
+.sd-menu-item[data-highlighted] {
+  background: var(--sd-hover);
+}
+
+.sd-menu-item:focus-visible {
+  outline: 2px solid var(--sd-focus-ring);
+  outline-offset: 2px;
+}
+
+.sd-menu-item[data-disabled] {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.sd-menu-item[data-danger="true"],
+.sd-menu-item[data-danger="true"] .sd-menu-item-icon {
+  color: var(--sd-danger);
+}
+
+.sd-menu-item[data-danger="true"][data-highlighted] {
+  background: var(--sd-danger-soft);
+}
+
+.sd-menu-item-icon {
+  display: inline-flex;
+  flex: none;
+  justify-content: center;
+  width: 16px;
+  color: var(--sd-muted);
+}
+
+.sd-menu-item-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sd-menu-shortcut {
+  margin-left: auto;
+  padding-left: 20px;
+}
+
+.sd-menu-separator {
+  height: 1px;
+  margin: 4px;
+  background: var(--sd-border);
+}
+
+.sd-context-menu {
+  position: fixed;
+  max-height: min(384px, calc(100dvh - 8px));
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+

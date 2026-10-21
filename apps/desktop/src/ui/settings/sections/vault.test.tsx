@@ -7,9 +7,9 @@ import { register, resolve } from '@rabjs/react'
 import { act, type ReactElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { FolderService } from '../../../services/folder.service'
-import { STAGE_ZOOM_VAR } from '../../../services/stage-zoom'
-import { VaultService } from '../../../services/vault.service'
+import { FolderService } from '../../../services/vault/folder.service'
+import { STAGE_ZOOM_VAR } from '../../../services/layout/stage-zoom'
+import { VaultService } from '../../../services/vault/vault.service'
 import { VaultSection } from './vault'
 
 function useMemoryFixture() {

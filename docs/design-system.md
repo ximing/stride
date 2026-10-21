@@ -39,7 +39,7 @@ Use semantic tokens (`--sd-bg`, `--sd-bg-elevated`, `--sd-fg`, `--sd-muted`, `--
 
 ## Shared component contracts
 
-Components live in `src/ui` and use the `sd-` prefix. Existing test IDs and accessible behavior must remain stable.
+Shared primitives live in `src/ui/primitives` and use the `sd-` prefix. Feature panels live in their own directories under `src/ui`. Existing test IDs and accessible behavior must remain stable.
 
 ### Button
 
@@ -51,7 +51,7 @@ Inputs have a visible bordered surface, 32px default height, 8px horizontal mini
 
 ### Select
 
-Use the Radix-backed `Select` from `src/ui/select.tsx`, not a raw native `<select>` in product UI. Its simple options API is:
+Use the Radix-backed `Select` from `src/ui/primitives/select.tsx`, not a raw native `<select>` in product UI. Its simple options API is:
 
 ```tsx
 <Select
@@ -67,7 +67,7 @@ Unknown trigger props such as `data-testid`, `aria-label`, `id`, and `className`
 
 ### Tabs
 
-Use the Radix-backed wrappers from `src/ui/tabs.tsx`: `Tabs`, `TabsList`, `TabsTrigger`, and `TabsContent`. They preserve Radix props, add `sd-tabs*` classes, and support icon + label content. Note editor tabs may keep their specialized close-button behavior but must use the same size, hover, selected, and focus tokens.
+Use the Radix-backed wrappers from `src/ui/primitives/tabs.tsx`: `Tabs`, `TabsList`, `TabsTrigger`, and `TabsContent`. They preserve Radix props, add `sd-tabs*` classes, and support icon + label content. Note editor tabs may keep their specialized close-button behavior but must use the same size, hover, selected, and focus tokens.
 
 ### Dialog, Menu, Toast, Tooltip
 

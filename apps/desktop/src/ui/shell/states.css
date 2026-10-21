@@ -1,0 +1,136 @@
+/* ---------- shared shell states and responsive fit ---------- */
+
+.chooser :focus-visible,
+.topbar :focus-visible,
+.rail :focus-visible,
+.tab-strip :focus-visible,
+.panel-head :focus-visible,
+.panel-rail :focus-visible,
+.statusbar :focus-visible {
+  outline: 2px solid var(--sd-accent);
+  outline-offset: 2px;
+}
+
+@media (max-width: 1200px) {
+  /* Cap only oversized columns: smaller custom widths still win, and widths
+     above this breakpoint remain entirely user-controlled. */
+  .workspace > .rail {
+    max-width: 200px !important;
+  }
+
+  .workspace > .note-list-col {
+    max-width: 240px !important;
+  }
+
+  .workspace > .panel {
+    max-width: 280px !important;
+  }
+
+  .workspace > .stage {
+    min-width: 0;
+    padding: var(--sd-space-4) var(--sd-space-3) var(--sd-space-6);
+  }
+
+  .stage > .tab-strip {
+    margin: calc(-1 * var(--sd-space-4)) calc(-1 * var(--sd-space-3)) var(--sd-space-3);
+  }
+
+  .panel-body {
+    padding: var(--sd-space-3) var(--sd-space-2) var(--sd-space-6);
+  }
+
+  .panel form,
+  .panel .sd-field,
+  .panel .property-row {
+    min-width: 0;
+  }
+}
+
+@media (max-width: 1100px) {
+  .search-mode {
+    display: none;
+  }
+
+  .statusbar-update-feedback {
+    max-width: 120px;
+  }
+}
+
+@media (max-width: 760px) {
+  .wordmark {
+    display: none;
+  }
+
+  .brand {
+    max-width: 132px;
+  }
+
+  .vault-switcher .vault-switcher-trigger.sd-btn {
+    max-width: 132px;
+  }
+
+  .statusbar-update-feedback,
+  .statusbar-version {
+    display: none;
+  }
+}
+
+@media (max-width: 560px) {
+  .topbar {
+    gap: 4px;
+    padding: 0 8px;
+  }
+
+  .search {
+    gap: 4px;
+  }
+
+  .search-submit.sd-btn {
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+
+  .search-submit.sd-btn .sd-btn-icon {
+    display: none;
+  }
+
+  .statusbar {
+    gap: 2px;
+    padding: 0 8px;
+  }
+}
+
+@media (max-width: 520px) {
+  .chooser {
+    padding: 16px;
+  }
+
+  .chooser-panel {
+    padding: 24px;
+  }
+
+  .chooser-actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .chooser-actions .sd-btn {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .chooser-git-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .chooser-git-row > .sd-btn {
+    align-self: flex-end;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vault-switcher-trigger > svg {
+    transition: none;
+  }
+}

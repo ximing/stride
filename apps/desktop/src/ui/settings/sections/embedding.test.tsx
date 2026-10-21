@@ -5,8 +5,8 @@ import { MemorySecretsStore } from '@stride/platform'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { resetSecretsStore, setSecretsStore, SETTINGS_STORAGE_KEY, SettingsService } from '../../../services/panels.service'
-import { VaultService } from '../../../services/vault.service'
+import { resetSecretsStore, setSecretsStore, SETTINGS_STORAGE_KEY, SettingsService } from '../../../services/settings/settings.service'
+import { VaultService } from '../../../services/vault/vault.service'
 import { degradedReason, EmbeddingSection, parseEmbeddingDim } from './embedding'
 
 function defaultForm() {

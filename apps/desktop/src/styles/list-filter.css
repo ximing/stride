@@ -1,0 +1,43 @@
+/* ---------- list filter (note list header) ---------- */
+
+.list-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin: 0.15rem 0.85rem 0.45rem;
+  padding: 0 0.45rem;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+  background: var(--sd-bg-elevated);
+  color: var(--sd-muted);
+}
+
+.list-filter:focus-within {
+  border-color: var(--sd-accent);
+}
+
+.list-filter .list-filter-input {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+  border: none;
+  padding: 0.3rem 0;
+  font-size: 0.85rem;
+}
+
+.list-filter .list-filter-clear {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  width: auto;
+  padding: 0.15rem;
+  border: none;
+  border-radius: 4px;
+  color: var(--sd-muted);
+}
+
+.list-filter .list-filter-clear:hover:not(:disabled) {
+  color: var(--sd-fg);
+  background: var(--sd-bg);
+}
+
