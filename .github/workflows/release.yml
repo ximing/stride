@@ -1,16 +1,27 @@
-# Release pipeline (T8.4): tag push v* -> macOS arm64/x64 builds ->
-# signed updater artifacts -> latest.json -> GitHub Release.
+# Release pipeline (T8.4, multi-platform extension 2026-10-21): tag push v* ->
+# macOS arm64/x64 + Linux x64 + Windows x64 builds -> signed updater artifacts
+# -> latest.json -> GitHub Release.
 #
-# Flow: two build jobs produce `Stride_{arch}.app.tar.gz` + `.sig` (minisign,
-# key from repo secrets), the release job assembles the static `latest.json`
-# via scripts/make-latest-json.mjs and attaches everything to the Release for
-# the pushed tag. The app's version is injected from the tag by
+# Flow: four build jobs produce the per-platform updater artifacts + `.sig`
+# (minisign, key from repo secrets), the release job assembles the static
+# `latest.json` via scripts/make-latest-json.mjs and attaches everything to the
+# Release for the pushed tag. The app's version is injected from the tag by
 # scripts/set-version.mjs, so the tag is the single source of the version.
+#
+# Updater artifact shapes (tauri v2 bundler, createUpdaterArtifacts):
+#   darwin-aarch64  Stride_aarch64.app.tar.gz       (+ .sig)
+#   darwin-x86_64   Stride_x64.app.tar.gz           (+ .sig)
+#   linux-x86_64    Stride_x86_64.AppImage.tar.gz   (+ .sig)
+#   windows-x86_64  Stride_x86_64-setup.nsis.zip    (+ .sig, zip-wrapped NSIS
+#                   installer — unpacked by the updater plugin's `zip` feature)
+# make-latest-json.mjs requires all four platforms to be present.
 #
 # Security posture: tag-push-only trigger (no PR / fork paths reach the
 # secrets), top-level `permissions` limited to `contents: write` (creating
 # the Release and uploading assets), signing secrets referenced only as env
 # of the single build step, actions pinned to major versions.
+# APPLE_SIGNING_IDENTITY='-' ad-hoc signs the mac builds so Apple Silicon
+# DMGs show "unidentified developer" instead of "damaged".
 
 name: Release
 
@@ -22,8 +33,14 @@ on:
 permissions:
   contents: write
 
+defaults:
+  run:
+    # Windows runners default to PowerShell; every step below is written in
+    # portable POSIX shell, so pin bash everywhere.
+    shell: bash
+
 jobs:
-  build-macos:
+  build:
     name: build ${{ matrix.rust-target }}
     runs-on: ${{ matrix.os }}
     strategy:
@@ -32,12 +49,28 @@ jobs:
         include:
           - os: macos-latest # arm64 runner
             rust-target: aarch64-apple-darwin
-            arch: aarch64
+            token: aarch64
+            artifact: updater-macos-aarch64
           - os: macos-15-intel # x64 runner
             rust-target: x86_64-apple-darwin
-            arch: x64
+            token: x64
+            artifact: updater-macos-x64
+          - os: ubuntu-22.04 # oldest supported runner => lowest glibc baseline
+            rust-target: x86_64-unknown-linux-gnu
+            token: x86_64
+            artifact: updater-linux-x86_64
+          - os: windows-latest
+            rust-target: x86_64-pc-windows-msvc
+            token: x86_64
+            artifact: updater-windows-x86_64
     steps:
       - uses: actions/checkout@v5
+
+      - name: Install Linux webkit/gtk build deps
+        if: matrix.os == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf xdg-utils
 
       - uses: pnpm/action-setup@v4 # reads packageManager from package.json
 
@@ -66,8 +99,10 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: '-' # ad-hoc sign, macOS only (no-op elsewhere)
 
       - name: Verify built version matches tag
+        if: runner.os == 'macOS'
         run: |
           APP="apps/desktop/src-tauri/target/${{ matrix.rust-target }}/release/bundle/macos/Stride.app"
           BUILT="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")"
@@ -78,22 +113,46 @@ jobs:
           fi
           echo "built app version: $BUILT"
 
-      - name: Stage per-arch artifacts
+      # Stage the updater artifact (+ .sig) under a stable, platform-tokened
+      # name; tauri's raw names embed the version, latest.json needs stable
+      # ones. Bundle dir layout differs per OS, hence the per-OS branches.
+      - name: Stage updater artifacts (macOS)
+        if: runner.os == 'macOS'
         run: |
           SRC="apps/desktop/src-tauri/target/${{ matrix.rust-target }}/release/bundle/macos"
           mkdir dist-release
-          cp "$SRC/Stride.app.tar.gz" "dist-release/Stride_${{ matrix.arch }}.app.tar.gz"
-          cp "$SRC/Stride.app.tar.gz.sig" "dist-release/Stride_${{ matrix.arch }}.app.tar.gz.sig"
+          cp "$SRC/Stride.app.tar.gz" "dist-release/Stride_${{ matrix.token }}.app.tar.gz"
+          cp "$SRC/Stride.app.tar.gz.sig" "dist-release/Stride_${{ matrix.token }}.app.tar.gz.sig"
+
+      - name: Stage updater artifacts (Linux)
+        if: runner.os == 'Linux'
+        run: |
+          BUNDLE="apps/desktop/src-tauri/target/${{ matrix.rust-target }}/release/bundle"
+          mkdir dist-release
+          # find (not a fixed dir) because the bundler may emit the updater
+          # archive into `appimage/` or `appimage-updater/`
+          cp "$(find "$BUNDLE" -name 'Stride_*.AppImage.tar.gz')" "dist-release/Stride_x86_64.AppImage.tar.gz"
+          cp "$(find "$BUNDLE" -name 'Stride_*.AppImage.tar.gz.sig')" "dist-release/Stride_x86_64.AppImage.tar.gz.sig"
+
+      - name: Stage updater artifacts (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          BUNDLE="apps/desktop/src-tauri/target/${{ matrix.rust-target }}/release/bundle"
+          mkdir dist-release
+          # find (not a fixed dir) because the bundler may emit the zip-wrapped
+          # installer into `nsis/` or `nsis-updater/`
+          cp "$(find "$BUNDLE" -name 'Stride_*-setup.nsis.zip')" "dist-release/Stride_x86_64-setup.nsis.zip"
+          cp "$(find "$BUNDLE" -name 'Stride_*-setup.nsis.zip.sig')" "dist-release/Stride_x86_64-setup.nsis.zip.sig"
 
       - uses: actions/upload-artifact@v4
         with:
-          name: updater-macos-${{ matrix.arch }}
+          name: ${{ matrix.artifact }}
           path: dist-release/
           if-no-files-found: error
 
   release:
     name: publish latest.json + release assets
-    needs: build-macos
+    needs: build
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
@@ -108,7 +167,7 @@ jobs:
 
       - uses: actions/download-artifact@v4
         with:
-          pattern: updater-macos-*
+          pattern: updater-*
           path: dist-release
           merge-multiple: true
 
@@ -136,3 +195,7 @@ jobs:
             dist-release/Stride_aarch64.app.tar.gz.sig
             dist-release/Stride_x64.app.tar.gz
             dist-release/Stride_x64.app.tar.gz.sig
+            dist-release/Stride_x86_64.AppImage.tar.gz
+            dist-release/Stride_x86_64.AppImage.tar.gz.sig
+            dist-release/Stride_x86_64-setup.nsis.zip
+            dist-release/Stride_x86_64-setup.nsis.zip.sig

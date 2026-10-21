@@ -47,17 +47,20 @@
   "bundle": {
     "active": true,
     "createUpdaterArtifacts": true,
-    "targets": ["app", "dmg"],
+    "targets": "all",
     "publisher": "Ximing",
     "category": "public.app-category.productivity",
     "shortDescription": "Local-first rich-text notes",
     "longDescription": "Stride is a local-first notes app: a folder of rich-text notes, versioned with git, with search and an AI agent. No account, no server — your notes stay on your machine.",
     "copyright": "Copyright (c) 2026 Ximing",
     "icon": [
+      "icons/16x16.png",
       "icons/32x32.png",
       "icons/128x128.png",
       "icons/128x128@2x.png",
+      "icons/256x256.png",
       "icons/icon.icns",
+      "icons/icon.ico",
       "icons/icon.png"
     ],
     "macOS": {

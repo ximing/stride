@@ -1,16 +1,26 @@
 #!/usr/bin/env node
-// Build the static `latest.json` consumed by tauri-plugin-updater (T8.4).
+// Build the static `latest.json` consumed by tauri-plugin-updater (T8.4,
+// extended to all four desktop platforms 2026-10-21).
 //
 // Shared by the release workflow and local dry-runs so there is exactly one
 // implementation of the manifest format. Input is a directory holding the
-// renamed per-arch updater artifacts:
+// renamed per-platform updater artifacts:
 //
-//   Stride_aarch64.app.tar.gz      + Stride_aarch64.app.tar.gz.sig
-//   Stride_x64.app.tar.gz          + Stride_x64.app.tar.gz.sig
+//   Stride_aarch64.app.tar.gz        + .sig   (darwin-aarch64)
+//   Stride_x64.app.tar.gz            + .sig   (darwin-x86_64)
+//   Stride_x86_64.AppImage.tar.gz    + .sig   (linux-x86_64)
+//   Stride_x86_64-setup.nsis.zip     + .sig   (windows-x86_64)
 //
-// (Any filename works as long as it contains `aarch64`/`arm64` or
-// `x64`/`x86_64` and sits next to a `<name>.sig` — tauri's raw output is
-// arch-less, so the pipeline renames it before calling this script.)
+// (Any filename works as long as it hits one of the MATCHERS rules below and
+// sits next to a `<name>.sig` — tauri's raw output is arch-less and
+// version-stamped, so the pipeline renames it before calling this script.)
+//
+// Windows artifact shape: tauri v2's bundler wraps the NSIS installer in a
+// stored-mode zip (`*-setup.nsis.zip`, see tauri-bundler bundle/updater_bundle.rs)
+// and the plugin unpacks it via its `zip` feature. Linux ships the AppImage as
+// `.AppImage.tar.gz` for the same reason.
+//
+// All four platforms are REQUIRED: a release ships everywhere or not at all.
 //
 // Usage:
 //   node scripts/make-latest-json.mjs --artifacts dist --tag v0.1.1 \
@@ -47,21 +57,47 @@ if (!/^v\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(tag)) {
 }
 const version = tag.replace(/^v/, '')
 
-// Arch token -> updater platform key. Windows/Linux join in T9.7.
-// Filenames come from our own pipeline (renamed with explicit arch tokens),
+// Platform keys follow the tauri-plugin-updater target triple convention
+// (`{os}-{arch}`), see the `platforms` map in the updater manifest docs.
+//
+// Filenames come from our own pipeline (renamed with explicit platform tokens),
 // so plain substring matching is enough; no word boundaries — `_` counts as a
 // word char and would defeat `\bx64\b` against `Stride_x64.app.tar.gz`.
-const ARCH_MATCHERS = [
-  [/aarch64|arm64/, 'darwin-aarch64'],
-  [/x86_64|x64/i, 'darwin-x86_64'],
+// Rules are ordered and extension-scoped so the `x64`-ish mac token can never
+// swallow the linux/windows files and vice versa.
+const MATCHERS = [
+  {
+    platform: 'darwin-aarch64',
+    match: (name) => name.endsWith('.app.tar.gz') && /aarch64|arm64/.test(name),
+  },
+  {
+    platform: 'darwin-x86_64',
+    match: (name) => name.endsWith('.app.tar.gz') && /x86_64|x64/i.test(name),
+  },
+  {
+    platform: 'linux-x86_64',
+    match: (name) => name.endsWith('.AppImage.tar.gz'),
+  },
+  {
+    platform: 'windows-x86_64',
+    match: (name) => name.endsWith('-setup.nsis.zip') || name.endsWith('.msi.zip') || name.endsWith('.msi') || name.endsWith('-setup.exe'),
+  },
 ]
+
+const REQUIRED_PLATFORMS = ['darwin-aarch64', 'darwin-x86_64', 'linux-x86_64', 'windows-x86_64']
 
 const platforms = {}
 for (const entry of readdirSync(artifactsDir).sort()) {
-  if (!entry.endsWith('.app.tar.gz')) continue
-  const match = ARCH_MATCHERS.find(([re]) => re.test(entry))
-  if (!match) continue
-  const platform = match[1]
+  if (entry.endsWith('.sig')) continue
+  const rule = MATCHERS.find(({ match }) => match(entry))
+  if (!rule) {
+    if (/\.(tar\.gz|zip|exe|msi|AppImage|app)$/.test(entry)) {
+      console.error(`unrecognized updater artifact (no platform match): ${entry}`)
+      process.exit(1)
+    }
+    continue
+  }
+  const { platform } = rule
   if (platforms[platform]) {
     console.error(`multiple artifacts for ${platform}: ${platforms[platform].name}, ${entry}`)
     process.exit(1)
@@ -85,9 +121,19 @@ for (const entry of readdirSync(artifactsDir).sort()) {
   }
 }
 
-for (const platform of ['darwin-aarch64', 'darwin-x86_64']) {
+const ARTIFACT_SHAPES = {
+  'darwin-aarch64': 'Stride_aarch64.app.tar.gz',
+  'darwin-x86_64': 'Stride_x64.app.tar.gz',
+  'linux-x86_64': 'Stride_x86_64.AppImage.tar.gz',
+  'windows-x86_64': 'Stride_x86_64-setup.nsis.zip',
+}
+
+for (const platform of REQUIRED_PLATFORMS) {
   if (!platforms[platform]) {
-    console.error(`no .app.tar.gz for ${platform} in ${artifactsDir} (looked for *aarch64*/*x64* names)`)
+    console.error(
+      `missing updater artifact for ${platform} in ${artifactsDir}\n` +
+        `  expected ${ARTIFACT_SHAPES[platform]} (+ .sig)`,
+    )
     process.exit(1)
   }
 }
