@@ -1,7 +1,7 @@
-// Full-screen settings overlay (T7.1). Not a route and not an editor tab: a
-// Radix dialog covering the workspace, so Esc, focus trapping, and focus
-// restore come from Dialog. Open/close state lives in SettingsPageService;
-// sections come from the registry in sections.ts.
+// Settings dialog. Not a route and not an editor tab: a centered Radix dialog
+// over the workspace, so the overlay, Esc, focus trapping, and focus restore
+// come from Dialog. Open/close state lives in SettingsPageService; sections
+// come from the registry in sections.ts.
 
 import * as Dialog from '@radix-ui/react-dialog'
 import { observer, useService } from '@rabjs/react'
@@ -28,17 +28,28 @@ export const SettingsPage = observer(function SettingsPage() {
       }}
     >
       <Dialog.Portal>
+        <Dialog.Overlay className="sd-overlay settings-backdrop" />
         <Dialog.Content
           className="settings-page"
           data-testid="settings-page"
           aria-label={t('settings.title')}
           onCloseAutoFocus={restoreFocus}
         >
-          <Dialog.Description className="settings-sr-only">
-            {t('settings.description')}
-          </Dialog.Description>
-          <div className="settings-sidebar">
+          <header className="settings-header">
             <Dialog.Title className="settings-title">{t('settings.title')}</Dialog.Title>
+            <Dialog.Description className="settings-sr-only">
+              {t('settings.description')}
+            </Dialog.Description>
+            <Dialog.Close asChild>
+              <IconButton
+                icon={X}
+                label={t('settings.close')}
+                className="settings-close"
+                data-testid="settings-close"
+              />
+            </Dialog.Close>
+          </header>
+          <div className="settings-sidebar">
             <nav className="settings-nav" aria-label={t('settings.nav')}>
               {SETTINGS_SECTIONS.map((section) => (
                 <button
@@ -57,17 +68,7 @@ export const SettingsPage = observer(function SettingsPage() {
           </div>
           <div className="settings-content" data-testid="settings-content">
             <div className="settings-content-inner">
-              <div className="settings-content-head">
-                <h2 className="settings-section-title">{t(`settings.sections.${active.id}`)}</h2>
-                <Dialog.Close asChild>
-                  <IconButton
-                    icon={X}
-                    label={t('settings.close')}
-                    className="settings-close"
-                    data-testid="settings-close"
-                  />
-                </Dialog.Close>
-              </div>
+              <h2 className="settings-section-title">{t(`settings.sections.${active.id}`)}</h2>
               <Body />
             </div>
           </div>

@@ -1,7 +1,7 @@
-// Settings page overlay state: open flag plus the active section. The page is
-// a full-screen overlay (not a route, not an editor tab), so its service is a
-// global singleton registered in main.tsx. It joins the overlay cohort, so
-// opening it closes quick open / search / palette and vice versa.
+// Settings dialog state: open flag plus the active section. The dialog is a
+// centered modal (not a route, not an editor tab), so its service is a global
+// singleton registered in main.tsx. It joins the overlay cohort, so opening
+// it closes quick open / search / palette and vice versa.
 
 import { has, register, Service } from '@rabjs/react'
 import { closeOtherOverlays } from '../platform/overlays'

@@ -21,7 +21,7 @@ function press(init: KeyboardEventInit, target: Window | Document = window): Key
   return event
 }
 
-describe('settings page overlay', () => {
+describe('settings dialog', () => {
   let host: HTMLDivElement | null = null
   let root: Root | null = null
   let settingsTrigger: HTMLButtonElement | null = null
@@ -59,6 +59,7 @@ describe('settings page overlay', () => {
     })
     const page = document.querySelector('[data-testid="settings-page"]')
     expect(page).not.toBeNull()
+    expect(document.querySelector('.settings-backdrop')).not.toBeNull()
     expect(document.querySelector('[data-testid="settings-section-appearance"]')).not.toBeNull()
     expect(document.querySelector('[data-testid="settings-nav-appearance"]')?.getAttribute('aria-current')).toBe('page')
   })
@@ -94,6 +95,7 @@ describe('settings page overlay', () => {
     })
     expect(service.open).toBe(false)
     expect(document.querySelector('[data-testid="settings-page"]')).toBeNull()
+    expect(document.querySelector('.settings-backdrop')).toBeNull()
 
     await act(async () => {
       service.show()

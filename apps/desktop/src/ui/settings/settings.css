@@ -1,19 +1,39 @@
-/* Full-screen desktop settings. Layout and shared section primitives consume
-   only the theme-aware --sd-* tokens. */
+/* Centered settings dialog. Layout and shared section primitives consume
+   only the theme-aware --sd-* tokens. The surface stays the workspace canvas
+   so section controls that highlight with --sd-bg-elevated still read. */
 
 .settings-page {
   position: fixed;
-  inset: 0;
-  z-index: 55;
+  top: 50%;
+  left: 50%;
+  z-index: var(--sd-z-modal);
   display: grid;
-  grid-template-columns: clamp(200px, 18vw, 224px) minmax(0, 1fr);
-  grid-template-rows: minmax(0, 1fr);
+  grid-template-columns: 220px minmax(0, 1fr);
+  grid-template-rows: auto minmax(0, 1fr);
+  width: min(920px, calc(100vw - 48px));
+  height: min(720px, calc(100dvh - 48px));
+  overflow: hidden;
+  transform: translate(-50%, -50%);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-dialog);
   background: var(--sd-bg);
   color: var(--sd-fg);
+  box-shadow: var(--sd-shadow-lg);
   font-family: var(--sd-font-sans);
   font-size: 14px;
   line-height: 1.45;
   outline: none;
+}
+
+.settings-page[data-state='open'] {
+  animation: sd-modal-in var(--sd-motion-dialog) var(--sd-ease-standard);
+}
+
+/* Close without waiting on the shared overlay fade. That animation does not
+   finish when the tab is in the background, and Radix then leaves the scrim
+   mounted over the workspace. */
+.settings-backdrop[data-state='closed'] {
+  animation: none !important;
 }
 
 .settings-page *,
@@ -27,9 +47,19 @@
   outline-offset: 2px;
 }
 
+.settings-header {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 10px 12px 10px 20px;
+  border-bottom: 1px solid var(--sd-border);
+}
+
 .settings-title {
   margin: 0;
-  padding: 20px 12px 16px;
   font-size: 20px;
   font-weight: 600;
   line-height: 28px;
@@ -53,12 +83,13 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  padding: 0 12px 20px;
+  padding: 12px;
   border-right: 1px solid var(--sd-border);
   background: var(--sd-bg);
 }
 
 .settings-nav {
+  flex: 1;
   min-height: 0;
   display: flex;
   flex-direction: column;
@@ -97,25 +128,14 @@
 }
 
 .settings-nav-item:hover {
-  background: var(--sd-bg-elevated);
+  background: var(--sd-inset);
   color: var(--sd-fg);
 }
 
 .settings-nav-item[aria-current='page'] {
-  background: var(--sd-bg-elevated);
+  background: color-mix(in srgb, var(--sd-accent) 11%, transparent);
   color: var(--sd-fg);
-  font-weight: 600;
-}
-
-.settings-nav-item[aria-current='page']::before {
-  content: '';
-  position: absolute;
-  top: 8px;
-  bottom: 8px;
-  left: 0;
-  width: 2px;
-  border-radius: 2px;
-  background: var(--sd-accent);
+  font-weight: 500;
 }
 
 .settings-nav-item[aria-current='page'] > svg {
@@ -135,19 +155,10 @@
   margin: 0 auto;
 }
 
-.settings-content-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  min-height: 32px;
-  padding-bottom: 16px;
-  margin-bottom: 24px;
-  border-bottom: 1px solid var(--sd-border);
-}
-
 .settings-section-title {
-  margin: 0;
+  margin: 0 0 20px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--sd-border);
   font-size: 16px;
   font-weight: 600;
   line-height: 24px;
@@ -157,16 +168,17 @@
   flex: none;
 }
 
-/* Shared single-choice control used by Appearance and This Vault. */
+/* Shared single-choice control used by Appearance and This Vault.
+   Track-and-thumb segmented idiom (see docs/design-system.md > Tabs). */
 .settings-segmented {
   display: inline-flex;
   align-items: stretch;
   gap: 2px;
   max-width: 100%;
   padding: 2px;
-  border: 1px solid var(--sd-border);
+  border: 1px solid transparent;
   border-radius: var(--sd-radius-lg);
-  background: var(--sd-bg);
+  background: var(--sd-inset);
 }
 
 .settings-page .settings-segment.sd-btn {
@@ -176,22 +188,22 @@
   border-radius: var(--sd-radius);
   background: transparent;
   color: var(--sd-muted);
-  box-shadow: inset 0 0 0 0 transparent;
+  box-shadow: none;
   font-size: 13px;
   font-weight: 400;
   white-space: nowrap;
 }
 
-.settings-page .settings-segment.sd-btn:hover:not(:disabled) {
-  background: var(--sd-bg-elevated);
+.settings-page .settings-segment.sd-btn:hover:not(:disabled):not([aria-pressed='true']) {
+  background: transparent;
   color: var(--sd-fg);
 }
 
 .settings-page .settings-segment.sd-btn[aria-pressed='true'] {
   background: var(--sd-bg-elevated);
   color: var(--sd-fg);
-  box-shadow: inset 0 -2px 0 var(--sd-accent);
-  font-weight: 600;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--sd-fg) 18%, transparent);
+  font-weight: 500;
 }
 
 /* Native choice behavior stays intact; dimensions and state treatment are
@@ -274,17 +286,19 @@
 @media (max-width: 640px) {
   .settings-page {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: auto minmax(0, 1fr);
+    grid-template-rows: auto auto minmax(0, 1fr);
+    width: min(920px, calc(100vw - 16px));
+    height: min(720px, calc(100dvh - 16px));
+  }
+
+  .settings-header {
+    padding: 8px 8px 8px 16px;
   }
 
   .settings-sidebar {
-    padding: 0 12px 10px;
+    padding: 8px 12px;
     border-right: 0;
     border-bottom: 1px solid var(--sd-border);
-  }
-
-  .settings-title {
-    padding: 12px 4px 10px;
   }
 
   .settings-nav {
@@ -313,17 +327,19 @@
     padding: 16px 16px 32px;
   }
 
-  .settings-content-head {
-    margin-bottom: 20px;
+  .settings-section-title {
+    margin-bottom: 16px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
+  .settings-page,
   .settings-page *,
   .settings-page *::before,
   .settings-page *::after {
     scroll-behavior: auto !important;
     transition: none !important;
+    animation: none !important;
   }
 
   .settings-ai-spin,
