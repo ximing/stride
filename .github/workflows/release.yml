@@ -11,7 +11,8 @@
 # Updater artifact shapes (tauri v2 bundler, createUpdaterArtifacts):
 #   darwin-aarch64  Stride_aarch64.app.tar.gz       (+ .sig)
 #   darwin-x86_64   Stride_x64.app.tar.gz           (+ .sig)
-#   linux-x86_64    Stride_x86_64.AppImage.tar.gz   (+ .sig)
+#   linux-x86_64    Stride_x86_64.AppImage          (+ .sig, raw AppImage —
+#                   tauri v2 does NOT tar.gz-wrap Linux updater artifacts)
 #   windows-x86_64  Stride_x86_64-setup.exe         (+ .sig, raw NSIS installer —
 #                   tauri v2 does NOT zip-wrap Windows updater artifacts)
 # make-latest-json.mjs requires all four platforms to be present.
@@ -131,8 +132,8 @@ jobs:
           mkdir dist-release
           # find (not a fixed dir) because the bundler may emit the updater
           # archive into `appimage/` or `appimage-updater/`
-          cp "$(find "$BUNDLE" -name 'Stride_*.AppImage.tar.gz')" "dist-release/Stride_x86_64.AppImage.tar.gz"
-          cp "$(find "$BUNDLE" -name 'Stride_*.AppImage.tar.gz.sig')" "dist-release/Stride_x86_64.AppImage.tar.gz.sig"
+          cp "$(find "$BUNDLE" -name 'Stride_*.AppImage')" "dist-release/Stride_x86_64.AppImage"
+          cp "$(find "$BUNDLE" -name 'Stride_*.AppImage.sig')" "dist-release/Stride_x86_64.AppImage.sig"
 
       - name: Stage updater artifacts (Windows)
         if: runner.os == 'Windows'
@@ -197,7 +198,7 @@ jobs:
             dist-release/Stride_aarch64.app.tar.gz.sig
             dist-release/Stride_x64.app.tar.gz
             dist-release/Stride_x64.app.tar.gz.sig
-            dist-release/Stride_x86_64.AppImage.tar.gz
-            dist-release/Stride_x86_64.AppImage.tar.gz.sig
+            dist-release/Stride_x86_64.AppImage
+            dist-release/Stride_x86_64.AppImage.sig
             dist-release/Stride_x86_64-setup.exe
             dist-release/Stride_x86_64-setup.exe.sig

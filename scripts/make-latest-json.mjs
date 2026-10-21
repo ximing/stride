@@ -8,7 +8,7 @@
 //
 //   Stride_aarch64.app.tar.gz        + .sig   (darwin-aarch64)
 //   Stride_x64.app.tar.gz            + .sig   (darwin-x86_64)
-//   Stride_x86_64.AppImage.tar.gz    + .sig   (linux-x86_64)
+//   Stride_x86_64.AppImage           + .sig   (linux-x86_64)
 //   Stride_x86_64-setup.exe          + .sig   (windows-x86_64)
 //
 // (Any filename works as long as it hits one of the MATCHERS rules below and
@@ -17,8 +17,8 @@
 //
 // Windows artifact shape: tauri v2 ships the raw NSIS installer as the
 // updater artifact (no zip wrapper — verified empirically on CI, tauri-cli
-// 2.12: `bundle/nsis/Stride_<ver>_x64-setup.exe` + `.sig`). Linux ships the
-// AppImage as `.AppImage.tar.gz`.
+// 2.12: `bundle/nsis/Stride_<ver>_x64-setup.exe` + `.sig`). Linux likewise
+// ships the raw AppImage (verified on CI: `bundle/appimage/*.AppImage.sig`).
 //
 // All four platforms are REQUIRED: a release ships everywhere or not at all.
 //
@@ -76,7 +76,7 @@ const MATCHERS = [
   },
   {
     platform: 'linux-x86_64',
-    match: (name) => name.endsWith('.AppImage.tar.gz'),
+    match: (name) => name.endsWith('.AppImage'),
   },
   {
     platform: 'windows-x86_64',
@@ -124,7 +124,7 @@ for (const entry of readdirSync(artifactsDir).sort()) {
 const ARTIFACT_SHAPES = {
   'darwin-aarch64': 'Stride_aarch64.app.tar.gz',
   'darwin-x86_64': 'Stride_x64.app.tar.gz',
-  'linux-x86_64': 'Stride_x86_64.AppImage.tar.gz',
+  'linux-x86_64': 'Stride_x86_64.AppImage',
   'windows-x86_64': 'Stride_x86_64-setup.exe',
 }
 
