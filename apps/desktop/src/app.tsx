@@ -1,12 +1,15 @@
-import { Notebook } from '@phosphor-icons/react'
 import { observer, useService } from '@rabjs/react'
+import { BookOpen, FolderOpen, FolderPlus, GitBranch, Notebook } from 'lucide-react'
 import { useEffect } from 'react'
 import { NoteEditor } from './editor'
 import { LayoutService } from './services/layout.service'
 import { GitService, SettingsService } from './services/panels.service'
 import { VaultService } from './services/vault.service'
+import { Button } from './ui/button'
 import { CommandPalette } from './ui/command-palette'
 import { EmptyState } from './ui/empty-state'
+import { Mark } from './ui/icon'
+import { Input } from './ui/input'
 import { NoteList } from './ui/note-list'
 import { QuickOpen } from './ui/quick-open'
 import { ResizeHandle } from './ui/resize-handle'
@@ -30,52 +33,90 @@ const Chooser = observer(function Chooser() {
   const git = useService(GitService)
   return (
     <section className="chooser" data-testid="vault-surface">
-      <div className="chooser-copy">
-        <div className="eyebrow">Local first</div>
-        <h1>Stride</h1>
-        <p>A folder of rich-text notes. Git moves them. Nothing here needs an account.</p>
-      </div>
-      <form
-        className="chooser-form"
-        onSubmit={(event) => {
-          event.preventDefault()
-        }}
-      >
-        <p className="chooser-lead">Welcome. Start an empty vault, open a folder, or clone the sample notes.</p>
-        <div className="chooser-actions">
-          <button className="primary" type="button" data-testid="new-vault" onClick={() => void vault.createNewVault()}>
-            New vault
-          </button>
-          <button className="primary" type="button" data-testid="open-vault" onClick={() => void vault.openFromDraft()}>
-            Open vault
-          </button>
-          <button className="primary" type="button" data-testid="clone-sample" onClick={() => void vault.cloneSampleVault()}>
-            Clone sample
-          </button>
-          <input
-            data-testid="git-clone-url"
-            value={git.cloneUrl}
-            onChange={(event) => git.setCloneUrl(event.target.value)}
-          />
-          <button
-            className="primary"
-            type="button"
-            data-testid="git-clone"
-            disabled={git.surface === 'unavailable'}
-            onClick={() => {
-              if (git.surface === 'unavailable') return
-              void git.cloneRemote()
-            }}
-          >
-            Clone
-          </button>
+      <div className="chooser-panel">
+        <div className="chooser-copy">
+          <div className="chooser-brand">
+            <span className="chooser-brand-mark" aria-hidden="true">
+              <Mark icon={Notebook} size={22} />
+            </span>
+            <h1>Stride</h1>
+          </div>
+          <p className="chooser-lead">A local-first workspace for your notes.</p>
+          <p className="chooser-description">
+            Keep rich-text notes in a folder you control. Use Git for history and sync when you need it—no account required.
+          </p>
         </div>
-        {git.surface === 'unavailable' && (
-          <p data-testid="git-clone-unavailable">git clone needs the desktop app</p>
-        )}
-        {git.cloneError && <p className="error" data-testid="git-clone-error">{git.cloneError}</p>}
-        {vault.error && <p className="error" data-testid="vault-error" role="alert">{vault.error}</p>}
-      </form>
+        <form
+          className="chooser-form"
+          onSubmit={(event) => {
+            event.preventDefault()
+          }}
+        >
+          <div className="chooser-start">
+            <div className="chooser-section-label">Start a workspace</div>
+            <div className="chooser-actions">
+              <Button
+                tone="primary"
+                size="lg"
+                icon={<Mark icon={FolderPlus} size={16} />}
+                data-testid="new-vault"
+                onClick={() => void vault.createNewVault()}
+              >
+                New vault
+              </Button>
+              <Button
+                tone="secondary"
+                size="lg"
+                icon={<Mark icon={FolderOpen} size={16} />}
+                data-testid="open-vault"
+                onClick={() => void vault.openFromDraft()}
+              >
+                Open vault
+              </Button>
+              <Button
+                tone="quiet"
+                size="lg"
+                icon={<Mark icon={BookOpen} size={16} />}
+                data-testid="clone-sample"
+                onClick={() => void vault.cloneSampleVault()}
+              >
+                Clone sample
+              </Button>
+            </div>
+          </div>
+          <div className="chooser-git">
+            <div className="chooser-git-row">
+              <Input
+                label="Git repository URL"
+                className="chooser-git-input"
+                data-testid="git-clone-url"
+                placeholder="https://github.com/you/notes.git"
+                value={git.cloneUrl}
+                onChange={(event) => git.setCloneUrl(event.target.value)}
+                spellCheck={false}
+              />
+              <Button
+                tone="secondary"
+                size="md"
+                icon={<Mark icon={GitBranch} size={16} />}
+                data-testid="git-clone"
+                disabled={git.surface === 'unavailable'}
+                onClick={() => {
+                  if (git.surface === 'unavailable') return
+                  void git.cloneRemote()
+                }}
+              >
+                Clone
+              </Button>
+            </div>
+            {git.surface === 'unavailable' && (
+              <p className="chooser-hint" data-testid="git-clone-unavailable">git clone needs the desktop app</p>
+            )}
+            {git.cloneError && <p className="error chooser-error" data-testid="git-clone-error" role="alert">{git.cloneError}</p>}
+          </div>
+          {vault.error && <p className="error chooser-error" data-testid="vault-error" role="alert">{vault.error}</p>}
+        </form>
+      </div>
     </section>
   )
 })
@@ -143,14 +184,15 @@ const Workspace = observer(function Workspace() {
                         : ''}
                 </span>
                 {vault.saveStatus === 'error' && (
-                  <button
-                    type="button"
+                  <Button
+                    tone="secondary"
+                    size="sm"
                     className="save-retry"
                     data-testid="save-retry"
                     onClick={() => { void vault.flush() }}
                   >
                     重试
-                  </button>
+                  </Button>
                 )}
                 <label className="rename-toggle">
                   <input

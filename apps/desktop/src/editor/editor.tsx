@@ -1,13 +1,17 @@
 import type { TipTapNode } from '@stride/core/note'
 import { isArchived, plainText, stripLeadingH1 } from '@stride/core/note'
 import { EditorContent, useEditor } from '@tiptap/react'
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { observer, useService } from '@rabjs/react'
 import { TabsService } from '../services/tabs.service'
 import { VaultService } from '../services/vault.service'
 import { createEditorExtensions } from './extensions'
 import { useEditorContextMenu } from './editor-context-menu'
+import { installImeEnterGuard } from './ime-enter'
+import { setMathClickHandler, updateMathLatex } from './math'
+import { EditorPrompt } from './prompt'
 import { plainTextSelection } from './search-jump'
+import { TableContextMenu } from './table-menu'
 import { EditorFind } from './find-bar'
 import { EditorToolbar } from './toolbar'
 import { resolveWikilinkClick } from './wikilink'
@@ -83,10 +87,21 @@ export const NoteEditor = observer(function NoteEditor() {
     return () => window.removeEventListener('stride-search-jump', onJump)
   }, [editor, vault])
 
+  const [mathPrompt, setMathPrompt] = useState<{ pos: number; kind: 'inline' | 'block'; latex: string } | null>(null)
+  useEffect(() => {
+    installImeEnterGuard()
+  }, [])
+  useEffect(() => {
+    if (!editor) return
+    setMathClickHandler((pos, kind, latex) => setMathPrompt({ pos, kind, latex }))
+    return () => setMathClickHandler(null)
+  }, [editor])
+
   const editorMenu = useEditorContextMenu({
     editor,
     notes,
     openLinkRef,
+    getFs: () => fsRef.current,
     onOpen: (target) => onOpenRef.current(target),
     openInNewTab: (id) => tabs.openNote(id),
   })
@@ -96,8 +111,24 @@ export const NoteEditor = observer(function NoteEditor() {
   return (
     <div data-testid="editor" className="editor" onContextMenu={editorMenu.onContextMenu}>
       <EditorFind editor={editor} />
-      <EditorToolbar editor={editor} openLinkRef={openLinkRef} />
+      <EditorToolbar editor={editor} openLinkRef={openLinkRef} getFs={() => fsRef.current} />
       <EditorContent editor={editor} />
+      <TableContextMenu editor={editor} />
+      {mathPrompt ? (
+        <EditorPrompt
+          key={`${mathPrompt.kind}:${mathPrompt.pos}:${mathPrompt.latex}`}
+          title="公式"
+          description="留空则删除这个公式。"
+          label="LaTeX"
+          inputTestId="math-latex"
+          initialValue={mathPrompt.latex}
+          onSubmit={(value) => {
+            updateMathLatex(editor, mathPrompt.pos, mathPrompt.kind, value)
+            setMathPrompt(null)
+          }}
+          onClose={() => setMathPrompt(null)}
+        />
+      ) : null}
       {editorMenu.menuElement}
     </div>
   )

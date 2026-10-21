@@ -24,14 +24,17 @@ function press(init: KeyboardEventInit, target: Window | Document = window): Key
 describe('settings page overlay', () => {
   let host: HTMLDivElement | null = null
   let root: Root | null = null
+  let settingsTrigger: HTMLButtonElement | null = null
 
   afterEach(() => {
     resolve(SettingsPageService).close()
     resolve(QuickOpenService).close()
     root?.unmount()
     host?.remove()
+    settingsTrigger?.remove()
     root = null
     host = null
+    settingsTrigger = null
   })
 
   async function mount() {
@@ -100,6 +103,29 @@ describe('settings page overlay', () => {
       close.click()
     })
     expect(service.open).toBe(false)
+  })
+
+  it('restores focus to the status bar settings button when closed', async () => {
+    const service = await mount()
+    settingsTrigger = document.createElement('button')
+    settingsTrigger.type = 'button'
+    settingsTrigger.dataset.testid = 'statusbar-settings'
+    document.body.appendChild(settingsTrigger)
+    settingsTrigger.focus()
+
+    await act(async () => {
+      service.show()
+    })
+    const close = document.querySelector('[data-testid="settings-close"]') as HTMLButtonElement
+    await act(async () => {
+      close.click()
+    })
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+
+    expect(service.open).toBe(false)
+    expect(document.activeElement).toBe(settingsTrigger)
   })
 
   it('opens via the manifest command id and its Mod+, chord', async () => {

@@ -6,9 +6,13 @@
 // timer as soon as it is saved.
 
 import { observer, useService } from '@rabjs/react'
-import { useState } from 'react'
 import type { UpdateChannel } from '@stride/core'
+import { CircleAlert, CircleCheck } from 'lucide-react'
+import { useState } from 'react'
 import { SettingsService } from '../../../services/panels.service'
+import { Button } from '../../button'
+import { Mark } from '../../icon'
+import { Input } from '../../input'
 import './updates.css'
 
 // Empty means the channel default feed. Anything else must be a real http(s)
@@ -55,8 +59,9 @@ export const UpdatesSection = observer(function UpdatesSection() {
           Update channel
         </span>
         <div className="supd-radios" role="radiogroup" aria-labelledby="settings-updates-channel-label">
-          <label className="supd-radio">
+          <label className="supd-radio settings-choice">
             <input
+              className="settings-choice-control"
               type="radio"
               name="settings-updates-channel"
               data-testid="settings-updates-channel-stable"
@@ -71,8 +76,9 @@ export const UpdatesSection = observer(function UpdatesSection() {
               <span className="supd-hint">Recommended. Fully tested releases.</span>
             </span>
           </label>
-          <label className="supd-radio">
+          <label className="supd-radio settings-choice">
             <input
+              className="settings-choice-control"
               type="radio"
               name="settings-updates-channel"
               data-testid="settings-updates-channel-beta"
@@ -90,8 +96,9 @@ export const UpdatesSection = observer(function UpdatesSection() {
         </div>
       </div>
       <div className="supd-field">
-        <label className="supd-check">
+        <label className="supd-check settings-choice">
           <input
+            className="settings-choice-control"
             type="checkbox"
             data-testid="settings-updates-auto-check"
             checked={autoCheck}
@@ -108,11 +115,9 @@ export const UpdatesSection = observer(function UpdatesSection() {
         </p>
       </div>
       <div className="supd-field">
-        <label className="supd-label" htmlFor="settings-updates-releases-url-input">
-          Releases URL
-        </label>
-        <input
+        <Input
           id="settings-updates-releases-url-input"
+          label="Releases URL"
           className="supd-input"
           type="text"
           autoComplete="off"
@@ -120,6 +125,8 @@ export const UpdatesSection = observer(function UpdatesSection() {
           data-testid="settings-updates-releases-url"
           value={releasesUrl}
           aria-invalid={urlError ? true : undefined}
+          aria-describedby={urlError ? undefined : 'settings-updates-releases-url-hint'}
+          aria-errormessage={urlError ? 'settings-updates-releases-url-error' : undefined}
           onChange={(event) => {
             setReleasesUrl(event.target.value)
             if (urlError && !validateReleasesUrl(event.target.value)) setUrlError('')
@@ -127,11 +134,11 @@ export const UpdatesSection = observer(function UpdatesSection() {
           }}
         />
         {urlError ? (
-          <p className="supd-error" data-testid="settings-updates-releases-url-error">
+          <p className="supd-error" id="settings-updates-releases-url-error" role="alert" data-testid="settings-updates-releases-url-error">
             {urlError}
           </p>
         ) : (
-          <p className="supd-hint">
+          <p className="supd-hint" id="settings-updates-releases-url-hint">
             Custom endpoint override (a latest.json or GitHub release API URL). Takes priority over the channel;
             leave empty to use the channel feed.
           </p>
@@ -143,16 +150,17 @@ export const UpdatesSection = observer(function UpdatesSection() {
         browser. Saved changes apply to the next update check.
       </p>
       <div className="supd-actions">
-        <button type="button" className="supd-save" data-testid="settings-updates-save" onClick={() => void save()}>
+        <Button tone="primary" size="lg" data-testid="settings-updates-save" onClick={() => void save()}>
           Save
-        </button>
+        </Button>
         {status && (
-          <p className="supd-status" data-testid="settings-updates-status">
-            {status}
+          <p className="supd-status" data-tone={status === 'Saved.' ? 'success' : 'error'} data-testid="settings-updates-status" role="status">
+            <Mark icon={status === 'Saved.' ? CircleCheck : CircleAlert} size={14} />
+            <span>{status}</span>
           </p>
         )}
         {settings.notice && (
-          <p className="supd-error" data-testid="settings-updates-notice">
+          <p className="supd-error" data-testid="settings-updates-notice" role="alert">
             {settings.notice}
           </p>
         )}

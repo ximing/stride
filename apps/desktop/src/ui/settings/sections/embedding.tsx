@@ -7,13 +7,14 @@
 // which clears the key; typing anything else replaces it. An empty or illegal
 // dim is not an error — it means dim 0, which turns the vector index off.
 
-import { SpinnerGap } from '@phosphor-icons/react/SpinnerGap'
-import { WarningCircle } from '@phosphor-icons/react/WarningCircle'
 import { observer, useService } from '@rabjs/react'
+import { CircleAlert, CircleCheck, LoaderCircle, TriangleAlert } from 'lucide-react'
 import { useEffect } from 'react'
 import { SettingsService, type EmbeddingRuntime } from '../../../services/panels.service'
 import { VaultService } from '../../../services/vault.service'
+import { Button } from '../../button'
 import { Mark } from '../../icon'
+import { Input } from '../../input'
 import './embedding.css'
 
 function isHttpUrl(value: string): boolean {
@@ -77,28 +78,29 @@ export const EmbeddingSection = observer(function EmbeddingSection() {
     <div className="settings-embedding" data-testid="settings-section-embedding">
       {vault.searchDegraded ? (
         <div className="settings-embedding-degraded" role="status" data-testid="embedding-degraded">
-          <Mark icon={WarningCircle} size={16} />
+          <Mark icon={CircleAlert} size={16} />
           <span>{degradedReason(settings.embeddingRuntime())}</span>
         </div>
       ) : null}
-      <label className="settings-embedding-field">
-        <span>Endpoint</span>
-        <input
+      <div className="settings-embedding-field">
+        <Input
+          label="Endpoint"
           className="settings-embedding-input"
           data-testid="embedding-endpoint"
           value={embedding.endpoint}
           placeholder="https://api.openai.com/v1"
           aria-invalid={Boolean(endpointError)}
+          aria-errormessage={endpointError ? 'embedding-error-endpoint' : undefined}
           onChange={(event) => {
             settings.embeddingTestResult = ''
             settings.patchEmbedding({ endpoint: event.target.value })
           }}
         />
-        {endpointError ? <span className="settings-embedding-error" data-testid="embedding-error-endpoint">{endpointError}</span> : null}
-      </label>
-      <label className="settings-embedding-field">
-        <span>Model</span>
-        <input
+        {endpointError ? <span className="settings-embedding-error" id="embedding-error-endpoint" role="alert" data-testid="embedding-error-endpoint">{endpointError}</span> : null}
+      </div>
+      <div className="settings-embedding-field">
+        <Input
+          label="Model"
           className="settings-embedding-input"
           data-testid="embedding-model"
           value={embedding.model}
@@ -108,82 +110,85 @@ export const EmbeddingSection = observer(function EmbeddingSection() {
             settings.patchEmbedding({ model: event.target.value })
           }}
         />
-      </label>
-      <label className="settings-embedding-field">
-        <span>API key</span>
-        <input
+      </div>
+      <div className="settings-embedding-field">
+        <Input
+          label="API key"
           className="settings-embedding-input"
           data-testid="embedding-key"
           type="password"
           value={settings.embeddingKey}
           placeholder={embedding.keyMask || 'API key'}
+          aria-describedby="embedding-key-meta"
           onChange={(event) => {
             settings.embeddingTestResult = ''
             settings.embeddingKey = event.target.value
           }}
         />
-        <span className="settings-embedding-meta">
+        <span className="settings-embedding-meta" id="embedding-key-meta">
           {embedding.keyMask
             ? `Stored key ${embedding.keyMask} — kept while the mask stays in the field; clear the field to remove the key.`
             : 'Keys are sealed before they are stored and never written in plaintext.'}
         </span>
-      </label>
-      <label className="settings-embedding-field">
-        <span>Dim</span>
-        <input
+      </div>
+      <div className="settings-embedding-field">
+        <Input
+          label="Dimensions"
           className="settings-embedding-input"
           data-testid="embedding-dim"
           inputMode="numeric"
           value={settings.embeddingDimText}
           placeholder="1536"
           aria-invalid={dimOff}
+          aria-describedby={dimOff ? 'embedding-dim-note' : undefined}
           onChange={(event) => {
             settings.embeddingTestResult = ''
             settings.setEmbeddingDim(event.target.value)
           }}
         />
         {dimOff ? (
-          <span className="settings-embedding-note" data-testid="embedding-dim-note">
+          <span className="settings-embedding-note" id="embedding-dim-note" data-testid="embedding-dim-note">
             Dim is empty or not a positive integer, so the vector index stays off (dim = 0) and search uses text only.
           </span>
         ) : null}
-      </label>
+      </div>
       <div className="settings-embedding-actions">
-        <button
-          type="button"
-          className="settings-embedding-btn"
+        <Button
+          tone="secondary"
+          size="sm"
           data-testid="embedding-test"
           disabled={testing || Boolean(endpointError) || dim === null}
+          icon={testing ? <span className="settings-embedding-spin"><Mark icon={LoaderCircle} size={14} /></span> : undefined}
           onClick={() => {
             void settings.testEmbedding()
           }}
         >
-          {testing ? <span className="settings-embedding-spin"><Mark icon={SpinnerGap} size={14} /></span> : null}
           {testing ? 'Testing…' : 'Test connection'}
-        </button>
+        </Button>
         {testResult ? (
           <p
             className={testOk ? 'settings-embedding-test-ok' : testDimMismatch ? 'settings-embedding-test-warn' : 'settings-embedding-test-err'}
             data-testid="embedding-test-result"
             role="status"
           >
-            {testOk ? 'Connection successful.' : testDimMismatch ? `Dimension mismatch: ${testResult.replace(/^维度不符:?\s*/, '')}` : testResult}
+            <Mark icon={testOk ? CircleCheck : testDimMismatch ? TriangleAlert : CircleAlert} size={14} />
+            <span>{testOk ? 'Connection successful.' : testDimMismatch ? `Dimension mismatch: ${testResult.replace(/^维度不符:?\s*/, '')}` : testResult}</span>
           </p>
         ) : null}
       </div>
-      <div className="settings-embedding-actions">
-        <button
-          type="button"
-          className="settings-embedding-btn settings-embedding-btn-primary"
+      <div className="settings-embedding-actions settings-embedding-save">
+        <Button
+          tone="primary"
+          size="lg"
           data-testid="settings-embedding-save"
           disabled={saving || Boolean(endpointError)}
+          icon={saving ? <span className="settings-embedding-spin"><Mark icon={LoaderCircle} size={14} /></span> : undefined}
           onClick={() => {
             void settings.save()
           }}
         >
-          {saving ? <span className="settings-embedding-spin"><Mark icon={SpinnerGap} size={14} /></span> : null}
           {saving ? 'Saving…' : 'Save'}
-        </button>
+        </Button>
         {settings.notice ? <p className="settings-embedding-error" data-testid="settings-embedding-notice" role="alert">{settings.notice}</p> : null}
       </div>
     </div>

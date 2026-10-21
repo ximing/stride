@@ -5,6 +5,7 @@ import { has, observer, useService } from '@rabjs/react'
 import { useState } from 'react'
 import { SettingsService } from '../../../services/panels.service'
 import { VaultService } from '../../../services/vault.service'
+import { Input } from '../../input'
 import './editor.css'
 
 const AUTOSAVE_DEBOUNCE_MIN = 100
@@ -33,9 +34,10 @@ const AutosaveField = observer(function AutosaveField() {
   return (
     <div className="editor-group">
       <h3 className="editor-heading">Autosave</h3>
-      <label className="editor-field">
-        <span>Debounce (ms)</span>
-        <input
+      <div className="editor-field">
+        <Input
+          label="Debounce (ms)"
+          className="editor-input"
           data-testid="autosave-debounce"
           type="number"
           inputMode="numeric"
@@ -43,14 +45,17 @@ const AutosaveField = observer(function AutosaveField() {
           max={AUTOSAVE_DEBOUNCE_MAX}
           step={50}
           value={draft ?? String(settings.form.editor.autosaveDebounceMs)}
+          aria-invalid={Boolean(error)}
+          aria-describedby="autosave-debounce-hint"
+          aria-errormessage={error ? 'autosave-debounce-error' : undefined}
           onChange={(event) => onChange(event.target.value)}
         />
-      </label>
-      <p className="editor-hint">
+      </div>
+      <p className="editor-hint" id="autosave-debounce-hint">
         Pause before an edit is written to disk, {AUTOSAVE_DEBOUNCE_MIN}–{AUTOSAVE_DEBOUNCE_MAX} ms. Applies to new edits.
       </p>
       {error && (
-        <p className="error" role="alert" data-testid="autosave-debounce-error">
+        <p className="error" id="autosave-debounce-error" role="alert" data-testid="autosave-debounce-error">
           {error}
         </p>
       )}
@@ -69,8 +74,9 @@ const RenameFromHeadingField = observer(function RenameFromHeadingField() {
   return (
     <div className="editor-group">
       <h3 className="editor-heading">Rename from heading</h3>
-      <label className="editor-toggle">
+      <label className="editor-toggle settings-choice">
         <input
+          className="settings-choice-control"
           type="checkbox"
           data-testid="settings-rename-from-heading"
           checked={vault.renameFromHeading}
@@ -79,7 +85,7 @@ const RenameFromHeadingField = observer(function RenameFromHeadingField() {
             void vault.setRenameFromHeading(event.target.checked)
           }}
         />
-        Rename the note file from its first heading (H1)
+        <span>Rename the note file from its first heading (H1)</span>
       </label>
       <p className="editor-hint">
         Stored per vault in .stride/vault.json.

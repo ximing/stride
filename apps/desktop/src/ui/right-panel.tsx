@@ -1,46 +1,47 @@
-import type { Icon } from '@phosphor-icons/react'
-import { ChatCircle } from '@phosphor-icons/react/ChatCircle'
-import { GitBranch } from '@phosphor-icons/react/GitBranch'
-import { ListBullets } from '@phosphor-icons/react/ListBullets'
-import { CaretLineRight } from '@phosphor-icons/react/CaretLineRight'
-import { SlidersHorizontal } from '@phosphor-icons/react/SlidersHorizontal'
 import { observer, useService } from '@rabjs/react'
+import {
+  GitBranch,
+  List,
+  MessageCircle,
+  PanelRightClose,
+  SlidersHorizontal,
+  type LucideIcon,
+} from 'lucide-react'
 import { LayoutService } from '../services/layout.service'
 import type { RightPanelTab } from '../services/layout'
+import { IconButton } from './button'
 import { ChatPanel } from './chat-panel'
 import { GitPanel } from './git-panel-host'
-import { Mark } from './icon'
 import { PropertiesPanel } from './properties-panel'
 import { TocPanel } from './toc-panel'
 
-const PANEL_TABS: { id: RightPanelTab; label: string; icon: Icon }[] = [
+const PANEL_TABS: { id: RightPanelTab; label: string; icon: LucideIcon }[] = [
   { id: 'properties', label: 'Properties', icon: SlidersHorizontal },
-  { id: 'toc', label: 'Outline', icon: ListBullets },
+  { id: 'toc', label: 'Outline', icon: List },
   { id: 'git', label: 'Git', icon: GitBranch },
-  { id: 'chat', label: 'Agent', icon: ChatCircle },
+  { id: 'chat', label: 'Agent', icon: MessageCircle },
 ]
 
 const TabButton = observer(function TabButton({ tab, collapsed }: { tab: (typeof PANEL_TABS)[number]; collapsed: boolean }) {
   const layout = useService(LayoutService)
   const active = !collapsed && layout.rightPanelTab === tab.id
   return (
-    <button
+    <IconButton
       key={tab.id}
-      type="button"
+      icon={tab.icon}
+      label={tab.label}
+      active={active}
       className="panel-tab"
       data-testid={`panel-tab-${tab.id}`}
       data-panel={tab.id}
       role="tab"
       aria-selected={active}
       title={tab.label}
-      aria-label={tab.label}
       onClick={() => {
         if (!collapsed && layout.rightPanelTab === tab.id) layout.setRightPanelCollapsed(true)
         else layout.setRightPanelTab(tab.id)
       }}
-    >
-      <Mark icon={tab.icon} size={17} />
-    </button>
+    />
   )
 })
 
@@ -69,15 +70,13 @@ export const RightPanel = observer(function RightPanel() {
     <div className="panel-wrap" data-testid="right-panel">
       <div className="panel-head">
         <PanelTabs collapsed={false} />
-        <button
-          type="button"
+        <IconButton
+          icon={PanelRightClose}
+          label="Hide panel"
           className="panel-tab panel-collapse"
           data-testid="panel-collapse"
-          aria-label="Hide panel"
           onClick={() => layout.setRightPanelCollapsed(true)}
-        >
-          <Mark icon={CaretLineRight} size={17} />
-        </button>
+        />
       </div>
       <div className="panel-body">
         {layout.rightPanelTab === 'properties' && <PropertiesPanel />}

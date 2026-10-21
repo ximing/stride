@@ -5,10 +5,12 @@
 // `idle`, so the banner simply never mounts in plain-browser dev. Release
 // notes render as plain-text lines on purpose — no markdown dependency.
 
-import { ArrowCircleUp, ArrowClockwise, DownloadSimple, WarningCircle, X } from '@phosphor-icons/react'
 import { observer, useService } from '@rabjs/react'
+import { CircleArrowUp, CircleAlert, Download, RefreshCw, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { UpdateService } from '../services/panels.service'
+import { Button, IconButton } from './button'
+import { Mark } from './icon'
 import './update-banner.css'
 
 // Long release notes collapse to the first lines behind a toggle.
@@ -45,10 +47,10 @@ export const UpdateBanner = observer(function UpdateBanner() {
   return (
     <div className="ubn" data-testid="update-banner" data-phase={phase}>
       <span className="ubn-icon" aria-hidden="true">
-        {phase === 'available' && <ArrowCircleUp size={18} weight="fill" />}
-        {phase === 'downloading' && <DownloadSimple size={18} weight="bold" />}
-        {phase === 'ready' && <ArrowClockwise size={18} weight="bold" />}
-        {phase === 'error' && <WarningCircle size={18} weight="fill" />}
+        {phase === 'available' && <Mark icon={CircleArrowUp} size={18} />}
+        {phase === 'downloading' && <Mark icon={Download} size={18} />}
+        {phase === 'ready' && <Mark icon={RefreshCw} size={18} />}
+        {phase === 'error' && <Mark icon={CircleAlert} size={18} />}
       </span>
 
       <div className="ubn-body">
@@ -62,11 +64,12 @@ export const UpdateBanner = observer(function UpdateBanner() {
             {updates.body && (
               <div className="ubn-notes" data-testid="update-notes">
                 {shownNotes.map((line, index) => (
-                  <p key={index}>{line || ' '}</p>
+                  <p key={index}>{line || ' '}</p>
                 ))}
                 {collapsible && (
-                  <button
-                    type="button"
+                  <Button
+                    tone="quiet"
+                    size="sm"
                     className="ubn-notes-toggle"
                     data-testid="update-notes-toggle"
                     onClick={() => {
@@ -74,7 +77,7 @@ export const UpdateBanner = observer(function UpdateBanner() {
                     }}
                   >
                     {notesExpanded ? '收起' : `展开全部（${noteLines.length} 行）`}
-                  </button>
+                  </Button>
                 )}
               </div>
             )}
@@ -115,75 +118,78 @@ export const UpdateBanner = observer(function UpdateBanner() {
       <div className="ubn-actions">
         {phase === 'available' && (
           <>
-            <button
-              type="button"
-              className="primary"
+            <Button
+              tone="primary"
+              size="sm"
               data-testid="update-download"
+              icon={<Mark icon={Download} size={14} />}
               onClick={() => {
                 void updates.download()
               }}
             >
               下载更新
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              tone="quiet"
+              size="sm"
               data-testid="update-dismiss"
               onClick={() => {
                 void updates.dismiss()
               }}
             >
               忽略此版本
-            </button>
+            </Button>
           </>
         )}
 
         {phase === 'ready' && (
           <>
-            <button
-              type="button"
-              className="primary"
+            <Button
+              tone="primary"
+              size="sm"
               data-testid="update-restart"
+              icon={<Mark icon={RefreshCw} size={14} />}
               onClick={() => {
                 void updates.confirm()
               }}
             >
               重启以更新到 v{updates.version}
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              tone="quiet"
+              size="sm"
               data-testid="update-later"
               onClick={() => {
                 setSnoozed(true)
               }}
             >
               稍后
-            </button>
+            </Button>
           </>
         )}
 
         {phase === 'error' && (
           <>
-            <button
-              type="button"
-              className="primary"
+            <Button
+              tone="primary"
+              size="sm"
               data-testid="update-retry"
+              icon={<Mark icon={RefreshCw} size={14} />}
               onClick={() => {
                 void updates.check()
               }}
             >
               重试
-            </button>
-            <button
-              type="button"
+            </Button>
+            <IconButton
+              icon={X}
+              label="关闭"
               className="ubn-close"
               data-testid="update-close"
-              aria-label="关闭"
               onClick={() => {
                 void updates.dismiss()
               }}
-            >
-              <X size={14} weight="bold" />
-            </button>
+            />
           </>
         )}
       </div>

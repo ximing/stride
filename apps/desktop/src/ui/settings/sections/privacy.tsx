@@ -9,8 +9,10 @@ const TelemetryToggle = observer(function TelemetryToggle() {
   const settings = useService(SettingsService)
   return (
     <div className="privacy-group">
-      <label className="privacy-toggle">
+      <h3 className="privacy-heading">Telemetry</h3>
+      <label className="privacy-toggle settings-choice">
         <input
+          className="settings-choice-control"
           type="checkbox"
           data-testid="telemetry-enabled"
           checked={settings.form.privacy.telemetryEnabled}
@@ -22,7 +24,7 @@ const TelemetryToggle = observer(function TelemetryToggle() {
             void settings.save()
           }}
         />
-        Allow telemetry
+        <span>Allow telemetry</span>
       </label>
       <p className="privacy-hint">
         Stride does not collect any telemetry in this version. This switch only saves your preference for

@@ -1,15 +1,21 @@
 import type { Editor } from '@tiptap/core'
 import { Table } from '@tiptap/extension-table'
-import { TableCell } from '@tiptap/extension-table-cell'
-import { TableHeader } from '@tiptap/extension-table-header'
 import { TableRow } from '@tiptap/extension-table-row'
+import { DocTableCell, DocTableHeader } from './table-cell'
+import { tableKeys } from './table-keys'
 
 export function tableExtensions() {
   return [
-    Table.configure({ resizable: false }),
+    Table.configure({
+      resizable: true,
+      cellMinWidth: 48,
+      handleWidth: 8,
+      lastColumnResizable: true,
+    }),
     TableRow,
-    TableHeader,
-    TableCell,
+    DocTableHeader,
+    DocTableCell,
+    tableKeys,
   ]
 }
 

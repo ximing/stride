@@ -1,15 +1,15 @@
-import { X } from '@phosphor-icons/react'
 import { observer, useService } from '@rabjs/react'
+import { X } from 'lucide-react'
 import { CommandService } from '../services/command.service'
 import { commandShortcut } from '../services/commands'
 import { TabsService } from '../services/tabs.service'
 import { VaultService } from '../services/vault.service'
-import { Mark } from './icon'
+import { IconButton } from './button'
 
 /**
  * Editor tab strip: one tab per open note (title derived live from vault.notes,
  * so renames follow automatically). Hidden while no vault is open or no tabs
- * exist. Close via the hover-revealed × button or middle click.
+ * exist. Close via the hover-revealed close button or middle click.
  */
 export const TabStrip = observer(function TabStrip() {
   const tabs = useService(TabsService)
@@ -47,16 +47,14 @@ export const TabStrip = observer(function TabStrip() {
             >
               <span className="tab-title">{title}</span>
             </button>
-            <button
-              type="button"
+            <IconButton
+              icon={X}
+              label={closeLabel}
               className="tab-close"
               data-testid="tab-close"
-              aria-label={closeLabel}
               title={closeLabel}
               onClick={() => tabs.closeTab(tab.id)}
-            >
-              <Mark icon={X} size={12} />
-            </button>
+            />
           </div>
         )
       })}

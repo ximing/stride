@@ -1,5 +1,5 @@
 import * as Toast from '@radix-ui/react-toast'
-import { X } from '@phosphor-icons/react'
+import { X } from 'lucide-react'
 import { type ReactNode } from 'react'
 import { Mark } from './icon'
 

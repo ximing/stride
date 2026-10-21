@@ -5,10 +5,10 @@
 // (stride:appearance) so theme.service.ts can restore them before the first
 // paint. All changes apply instantly via CSS variables on <html>.
 
-import { Desktop, Moon, Sun } from '@phosphor-icons/react'
 import { has, observer, useService } from '@rabjs/react'
-import { useEffect, useState } from 'react'
 import type { NoteWidth } from '@stride/core'
+import { Monitor, Moon, Sun, type LucideIcon } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import {
   applyAppearance,
   defaultAppearanceStorage,
@@ -22,32 +22,29 @@ import {
 import { SettingsService } from '../../../services/panels.service'
 import { THEME_MODES, type ThemeMode } from '../../../services/theme'
 import { ThemeService } from '../../../services/theme.service'
-import { Mark } from '../../icon'
+import { Input } from '../../input'
+import { SettingsSegmentedControl } from '../segmented-control'
 import './appearance.css'
 
-const THEME_ICONS: Record<ThemeMode, typeof Sun> = { light: Sun, dark: Moon, system: Desktop }
+const THEME_ICONS: Record<ThemeMode, LucideIcon> = { light: Sun, dark: Moon, system: Monitor }
 const THEME_LABELS: Record<ThemeMode, string> = { light: 'Light', dark: 'Dark', system: 'System' }
 const WIDTH_LABELS: Record<NoteWidth, string> = { narrow: 'Narrow', standard: 'Standard', wide: 'Wide' }
+
+const THEME_OPTIONS = THEME_MODES.map((mode) => ({ value: mode, label: THEME_LABELS[mode], icon: THEME_ICONS[mode] }))
+const WIDTH_OPTIONS = NOTE_WIDTHS.map((width) => ({ value: width, label: WIDTH_LABELS[width] }))
 
 const ThemeGroup = observer(function ThemeGroup() {
   const theme = useService(ThemeService)
   return (
     <div className="appearance-group">
       <h3 className="appearance-heading">Theme</h3>
-      <div className="theme-picker" role="group" aria-label="Theme">
-        {THEME_MODES.map((mode) => (
-          <button
-            key={mode}
-            type="button"
-            data-testid={`theme-${mode}`}
-            aria-pressed={theme.mode === mode}
-            onClick={() => theme.setTheme(mode)}
-          >
-            <Mark icon={THEME_ICONS[mode]} size={16} />
-            {THEME_LABELS[mode]}
-          </button>
-        ))}
-      </div>
+      <SettingsSegmentedControl
+        label="Theme"
+        value={theme.mode}
+        options={THEME_OPTIONS}
+        testIdPrefix="theme"
+        onChange={(mode) => theme.setTheme(mode)}
+      />
       <p className="appearance-hint">System follows the OS appearance and tracks it live.</p>
     </div>
   )
@@ -94,25 +91,20 @@ const AppearancePrefsForm = observer(function AppearancePrefsForm() {
     <>
       <div className="appearance-group">
         <h3 className="appearance-heading">Note width</h3>
-        <div className="theme-picker" role="group" aria-label="Note width">
-          {NOTE_WIDTHS.map((width) => (
-            <button
-              key={width}
-              type="button"
-              data-testid={`note-width-${width}`}
-              aria-pressed={noteWidth === width}
-              onClick={() => patchAppearance({ noteWidth: width })}
-            >
-              {WIDTH_LABELS[width]}
-            </button>
-          ))}
-        </div>
+        <SettingsSegmentedControl
+          label="Note width"
+          value={noteWidth}
+          options={WIDTH_OPTIONS}
+          testIdPrefix="note-width"
+          onChange={(width) => patchAppearance({ noteWidth: width })}
+        />
         <p className="appearance-hint">Caps the editor column; wide removes the cap.</p>
       </div>
       <div className="appearance-group">
-        <h3 className="appearance-heading">Font size</h3>
-        <label className="appearance-fontsize">
-          <input
+        <div className="appearance-fontsize-field">
+          <Input
+            label="Font size (px)"
+            className="appearance-fontsize-input"
             data-testid="note-font-size"
             type="number"
             inputMode="numeric"
@@ -120,15 +112,17 @@ const AppearancePrefsForm = observer(function AppearancePrefsForm() {
             max={NOTE_FONT_SIZE_MAX}
             step={1}
             value={fontDraft ?? String(fontSize)}
+            aria-invalid={Boolean(fontError)}
+            aria-describedby="note-font-size-hint"
+            aria-errormessage={fontError ? 'note-font-size-error' : undefined}
             onChange={(event) => onFontSizeChange(event.target.value)}
           />
-          <span>px</span>
-        </label>
-        <p className="appearance-hint">
+        </div>
+        <p className="appearance-hint" id="note-font-size-hint">
           Editor body text, {NOTE_FONT_SIZE_MIN}–{NOTE_FONT_SIZE_MAX}px. Applies immediately.
         </p>
         {fontError && (
-          <p className="error" role="alert" data-testid="note-font-size-error">
+          <p className="error" id="note-font-size-error" role="alert" data-testid="note-font-size-error">
             {fontError}
           </p>
         )}

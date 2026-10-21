@@ -1,5 +1,5 @@
-import { MagnifyingGlass } from '@phosphor-icons/react'
 import { observer, useService } from '@rabjs/react'
+import { Search } from 'lucide-react'
 import { Fragment, useEffect, useRef } from 'react'
 import { paletteItemSection, paletteItemTitle, type PaletteItem } from '../services/command-palette'
 import { CommandPaletteService } from '../services/command-palette.service'
@@ -74,37 +74,40 @@ export const CommandPalette = observer(function CommandPalette() {
 
   return (
     <div
-      className="command-palette-backdrop"
+      className="command-palette-backdrop sd-command-backdrop"
       onClick={(event) => {
         if (event.target === event.currentTarget) service.close()
       }}
     >
       <div
-        className="command-palette"
+        className="command-palette sd-command-surface"
         data-testid="command-palette"
         role="dialog"
         aria-modal="true"
         aria-labelledby="command-palette-title"
         onClick={(event) => event.stopPropagation()}
       >
-        <h2 id="command-palette-title" className="command-palette-title">命令面板</h2>
-        <input
-          ref={inputRef}
-          className="command-palette-input"
-          data-testid="command-palette-input"
-          placeholder="命令、笔记，或向 AI 提问"
-          aria-label="命令、笔记，或向 AI 提问"
-          autoFocus
-          autoComplete="off"
-          spellCheck={false}
-          value={service.query}
-          onChange={(event) => service.setQuery(event.target.value)}
-        />
-        <div ref={listRef} className="command-palette-list" role="listbox" aria-label="命令与笔记">
+        <h2 id="command-palette-title" className="command-palette-title sd-command-title">命令面板</h2>
+        <div className="sd-command-search">
+          <Search aria-hidden="true" size={16} strokeWidth={1.75} />
+          <input
+            ref={inputRef}
+            className="command-palette-input sd-command-input"
+            data-testid="command-palette-input"
+            placeholder="命令、笔记，或向 AI 提问"
+            aria-label="命令、笔记，或向 AI 提问"
+            autoFocus
+            autoComplete="off"
+            spellCheck={false}
+            value={service.query}
+            onChange={(event) => service.setQuery(event.target.value)}
+          />
+        </div>
+        <div ref={listRef} className="command-palette-list sd-command-list" role="listbox" aria-label="命令与笔记">
           {items.length === 0 && (
             <EmptyState
               compact
-              icon={MagnifyingGlass}
+              icon={Search}
               title="没有匹配的命令或笔记"
               body="换个关键词试试;输入问题可向 AI 提问。"
               testId="command-palette-empty"
@@ -115,7 +118,7 @@ export const CommandPalette = observer(function CommandPalette() {
             let header = null
             if (section !== lastSection) {
               lastSection = section
-              header = <p className="command-palette-section">{section}</p>
+              header = <p className="command-palette-section sd-command-section">{section}</p>
             }
             const commandId = itemCommandId(item)
             const disabled = (item.kind === 'command' || item.kind === 'instance') && !item.enabled
@@ -124,7 +127,7 @@ export const CommandPalette = observer(function CommandPalette() {
                 {header}
                 <button
                   type="button"
-                  className="command-item"
+                  className="command-item sd-command-item"
                   data-testid={itemTestId(item)}
                   data-command-id={commandId ?? undefined}
                   data-note-id={item.kind === 'note' ? item.noteId : undefined}
@@ -134,9 +137,9 @@ export const CommandPalette = observer(function CommandPalette() {
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => service.activate(item)}
                 >
-                  <span className="command-item-title">{paletteItemTitle(item)}</span>
+                  <span className="command-item-title sd-command-item-title">{paletteItemTitle(item)}</span>
                   {item.kind === 'command' && item.command.shortcut ? (
-                    <kbd className="command-item-shortcut">{formatShortcut(item.command.shortcut)}</kbd>
+                    <kbd className="command-item-shortcut sd-command-kbd">{formatShortcut(item.command.shortcut)}</kbd>
                   ) : null}
                 </button>
               </Fragment>

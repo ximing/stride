@@ -1,130 +1,241 @@
-/* Settings page overlay (T7.1). All colors come from tokens.css (--sd-*), so
-   light and dark both hold. Sits above the workspace (overlays peak at 50,
-   toasts at 60 in styles.css) and below toasts. */
+/* Full-screen desktop settings. Layout and shared section primitives consume
+   only the theme-aware --sd-* tokens. */
 
 .settings-page {
   position: fixed;
   inset: 0;
   z-index: 55;
   display: grid;
-  grid-template-columns: 232px 1fr;
+  grid-template-columns: clamp(200px, 18vw, 224px) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
   background: var(--sd-bg);
   color: var(--sd-fg);
+  font-family: var(--sd-font-sans);
+  font-size: 14px;
+  line-height: 1.45;
   outline: none;
 }
 
+.settings-page *,
+.settings-page *::before,
+.settings-page *::after {
+  box-sizing: border-box;
+}
+
+.settings-page :focus-visible {
+  outline: 2px solid var(--sd-accent);
+  outline-offset: 2px;
+}
+
 .settings-title {
-  position: absolute;
-  top: 0;
-  left: 0;
-  padding: 18px 20px 10px;
   margin: 0;
-  font-size: 13px;
+  padding: 20px 12px 16px;
+  font-size: 20px;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--sd-muted);
+  line-height: 28px;
+  letter-spacing: -0.01em;
 }
 
 .settings-sr-only {
   position: absolute;
   width: 1px;
   height: 1px;
+  padding: 0;
+  margin: -1px;
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
+  border: 0;
+}
+
+.settings-sidebar {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0 12px 20px;
+  border-right: 1px solid var(--sd-border);
+  background: var(--sd-bg);
 }
 
 .settings-nav {
-  grid-row: 1;
+  min-height: 0;
   display: flex;
   flex-direction: column;
   gap: 2px;
-  padding: 52px 10px 16px;
-  border-right: 1px solid var(--sd-border);
-  background: var(--sd-bg);
   overflow-y: auto;
 }
 
 .settings-nav-item {
+  position: relative;
   display: flex;
   align-items: center;
-  gap: 9px;
-  padding: 7px 10px;
-  border: none;
+  gap: 10px;
+  width: 100%;
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 0;
   border-radius: var(--sd-radius);
   background: transparent;
-  color: var(--sd-fg);
+  color: var(--sd-muted);
   font: inherit;
   font-size: 13px;
   text-align: left;
   cursor: pointer;
+  transition: background-color 120ms ease, color 120ms ease;
+}
+
+.settings-nav-item > svg {
+  flex: none;
+}
+
+.settings-nav-item > span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .settings-nav-item:hover {
   background: var(--sd-bg-elevated);
+  color: var(--sd-fg);
 }
 
 .settings-nav-item[aria-current='page'] {
   background: var(--sd-bg-elevated);
-  color: var(--sd-accent);
+  color: var(--sd-fg);
   font-weight: 600;
 }
 
+.settings-nav-item[aria-current='page']::before {
+  content: '';
+  position: absolute;
+  top: 8px;
+  bottom: 8px;
+  left: 0;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--sd-accent);
+}
+
+.settings-nav-item[aria-current='page'] > svg {
+  color: var(--sd-accent);
+}
+
 .settings-content {
-  grid-row: 1;
-  padding: 20px 28px 28px;
+  min-width: 0;
+  min-height: 0;
+  padding: 20px 32px 40px;
   overflow-y: auto;
+}
+
+.settings-content-inner {
+  width: 100%;
+  max-width: 720px;
+  margin: 0 auto;
 }
 
 .settings-content-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 18px;
+  gap: 16px;
+  min-height: 32px;
+  padding-bottom: 16px;
+  margin-bottom: 24px;
+  border-bottom: 1px solid var(--sd-border);
 }
 
 .settings-section-title {
   margin: 0;
-  font-size: 18px;
+  font-size: 16px;
   font-weight: 600;
+  line-height: 24px;
 }
 
 .settings-close {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  border: 1px solid var(--sd-border);
-  border-radius: var(--sd-radius);
-  background: var(--sd-bg-elevated);
-  color: var(--sd-muted);
-  cursor: pointer;
+  flex: none;
 }
 
-.settings-close:hover:not(:disabled) {
+/* Shared single-choice control used by Appearance and This Vault. */
+.settings-segmented {
+  display: inline-flex;
+  align-items: stretch;
+  gap: 2px;
+  max-width: 100%;
+  padding: 2px;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-lg);
+  background: var(--sd-bg);
+}
+
+.settings-page .settings-segment.sd-btn {
+  min-height: 28px;
+  padding: 4px 10px;
+  border: 0;
+  border-radius: var(--sd-radius);
+  background: transparent;
+  color: var(--sd-muted);
+  box-shadow: inset 0 0 0 0 transparent;
+  font-size: 13px;
+  font-weight: 400;
+  white-space: nowrap;
+}
+
+.settings-page .settings-segment.sd-btn:hover:not(:disabled) {
+  background: var(--sd-bg-elevated);
   color: var(--sd-fg);
 }
 
-/* Shortcuts section (read-only, manifest-driven). */
+.settings-page .settings-segment.sd-btn[aria-pressed='true'] {
+  background: var(--sd-bg-elevated);
+  color: var(--sd-fg);
+  box-shadow: inset 0 -2px 0 var(--sd-accent);
+  font-weight: 600;
+}
 
+/* Native choice behavior stays intact; dimensions and state treatment are
+   shared across every settings section. */
+.settings-choice {
+  color: var(--sd-fg);
+  cursor: pointer;
+}
+
+.settings-choice:hover {
+  color: var(--sd-accent);
+}
+
+.settings-choice:has(.settings-choice-control:disabled) {
+  color: var(--sd-muted);
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.settings-choice-control {
+  flex: none;
+  width: 14px;
+  height: 14px;
+  margin: 0;
+  accent-color: var(--sd-accent);
+  cursor: inherit;
+}
+
+/* Shortcuts section (read-only, manifest-driven). */
 .settings-shortcuts {
-  max-width: 640px;
+  width: 100%;
 }
 
 .settings-shortcut-group + .settings-shortcut-group {
-  margin-top: 20px;
+  margin-top: 24px;
 }
 
 .settings-shortcut-heading {
-  margin: 0 0 6px;
+  margin: 0 0 8px;
+  color: var(--sd-muted);
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--sd-muted);
 }
 
 .settings-shortcut-list {
@@ -133,7 +244,6 @@
   padding: 0;
   border: 1px solid var(--sd-border);
   border-radius: var(--sd-radius-lg);
-  background: var(--sd-bg-elevated);
   overflow: hidden;
 }
 
@@ -142,6 +252,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+  min-height: 36px;
   padding: 7px 12px;
   font-size: 13px;
 }
@@ -158,4 +269,65 @@
 
 .settings-shortcut-none {
   color: var(--sd-muted);
+}
+
+@media (max-width: 640px) {
+  .settings-page {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+
+  .settings-sidebar {
+    padding: 0 12px 10px;
+    border-right: 0;
+    border-bottom: 1px solid var(--sd-border);
+  }
+
+  .settings-title {
+    padding: 12px 4px 10px;
+  }
+
+  .settings-nav {
+    flex-direction: row;
+    gap: 4px;
+    padding-bottom: 2px;
+    overflow-x: auto;
+    overflow-y: hidden;
+  }
+
+  .settings-nav-item {
+    flex: none;
+    width: auto;
+  }
+
+  .settings-nav-item[aria-current='page']::before {
+    top: auto;
+    right: 10px;
+    bottom: 0;
+    left: 10px;
+    width: auto;
+    height: 2px;
+  }
+
+  .settings-content {
+    padding: 16px 16px 32px;
+  }
+
+  .settings-content-head {
+    margin-bottom: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .settings-page *,
+  .settings-page *::before,
+  .settings-page *::after {
+    scroll-behavior: auto !important;
+    transition: none !important;
+  }
+
+  .settings-ai-spin,
+  .settings-embedding-spin {
+    animation: none !important;
+  }
 }

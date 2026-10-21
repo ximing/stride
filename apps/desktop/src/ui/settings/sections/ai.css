@@ -1,41 +1,42 @@
-/* AI settings section (T7.2). Tokens only (--sd-*), so light/dark both hold. */
-
 .settings-ai {
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  max-width: 640px;
+  gap: 16px;
+  width: 100%;
 }
 
 .settings-ai-empty {
   margin: 0;
-  padding: 12px;
-  border: 1px dashed var(--sd-border);
-  border-radius: var(--sd-radius-lg);
+  padding: 12px 0;
+  border-top: 1px solid var(--sd-border);
+  border-bottom: 1px solid var(--sd-border);
   color: var(--sd-muted);
   font-size: 13px;
+  line-height: 1.5;
 }
 
 .settings-ai-list {
   border: 1px solid var(--sd-border);
   border-radius: var(--sd-radius-lg);
-  background: var(--sd-bg-elevated);
   overflow: hidden;
 }
 
 .settings-ai-row {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
   width: 100%;
+  min-height: 40px;
   padding: 8px 12px;
-  border: none;
+  border: 0;
   background: transparent;
   color: var(--sd-fg);
   font: inherit;
   font-size: 13px;
   text-align: left;
   cursor: pointer;
+  transition: background-color 120ms ease;
 }
 
 .settings-ai-row + .settings-ai-row {
@@ -43,15 +44,12 @@
 }
 
 .settings-ai-row:hover {
-  background: var(--sd-bg);
+  background: var(--sd-bg-elevated);
 }
 
 .settings-ai-row[aria-selected='true'] {
-  background: var(--sd-bg);
-}
-
-.settings-ai-row[aria-selected='true'] .settings-ai-row-name {
-  color: var(--sd-accent);
+  background: var(--sd-bg-elevated);
+  box-shadow: inset 2px 0 0 var(--sd-accent);
 }
 
 .settings-ai-row-name {
@@ -79,45 +77,41 @@
   gap: 4px;
   color: var(--sd-accent);
   font-size: 12px;
+  white-space: nowrap;
 }
 
 .settings-ai-form {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 14px;
-  border: 1px solid var(--sd-border);
-  border-radius: var(--sd-radius-lg);
-  background: var(--sd-bg-elevated);
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  padding-top: 20px;
+  border-top: 1px solid var(--sd-border);
 }
 
 .settings-ai-field {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  align-items: stretch;
+  gap: 6px;
+  min-width: 0;
   font-size: 13px;
 }
 
-.settings-ai-field > span:first-child {
-  color: var(--sd-muted);
-  font-size: 12px;
+.settings-ai-field-wide {
+  grid-column: 1 / -1;
+}
+
+.settings-ai-field > .sd-field {
+  width: 100%;
+  min-width: 0;
+  flex: none;
 }
 
 .settings-ai-input {
-  padding: 6px 8px;
-  border: 1px solid var(--sd-border);
-  border-radius: var(--sd-radius);
-  background: var(--sd-bg);
-  color: var(--sd-fg);
-  font: inherit;
-  font-size: 13px;
   width: 100%;
+  min-width: 0;
   box-sizing: border-box;
-}
-
-.settings-ai-input:focus {
-  outline: none;
-  border-color: var(--sd-accent);
+  text-align: left;
 }
 
 .settings-ai-input[aria-invalid='true'] {
@@ -127,15 +121,18 @@
 .settings-ai-meta {
   color: var(--sd-muted);
   font-size: 12px;
+  line-height: 1.5;
 }
 
 .settings-ai-error {
+  margin: 0;
   color: var(--sd-danger);
   font-size: 12px;
-  margin: 0;
+  line-height: 1.5;
 }
 
-.settings-ai-actions {
+.settings-ai-actions,
+.settings-ai-save {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -143,58 +140,37 @@
 }
 
 .settings-ai-save {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
-  padding-top: 4px;
+  gap: 12px;
+  padding-top: 16px;
   border-top: 1px solid var(--sd-border);
 }
 
-.settings-ai-btn {
+.settings-ai-save > .settings-ai-error {
+  flex: 1 1 260px;
+}
+
+.settings-ai-test-ok,
+.settings-ai-test-err {
   display: inline-flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 6px;
-  padding: 6px 12px;
-  border: 1px solid var(--sd-border);
-  border-radius: var(--sd-radius);
-  background: var(--sd-bg-elevated);
-  color: var(--sd-fg);
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.settings-ai-btn:hover:not(:disabled) {
-  border-color: var(--sd-fg);
-}
-
-.settings-ai-btn:disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
-
-.settings-ai-btn-primary {
-  background: var(--sd-accent);
-  border-color: var(--sd-accent);
-  color: var(--sd-bg);
-}
-
-.settings-ai-btn-primary:hover:not(:disabled) {
-  border-color: var(--sd-accent);
-  filter: brightness(1.08);
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .settings-ai-test-ok {
-  margin: 0;
   color: var(--sd-accent);
-  font-size: 12px;
 }
 
 .settings-ai-test-err {
-  margin: 0;
   color: var(--sd-danger);
-  font-size: 12px;
+}
+
+.settings-ai-test-ok > svg,
+.settings-ai-test-err > svg {
+  flex: none;
+  margin-top: 2px;
 }
 
 .settings-ai-spin {
@@ -205,5 +181,15 @@
 @keyframes settings-ai-rotate {
   to {
     transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 720px) {
+  .settings-ai-form {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .settings-ai-field-wide {
+    grid-column: auto;
   }
 }

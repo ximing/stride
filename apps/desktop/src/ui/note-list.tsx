@@ -1,4 +1,4 @@
-import { ArrowsDownUp, Bookmark, MagnifyingGlass, Note, Tray, X } from '@phosphor-icons/react'
+import { ArrowUpDown, Bookmark, Check, FileText, Inbox, Search, X } from 'lucide-react'
 import { observer, raw, useService } from '@rabjs/react'
 import { plainText, type StrideNote } from '@stride/core/note'
 import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -12,8 +12,10 @@ import { TabsService } from '../services/tabs.service'
 import { VaultService } from '../services/vault.service'
 import { ViewsService } from '../services/views.service'
 import { ContextMenu } from './context-menu'
+import { Button, IconButton } from './button'
 import { EmptyState } from './empty-state'
 import { Mark } from './icon'
+import { Input } from './input'
 import { Menu, MenuContent, MenuItem, MenuTrigger } from './menu'
 import { Modal, ModalClose, ModalContent } from './modal'
 
@@ -87,8 +89,9 @@ export const ListFilterInput = observer(function ListFilterInput() {
   const listFilter = useService(ListFilterService)
   return (
     <div className="list-filter">
-      <Mark icon={MagnifyingGlass} size={14} />
-      <input
+      <Mark icon={Search} size={14} />
+      <Input
+        label="过滤标题或属性"
         className="list-filter-input"
         data-testid="list-filter"
         placeholder="过滤标题或属性"
@@ -96,15 +99,14 @@ export const ListFilterInput = observer(function ListFilterInput() {
         onChange={(event) => listFilter.setQuery(event.target.value)}
       />
       {listFilter.query.trim() !== '' && (
-        <button
-          type="button"
+        <IconButton
           className="list-filter-clear"
           data-testid="list-filter-clear"
-          aria-label="清空过滤"
+          icon={X}
+          label="清空过滤"
+          size="sm"
           onClick={() => listFilter.clear()}
-        >
-          <Mark icon={X} size={13} />
-        </button>
+        />
       )}
     </div>
   )
@@ -135,8 +137,14 @@ const SortMenu = observer(function SortMenu() {
   const effective = viewSort ?? list.sort
   return (
     <Menu>
-      <MenuTrigger className="note-list-sort" data-testid="note-list-sort" aria-label="Sort notes">
-        <Mark icon={ArrowsDownUp} size={14} />
+      <MenuTrigger asChild>
+        <IconButton
+          className="note-list-sort"
+          data-testid="note-list-sort"
+          icon={ArrowUpDown}
+          label="Sort notes"
+          size="sm"
+        />
       </MenuTrigger>
       <MenuContent align="end">
         {viewSort && (
@@ -153,7 +161,7 @@ const SortMenu = observer(function SortMenu() {
               aria-checked={active}
               onSelect={() => list.setSort({ key, dir })}
             >
-              <span className="menu-check">{active ? '✓' : ''}</span>
+              <span className="menu-check">{active ? <Mark icon={Check} size={14} /> : null}</span>
               {SORT_LABELS[key][dir]}
             </MenuItem>
           )
@@ -172,12 +180,14 @@ const BatchBar = observer(function BatchBar() {
       <span className="note-list-batch-count" data-testid="note-list-batch-count">
         {list.selectionCount} selected
       </span>
-      <button type="button" data-testid="batch-archive" onClick={() => void list.archiveSelected()}>
+      <Button size="sm" tone="quiet" data-testid="batch-archive" onClick={() => void list.archiveSelected()}>
         Archive
-      </button>
+      </Button>
       <Menu open={list.retypeOpen} onOpenChange={(open) => { list.retypeOpen = open }}>
-        <MenuTrigger className="note-list-batch-retype" data-testid="batch-retype">
-          Type
+        <MenuTrigger asChild>
+          <Button className="note-list-batch-retype" size="sm" tone="quiet" data-testid="batch-retype">
+            Type
+          </Button>
         </MenuTrigger>
         <MenuContent>
           {types.length === 0 && <MenuItem disabled>No types yet</MenuItem>}
@@ -192,23 +202,23 @@ const BatchBar = observer(function BatchBar() {
           ))}
         </MenuContent>
       </Menu>
-      <button
-        type="button"
+      <Button
         className="note-list-batch-delete"
+        size="sm"
+        tone="danger"
         data-testid="batch-delete"
         onClick={() => { list.confirmingDelete = true }}
       >
         Delete
-      </button>
-      <button
-        type="button"
+      </Button>
+      <IconButton
         className="note-list-batch-clear"
         data-testid="batch-clear"
-        aria-label="Clear selection"
+        icon={X}
+        label="Clear selection"
+        size="sm"
         onClick={() => list.clearSelection()}
-      >
-        <Mark icon={X} size={13} />
-      </button>
+      />
     </div>
   )
 })
@@ -221,14 +231,18 @@ const BatchDeleteModal = observer(function BatchDeleteModal() {
         title="Delete notes"
         description={`Delete ${list.selectionCount} notes permanently? This cannot be undone.`}
       >
-        <button
-          type="button"
-          data-testid="confirm-delete"
-          onClick={() => { void list.deleteSelected() }}
-        >
-          Delete
-        </button>
-        <ModalClose data-testid="cancel-delete">Cancel</ModalClose>
+        <div className="sd-modal-actions">
+          <ModalClose asChild>
+            <Button tone="secondary" data-testid="cancel-delete">Cancel</Button>
+          </ModalClose>
+          <Button
+            tone="danger"
+            data-testid="confirm-delete"
+            onClick={() => { void list.deleteSelected() }}
+          >
+            Delete
+          </Button>
+        </div>
       </ModalContent>
     </Modal>
   )
@@ -263,7 +277,7 @@ const NoteRow = memo(function NoteRow({
   return (
     <button
       type="button"
-      className="note-list-item"
+      className={['note-list-item', active ? 'is-active' : '', selected ? 'is-selected' : ''].filter(Boolean).join(' ')}
       data-testid="note-list-item"
       data-note-id={note.id}
       aria-current={active ? 'true' : undefined}
@@ -383,7 +397,7 @@ export const NoteList = observer(function NoteList() {
       emptyState = (
         <EmptyState
           compact
-          icon={MagnifyingGlass}
+          icon={Search}
           title={`No notes match “${filterQuery}”.`}
           actionLabel="清空过滤"
           actionTestId="note-list-empty-clear"
@@ -395,7 +409,7 @@ export const NoteList = observer(function NoteList() {
       emptyState = (
         <EmptyState
           compact
-          icon={MagnifyingGlass}
+          icon={Search}
           title={`No results for “${vault.searchQuery.trim()}”.`}
           body="Try different keywords, or check the index status in the status bar."
           testId="note-list-empty-search"
@@ -415,7 +429,7 @@ export const NoteList = observer(function NoteList() {
       emptyState = (
         <EmptyState
           compact
-          icon={Note}
+          icon={FileText}
           title="No notes yet"
           body="Create your first note to get started."
           actionLabel="New note"
@@ -425,7 +439,7 @@ export const NoteList = observer(function NoteList() {
         />
       )
     } else {
-      emptyState = <EmptyState compact icon={Tray} title="No notes here." testId="note-list-empty" />
+      emptyState = <EmptyState compact icon={Inbox} title="No notes here." testId="note-list-empty" />
     }
   }
 

@@ -1,3 +1,4 @@
+import { Check, FileText, Folder, Pencil, Trash2 } from 'lucide-react'
 import { observer, useService } from '@rabjs/react'
 import { useEffect, useMemo, useState, type DragEvent } from 'react'
 import type { StrideNote } from '@stride/core/note'
@@ -13,7 +14,10 @@ import { NoteListService } from '../services/note-list.service'
 import { TabsService } from '../services/tabs.service'
 import { VaultService } from '../services/vault.service'
 import { ContextMenu } from './context-menu'
+import { Button, IconButton } from './button'
 import { EmptyState } from './empty-state'
+import { Mark } from './icon'
+import { Input } from './input'
 import { Modal, ModalClose, ModalContent } from './modal'
 
 // A vault-scale folder can hold thousands of notes; the tree renders at most
@@ -66,7 +70,7 @@ function NoteLink({
       data-testid="note-link"
       data-note-id={note.id}
       draggable
-      className={active ? 'active' : ''}
+      className={active ? 'note-link is-active' : 'note-link'}
       onClick={onSelect}
       onContextMenu={(event) => {
         event.preventDefault()
@@ -78,7 +82,8 @@ function NoteLink({
         event.dataTransfer.effectAllowed = 'move'
       }}
     >
-      {note.title}
+      <Mark icon={FileText} size={14} />
+      <span className="folder-note-label">{note.title}</span>
     </button>
   )
 }
@@ -176,7 +181,8 @@ function FolderBlock({
     >
       <div className="folder-row-main">
         {renaming === path ? (
-          <input
+          <Input
+            label={`Rename ${label}`}
             className="folder-rename-input"
             value={draft}
             aria-label={`Rename ${label}`}
@@ -189,19 +195,33 @@ function FolderBlock({
             }}
           />
         ) : (
-          <span className="folder-label">{label}</span>
+          <span className="folder-label">
+            <Mark icon={Folder} size={14} />
+            <span className="folder-label-text">{label}</span>
+          </span>
         )}
-        <button type="button" data-testid="rename-folder" onClick={() => (renaming === path ? onRename(path) : onStartRename(path))}>
-          Rename
-        </button>
-        <button type="button" data-testid="delete-folder" onClick={() => onDelete(path)}>
-          Delete
-        </button>
+        <div className="folder-row-actions">
+          <IconButton
+            data-testid="rename-folder"
+            icon={renaming === path ? Check : Pencil}
+            label={renaming === path ? `Save name for ${label}` : `Rename ${label}`}
+            size="sm"
+            onClick={() => (renaming === path ? onRename(path) : onStartRename(path))}
+          />
+          <IconButton
+            data-testid="delete-folder"
+            icon={Trash2}
+            label={`Delete ${label}`}
+            size="sm"
+            onClick={() => onDelete(path)}
+          />
+        </div>
       </div>
       <div className="folder-children">
         {creatingIn === path && (
           <div className="folder-create">
-            <input
+            <Input
+              label={`New folder inside ${label}`}
               data-testid="folder-child-name"
               value={createDraft}
               aria-label={`New folder inside ${label}`}
@@ -213,9 +233,9 @@ function FolderBlock({
                 }
               }}
             />
-            <button type="button" data-testid="create-folder-child" onClick={() => onCreateIn(path)}>
+            <Button size="sm" tone="secondary" data-testid="create-folder-child" onClick={() => onCreateIn(path)}>
               Create
-            </button>
+            </Button>
           </div>
         )}
         {childFolders(paths, path).map((child) => (
@@ -368,9 +388,11 @@ export const FolderTree = observer(function FolderTree() {
         openRootMenu(event.clientX, event.clientY)
       }}
     >
-      <button type="button" data-testid="new-folder" onClick={() => setCreating(true)}>
-        New folder
-      </button>
+      <div className="folder-tree-actions">
+        <Button size="sm" tone="secondary" data-testid="new-folder" onClick={() => setCreating(true)}>
+          New folder
+        </Button>
+      </div>
       {treeEmpty && (
         <EmptyState
           compact
@@ -380,7 +402,8 @@ export const FolderTree = observer(function FolderTree() {
       )}
       {creating && (
         <div className="folder-create">
-          <input
+          <Input
+            label="Folder name"
             data-testid="folder-name"
             value={name}
             onChange={(event) => setName(event.target.value)}
@@ -391,9 +414,9 @@ export const FolderTree = observer(function FolderTree() {
               }
             }}
           />
-          <button type="button" data-testid="create-folder" onClick={() => void submitCreate()}>
+          <Button size="sm" tone="secondary" data-testid="create-folder" onClick={() => void submitCreate()}>
             Create
-          </button>
+          </Button>
         </div>
       )}
       {childFolders(paths, '').map((path) => (
@@ -425,17 +448,21 @@ export const FolderTree = observer(function FolderTree() {
           title="Delete folder"
           description={`Delete folder “${deletingLabel}”? The folder must be empty of notes.`}
         >
-          <button
-            type="button"
-            data-testid="confirm-delete-folder"
-            onClick={() => {
-              void folderService.deleteFolder(deleting)
-              setDeleting('')
-            }}
-          >
-            Delete
-          </button>
-          <ModalClose data-testid="cancel-delete-folder">Cancel</ModalClose>
+          <div className="sd-modal-actions">
+            <ModalClose asChild>
+              <Button tone="secondary" data-testid="cancel-delete-folder">Cancel</Button>
+            </ModalClose>
+            <Button
+              tone="danger"
+              data-testid="confirm-delete-folder"
+              onClick={() => {
+                void folderService.deleteFolder(deleting)
+                setDeleting('')
+              }}
+            >
+              Delete
+            </Button>
+          </div>
         </ModalContent>
       </Modal>
       {menu && <ContextMenu x={menu.x} y={menu.y} items={menu.items} onClose={() => setMenu(null)} />}

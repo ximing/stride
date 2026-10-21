@@ -1,11 +1,13 @@
 import { observer, useService } from '@rabjs/react'
+import { Plus, X } from 'lucide-react'
 import { typeSidebarLabel } from '../../../../packages/core/src/types'
 import { VIEW_FILTER_OPS, type ViewFilterOp, type ViewSortDir, type ViewSortKey } from '../../../../packages/core/src/views'
 import { VaultService } from '../services/vault.service'
 import { ViewsService } from '../services/views.service'
-import { Button } from './button'
+import { Button, IconButton } from './button'
 import { Input } from './input'
 import { Modal, ModalClose, ModalContent } from './modal'
+import { Select } from './select'
 
 const SORT_LABELS: Record<ViewSortKey, Record<ViewSortDir, string>> = {
   mtime: { desc: 'Modified: newest first', asc: 'Modified: oldest first' },
@@ -22,11 +24,20 @@ const SORT_OPTIONS: { key: ViewSortKey; dir: ViewSortDir }[] = [
   { key: 'created', dir: 'asc' },
 ]
 
+const SORT_SELECT_OPTIONS = [
+  { value: '__default__', label: 'Default (manual sort)' },
+  ...SORT_OPTIONS.map(({ key, dir }) => ({ value: `${key}:${dir}`, label: SORT_LABELS[key][dir] })),
+]
+
 const OP_LABELS: Record<ViewFilterOp, string> = {
   eq: 'is',
   contains: 'contains',
   exists: 'exists',
 }
+
+const OP_OPTIONS = VIEW_FILTER_OPS.map((op) => ({ value: op, label: OP_LABELS[op] }))
+const ANY_TYPE = '__any__'
+const DEFAULT_SORT = '__default__'
 
 /**
  * Editor for saved views (`views/*.json`). All state lives in
@@ -58,46 +69,34 @@ export const ViewEditorModal = observer(function ViewEditorModal() {
               value={draft.icon}
               onChange={(event) => views.updateDraft({ icon: event.target.value })}
             />
-            <label className="sd-field">
-              <span className="sd-field-label">Type</span>
-              <select
-                className="sd-field-input"
-                data-testid="view-type"
-                value={draft.type}
-                onChange={(event) => views.updateDraft({ type: event.target.value })}
-              >
-                <option value="">Any type</option>
-                {typeOptions.map((note) => (
-                  <option key={note.id} value={note.title}>{typeSidebarLabel(note)}</option>
-                ))}
-                {draft.type !== '' && !typeOptions.some((note) => note.title === draft.type) && (
-                  <option value={draft.type}>{draft.type}</option>
-                )}
-              </select>
-            </label>
-            <label className="sd-field">
-              <span className="sd-field-label">Sort</span>
-              <select
-                className="sd-field-input"
-                data-testid="view-sort"
-                value={draft.sortKey === '' ? '' : `${draft.sortKey}:${draft.sortDir}`}
-                onChange={(event) => {
-                  const value = event.target.value
-                  if (value === '') {
-                    views.updateDraft({ sortKey: '' })
-                    return
-                  }
-                  const [key, dir] = value.split(':') as [ViewSortKey, ViewSortDir]
-                  views.updateDraft({ sortKey: key, sortDir: dir })
-                }}
-              >
-                <option value="">Default (manual sort)</option>
-                {SORT_OPTIONS.map(({ key, dir }) => (
-                  <option key={`${key}-${dir}`} value={`${key}:${dir}`}>{SORT_LABELS[key][dir]}</option>
-                ))}
-              </select>
-            </label>
-            <label className="advance-inbox">
+            <Select
+              label="Type"
+              data-testid="view-type"
+              value={draft.type === '' ? ANY_TYPE : draft.type}
+              onValueChange={(value) => views.updateDraft({ type: value === ANY_TYPE ? '' : value })}
+              options={[
+                { value: ANY_TYPE, label: 'Any type' },
+                ...typeOptions.map((note) => ({ value: note.title, label: typeSidebarLabel(note) })),
+                ...(draft.type !== '' && !typeOptions.some((note) => note.title === draft.type)
+                  ? [{ value: draft.type, label: draft.type }]
+                  : []),
+              ]}
+            />
+            <Select
+              label="Sort"
+              data-testid="view-sort"
+              value={draft.sortKey === '' ? DEFAULT_SORT : `${draft.sortKey}:${draft.sortDir}`}
+              onValueChange={(value) => {
+                if (value === DEFAULT_SORT) {
+                  views.updateDraft({ sortKey: '' })
+                  return
+                }
+                const [key, dir] = value.split(':') as [ViewSortKey, ViewSortDir]
+                views.updateDraft({ sortKey: key, sortDir: dir })
+              }}
+              options={SORT_SELECT_OPTIONS}
+            />
+            <label className="advance-inbox view-archived">
               <input
                 type="checkbox"
                 data-testid="view-archived"
@@ -110,57 +109,69 @@ export const ViewEditorModal = observer(function ViewEditorModal() {
               <span className="sd-field-label">Property filters</span>
               {draft.filters.map((filter, index) => (
                 <div className="view-filter-row" data-testid="view-filter-row" key={index}>
-                  <input
-                    className="sd-field-input"
+                  <Input
+                    aria-label="Property"
+                    className="view-filter-key"
                     data-testid="view-filter-key"
                     placeholder="property"
                     value={filter.key}
                     onChange={(event) => views.updateDraftFilter(index, { key: event.target.value })}
                   />
-                  <select
-                    className="sd-field-input"
+                  <Select
+                    aria-label="Filter operator"
+                    className="view-filter-op"
                     data-testid="view-filter-op"
                     value={filter.op}
-                    onChange={(event) => views.updateDraftFilter(index, { op: event.target.value as ViewFilterOp })}
-                  >
-                    {VIEW_FILTER_OPS.map((op) => (
-                      <option key={op} value={op}>{OP_LABELS[op]}</option>
-                    ))}
-                  </select>
+                    onValueChange={(value) => views.updateDraftFilter(index, { op: value as ViewFilterOp })}
+                    options={OP_OPTIONS}
+                  />
                   {filter.op !== 'exists' && (
-                    <input
-                      className="sd-field-input"
+                    <Input
+                      aria-label="Filter value"
+                      className="view-filter-value"
                       data-testid="view-filter-value"
                       placeholder="value"
                       value={filter.value}
                       onChange={(event) => views.updateDraftFilter(index, { value: event.target.value })}
                     />
                   )}
-                  <button
-                    type="button"
+                  <IconButton
                     className="view-filter-remove"
                     data-testid="view-filter-remove"
-                    aria-label="Remove filter"
+                    icon={X}
+                    label="Remove filter"
                     onClick={() => views.removeDraftFilter(index)}
-                  >
-                    ×
-                  </button>
+                  />
                 </div>
               ))}
-              <button type="button" data-testid="view-filter-add" onClick={() => views.addDraftFilter()}>
+              <Button
+                tone="secondary"
+                size="sm"
+                className="view-filter-add"
+                data-testid="view-filter-add"
+                icon={<Plus aria-hidden="true" size={14} strokeWidth={1.75} />}
+                onClick={() => views.addDraftFilter()}
+              >
                 Add filter
-              </button>
+              </Button>
             </div>
             <div className="view-editor-actions">
-              <Button tone="primary" data-testid="view-save" onClick={() => void views.saveDraft()}>
-                Save view
-              </Button>
               {draft.file !== '' && (
-                <Button tone="danger" data-testid="view-delete" onClick={() => void views.deleteView(draft.file)}>
+                <Button
+                  tone="danger"
+                  className="view-editor-delete"
+                  data-testid="view-delete"
+                  onClick={() => void views.deleteView(draft.file)}
+                >
                   Delete
                 </Button>
               )}
-              <ModalClose data-testid="view-cancel">Cancel</ModalClose>
+              <ModalClose asChild>
+                <Button tone="secondary" className="view-editor-cancel" data-testid="view-cancel">Cancel</Button>
+              </ModalClose>
+              <Button tone="primary" className="view-editor-save" data-testid="view-save" onClick={() => void views.saveDraft()}>
+                Save view
+              </Button>
             </div>
           </div>
         )}

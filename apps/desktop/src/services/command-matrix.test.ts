@@ -42,6 +42,18 @@ const EDITOR_KEYMAP_CHORDS = [
   'Mod+Shift+B',
   'Mod+Shift+H',
   'Mod+Shift+S',
+  'Mod+Shift+L',
+  'Mod+Shift+E',
+  'Mod+Shift+R',
+  'Mod+Shift+J',
+  'Mod+ArrowUp',
+  'Mod+ArrowDown',
+  'Mod+ArrowLeft',
+  'Mod+ArrowRight',
+  'Mod+Shift+ArrowUp',
+  'Mod+Shift+ArrowDown',
+  'Mod+Shift+ArrowLeft',
+  'Mod+Shift+ArrowRight',
 ]
 
 describe('shortcut matrix', () => {

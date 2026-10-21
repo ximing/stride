@@ -5,8 +5,8 @@
 // the live values; zoom reaches the stage instantly through stage-zoom.ts and
 // viewMode reaches NoteList through the `is-compact` class.
 
-import { FolderOpen } from '@phosphor-icons/react'
 import { has, observer, useService } from '@rabjs/react'
+import { FolderOpen } from 'lucide-react'
 import { useState } from 'react'
 import {
   VAULT_ZOOM_MAX,
@@ -15,13 +15,16 @@ import {
   type ViewMode,
 } from '../../../../../../packages/core/src/vault-config'
 import { VaultService } from '../../../services/vault.service'
-import { EmptyState } from '../../empty-state'
+import { Mark } from '../../icon'
+import { Input } from '../../input'
+import { SettingsSegmentedControl } from '../segmented-control'
 import './vault.css'
 
 const PER_VAULT_HINT = 'This vault only — stored in .stride/vault.json and synced with the vault folder.'
 
 const VIEW_MODES: readonly ViewMode[] = ['comfortable', 'compact']
 const VIEW_MODE_LABELS: Record<ViewMode, string> = { comfortable: 'Comfortable', compact: 'Compact' }
+const VIEW_MODE_OPTIONS = VIEW_MODES.map((mode) => ({ value: mode, label: VIEW_MODE_LABELS[mode] }))
 
 const GIT_SETUP_OPTIONS: readonly GitSetupPreference[] = ['undecided', 'enabled', 'disabled']
 const GIT_SETUP_LABELS: Record<GitSetupPreference, string> = {
@@ -49,9 +52,10 @@ const ZoomField = observer(function ZoomField() {
 
   return (
     <div className="svault-group">
-      <h3 className="svault-heading">Zoom</h3>
-      <label className="svault-zoom">
-        <input
+      <div className="svault-zoom">
+        <Input
+          label="Zoom (×)"
+          className="svault-zoom-input"
           data-testid="vault-zoom"
           type="number"
           inputMode="decimal"
@@ -59,15 +63,17 @@ const ZoomField = observer(function ZoomField() {
           max={VAULT_ZOOM_MAX}
           step={0.05}
           value={draft ?? String(vault.zoom)}
+          aria-invalid={Boolean(error)}
+          aria-describedby="vault-zoom-hint"
+          aria-errormessage={error ? 'vault-zoom-error' : undefined}
           onChange={(event) => onChange(event.target.value)}
         />
-        <span>×</span>
-      </label>
-      <p className="svault-hint">
+      </div>
+      <p className="svault-hint" id="vault-zoom-hint">
         Editor zoom, {VAULT_ZOOM_MIN}–{VAULT_ZOOM_MAX}×. Applies immediately. {PER_VAULT_HINT}
       </p>
       {error && (
-        <p className="error" role="alert" data-testid="vault-zoom-error">
+        <p className="error" id="vault-zoom-error" role="alert" data-testid="vault-zoom-error">
           {error}
         </p>
       )}
@@ -80,19 +86,13 @@ const ViewModeField = observer(function ViewModeField() {
   return (
     <div className="svault-group">
       <h3 className="svault-heading">Note list density</h3>
-      <div className="theme-picker" role="group" aria-label="Note list density">
-        {VIEW_MODES.map((mode) => (
-          <button
-            key={mode}
-            type="button"
-            data-testid={`vault-view-mode-${mode}`}
-            aria-pressed={vault.viewMode === mode}
-            onClick={() => void vault.setViewMode(mode)}
-          >
-            {VIEW_MODE_LABELS[mode]}
-          </button>
-        ))}
-      </div>
+      <SettingsSegmentedControl
+        label="Note list density"
+        value={vault.viewMode}
+        options={VIEW_MODE_OPTIONS}
+        testIdPrefix="vault-view-mode"
+        onChange={(mode) => void vault.setViewMode(mode)}
+      />
       <p className="svault-hint">Compact tightens rows and drops the snippet line. {PER_VAULT_HINT}</p>
     </div>
   )
@@ -105,15 +105,16 @@ const GitSetupField = observer(function GitSetupField() {
       <h3 className="svault-heading">Git setup</h3>
       <div className="svault-radios" role="radiogroup" aria-label="Git setup preference">
         {GIT_SETUP_OPTIONS.map((option) => (
-          <label key={option} className="svault-radio">
+          <label key={option} className="svault-radio settings-choice">
             <input
+              className="settings-choice-control"
               type="radio"
               name="vault-git-setup"
               data-testid={`vault-git-setup-${option}`}
               checked={vault.gitSetupPreference === option}
               onChange={() => void vault.setGitSetupPreference(option)}
             />
-            {GIT_SETUP_LABELS[option]}
+            <span>{GIT_SETUP_LABELS[option]}</span>
           </label>
         ))}
       </div>
@@ -128,13 +129,13 @@ const VaultFields = observer(function VaultFields() {
   const vault = useService(VaultService)
   if (vault.phase !== 'ready') {
     return (
-      <EmptyState
-        compact
-        icon={FolderOpen}
-        title="No vault open"
-        body="Open a vault to configure these settings."
-        testId="vault-settings-empty"
-      />
+      <div className="svault-empty" data-testid="vault-settings-empty">
+        <Mark icon={FolderOpen} size={20} />
+        <div>
+          <p className="svault-empty-title">No vault open</p>
+          <p className="svault-hint">Open a vault to configure these settings.</p>
+        </div>
+      </div>
     )
   }
   return (

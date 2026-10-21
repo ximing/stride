@@ -1,4 +1,4 @@
-import { ListBullets } from '@phosphor-icons/react'
+import { ListTree } from 'lucide-react'
 import type { Editor } from '@tiptap/core'
 import { observer, useService } from '@rabjs/react'
 import { VaultService } from '../services/vault.service'
@@ -36,10 +36,10 @@ export const TocPanel = observer(function TocPanel() {
   const note = vault.active
   if (!note) {
     return (
-      <div data-testid="toc-panel">
+      <div className="toc-panel" data-testid="toc-panel">
         <EmptyState
           compact
-          icon={ListBullets}
+          icon={ListTree}
           title="Select a note"
           body="The outline of the open note shows here."
           testId="toc-empty"
@@ -51,10 +51,10 @@ export const TocPanel = observer(function TocPanel() {
   // tocItems always leads with the title (level 1); only title means no headings.
   if (items.length <= 1) {
     return (
-      <div data-testid="toc-panel">
+      <div className="toc-panel" data-testid="toc-panel">
         <EmptyState
           compact
-          icon={ListBullets}
+          icon={ListTree}
           title="No headings in this note."
           body="Add headings to build an outline."
           testId="toc-empty-headings"
@@ -63,19 +63,22 @@ export const TocPanel = observer(function TocPanel() {
     )
   }
   return (
-    <div data-testid="toc-panel">
-      {items.map((item, index) => (
-        <button
-          key={`${item.level}-${item.pos}-${index}`}
-          type="button"
-          className="toc-item"
-          data-testid="toc-item"
-          data-level={item.level}
-          onClick={() => openItem(item)}
-        >
-          {item.text}
-        </button>
-      ))}
+    <div className="toc-panel" data-testid="toc-panel">
+      <h2 className="panel-heading">Outline</h2>
+      <div className="toc-list">
+        {items.map((item, index) => (
+          <button
+            key={`${item.level}-${item.pos}-${index}`}
+            type="button"
+            className="toc-item"
+            data-testid="toc-item"
+            data-level={item.level}
+            onClick={() => openItem(item)}
+          >
+            {item.text}
+          </button>
+        ))}
+      </div>
     </div>
   )
 })

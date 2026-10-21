@@ -21,6 +21,11 @@ import { VaultService } from './services/vault.service'
 import { ViewsService } from './services/views.service'
 import './ui/tokens.css'
 import './styles.css'
+import './ui/primitives.css'
+import './ui/shell.css'
+import './ui/panels.css'
+import './ui/overlays.css'
+import './editor/chrome.css'
 
 // Apply the persisted theme synchronously, before the first paint, so the app
 // never flashes the wrong palette (system removes the attribute; light/dark

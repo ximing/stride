@@ -1,6 +1,6 @@
 import { Node, mergeAttributes, type Editor } from '@tiptap/core'
-import { Plugin, PluginKey } from '@tiptap/pm/state'
 import type { FileSystemBackend } from '@stride/platform'
+import { MIN_IMAGE_WIDTH_PX, imageLengthPx, nextImageSize, type ImageResizeCorner } from './image-resize'
 
 const mimeExtensions: Record<string, string> = {
   'image/png': 'png',
@@ -8,8 +8,6 @@ const mimeExtensions: Record<string, string> = {
   'image/gif': 'gif',
   'image/webp': 'webp',
 }
-
-const imagePluginKey = new PluginKey('imageAttachment')
 
 export function imageMimeExtension(type: string): string {
   const mime = type.split(';', 1)[0]?.trim().toLowerCase() ?? ''
@@ -69,7 +67,7 @@ export const imageSlashCommand = {
   },
 }
 
-function pastedImageUrl(text: string): string | null {
+export function pastedImageUrl(text: string): string | null {
   const value = text.trim()
   if (!value.startsWith('http://') && !value.startsWith('https://')) return null
   if (/\s/.test(value)) return null
@@ -81,7 +79,7 @@ function pastedImageUrl(text: string): string | null {
   return value
 }
 
-function imageFiles(data: DataTransfer | null): File[] {
+export function imageFiles(data: DataTransfer | null): File[] {
   if (!data) return []
   const files: File[] = []
   const items = data.items
@@ -100,11 +98,48 @@ function imageFiles(data: DataTransfer | null): File[] {
   return files
 }
 
-function insertImages(editor: Editor, srcs: string[], pos: number) {
+export async function storeImageFiles(fs: FileSystemBackend, files: File[]): Promise<string[]> {
+  const srcs: string[] = []
+  try {
+    for (const file of files) srcs.push(await saveAttachment(fs, file))
+  } catch {
+    // Keep whatever already saved. Do not insert blob: or data: urls.
+  }
+  return srcs
+}
+
+/** Insert stored images, replacing [from, to). A drop uses the same position twice. */
+export function insertStoredImages(editor: Editor, srcs: string[], from: number, to = from): void {
   if (editor.isDestroyed || srcs.length === 0) return
   const content = srcs.map((src) => ({ type: 'image', attrs: { src } }))
-  const inserted = editor.chain().insertContentAt(pos, content).run()
+  const inserted = editor.chain().insertContentAt({ from, to }, content).run()
   if (!inserted) editor.chain().insertContent(content).run()
+}
+
+export async function localizeHttpImages(editor: Editor, fs: FileSystemBackend): Promise<void> {
+  if (editor.isDestroyed) return
+  const jobs: { pos: number; src: string }[] = []
+  editor.state.doc.descendants((node, pos) => {
+    if (node.type.name !== 'image') return
+    const src = node.attrs.src
+    if (typeof src === 'string' && (src.startsWith('http://') || src.startsWith('https://'))) {
+      jobs.push({ pos, src })
+    }
+  })
+  for (let index = jobs.length - 1; index >= 0; index -= 1) {
+    const job = jobs[index]
+    if (!job || editor.isDestroyed) return
+    let next = job.src
+    try {
+      next = await localizeRemoteImage(fs, job.src)
+    } catch {
+      next = job.src
+    }
+    if (next === job.src || editor.isDestroyed) continue
+    const current = editor.state.doc.nodeAt(job.pos)
+    if (!current || current.type.name !== 'image' || current.attrs.src !== job.src) continue
+    editor.view.dispatch(editor.state.tr.setNodeMarkup(job.pos, undefined, { ...current.attrs, src: next }))
+  }
 }
 
 function mimeFromPath(src: string): string {
@@ -150,22 +185,6 @@ export function createImageExtension(options: {
     if (path.startsWith('attachments/')) options.onUploaded?.(path)
   }
 
-  const storeFiles = async (files: File[], pos: number, editor: Editor) => {
-    const fs = options.getFs()
-    if (!fs) return
-    const srcs: string[] = []
-    try {
-      for (const file of files) {
-        const path = await saveAttachment(fs, file)
-        remember(path)
-        srcs.push(path)
-      }
-    } catch {
-      // Keep whatever already saved. Do not insert blob: or data: urls.
-    }
-    insertImages(editor, srcs, pos)
-  }
-
   return Node.create({
     name: 'image',
     inline: false,
@@ -176,6 +195,27 @@ export function createImageExtension(options: {
     addAttributes() {
       return {
         src: { default: '' },
+        alt: {
+          default: '',
+          parseHTML: (element) => element.getAttribute('alt') ?? '',
+          renderHTML: (attributes) => (attributes.alt ? { alt: attributes.alt } : {}),
+        },
+        width: {
+          default: null,
+          parseHTML: (element) => imageLengthPx(element.getAttribute('width')),
+          renderHTML: (attributes) => {
+            const width = imageLengthPx(attributes.width)
+            return width ? { width: String(width) } : {}
+          },
+        },
+        height: {
+          default: null,
+          parseHTML: (element) => imageLengthPx(element.getAttribute('height')),
+          renderHTML: (attributes) => {
+            const height = imageLengthPx(attributes.height)
+            return height ? { height: String(height) } : {}
+          },
+        },
       }
     },
     parseHTML() {
@@ -186,6 +226,7 @@ export function createImageExtension(options: {
     },
     addNodeView() {
       return ({ node, editor, getPos }) => {
+        let current = node
         const dom = document.createElement('div')
         dom.className = 'editor-image'
         dom.contentEditable = 'false'
@@ -204,6 +245,63 @@ export function createImageExtension(options: {
         input.type = 'file'
         input.accept = 'image/*'
         input.hidden = true
+
+        const corners: ImageResizeCorner[] = ['nw', 'ne', 'sw', 'se']
+        const handles = corners.map((corner) => {
+          const handle = document.createElement('span')
+          handle.className = `editor-image-handle is-${corner}`
+          handle.dataset.corner = corner
+          handle.dataset.testid = `image-resize-${corner}`
+          handle.contentEditable = 'false'
+          handle.addEventListener('pointerdown', (event) => {
+            if (!editor.isEditable || event.button !== 0) return
+            event.preventDefault()
+            event.stopPropagation()
+            const startX = event.clientX
+            const startY = event.clientY
+            const rect = img.getBoundingClientRect()
+            const startWidth = imageLengthPx(current.attrs.width)
+              ?? Math.max(1, Math.round(rect.width || img.naturalWidth || MIN_IMAGE_WIDTH_PX))
+            const startHeight = imageLengthPx(current.attrs.height)
+              ?? Math.max(1, Math.round(rect.height || img.naturalHeight || startWidth))
+            const maxWidth = Math.max(startWidth, editor.view.dom.clientWidth || startWidth)
+            let pending: { width: number; height: number } | null = null
+            const move = (ev: PointerEvent) => {
+              pending = nextImageSize({
+                startWidth,
+                startHeight,
+                deltaX: ev.clientX - startX,
+                deltaY: ev.clientY - startY,
+                corner,
+                minWidth: MIN_IMAGE_WIDTH_PX,
+                maxWidth,
+              })
+              applyBox(pending.width, pending.height)
+            }
+            const up = () => {
+              handle.removeEventListener('pointermove', move)
+              handle.removeEventListener('pointerup', up)
+              if (!pending) return
+              const pos = typeof getPos === 'function' ? getPos() : undefined
+              if (typeof pos !== 'number' || editor.isDestroyed) return
+              const live = editor.state.doc.nodeAt(pos)
+              if (!live || live.type.name !== 'image') return
+              editor.view.dispatch(editor.state.tr.setNodeMarkup(pos, undefined, {
+                ...live.attrs,
+                width: pending.width,
+                height: pending.height,
+              }))
+            }
+            handle.addEventListener('pointermove', move)
+            handle.addEventListener('pointerup', up)
+            try {
+              handle.setPointerCapture(event.pointerId)
+            } catch {
+              // jsdom has no pointer capture
+            }
+          })
+          return handle
+        })
 
         const onRead = async (src: string): Promise<Uint8Array | null> => {
           const fs = options.getFs()
@@ -253,6 +351,17 @@ export function createImageExtension(options: {
         let shown = ''
         let generation = 0
 
+        const applyBox = (width: number | null, height: number | null) => {
+          if (width && width > 0) {
+            img.style.width = `${width}px`
+            dom.style.width = `${width}px`
+          } else {
+            img.style.width = ''
+            dom.style.width = ''
+          }
+          img.style.height = height && height > 0 ? `${height}px` : ''
+        }
+
         const paint = (src: string) => {
           shown = src
           const generationId = ++generation
@@ -283,16 +392,28 @@ export function createImageExtension(options: {
           })()
         }
 
-        dom.append(img, button, input)
+        dom.append(img, button, input, ...handles)
+        const altOf = (value: unknown) => (typeof value === 'string' ? value : '')
+        img.alt = altOf(node.attrs.alt)
+        applyBox(imageLengthPx(node.attrs.width), imageLengthPx(node.attrs.height))
         paint(typeof node.attrs.src === 'string' ? node.attrs.src : '')
 
         return {
           dom,
           update: (updated) => {
             if (updated.type.name !== 'image') return false
+            current = updated
+            img.alt = altOf(updated.attrs.alt)
+            applyBox(imageLengthPx(updated.attrs.width), imageLengthPx(updated.attrs.height))
             const next = typeof updated.attrs.src === 'string' ? updated.attrs.src : ''
             if (next !== shown) paint(next)
             return true
+          },
+          selectNode: () => {
+            dom.classList.add('is-selected')
+          },
+          deselectNode: () => {
+            dom.classList.remove('is-selected')
           },
           destroy: () => {
             generation += 1
@@ -302,56 +423,11 @@ export function createImageExtension(options: {
           ignoreMutation: () => true,
           stopEvent: (event) => {
             const target = event.target
-            return target === button || target === input
+            if (target === button || target === input) return true
+            return target instanceof globalThis.Node && handles.some((handle) => handle.contains(target))
           },
         }
       }
-    },
-    addProseMirrorPlugins() {
-      const editor = this.editor
-      return [
-        new Plugin({
-          key: imagePluginKey,
-          props: {
-            handlePaste: (view, event) => {
-              const files = imageFiles(event.clipboardData)
-              if (files.length > 0) {
-                event.preventDefault()
-                if (!options.getFs()) return true
-                void storeFiles(files, view.state.selection.from, editor)
-                return true
-              }
-              const url = pastedImageUrl(event.clipboardData?.getData('text/plain') ?? '')
-              if (!url) return false
-              event.preventDefault()
-              const fs = options.getFs()
-              if (!fs) return true
-              const pos = view.state.selection.from
-              void (async () => {
-                let src = url
-                try {
-                  src = await localizeRemoteImage(fs, url)
-                } catch {
-                  src = url
-                }
-                remember(src)
-                insertImages(editor, [src], pos)
-              })()
-              return true
-            },
-            handleDrop: (view, event, _slice, moved) => {
-              if (moved) return false
-              const files = imageFiles(event.dataTransfer)
-              if (files.length === 0) return false
-              event.preventDefault()
-              if (!options.getFs()) return true
-              const coords = view.posAtCoords({ left: event.clientX, top: event.clientY })
-              void storeFiles(files, coords?.pos ?? view.state.selection.from, editor)
-              return true
-            },
-          },
-        }),
-      ]
     },
   })
 }

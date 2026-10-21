@@ -2,13 +2,15 @@ import { register, resolve } from '@rabjs/react'
 import type { StrideNote } from '@stride/core/note'
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { notePath, readNoteFile } from '../../../../packages/core/src/vault'
 import { App } from '../app'
 import { FolderService } from '../services/folder.service'
 import { ChatService, GitService, SettingsService, UpdateService } from '../services/panels.service'
 import { VaultService } from '../services/vault.service'
 import { PropertiesPanel } from './properties-panel'
+
+const originalScrollIntoView = window.HTMLElement.prototype.scrollIntoView
 
 function linkedNote(id: string, title: string, properties: StrideNote['properties'], targets: string[]): StrideNote {
   return {
@@ -32,17 +34,34 @@ function useMemoryFixture() {
   window.history.replaceState(null, '', '/?fixture=memory')
 }
 
-function setControlValue(element: HTMLInputElement | HTMLSelectElement, value: string) {
-  const prototype = element instanceof HTMLSelectElement ? HTMLSelectElement.prototype : HTMLInputElement.prototype
-  const setter = Object.getOwnPropertyDescriptor(prototype, 'value')?.set
+function setControlValue(element: HTMLInputElement, value: string) {
+  const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
   setter?.call(element, value)
   element.dispatchEvent(new Event('input', { bubbles: true }))
   element.dispatchEvent(new Event('change', { bubbles: true }))
 }
 
+async function selectPropertyType(host: HTMLElement, label: string) {
+  const trigger = host.querySelector<HTMLButtonElement>('[data-testid="property-type"]')!
+  await act(async () => {
+    trigger.click()
+  })
+  const option = [...document.querySelectorAll('[role="option"]')].find((item) => item.textContent === label)
+  expect(option, `Missing ${label} option`).not.toBeNull()
+  await act(async () => {
+    ;(option as HTMLElement).click()
+  })
+}
+
 describe('PropertiesPanel', () => {
+  beforeEach(() => {
+    window.HTMLElement.prototype.scrollIntoView = vi.fn()
+  })
+
   afterEach(() => {
     window.history.replaceState(null, '', '/')
+    if (originalScrollIntoView) window.HTMLElement.prototype.scrollIntoView = originalScrollIntoView
+    else Reflect.deleteProperty(window.HTMLElement.prototype, 'scrollIntoView')
   })
 
   it('writes a number and a boolean as JSON and does not render _secret', async () => {
@@ -72,7 +91,9 @@ describe('PropertiesPanel', () => {
 
       await act(async () => {
         setControlValue(host.querySelector<HTMLInputElement>('[data-testid="property-name"]')!, 'count')
-        setControlValue(host.querySelector<HTMLSelectElement>('[data-testid="property-type"]')!, 'number')
+      })
+      await selectPropertyType(host, 'number')
+      await act(async () => {
         setControlValue(host.querySelector<HTMLInputElement>('[data-testid="property-value"]')!, '12')
       })
       await act(async () => {
@@ -81,8 +102,8 @@ describe('PropertiesPanel', () => {
 
       await act(async () => {
         setControlValue(host.querySelector<HTMLInputElement>('[data-testid="property-name"]')!, 'done')
-        setControlValue(host.querySelector<HTMLSelectElement>('[data-testid="property-type"]')!, 'boolean')
       })
+      await selectPropertyType(host, 'boolean')
       const checkbox = host.querySelector<HTMLInputElement>('[data-testid="property-value"]')!
       expect(checkbox.type).toBe('checkbox')
       await act(async () => {
@@ -145,7 +166,9 @@ describe('PropertiesPanel', () => {
       })
       await act(async () => {
         setControlValue(host.querySelector<HTMLInputElement>('[data-testid="property-name"]')!, 'label')
-        setControlValue(host.querySelector<HTMLSelectElement>('[data-testid="property-type"]')!, 'string')
+      })
+      await selectPropertyType(host, 'string')
+      await act(async () => {
         setControlValue(host.querySelector<HTMLInputElement>('[data-testid="property-value"]')!, 'solo')
       })
       await act(async () => {
@@ -153,7 +176,9 @@ describe('PropertiesPanel', () => {
       })
       await act(async () => {
         setControlValue(host.querySelector<HTMLInputElement>('[data-testid="property-name"]')!, 'tags')
-        setControlValue(host.querySelector<HTMLSelectElement>('[data-testid="property-type"]')!, 'list')
+      })
+      await selectPropertyType(host, 'list')
+      await act(async () => {
         setControlValue(host.querySelector<HTMLInputElement>('[data-testid="property-value"]')!, 'solo')
       })
       await act(async () => {

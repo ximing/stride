@@ -1,4 +1,4 @@
-import { SlidersHorizontal } from '@phosphor-icons/react'
+import { Archive, SlidersHorizontal, Trash2, X } from 'lucide-react'
 import { observer, useService } from '@rabjs/react'
 import { relationsOf, resolveNote, type NoteRelations } from '@stride/core/graph'
 import { bodyWikilinks, isArchived, isHiddenProperty, propertyKind, type StrideNote } from '@stride/core/note'
@@ -6,7 +6,11 @@ import { useState } from 'react'
 import { TabsService } from '../services/tabs.service'
 import { VaultService } from '../services/vault.service'
 import { EmptyState } from './empty-state'
+import { Button, IconButton } from './button'
+import { Mark } from './icon'
+import { Input } from './input'
 import { Modal, ModalClose, ModalContent } from './modal'
+import { Select } from './select'
 
 function unresolvedRelations(
   note: StrideNote,
@@ -30,6 +34,13 @@ function unresolvedRelations(
   return rows
 }
 
+const PROPERTY_TYPE_OPTIONS = [
+  { value: 'string', label: 'string' },
+  { value: 'number', label: 'number' },
+  { value: 'boolean', label: 'boolean' },
+  { value: 'list', label: 'list' },
+]
+
 export const PropertiesPanel = observer(function PropertiesPanel() {
   const vault = useService(VaultService)
   const tabs = useService(TabsService)
@@ -51,140 +62,149 @@ export const PropertiesPanel = observer(function PropertiesPanel() {
   const unresolved = unresolvedRelations(note, graph.notes, relations.outgoing)
   const fields = Object.keys(note.properties).filter((field) => !isHiddenProperty(field))
   return (
-    <div>
-      <button
-        type="button"
-        data-testid="archive-note"
-        onClick={() => vault.updateBooleanProperty('archived', !isArchived(note))}
-      >
-        {isArchived(note) ? 'Unarchive' : 'Archive'}
-      </button>
-      <button type="button" data-testid="delete-note" onClick={() => setDeleteOpen(true)}>
-        Delete
-      </button>
-      <Modal open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <ModalContent title="Delete note" description="Delete this note permanently? This cannot be undone.">
-          <button
-            type="button"
-            data-testid="confirm-delete"
-            onClick={() => {
-              void vault.deleteActiveNote()
-              setDeleteOpen(false)
-            }}
+    <div className="properties-panel">
+      <div className="properties-panel-head">
+        <h2 className="panel-heading">Properties</h2>
+        <div className="properties-actions">
+          <Button
+            size="sm"
+            tone="secondary"
+            icon={<Mark icon={Archive} size={14} />}
+            data-testid="archive-note"
+            onClick={() => vault.updateBooleanProperty('archived', !isArchived(note))}
+          >
+            {isArchived(note) ? 'Unarchive' : 'Archive'}
+          </Button>
+          <Button
+            size="sm"
+            tone="danger"
+            icon={<Mark icon={Trash2} size={14} />}
+            data-testid="delete-note"
+            onClick={() => setDeleteOpen(true)}
           >
             Delete
-          </button>
-          <ModalClose data-testid="cancel-delete">Cancel</ModalClose>
+          </Button>
+        </div>
+      </div>
+      <Modal open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <ModalContent title="Delete note" description="Delete this note permanently? This cannot be undone.">
+          <div className="sd-modal-actions">
+            <ModalClose asChild>
+              <Button tone="secondary" data-testid="cancel-delete">Cancel</Button>
+            </ModalClose>
+            <Button
+              tone="danger"
+              data-testid="confirm-delete"
+              onClick={() => {
+                void vault.deleteActiveNote()
+                setDeleteOpen(false)
+              }}
+            >
+              Delete
+            </Button>
+          </div>
         </ModalContent>
       </Modal>
-      <h2>Properties</h2>
-      <label className="field">
-        <span>Type</span>
-        <input value={note.type} onChange={(event) => vault.updateType(event.target.value)} />
-      </label>
+      <Input label="Type" value={note.type} onChange={(event) => vault.updateType(event.target.value)} />
       {fields.map((field) => {
         const value = note.properties[field]
         const kind = propertyKind(value)
         return (
           <div className="field property-row" data-testid="property-field" data-name={field} key={field}>
-            <label>
-              <span>{field}</span>
-              {kind === 'boolean' ? (
-                <input
-                  className="property-check"
-                  type="checkbox"
-                  checked={value === true}
-                  onChange={(event) => vault.updateBooleanProperty(field, event.target.checked)}
-                  onBlur={() => vault.blurProperty()}
-                />
-              ) : kind === 'number' ? (
-                <input
-                  type="number"
-                  step="any"
-                  value={vault.numberText(field)}
-                  onChange={(event) => vault.updateNumberProperty(field, event.target.value)}
-                  onBlur={() => vault.commitNumberProperty(field)}
-                />
-              ) : (
-                <input
-                  type="text"
-                  value={kind === 'list' ? vault.listText(field) : vault.propertyText(field)}
-                  onChange={(event) => {
-                    if (kind === 'list') vault.updateListProperty(field, event.target.value)
-                    else vault.updateProperty(field, event.target.value)
-                  }}
-                  onBlur={() => {
-                    if (kind === 'list') vault.commitListProperty(field)
-                    else vault.blurProperty()
-                  }}
-                />
-              )}
-            </label>
-            <button
-              type="button"
+            {kind === 'boolean' ? (
+              <Input
+                label={field}
+                className="property-check"
+                type="checkbox"
+                checked={value === true}
+                onChange={(event) => vault.updateBooleanProperty(field, event.target.checked)}
+                onBlur={() => vault.blurProperty()}
+              />
+            ) : kind === 'number' ? (
+              <Input
+                label={field}
+                type="number"
+                step="any"
+                value={vault.numberText(field)}
+                onChange={(event) => vault.updateNumberProperty(field, event.target.value)}
+                onBlur={() => vault.commitNumberProperty(field)}
+              />
+            ) : (
+              <Input
+                label={field}
+                type="text"
+                value={kind === 'list' ? vault.listText(field) : vault.propertyText(field)}
+                onChange={(event) => {
+                  if (kind === 'list') vault.updateListProperty(field, event.target.value)
+                  else vault.updateProperty(field, event.target.value)
+                }}
+                onBlur={() => {
+                  if (kind === 'list') vault.commitListProperty(field)
+                  else vault.blurProperty()
+                }}
+              />
+            )}
+            <IconButton
+              className="property-remove"
               data-testid="remove-property"
+              icon={X}
+              label={`Remove ${field}`}
+              size="sm"
               onClick={() => {
                 vault.removeProperty(field)
                 vault.blurProperty()
               }}
-            >
-              Remove
-            </button>
+            />
           </div>
         )
       })}
       <form
+        className="property-add-form"
         onSubmit={(event) => {
           event.preventDefault()
           vault.addProperty()
         }}
       >
-        <label className="field">
-          <span>Name</span>
-          <input
-            data-testid="property-name"
-            value={vault.propertyName}
-            onChange={(event) => vault.setPropertyName(event.target.value)}
-            placeholder="supports"
+        <h3 className="panel-subheading">Add property</h3>
+        <Input
+          label="Name"
+          data-testid="property-name"
+          value={vault.propertyName}
+          onChange={(event) => vault.setPropertyName(event.target.value)}
+          placeholder="supports"
+        />
+        <Select
+          label="Type"
+          data-testid="property-type"
+          value={vault.propertyType}
+          onValueChange={(value) => vault.setPropertyType(value)}
+          options={PROPERTY_TYPE_OPTIONS}
+        />
+        {vault.propertyType === 'boolean' ? (
+          <Input
+            label="Value"
+            className="property-check"
+            type="checkbox"
+            data-testid="property-value"
+            checked={vault.propertyChecked}
+            onChange={(event) => vault.setPropertyChecked(event.target.checked)}
           />
-        </label>
-        <label className="field">
-          <span>Type</span>
-          <select
-            data-testid="property-type"
-            value={vault.propertyType}
-            onChange={(event) => vault.setPropertyType(event.target.value)}
-          >
-            <option value="string">string</option>
-            <option value="number">number</option>
-            <option value="boolean">boolean</option>
-            <option value="list">list</option>
-          </select>
-        </label>
-        <label className="field">
-          <span>Value</span>
-          {vault.propertyType === 'boolean' ? (
-            <input
-              className="property-check"
-              type="checkbox"
-              data-testid="property-value"
-              checked={vault.propertyChecked}
-              onChange={(event) => vault.setPropertyChecked(event.target.checked)}
-            />
-          ) : (
-            <input
-              data-testid="property-value"
-              type={vault.propertyType === 'number' ? 'number' : 'text'}
-              step={vault.propertyType === 'number' ? 'any' : undefined}
-              value={vault.propertyValue}
-              onChange={(event) => vault.setPropertyValue(event.target.value)}
-              placeholder={vault.propertyType === 'list' ? '[[Other note]] token' : '[[Other note]]'}
-            />
-          )}
-        </label>
-        <button type="submit" data-testid="add-property">Add field</button>
+        ) : (
+          <Input
+            label="Value"
+            data-testid="property-value"
+            type={vault.propertyType === 'number' ? 'number' : 'text'}
+            step={vault.propertyType === 'number' ? 'any' : undefined}
+            value={vault.propertyValue}
+            onChange={(event) => vault.setPropertyValue(event.target.value)}
+            placeholder={vault.propertyType === 'list' ? '[[Other note]] token' : '[[Other note]]'}
+          />
+        )}
+        <Button className="property-add" size="sm" tone="secondary" type="submit" data-testid="add-property">
+          Add field
+        </Button>
       </form>
-      <h2>Relationships</h2>
+      <h2 className="panel-heading">Relationships</h2>
       {relations.shown.length === 0 && unresolved.length === 0 && (
         <EmptyState compact title="No relationships yet." testId="relationships-empty" />
       )}
@@ -215,7 +235,7 @@ export const PropertiesPanel = observer(function PropertiesPanel() {
           {link.field}: {link.label}
         </p>
       ))}
-      <h2>Backlinks</h2>
+      <h2 className="panel-heading">Backlinks</h2>
       {relations.backlinks.length === 0 && <EmptyState compact title="No backlinks." testId="backlinks-empty" />}
       {relations.backlinks.map((link) => (
         <button

@@ -1,4 +1,4 @@
-import { Note } from '@phosphor-icons/react'
+import { Notebook as Note } from 'lucide-react'
 import { register, resolve } from '@rabjs/react'
 import { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'

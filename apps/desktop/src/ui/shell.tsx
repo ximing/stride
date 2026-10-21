@@ -1,16 +1,16 @@
 import {
   BookOpen,
   Check,
-  FolderSimple,
+  FileText,
+  Folder,
   GitBranch,
-  House,
-  MagnifyingGlass,
-  Note,
+  Home,
+  Inbox,
+  MessageCircle,
   Notebook,
-  Tray,
-} from '@phosphor-icons/react'
+  Search,
+} from 'lucide-react'
 import { observer, useService } from '@rabjs/react'
-import { Mark } from './icon'
 import { ComponentsPreviewService } from './preview.service'
 
 type SampleNote = {
@@ -86,6 +86,9 @@ const notes: SampleNote[] = [
   },
 ]
 
+const navIconProps = { size: 16, strokeWidth: 1.75, 'aria-hidden': true } as const
+const statusIconProps = { size: 14, strokeWidth: 1.75, 'aria-hidden': true } as const
+
 function noteById(id: string) {
   return notes.find((item) => item.id === id)
 }
@@ -102,67 +105,81 @@ export const Shell = observer(function Shell() {
         <div className="sd-columns">
           <aside data-testid="region-sidebar" className="sd-col sd-side">
             <p className="sd-side-mark">
-              <Mark icon={Notebook} size={20} />
+              <Notebook size={18} strokeWidth={1.75} aria-hidden="true" />
               <span>home</span>
             </p>
             <p className="sd-kicker">Views</p>
             <button type="button" className="sd-nav">
-              <Mark icon={BookOpen} />
+              <BookOpen {...navIconProps} />
               All notes
             </button>
             <button type="button" className="sd-nav">
-              <Mark icon={Tray} />
+              <Inbox {...navIconProps} />
               Inbox
             </button>
             <button type="button" className="sd-nav">
-              <Mark icon={Note} />
+              <FileText {...navIconProps} />
               Journal
             </button>
             <p className="sd-kicker">Folders</p>
             <button type="button" className="sd-nav" aria-current="page">
-              <Mark icon={FolderSimple} />
+              <Folder {...navIconProps} />
               Field notes
             </button>
             <button type="button" className="sd-nav">
-              <Mark icon={FolderSimple} />
+              <Folder {...navIconProps} />
               Reading
             </button>
           </aside>
 
           <section data-testid="region-notes" className="sd-col sd-notes" aria-label="Notes">
-            <h2 className="sd-list-title">Field notes</h2>
-            <p className="sd-list-count">{notes.length} notes</p>
-            {notes.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                className="sd-note"
-                aria-current={item.id === note.id ? 'true' : undefined}
-                onClick={() => preview.selectNote(item.id)}
-              >
-                <span className="sd-note-name">{item.title}</span>
-                <span className="sd-note-day">{item.when}</span>
-                <span className="sd-note-meta">{item.snippet}</span>
-              </button>
-            ))}
+            <div className="sd-list-heading">
+              <h2 className="sd-list-title">Field notes</h2>
+              <p className="sd-list-count">{notes.length} notes</p>
+            </div>
+            <div className="sd-note-list">
+              {notes.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  className="sd-note"
+                  aria-current={item.id === note.id ? 'true' : undefined}
+                  onClick={() => preview.selectNote(item.id)}
+                >
+                  <span className="sd-note-heading">
+                    <span className="sd-note-name">{item.title}</span>
+                    <span className="sd-note-day">{item.when}</span>
+                  </span>
+                  <span className="sd-note-meta">{item.snippet}</span>
+                </button>
+              ))}
+            </div>
           </section>
 
           <article data-testid="region-editor" className="sd-col sd-editor">
-            <h1 className="sd-note-title">{note.title}</h1>
-            <p className="sd-note-when">{note.when}</p>
-            <div className="sd-note-body">
-              {note.paragraphs.map((paragraph) => (
-                <p key={paragraph}>{paragraph}</p>
-              ))}
-              {linked && note.linkLead ? (
-                <p>
-                  {note.linkLead}{' '}
-                  <button type="button" className="sd-wikilink" onClick={() => preview.selectNote(linked.id)}>
-                    [[{linked.title}]]
-                  </button>
-                  .
-                </p>
-              ) : null}
+            <div className="sd-editor-tabbar" aria-label="Open notes">
+              <div className="sd-editor-tab" aria-current="page">
+                <FileText {...statusIconProps} />
+                <span className="sd-editor-tab-label">{note.title}</span>
+              </div>
+            </div>
+            <div className="sd-editor-paper">
+              <h1 className="sd-note-title">{note.title}</h1>
+              <p className="sd-note-when">{note.when}</p>
+              <div className="sd-note-body">
+                {note.paragraphs.map((paragraph) => (
+                  <p key={paragraph}>{paragraph}</p>
+                ))}
+                {linked && note.linkLead ? (
+                  <p>
+                    {note.linkLead}{' '}
+                    <button type="button" className="sd-wikilink" onClick={() => preview.selectNote(linked.id)}>
+                      [[{linked.title}]]
+                    </button>
+                    .
+                  </p>
+                ) : null}
+              </div>
             </div>
           </article>
 
@@ -186,7 +203,8 @@ export const Shell = observer(function Shell() {
             {backlinks.length === 0 ? <p className="sd-empty">No notes link here yet.</p> : null}
             {backlinks.map((item) => (
               <button key={item.id} type="button" className="sd-backlink" onClick={() => preview.selectNote(item.id)}>
-                {item.title}
+                <FileText {...statusIconProps} />
+                <span>{item.title}</span>
               </button>
             ))}
           </aside>
@@ -194,23 +212,23 @@ export const Shell = observer(function Shell() {
       </div>
       <footer data-testid="region-statusbar" className="sd-status">
         <span className="sd-status-item">
-          <Mark icon={House} size={14} />
+          <Home {...statusIconProps} />
           home
         </span>
         <span className="sd-status-item">
-          <Mark icon={GitBranch} size={14} />
+          <GitBranch {...statusIconProps} />
           main
         </span>
         <span className="sd-status-item">
-          <Mark icon={MagnifyingGlass} size={14} />
+          <Search {...statusIconProps} />
           Index ready
         </span>
         <span className="sd-status-item">
-          <Mark icon={Note} size={14} />
+          <MessageCircle {...statusIconProps} />
           Ask
         </span>
         <span className="sd-status-item">
-          <Mark icon={Check} size={14} />
+          <Check {...statusIconProps} />
           Up to date
         </span>
         <span className="sd-status-item sd-status-end">0.1.0</span>

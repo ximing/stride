@@ -1,20 +1,28 @@
-/* Updates settings section (T7.2). Scoped under .supd so parallel section
-   styles cannot collide. Colors come from tokens.css (--sd-*). */
-
 .supd {
-  max-width: 560px;
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  gap: 20px;
+  width: 100%;
 }
 
 .supd-field {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  align-items: flex-start;
+  gap: 8px;
+  min-width: 0;
 }
 
+.supd-field > .sd-field {
+  width: 480px;
+  max-width: 100%;
+  min-width: 0;
+  flex: none;
+}
+
+.supd-field > .sd-field .sd-field-label,
 .supd-label {
+  color: var(--sd-fg);
   font-size: 13px;
   font-weight: 600;
 }
@@ -22,19 +30,17 @@
 .supd-radios {
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
 }
 
 .supd-radio {
   display: flex;
   align-items: flex-start;
   gap: 8px;
-  cursor: pointer;
 }
 
-.supd-radio input {
-  accent-color: var(--sd-accent);
-  margin: 2px 0 0;
+.supd-radio > .settings-choice-control {
+  margin-top: 3px;
 }
 
 .supd-radio > span {
@@ -44,6 +50,7 @@
 }
 
 .supd-radio-label {
+  color: var(--sd-fg);
   font-size: 13px;
   font-weight: 600;
 }
@@ -54,31 +61,10 @@
   gap: 8px;
   font-size: 13px;
   font-weight: 600;
-  cursor: pointer;
-}
-
-.supd-check input {
-  accent-color: var(--sd-accent);
-  width: 14px;
-  height: 14px;
-  margin: 0;
 }
 
 .supd-input {
-  width: 320px;
-  max-width: 100%;
-  padding: 6px 8px;
-  border: 1px solid var(--sd-border);
-  border-radius: var(--sd-radius);
-  background: var(--sd-bg-elevated);
-  color: var(--sd-fg);
-  font: inherit;
-  font-size: 13px;
-}
-
-.supd-input:focus {
-  outline: none;
-  border-color: var(--sd-accent);
+  width: 100%;
 }
 
 .supd-input[aria-invalid='true'] {
@@ -86,51 +72,54 @@
 }
 
 .supd-hint {
+  max-width: 68ch;
   margin: 0;
+  color: var(--sd-muted);
   font-size: 12px;
   font-weight: 400;
-  color: var(--sd-muted);
+  line-height: 1.5;
 }
 
 .supd-error {
+  max-width: 64ch;
   margin: 0;
-  font-size: 12px;
   color: var(--sd-danger);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .supd-note {
+  max-width: 72ch;
   margin: 0;
-  padding: 10px 12px;
-  border: 1px solid var(--sd-border);
-  border-radius: var(--sd-radius);
-  background: var(--sd-bg-elevated);
-  font-size: 12px;
+  padding: 0 0 0 12px;
+  border-left: 2px solid var(--sd-border);
   color: var(--sd-muted);
+  font-size: 12px;
+  line-height: 1.55;
 }
 
 .supd-actions {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 12px;
-}
-
-.supd-save {
-  padding: 6px 14px;
-  border: 1px solid var(--sd-accent);
-  border-radius: var(--sd-radius);
-  background: var(--sd-accent);
-  color: var(--sd-bg);
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-
-.supd-save:hover:not(:disabled) {
-  filter: brightness(1.08);
+  padding-top: 16px;
+  border-top: 1px solid var(--sd-border);
 }
 
 .supd-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   margin: 0;
-  font-size: 12px;
   color: var(--sd-muted);
+  font-size: 12px;
+}
+
+.supd-status[data-tone='success'] {
+  color: var(--sd-accent);
+}
+
+.supd-status[data-tone='error'] {
+  color: var(--sd-danger);
 }

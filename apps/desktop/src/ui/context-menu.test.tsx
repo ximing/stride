@@ -1,7 +1,7 @@
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { PencilSimple, Trash } from '@phosphor-icons/react'
+import { Pencil as PencilSimple, Trash2 as Trash } from 'lucide-react'
 import type { ContextMenuEntry } from '../services/context-menu'
 import { ContextMenu } from './context-menu'
 

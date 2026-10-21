@@ -1,5 +1,5 @@
-import { MagnifyingGlass, Note } from '@phosphor-icons/react'
 import { observer, useService } from '@rabjs/react'
+import { FileText, Search } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { CommandService } from '../services/command.service'
 import { QuickOpenService, quickOpenResults } from '../services/quick-open.service'
@@ -58,68 +58,74 @@ export const QuickOpen = observer(function QuickOpen() {
 
   return (
     <div
-      className="quick-open-backdrop"
+      className="quick-open-backdrop sd-command-backdrop"
       onClick={(event) => {
         if (event.target === event.currentTarget) service.close()
       }}
     >
       <div
-        className="quick-open"
+        className="quick-open sd-command-surface"
         data-testid="quick-open"
         role="dialog"
         aria-modal="true"
         aria-labelledby="quick-open-title"
         onClick={(event) => event.stopPropagation()}
       >
-        <h2 id="quick-open-title" className="quick-open-title">快速打开</h2>
-        <input
-          ref={inputRef}
-          className="quick-open-input"
-          data-testid="quick-open-input"
-          placeholder="跳到笔记"
-          aria-label="跳到笔记"
-          autoFocus
-          autoComplete="off"
-          spellCheck={false}
-          value={service.query}
-          onChange={(event) => service.setQuery(event.target.value)}
-        />
-        {results.length === 0 ? (
-          service.query.trim() === '' ? (
-            <EmptyState
-              compact
-              icon={Note}
-              title="还没有笔记"
-              body="先新建一篇笔记，再用 Cmd+P 快速跳转。"
-              testId="quick-open-empty"
-            />
+        <h2 id="quick-open-title" className="quick-open-title sd-command-title">快速打开</h2>
+        <div className="sd-command-search">
+          <Search aria-hidden="true" size={16} strokeWidth={1.75} />
+          <input
+            ref={inputRef}
+            className="quick-open-input sd-command-input"
+            data-testid="quick-open-input"
+            placeholder="跳到笔记"
+            aria-label="跳到笔记"
+            autoFocus
+            autoComplete="off"
+            spellCheck={false}
+            value={service.query}
+            onChange={(event) => service.setQuery(event.target.value)}
+          />
+        </div>
+        <div ref={listRef} className="quick-open-list sd-command-list" role="listbox" aria-label="笔记">
+          {results.length === 0 ? (
+            service.query.trim() === '' ? (
+              <EmptyState
+                compact
+                icon={FileText}
+                title="还没有笔记"
+                body="先新建一篇笔记，再用 Cmd+P 快速跳转。"
+                testId="quick-open-empty"
+              />
+            ) : (
+              <EmptyState
+                compact
+                icon={Search}
+                title="没有匹配的笔记"
+                testId="quick-open-empty"
+              />
+            )
           ) : (
-            <EmptyState
-              compact
-              icon={MagnifyingGlass}
-              title="没有匹配的笔记"
-              testId="quick-open-empty"
-            />
-          )
-        ) : (
-          <div ref={listRef} className="quick-open-list" role="listbox" aria-label="笔记">
-            {results.map((note, index) => (
-              <button
-                key={note.id}
-                type="button"
-                className="quick-open-result"
-                data-testid="quick-open-result"
-                data-note-id={note.id}
-                role="option"
-                aria-selected={index === selectedIndex}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => service.choose(note.id)}
-              >
-                {note.title}
-              </button>
-            ))}
-          </div>
-        )}
+            <>
+              <p className="quick-open-section sd-command-section">笔记</p>
+              {results.map((note, index) => (
+                <button
+                  key={note.id}
+                  type="button"
+                  className="quick-open-result sd-command-item"
+                  data-testid="quick-open-result"
+                  data-note-id={note.id}
+                  role="option"
+                  aria-selected={index === selectedIndex}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => service.choose(note.id)}
+                >
+                  <span className="quick-open-result-title sd-command-item-title">{note.title}</span>
+                </button>
+              ))}
+            </>
+          )}
+        </div>
       </div>
     </div>
   )

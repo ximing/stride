@@ -248,19 +248,32 @@ describe('editor formats', () => {
     })
 
     const toolbarIds = [
+      'toolbar-undo',
+      'toolbar-redo',
       'toolbar-bold',
       'toolbar-italic',
-      'toolbar-h2',
-      'toolbar-h3',
+      'toolbar-strike',
+      'toolbar-subscript',
+      'toolbar-superscript',
+      'toolbar-font-size',
+      'toolbar-color',
+      'toolbar-background',
+      'toolbar-clear',
+      'toolbar-align',
+      'toolbar-heading',
       'toolbar-bullet',
       'toolbar-ordered',
       'toolbar-quote',
       'toolbar-link',
       'toolbar-highlight',
-      'toolbar-strike',
       'toolbar-code',
       'toolbar-code-block',
+      'toolbar-image',
+      'toolbar-table',
       'toolbar-hr',
+      'toolbar-math',
+      'toolbar-mermaid',
+      'toolbar-find',
       'toolbar-wikilink',
     ]
     expect(host.querySelector('[data-testid="editor-toolbar"]')).not.toBeNull()
@@ -269,12 +282,14 @@ describe('editor formats', () => {
       expect(button, id).not.toBeNull()
       expect(button?.getAttribute('type')).toBe('button')
     }
+    expect(document.querySelector('[data-testid="toolbar-heading"]')?.textContent).toContain('正文')
     expect(document.querySelector('[data-testid="toolbar-h1"]')).toBeNull()
+    expect(document.querySelector('[data-testid="toolbar-h2"]')).toBeNull()
     expect(document.querySelector('[data-testid="editor-bubble"]')).not.toBeNull()
-    for (const id of ['bubble-bold', 'bubble-italic', 'bubble-h2', 'bubble-h3', 'bubble-bullet', 'bubble-ordered', 'bubble-quote', 'bubble-link', 'bubble-highlight']) {
+    for (const id of ['bubble-bold', 'bubble-italic', 'bubble-strike', 'bubble-link']) {
       expect(document.querySelector(`[data-testid="${id}"]`), id).not.toBeNull()
     }
-    for (const id of ['bubble-strike', 'bubble-code', 'bubble-code-block', 'bubble-hr', 'bubble-wikilink']) {
+    for (const id of ['bubble-h2', 'bubble-h3', 'bubble-bullet', 'bubble-ordered', 'bubble-quote', 'bubble-highlight', 'bubble-code', 'bubble-code-block', 'bubble-hr', 'bubble-wikilink']) {
       expect(document.querySelector(`[data-testid="${id}"]`), id).toBeNull()
     }
     expect(document.querySelector('[data-testid="toolbar-bold"]')?.getAttribute('aria-label')).toBe(`粗体 ${formatShortcut('Mod+B')}`)

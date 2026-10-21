@@ -1,47 +1,44 @@
-/* Appearance settings section (T7.2). Colors come from the --sd-* tokens in
-   ui/tokens.css; segmented controls reuse the .theme-picker styles in
-   styles.css. */
-
 .appearance-section {
-  max-width: 560px;
+  width: 100%;
 }
 
 .appearance-group + .appearance-group {
-  margin-top: 22px;
+  margin-top: 28px;
 }
 
 .appearance-heading {
-  margin: 0 0 8px;
-  font-size: 12px;
+  margin: 0 0 10px;
+  color: var(--sd-fg);
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--sd-muted);
 }
 
 .appearance-hint {
+  max-width: 64ch;
   margin: 8px 0 0;
+  color: var(--sd-muted);
   font-size: 12px;
-  color: var(--sd-muted);
+  line-height: 1.5;
 }
 
-.appearance-fontsize {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--sd-muted);
+.appearance-fontsize-field {
+  width: 160px;
+  max-width: 100%;
 }
 
-.appearance-fontsize input {
-  width: 5.5rem;
-  padding: 4px 8px;
-  border: 1px solid var(--sd-border);
-  border-radius: var(--sd-radius);
-  background: var(--sd-bg-elevated);
-  color: var(--sd-fg);
+.appearance-fontsize-field .sd-field {
+  width: 100%;
+  min-width: 0;
+}
+
+.appearance-fontsize-input {
+  width: 100%;
 }
 
 .appearance-section .error {
+  max-width: 64ch;
   margin: 8px 0 0;
+  color: var(--sd-danger);
   font-size: 12px;
+  line-height: 1.5;
 }

@@ -8,6 +8,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetSecretsStore, setSecretsStore, SETTINGS_STORAGE_KEY, SettingsService } from '../../../services/panels.service'
 import { AiSection, hasLlmErrors, llmConfigErrors } from './ai'
 
+const originalScrollIntoView = window.HTMLElement.prototype.scrollIntoView
+
 function defaultForm() {
   return {
     embedding: { endpoint: '', model: '', keyMask: '', dim: 4 },
@@ -49,10 +51,16 @@ function setInputValue(input: HTMLInputElement, value: string) {
   input.dispatchEvent(new Event('input', { bubbles: true }))
 }
 
-function setSelectValue(select: HTMLSelectElement, value: string) {
-  const setter = Object.getOwnPropertyDescriptor(window.HTMLSelectElement.prototype, 'value')!.set!
-  setter.call(select, value)
-  select.dispatchEvent(new Event('change', { bubbles: true }))
+async function selectOption(testId: string, label: string) {
+  const trigger = document.querySelector(`[data-testid="${testId}"]`) as HTMLButtonElement
+  await act(async () => {
+    trigger.click()
+  })
+  const option = [...document.querySelectorAll('[role="option"]')].find((item) => item.textContent === label)
+  expect(option, `Missing ${label} option`).not.toBeNull()
+  await act(async () => {
+    ;(option as HTMLElement).click()
+  })
 }
 
 function field(testId: string): HTMLInputElement {
@@ -83,6 +91,7 @@ describe('ai settings section', () => {
   let root: Root | null = null
 
   beforeEach(() => {
+    window.HTMLElement.prototype.scrollIntoView = vi.fn()
     if (!has(SettingsService)) register(SettingsService)
     setSecretsStore(new MemorySecretsStore())
     resetSettings()
@@ -94,6 +103,8 @@ describe('ai settings section', () => {
     root = null
     host = null
     vi.unstubAllGlobals()
+    if (originalScrollIntoView) window.HTMLElement.prototype.scrollIntoView = originalScrollIntoView
+    else Reflect.deleteProperty(window.HTMLElement.prototype, 'scrollIntoView')
     localStorage.removeItem(SETTINGS_STORAGE_KEY)
     resetSettings()
     resetSecretsStore()
@@ -224,8 +235,8 @@ describe('ai settings section', () => {
     // and Base URL becomes required.
     await act(async () => {
       setInputValue(field('llm-base-url'), '')
-      setSelectValue(document.querySelector('[data-testid="llm-provider"]') as HTMLSelectElement, 'custom')
     })
+    await selectOption('llm-provider', 'Custom')
     expect(document.querySelector('[data-testid="llm-error-base-url"]')?.textContent).toContain('required')
     expect(document.querySelector('[data-testid="llm-error-model"]')?.textContent).toContain('Model is required')
 

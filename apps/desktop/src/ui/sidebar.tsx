@@ -1,20 +1,29 @@
-import type { Icon } from '@phosphor-icons/react'
-import { Bookmark } from '@phosphor-icons/react/Bookmark'
-import { Briefcase } from '@phosphor-icons/react/Briefcase'
-import { Calendar } from '@phosphor-icons/react/Calendar'
-import { Folder } from '@phosphor-icons/react/Folder'
-import { Note } from '@phosphor-icons/react/Note'
-import { PencilSimple } from '@phosphor-icons/react/PencilSimple'
-import { Star } from '@phosphor-icons/react/Star'
-import { Tag } from '@phosphor-icons/react/Tag'
-import { User } from '@phosphor-icons/react/User'
 import { observer, useService } from '@rabjs/react'
 import type { StrideNote } from '@stride/core/note'
+import {
+  Bookmark,
+  Briefcase,
+  Calendar,
+  ChevronDown,
+  ChevronRight,
+  FileText,
+  Files,
+  Folder,
+  Inbox,
+  Pencil,
+  Plus,
+  SquarePen,
+  Star,
+  Tag,
+  User,
+  type LucideIcon,
+} from 'lucide-react'
 import { useState } from 'react'
 import { typeSidebarLabel } from '../../../../packages/core/src/types'
 import { TabsService } from '../services/tabs.service'
 import { VaultService } from '../services/vault.service'
 import { ViewsService } from '../services/views.service'
+import { Button, IconButton } from './button'
 import { EmptyState } from './empty-state'
 import { FolderTree } from './folder-tree'
 import { Mark } from './icon'
@@ -23,8 +32,8 @@ import { ViewEditorModal } from './view-editor'
 /** dataTransfer mime for view-row drags (dataTransfer.types lowercases types). */
 const VIEW_DRAG_MIME = 'application/x-stride-view'
 
-const TYPE_ICONS: Record<string, Icon> = {
-  note: Note,
+const TYPE_ICONS: Record<string, LucideIcon> = {
+  note: FileText,
   briefcase: Briefcase,
   user: User,
   folder: Folder,
@@ -96,26 +105,32 @@ const SavedViews = observer(function SavedViews() {
             data-testid="view-link"
             data-view={item.file}
             className={views.isActive(item.file) ? 'active' : ''}
+            aria-current={views.isActive(item.file) ? 'page' : undefined}
             onClick={() => views.activate(item.file)}
           >
             {item.view.icon ? <span className="view-icon">{item.view.icon}</span> : null}
             <span className="type-label">{item.view.name}</span>
           </button>
-          <button
-            type="button"
+          <IconButton
+            icon={Pencil}
+            label={`Edit ${item.view.name}`}
             className="view-edit"
             data-testid="view-edit"
             data-view={item.file}
-            aria-label={`Edit ${item.view.name}`}
             onClick={() => views.openEditor(item.file)}
-          >
-            <Mark icon={PencilSimple} size={13} />
-          </button>
+          />
         </div>
       ))}
-      <button type="button" data-testid="new-view" onClick={() => views.openNewEditor()}>
+      <Button
+        tone="quiet"
+        size="sm"
+        className="rail-quiet-action"
+        data-testid="new-view"
+        icon={<Mark icon={Plus} size={14} />}
+        onClick={() => views.openNewEditor()}
+      >
         New view
-      </button>
+      </Button>
       <ViewEditorModal />
     </>
   )
@@ -129,11 +144,34 @@ export const Rail = observer(function Rail() {
   const showInstances = vault.active?.type === 'Type'
   return (
     <div className="rail-inner">
-      <button type="button" data-testid="new-note" className="primary" onClick={() => vault.createNote()}>New note</button>
+      <Button
+        tone="primary"
+        size="lg"
+        className="rail-new-note"
+        data-testid="new-note"
+        icon={<Mark icon={SquarePen} size={16} />}
+        onClick={() => vault.createNote()}
+      >
+        New note
+      </Button>
       <div className="group-label">Views</div>
-      <button type="button" className={vault.listFilter === 'all' ? 'active' : ''} onClick={() => vault.setFilter('all')}>All</button>
-      <button type="button" className={vault.listFilter === 'inbox' ? 'active' : ''} onClick={() => vault.setFilter('inbox')}>
-        Inbox ({vault.inboxCount})
+      <button
+        type="button"
+        className={vault.listFilter === 'all' ? 'rail-nav-item active' : 'rail-nav-item'}
+        aria-current={vault.listFilter === 'all' ? 'page' : undefined}
+        onClick={() => vault.setFilter('all')}
+      >
+        <span className="rail-nav-icon"><Mark icon={Files} size={16} /></span>
+        <span className="type-label">All</span>
+      </button>
+      <button
+        type="button"
+        className={vault.listFilter === 'inbox' ? 'rail-nav-item active' : 'rail-nav-item'}
+        aria-current={vault.listFilter === 'inbox' ? 'page' : undefined}
+        onClick={() => vault.setFilter('inbox')}
+      >
+        <span className="rail-nav-icon"><Mark icon={Inbox} size={16} /></span>
+        <span className="type-label">Inbox ({vault.inboxCount})</span>
       </button>
       {vault.listFilter === 'inbox' && (
         <label className="advance-inbox">
@@ -155,6 +193,7 @@ export const Rail = observer(function Rail() {
         const icon = typeIconKey(note)
         const color = typeColorKey(note)
         const collapsed = vault.collapsedTypes.includes(note.title)
+        const active = vault.listFilter === note.title
         return (
           <div className="type-row" key={note.id}>
             <button
@@ -162,43 +201,49 @@ export const Rail = observer(function Rail() {
               data-testid="type-link"
               data-type={note.title}
               data-icon={icon}
-              className={vault.listFilter === note.title ? 'active' : ''}
+              className={active ? 'active' : ''}
+              aria-current={active ? 'page' : undefined}
               onClick={() => {
                 vault.setFilter(note.title)
                 tabs.openNote(note.id)
               }}
             >
               <span className={`type-dot type-dot-${color}`} />
-              <span className="type-icon"><Mark icon={TYPE_ICONS[icon] ?? Note} size={16} /></span>
+              <span className="type-icon"><Mark icon={TYPE_ICONS[icon] ?? FileText} size={16} /></span>
               <span className="type-label">{typeSidebarLabel(note)}</span>
             </button>
             {collapsed ? null : (
-              <button
-                type="button"
+              <IconButton
+                icon={Plus}
+                label={`New ${note.title}`}
                 className="type-add"
                 data-testid="type-new-instance"
                 data-type={note.title}
-                aria-label={`New ${note.title}`}
                 onClick={() => vault.createInstance(note.title)}
-              >
-                +
-              </button>
+              />
             )}
-            <button
-              type="button"
+            <IconButton
+              icon={collapsed ? ChevronRight : ChevronDown}
+              label={collapsed ? `Expand ${note.title}` : `Collapse ${note.title}`}
               className="type-collapse"
               data-testid="type-collapse"
               data-type={note.title}
               aria-expanded={!collapsed}
-              aria-label={collapsed ? `Expand ${note.title}` : `Collapse ${note.title}`}
               onClick={() => vault.toggleTypeCollapsed(note.title)}
-            >
-              {collapsed ? '▸' : '▾'}
-            </button>
+            />
           </div>
         )
       })}
-      <button type="button" data-testid="new-type" onClick={() => vault.createType()}>New type</button>
+      <Button
+        tone="quiet"
+        size="sm"
+        className="rail-quiet-action"
+        data-testid="new-type"
+        icon={<Mark icon={Plus} size={14} />}
+        onClick={() => vault.createType()}
+      >
+        New type
+      </Button>
       {showInstances && (
         <div className="type-instances" data-testid="type-instances">
           <div className="group-label">Instances</div>
@@ -208,17 +253,26 @@ export const Rail = observer(function Rail() {
               key={note.id}
               type="button"
               data-testid="instance-link"
-              className={vault.activeId === note.id ? 'active' : ''}
+              className={vault.activeId === note.id ? 'rail-nav-item active' : 'rail-nav-item'}
+              aria-current={vault.activeId === note.id ? 'page' : undefined}
               onClick={() => tabs.openNote(note.id)}
             >
-              {note.title}
+              <span className="rail-nav-icon"><Mark icon={FileText} size={16} /></span>
+              <span className="type-label">{note.title}</span>
             </button>
           ))}
         </div>
       )}
       {fallbackTypes.map((type) => (
-        <button key={type} type="button" className={vault.listFilter === type ? 'active' : ''} onClick={() => vault.setFilter(type)}>
-          {type}
+        <button
+          key={type}
+          type="button"
+          className={vault.listFilter === type ? 'rail-nav-item active' : 'rail-nav-item'}
+          aria-current={vault.listFilter === type ? 'page' : undefined}
+          onClick={() => vault.setFilter(type)}
+        >
+          <span className="rail-nav-icon"><Mark icon={FileText} size={16} /></span>
+          <span className="type-label">{type}</span>
         </button>
       ))}
       <div className="group-label">Notes</div>

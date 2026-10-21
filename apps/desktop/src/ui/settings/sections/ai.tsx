@@ -4,15 +4,14 @@
 // semantics: untouched (no draft) keeps the sealed key, an empty draft clears
 // it, a mask-shaped draft keeps it, anything else replaces it.
 
-import { Plus } from '@phosphor-icons/react/Plus'
-import { SpinnerGap } from '@phosphor-icons/react/SpinnerGap'
-import { Star } from '@phosphor-icons/react/Star'
-import { Trash } from '@phosphor-icons/react/Trash'
-import { WarningCircle } from '@phosphor-icons/react/WarningCircle'
 import { observer, useService } from '@rabjs/react'
 import { catalogBaseUrl, catalogModelSuggestions, LLM_PROVIDERS, llmProviderInfo, type PublicLlmConfig } from '@stride/core'
+import { CircleAlert, CircleCheck, LoaderCircle, Plus, Star, Trash2 } from 'lucide-react'
 import { SettingsService } from '../../../services/panels.service'
+import { Button } from '../../button'
 import { Mark } from '../../icon'
+import { Input } from '../../input'
+import { Select } from '../../select'
 import './ai.css'
 
 export interface LlmFieldErrors {
@@ -87,7 +86,7 @@ export const AiSection = observer(function AiSection() {
                 <span className="settings-ai-row-provider">{llmProviderInfo(config.provider)?.label ?? config.provider}</span>
                 {invalid ? (
                   <span className="settings-ai-row-warning" title="This configuration has errors">
-                    <Mark icon={WarningCircle} size={14} />
+                    <Mark icon={CircleAlert} size={14} />
                   </span>
                 ) : null}
                 {config.isDefault ? (
@@ -102,67 +101,72 @@ export const AiSection = observer(function AiSection() {
         </div>
       )}
       <div className="settings-ai-actions">
-        <button type="button" className="settings-ai-btn" data-testid="llm-add" onClick={() => settings.addLlmConfig()}>
-          <Mark icon={Plus} size={14} />
+        <Button
+          tone="secondary"
+          size="sm"
+          data-testid="llm-add"
+          icon={<Mark icon={Plus} size={14} />}
+          onClick={() => settings.addLlmConfig()}
+        >
           Add provider
-        </button>
-        <button
-          type="button"
-          className="settings-ai-btn"
+        </Button>
+        <Button
+          tone="danger"
+          size="sm"
           data-testid="llm-delete"
           disabled={!selected}
+          icon={<Mark icon={Trash2} size={14} />}
           onClick={() => selected && settings.removeLlmConfig(selected.id)}
         >
-          <Mark icon={Trash} size={14} />
           Delete
-        </button>
-        <button
-          type="button"
-          className="settings-ai-btn"
+        </Button>
+        <Button
+          tone="quiet"
+          size="sm"
           data-testid="llm-default"
           disabled={!selected || selected.isDefault}
+          icon={<Mark icon={Star} size={14} />}
           onClick={() => selected && settings.setDefaultLlmConfig(selected.id)}
         >
-          <Mark icon={Star} size={14} />
           Set as default
-        </button>
+        </Button>
       </div>
       {selected ? (
         <div className="settings-ai-form">
-          <label className="settings-ai-field">
-            <span>Name</span>
-            <input
+          <div className="settings-ai-field">
+            <Input
+              label="Name"
               className="settings-ai-input"
               data-testid="llm-name"
               value={selected.name}
               aria-invalid={Boolean(selectedErrors.name)}
+              aria-errormessage={selectedErrors.name ? 'llm-error-name' : undefined}
               onChange={(event) => settings.patchLlmConfig({ name: event.target.value })}
             />
-            {selectedErrors.name ? <span className="settings-ai-error" data-testid="llm-error-name">{selectedErrors.name}</span> : null}
-          </label>
-          <label className="settings-ai-field">
-            <span>Provider</span>
-            <select
+            {selectedErrors.name ? <span className="settings-ai-error" id="llm-error-name" data-testid="llm-error-name">{selectedErrors.name}</span> : null}
+          </div>
+          <div className="settings-ai-field">
+            <Select
+              label="Provider"
               className="settings-ai-input"
               data-testid="llm-provider"
               value={selected.provider}
               aria-invalid={Boolean(selectedErrors.provider)}
-              onChange={(event) => settings.patchLlmConfig({ provider: event.target.value })}
-            >
-              {LLM_PROVIDERS.map((provider) => (
-                <option key={provider.id} value={provider.id}>{provider.label}</option>
-              ))}
-            </select>
-            {selectedErrors.provider ? <span className="settings-ai-error" data-testid="llm-error-provider">{selectedErrors.provider}</span> : null}
-          </label>
-          <label className="settings-ai-field">
-            <span>Model</span>
-            <input
+              aria-errormessage={selectedErrors.provider ? 'llm-error-provider' : undefined}
+              options={LLM_PROVIDERS.map((provider) => ({ value: provider.id, label: provider.label }))}
+              onValueChange={(provider) => settings.patchLlmConfig({ provider })}
+            />
+            {selectedErrors.provider ? <span className="settings-ai-error" id="llm-error-provider" data-testid="llm-error-provider">{selectedErrors.provider}</span> : null}
+          </div>
+          <div className="settings-ai-field">
+            <Input
+              label="Model"
               className="settings-ai-input"
               data-testid="llm-model"
               value={selected.model}
               list="settings-ai-model-suggestions"
               aria-invalid={Boolean(selectedErrors.model)}
+              aria-errormessage={selectedErrors.model ? 'llm-error-model' : undefined}
               onChange={(event) => settings.patchLlmConfig({ model: event.target.value })}
             />
             <datalist id="settings-ai-model-suggestions">
@@ -170,77 +174,80 @@ export const AiSection = observer(function AiSection() {
                 <option key={model} value={model} />
               ))}
             </datalist>
-            {selectedErrors.model ? <span className="settings-ai-error" data-testid="llm-error-model">{selectedErrors.model}</span> : null}
-          </label>
-          <label className="settings-ai-field">
-            <span>Base URL</span>
-            <input
+            {selectedErrors.model ? <span className="settings-ai-error" id="llm-error-model" data-testid="llm-error-model">{selectedErrors.model}</span> : null}
+          </div>
+          <div className="settings-ai-field">
+            <Input
+              label="Base URL"
               className="settings-ai-input"
               data-testid="llm-base-url"
               value={selected.baseUrl}
               placeholder={catalogBaseUrl(selected.provider) || 'https://…'}
               aria-invalid={Boolean(selectedErrors.baseUrl)}
+              aria-errormessage={selectedErrors.baseUrl ? 'llm-error-base-url' : undefined}
               onChange={(event) => settings.patchLlmConfig({ baseUrl: event.target.value })}
             />
-            {selectedErrors.baseUrl ? <span className="settings-ai-error" data-testid="llm-error-base-url">{selectedErrors.baseUrl}</span> : null}
-          </label>
-          <label className="settings-ai-field">
-            <span>API key</span>
-            <input
+            {selectedErrors.baseUrl ? <span className="settings-ai-error" id="llm-error-base-url" data-testid="llm-error-base-url">{selectedErrors.baseUrl}</span> : null}
+          </div>
+          <div className="settings-ai-field settings-ai-field-wide">
+            <Input
+              label="API key"
               className="settings-ai-input"
               data-testid="llm-key"
               type="password"
               value={settings.llmKeyDrafts[selected.id] ?? ''}
               placeholder={selected.keyMask || 'API key'}
+              aria-describedby="llm-key-meta"
               onChange={(event) => {
                 settings.llmKeyDrafts = { ...settings.llmKeyDrafts, [selected.id]: event.target.value }
               }}
             />
-            <span className="settings-ai-meta">
+            <span className="settings-ai-meta" id="llm-key-meta">
               {selected.keyMask
                 ? `Stored key ${selected.keyMask} — kept while the field stays untouched; enter a new key to replace it.`
                 : 'Keys are sealed before they are stored and never written in plaintext.'}
             </span>
-          </label>
-          <div className="settings-ai-actions">
-            <button
-              type="button"
-              className="settings-ai-btn"
+          </div>
+          <div className="settings-ai-actions settings-ai-field-wide">
+            <Button
+              tone="secondary"
+              size="sm"
               data-testid="llm-test"
               disabled={testing || hasLlmErrors(selectedErrors)}
+              icon={testing ? <span className="settings-ai-spin"><Mark icon={LoaderCircle} size={14} /></span> : undefined}
               onClick={() => {
                 settings.llmTestResult = ''
                 void settings.testSelectedLlm()
               }}
             >
-              {testing ? <span className="settings-ai-spin"><Mark icon={SpinnerGap} size={14} /></span> : null}
               {testing ? 'Testing…' : 'Test connection'}
-            </button>
+            </Button>
             {settings.llmTestResult ? (
               <p
                 className={testOk ? 'settings-ai-test-ok' : 'settings-ai-test-err'}
                 data-testid="llm-test-result"
                 role="status"
               >
-                {testOk ? 'Connection successful.' : settings.llmTestResult}
+                <Mark icon={testOk ? CircleCheck : CircleAlert} size={14} />
+                <span>{testOk ? 'Connection successful.' : settings.llmTestResult}</span>
               </p>
             ) : null}
           </div>
         </div>
       ) : null}
       <div className="settings-ai-save">
-        <button
-          type="button"
-          className="settings-ai-btn settings-ai-btn-primary"
+        <Button
+          tone="primary"
+          size="lg"
           data-testid="settings-ai-save"
           disabled={saving || invalidCount > 0}
+          icon={saving ? <span className="settings-ai-spin"><Mark icon={LoaderCircle} size={14} /></span> : undefined}
           onClick={() => {
             void settings.save()
           }}
         >
-          {saving ? <span className="settings-ai-spin"><Mark icon={SpinnerGap} size={14} /></span> : null}
           {saving ? 'Saving…' : 'Save'}
-        </button>
+        </Button>
         {invalidCount > 0 ? (
           <p className="settings-ai-error" data-testid="settings-ai-invalid-summary" role="alert">
             Fix the highlighted fields before saving ({invalidCount} of {configs.length} {configs.length === 1 ? 'configuration' : 'configurations'} invalid).

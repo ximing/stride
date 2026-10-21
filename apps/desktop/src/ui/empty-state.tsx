@@ -1,10 +1,10 @@
-import type { Icon } from '@phosphor-icons/react'
+import type { LucideIcon } from 'lucide-react'
 import { Button } from './button'
 import { Mark } from './icon'
 
 export interface EmptyStateProps {
-  /** Phosphor icon. Omit for dense inline hints. */
-  icon?: Icon
+  /** Lucide icon. Omit for dense inline hints. */
+  icon?: LucideIcon
   title: string
   body?: string
   /** error paints icon and title with --sd-danger. */
@@ -48,13 +48,13 @@ export function EmptyState({
     >
       {icon ? (
         <span className="sd-empty-state-icon">
-          <Mark icon={icon} size={compact ? 18 : 26} />
+          <Mark icon={icon} size={compact ? 18 : 20} />
         </span>
       ) : null}
       <p className="sd-empty-state-title">{title}</p>
       {body ? <p className="sd-empty-state-body">{body}</p> : null}
       {actionLabel && onAction ? (
-        <Button tone="primary" className="sd-empty-state-action" data-testid={actionTestId} onClick={onAction}>
+        <Button tone="primary" size={compact ? 'sm' : 'md'} className="sd-empty-state-action" data-testid={actionTestId} onClick={onAction}>
           {actionLabel}
         </Button>
       ) : null}

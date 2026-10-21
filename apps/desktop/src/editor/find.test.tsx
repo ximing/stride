@@ -148,7 +148,8 @@ describe('find text', () => {
       content: [{ type: 'paragraph', content: [{ type: 'text', text: '学习 Machine' }] }],
     })
     expect(findTextMatches(literal.state.doc, '学.')).toEqual([])
-    expect(findTextMatches(literal.state.doc, 'machine')).toEqual([])
+    expect(findTextMatches(literal.state.doc, 'machine', true)).toEqual([])
+    expect(findTextMatches(literal.state.doc, 'machine')).toHaveLength(1)
     expect(findTextMatches(literal.state.doc, 'Machine')).toHaveLength(1)
   })
 

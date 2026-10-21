@@ -1,15 +1,114 @@
 /* Single source of truth for Stride design tokens.
-   - The :root blocks drive the app (styles.css consumes the same --sd-* tokens).
-   - The .sd-preview scopes carry the same tokens for the /dev/components preview,
-     whose data-theme switcher is independent of the app theme.
-   light is the base; [data-theme="dark"] overrides; "system" means NO data-theme
-   attribute on :root, so the prefers-color-scheme media query applies and tracks
-   OS changes with no JS listener. */
+   Light is the base; [data-theme="dark"] is an explicit override. System
+   means no root data-theme attribute, so the media query tracks the OS.
+   The same scopes are mirrored under .sd-preview for /dev/components. */
 
-/* Theme-independent tokens. */
 :root {
+  --sd-font-sans: "Avenir Next", Avenir, "Segoe UI", sans-serif;
+  --sd-font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  --sd-font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+
+  --sd-text-xs: 12px;
+  --sd-text-sm: 13px;
+  --sd-text-md: 14px;
+  --sd-text-lg: 16px;
+  --sd-text-xl: 20px;
+  --sd-text-note-title: 34px;
+  --sd-font-size-xs: var(--sd-text-xs);
+  --sd-font-size-sm: var(--sd-text-sm);
+  --sd-font-size-md: var(--sd-text-md);
+  --sd-font-size-lg: var(--sd-text-lg);
+  --sd-font-size-xl: var(--sd-text-xl);
+
+  --sd-space-1: 4px;
+  --sd-space-2: 8px;
+  --sd-space-3: 12px;
+  --sd-space-4: 16px;
+  --sd-space-5: 20px;
+  --sd-space-6: 24px;
+  --sd-space-8: 32px;
+
+  --sd-radius-sm: 6px;
   --sd-radius: 6px;
-  --sd-radius-lg: 10px;
+  --sd-radius-md: 8px;
+  --sd-radius-lg: 12px;
+  --sd-radius-panel: 8px;
+  --sd-radius-dialog: 12px;
+  --sd-radius-pill: 999px;
+
+  --sd-control-sm: 28px;
+  --sd-control-md: 32px;
+  --sd-control-lg: 36px;
+  --sd-control-height-sm: var(--sd-control-sm);
+  --sd-control-height-md: var(--sd-control-md);
+  --sd-control-height-lg: var(--sd-control-lg);
+
+  --sd-motion-hover: 120ms;
+  --sd-motion-menu: 160ms;
+  --sd-motion-dialog: 180ms;
+  --sd-duration-fast: var(--sd-motion-hover);
+  --sd-duration-menu: var(--sd-motion-menu);
+  --sd-duration-dialog: var(--sd-motion-dialog);
+  --sd-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --sd-ease-exit: cubic-bezier(0.4, 0, 1, 1);
+
+  --sd-z-sticky: 10;
+  --sd-z-dropdown: 30;
+  --sd-z-menu: var(--sd-z-dropdown);
+  --sd-z-popover: var(--sd-z-dropdown);
+  --sd-z-overlay: 40;
+  --sd-z-modal: 41;
+  --sd-z-tooltip: 50;
+  --sd-z-toast: 60;
+}
+
+:root,
+:root[data-theme="light"],
+.sd-preview,
+.sd-preview[data-theme="light"],
+.sd-preview[data-theme="system"] {
+  color-scheme: light;
+  --sd-bg: #f3f4f1;
+  --sd-surface: #fcfdfb;
+  --sd-bg-surface: var(--sd-surface);
+  --sd-bg-elevated: #ffffff;
+  --sd-fg: #252a26;
+  --sd-muted: #697169;
+  --sd-border: #dde1da;
+  --sd-border-strong: color-mix(in srgb, var(--sd-fg) 24%, var(--sd-border));
+  --sd-accent: #356854;
+  --sd-accent-fg: #ffffff;
+  --sd-accent-hover: color-mix(in srgb, var(--sd-accent) 88%, var(--sd-fg));
+  --sd-accent-active: color-mix(in srgb, var(--sd-accent) 78%, var(--sd-fg));
+  --sd-accent-soft: color-mix(in srgb, var(--sd-accent) 12%, var(--sd-surface));
+  --sd-surface-hover: color-mix(in srgb, var(--sd-fg) 4%, var(--sd-surface));
+  --sd-surface-selected: color-mix(in srgb, var(--sd-accent) 10%, var(--sd-surface));
+  --sd-surface-active: color-mix(in srgb, var(--sd-fg) 8%, var(--sd-surface));
+  --sd-hover: var(--sd-surface-hover);
+  --sd-selected: var(--sd-surface-selected);
+  --sd-focus: var(--sd-accent);
+  --sd-focus-ring: var(--sd-accent);
+  --sd-danger: #a63d36;
+  --sd-danger-fg: #ffffff;
+  --sd-danger-hover: color-mix(in srgb, var(--sd-danger) 88%, var(--sd-fg));
+  --sd-danger-soft: color-mix(in srgb, var(--sd-danger) 10%, var(--sd-surface));
+  --sd-overlay: rgba(23, 26, 24, 0.38);
+  --sd-tooltip-bg: var(--sd-fg);
+  --sd-tooltip-fg: var(--sd-surface);
+  --sd-shadow-sm: 0 4px 12px rgba(37, 42, 38, 0.08), 0 1px 2px rgba(37, 42, 38, 0.06);
+  --sd-shadow-lg: 0 20px 52px rgba(37, 42, 38, 0.16), 0 2px 6px rgba(37, 42, 38, 0.08);
+  --sd-shadow: var(--sd-shadow-sm);
+  --sd-mark: #f3e2a8;
+  --sd-mark-strong: #f3d27a;
+  --sd-syntax-keyword: #356854;
+  --sd-syntax-string: #8c5220;
+  --sd-syntax-number: #6d4fa3;
+  --sd-syntax-comment: #697169;
+  --sd-syntax-function: #2f5f8a;
+  --sd-syntax-attr: #2c6e66;
+  --sd-diff-add: #2e6b4e;
+  --sd-diff-del: #a63d36;
+  --sd-diff-hunk: #697169;
   --sd-dot-gray: #b7aa9b;
   --sd-dot-blue: #7ea0c4;
   --sd-dot-teal: #6eaea4;
@@ -19,88 +118,117 @@
   --sd-dot-red: #e7aea6;
   --sd-dot-pink: #e3a3b5;
   --sd-dot-yellow: #e0c27a;
-  --sd-font-sans: "Avenir Next", Avenir, "Segoe UI", sans-serif;
-  --sd-font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
-  --sd-font-mono: "IBM Plex Mono", ui-monospace, monospace;
-}
-
-:root,
-:root[data-theme="light"],
-.sd-preview,
-.sd-preview[data-theme="light"],
-.sd-preview[data-theme="system"] {
-  color-scheme: light;
-  --sd-bg: #f2eee6;
-  --sd-bg-elevated: #faf8f3;
-  --sd-fg: #2a241c;
-  --sd-muted: #645a4f;
-  --sd-border: #d0c5b6;
-  --sd-accent: #1f5c40;
-  --sd-danger: #7c2f29;
-  --sd-overlay: rgba(32, 26, 20, 0.36);
-  --sd-shadow: 0 18px 44px rgba(42, 36, 28, 0.12), 0 1px 2px rgba(42, 36, 28, 0.08);
-  --sd-mark: #f3e2a8;
-  --sd-mark-strong: #f3d27a;
-  --sd-syntax-keyword: #1f5c40;
-  --sd-syntax-string: #8c5220;
-  --sd-syntax-number: #6d4fa3;
-  --sd-syntax-comment: #645a4f;
-  --sd-syntax-function: #2f5f8a;
-  --sd-syntax-attr: #2c6e66;
-  --sd-diff-add: #2e6b4e;
-  --sd-diff-del: #7c2f29;
-  --sd-diff-hunk: #645a4f;
 }
 
 :root[data-theme="dark"],
 .sd-preview[data-theme="dark"] {
   color-scheme: dark;
-  --sd-bg: #1c1814;
-  --sd-bg-elevated: #27221c;
-  --sd-fg: #f3eee6;
-  --sd-muted: #b5a494;
-  --sd-border: #463e36;
-  --sd-accent: #8fbfa4;
-  --sd-danger: #e7aea6;
-  --sd-overlay: rgba(8, 6, 4, 0.64);
-  --sd-shadow: 0 18px 48px rgba(6, 4, 2, 0.5), 0 1px 2px rgba(6, 4, 2, 0.4);
+  --sd-bg: #171a18;
+  --sd-surface: #202421;
+  --sd-bg-surface: var(--sd-surface);
+  --sd-bg-elevated: #272c28;
+  --sd-fg: #edf0eb;
+  --sd-muted: #9ca59c;
+  --sd-border: #353c36;
+  --sd-border-strong: color-mix(in srgb, var(--sd-fg) 24%, var(--sd-border));
+  --sd-accent: #94bfa7;
+  --sd-accent-fg: #171a18;
+  --sd-accent-hover: color-mix(in srgb, var(--sd-accent) 88%, var(--sd-fg));
+  --sd-accent-active: color-mix(in srgb, var(--sd-accent) 78%, var(--sd-fg));
+  --sd-accent-soft: color-mix(in srgb, var(--sd-accent) 16%, var(--sd-surface));
+  --sd-surface-hover: color-mix(in srgb, var(--sd-fg) 6%, var(--sd-surface));
+  --sd-surface-selected: color-mix(in srgb, var(--sd-accent) 14%, var(--sd-surface));
+  --sd-surface-active: color-mix(in srgb, var(--sd-fg) 10%, var(--sd-surface));
+  --sd-hover: var(--sd-surface-hover);
+  --sd-selected: var(--sd-surface-selected);
+  --sd-focus: var(--sd-accent);
+  --sd-focus-ring: var(--sd-accent);
+  --sd-danger: #e5a19a;
+  --sd-danger-fg: #171a18;
+  --sd-danger-hover: color-mix(in srgb, var(--sd-danger) 88%, var(--sd-fg));
+  --sd-danger-soft: color-mix(in srgb, var(--sd-danger) 14%, var(--sd-surface));
+  --sd-overlay: rgba(0, 0, 0, 0.58);
+  --sd-tooltip-bg: var(--sd-fg);
+  --sd-tooltip-fg: var(--sd-bg);
+  --sd-shadow-sm: 0 5px 16px rgba(0, 0, 0, 0.28), 0 1px 3px rgba(0, 0, 0, 0.32);
+  --sd-shadow-lg: 0 24px 64px rgba(0, 0, 0, 0.48), 0 3px 10px rgba(0, 0, 0, 0.36);
+  --sd-shadow: var(--sd-shadow-sm);
   --sd-mark: #6b5a2e;
   --sd-mark-strong: #7a6536;
-  --sd-syntax-keyword: #8fbfa4;
+  --sd-syntax-keyword: #94bfa7;
   --sd-syntax-string: #d9a06a;
   --sd-syntax-number: #bfa7d8;
-  --sd-syntax-comment: #b5a494;
+  --sd-syntax-comment: #9ca59c;
   --sd-syntax-function: #93b4d4;
   --sd-syntax-attr: #8cc4ba;
-  --sd-diff-add: #8fbfa4;
-  --sd-diff-del: #e7aea6;
-  --sd-diff-hunk: #b5a494;
+  --sd-diff-add: #94bfa7;
+  --sd-diff-del: #e5a19a;
+  --sd-diff-hunk: #9ca59c;
+  --sd-dot-gray: #aaa79e;
+  --sd-dot-blue: #91b4d7;
+  --sd-dot-teal: #83c4ba;
+  --sd-dot-green: #94bfa7;
+  --sd-dot-orange: #dda067;
+  --sd-dot-purple: #c2add5;
+  --sd-dot-red: #e5a19a;
+  --sd-dot-pink: #e5aabc;
+  --sd-dot-yellow: #dfc580;
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]):not([data-theme="dark"]),
   .sd-preview[data-theme="system"] {
     color-scheme: dark;
-    --sd-bg: #1c1814;
-    --sd-bg-elevated: #27221c;
-    --sd-fg: #f3eee6;
-    --sd-muted: #b5a494;
-    --sd-border: #463e36;
-    --sd-accent: #8fbfa4;
-    --sd-danger: #e7aea6;
-    --sd-overlay: rgba(8, 6, 4, 0.64);
-    --sd-shadow: 0 18px 48px rgba(6, 4, 2, 0.5), 0 1px 2px rgba(6, 4, 2, 0.4);
+    --sd-bg: #171a18;
+    --sd-surface: #202421;
+    --sd-bg-surface: var(--sd-surface);
+    --sd-bg-elevated: #272c28;
+    --sd-fg: #edf0eb;
+    --sd-muted: #9ca59c;
+    --sd-border: #353c36;
+    --sd-border-strong: color-mix(in srgb, var(--sd-fg) 24%, var(--sd-border));
+    --sd-accent: #94bfa7;
+    --sd-accent-fg: #171a18;
+    --sd-accent-hover: color-mix(in srgb, var(--sd-accent) 88%, var(--sd-fg));
+    --sd-accent-active: color-mix(in srgb, var(--sd-accent) 78%, var(--sd-fg));
+    --sd-accent-soft: color-mix(in srgb, var(--sd-accent) 16%, var(--sd-surface));
+    --sd-surface-hover: color-mix(in srgb, var(--sd-fg) 6%, var(--sd-surface));
+    --sd-surface-selected: color-mix(in srgb, var(--sd-accent) 14%, var(--sd-surface));
+    --sd-surface-active: color-mix(in srgb, var(--sd-fg) 10%, var(--sd-surface));
+    --sd-hover: var(--sd-surface-hover);
+    --sd-selected: var(--sd-surface-selected);
+    --sd-focus: var(--sd-accent);
+    --sd-focus-ring: var(--sd-accent);
+    --sd-danger: #e5a19a;
+    --sd-danger-fg: #171a18;
+    --sd-danger-hover: color-mix(in srgb, var(--sd-danger) 88%, var(--sd-fg));
+    --sd-danger-soft: color-mix(in srgb, var(--sd-danger) 14%, var(--sd-surface));
+    --sd-overlay: rgba(0, 0, 0, 0.58);
+    --sd-tooltip-bg: var(--sd-fg);
+    --sd-tooltip-fg: var(--sd-bg);
+    --sd-shadow-sm: 0 5px 16px rgba(0, 0, 0, 0.28), 0 1px 3px rgba(0, 0, 0, 0.32);
+    --sd-shadow-lg: 0 24px 64px rgba(0, 0, 0, 0.48), 0 3px 10px rgba(0, 0, 0, 0.36);
+    --sd-shadow: var(--sd-shadow-sm);
     --sd-mark: #6b5a2e;
     --sd-mark-strong: #7a6536;
-    --sd-syntax-keyword: #8fbfa4;
+    --sd-syntax-keyword: #94bfa7;
     --sd-syntax-string: #d9a06a;
     --sd-syntax-number: #bfa7d8;
-    --sd-syntax-comment: #b5a494;
+    --sd-syntax-comment: #9ca59c;
     --sd-syntax-function: #93b4d4;
     --sd-syntax-attr: #8cc4ba;
-    --sd-diff-add: #8fbfa4;
-    --sd-diff-del: #e7aea6;
-    --sd-diff-hunk: #b5a494;
+    --sd-diff-add: #94bfa7;
+    --sd-diff-del: #e5a19a;
+    --sd-diff-hunk: #9ca59c;
+    --sd-dot-gray: #aaa79e;
+    --sd-dot-blue: #91b4d7;
+    --sd-dot-teal: #83c4ba;
+    --sd-dot-green: #94bfa7;
+    --sd-dot-orange: #dda067;
+    --sd-dot-purple: #c2add5;
+    --sd-dot-red: #e5a19a;
+    --sd-dot-pink: #e5aabc;
+    --sd-dot-yellow: #dfc580;
   }
 }
 
@@ -132,18 +260,18 @@
   overflow: hidden;
   background: var(--bg);
   color: var(--fg);
-  font-family: "Avenir Next", Avenir, "Segoe UI", sans-serif;
-  font-size: 15px;
+  font-family: var(--sd-font-sans);
+  font-size: var(--sd-text-md);
   line-height: 1.45;
 }
 
 .sd-preview ::selection {
-  background: var(--accent);
-  color: var(--bg);
+  background: var(--sd-accent-soft);
+  color: var(--sd-fg);
 }
 
-.sd-preview button,
-.sd-preview input {
+:where(.sd-preview) button,
+:where(.sd-preview) input {
   font: inherit;
   color: inherit;
   background: transparent;
@@ -153,7 +281,7 @@
   margin: 0;
 }
 
-.sd-preview button {
+:where(.sd-preview) button {
   cursor: pointer;
 }
 
@@ -195,7 +323,7 @@
 .sd-modal-title,
 .sd-note-name,
 .sd-pop-title {
-  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  font-family: var(--sd-font-serif);
   font-weight: 500;
 }
 
@@ -239,7 +367,7 @@
   gap: 0.45rem;
 }
 
-.sd-preview .sd-btn {
+:where(.sd-preview) .sd-btn {
   gap: 0.4rem;
   padding: 0.4rem 0.72rem;
   border: 1px solid var(--border);
@@ -250,33 +378,33 @@
   white-space: nowrap;
 }
 
-.sd-preview .sd-btn-primary {
+:where(.sd-preview) .sd-btn-primary {
   background: var(--accent);
   border-color: var(--accent);
   color: var(--bg);
 }
 
-.sd-preview .sd-btn-danger {
+:where(.sd-preview) .sd-btn-danger {
   border-color: var(--danger);
   color: var(--danger);
 }
 
-.sd-preview .sd-btn:hover:not(:disabled) {
+:where(.sd-preview) .sd-btn:hover:not(:disabled) {
   border-color: var(--fg);
 }
 
-.sd-preview .sd-btn-primary:hover:not(:disabled) {
+:where(.sd-preview) .sd-btn-primary:hover:not(:disabled) {
   border-color: var(--accent);
   filter: brightness(1.08);
 }
 
-.sd-preview .sd-btn-danger:hover:not(:disabled) {
+:where(.sd-preview) .sd-btn-danger:hover:not(:disabled) {
   background: var(--danger);
   border-color: var(--danger);
   color: var(--bg);
 }
 
-.sd-preview .sd-btn:disabled {
+:where(.sd-preview) .sd-btn:disabled {
   opacity: 0.42;
   cursor: not-allowed;
 }
@@ -298,7 +426,7 @@
   font-size: 0.86rem;
 }
 
-.sd-preview .sd-field-input {
+:where(.sd-preview) .sd-field-input {
   width: 100%;
   padding: 0.32rem 0;
   border: 0;
@@ -308,12 +436,12 @@
   color: var(--fg);
 }
 
-.sd-preview .sd-field-input:focus {
+:where(.sd-preview) .sd-field-input:focus {
   outline: none;
   border-bottom-color: var(--accent);
 }
 
-.sd-preview .sd-field-input::placeholder {
+:where(.sd-preview) .sd-field-input::placeholder {
   color: var(--muted);
 }
 
@@ -395,8 +523,8 @@
   margin-top: 1rem;
 }
 
-.sd-preview .sd-modal-x,
-.sd-preview .sd-toast-close {
+:where(.sd-preview) .sd-modal-x,
+:where(.sd-preview) .sd-toast-close {
   color: var(--muted);
   border-radius: 4px;
   padding: 0.2rem;
@@ -408,8 +536,8 @@
   right: 0.7rem;
 }
 
-.sd-preview .sd-modal-x:hover,
-.sd-preview .sd-toast-close:hover {
+:where(.sd-preview) .sd-modal-x:hover,
+:where(.sd-preview) .sd-toast-close:hover {
   color: var(--fg);
 }
 
@@ -535,7 +663,7 @@
 .sd-side-mark {
   gap: 0.45rem;
   margin: 0 0 0.35rem;
-  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, serif;
+  font-family: var(--sd-font-serif);
   font-size: 1.2rem;
 }
 
@@ -627,7 +755,7 @@
 
 .sd-note-body {
   max-width: 62ch;
-  font-family: "Iowan Old Style", "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif;
+  font-family: var(--sd-font-serif);
   font-size: 1.125rem;
   line-height: 1.65;
   text-wrap: pretty;
@@ -674,7 +802,7 @@
 
 .sd-preview .sd-backlink {
   padding: 0.4rem 0.35rem;
-  font-family: "Iowan Old Style", Palatino, Georgia, serif;
+  font-family: var(--sd-font-serif);
   font-size: 1.02rem;
 }
 

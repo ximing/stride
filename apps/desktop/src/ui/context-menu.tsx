@@ -16,7 +16,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ContextMenuEntry } from '../services/context-menu'
-import { Mark } from './icon'
 import { useLayer } from './layer'
 
 export interface ContextMenuProps {
@@ -142,6 +141,7 @@ export function ContextMenu({ x, y, items, onClose, testId = 'context-menu' }: C
         if (entry.kind === 'separator') {
           return <div key={entry.id} className="sd-menu-separator" role="separator" />
         }
+        const Glyph = entry.icon
         return (
           <div
             key={entry.id}
@@ -161,13 +161,13 @@ export function ContextMenu({ x, y, items, onClose, testId = 'context-menu' }: C
               activate(index)
             }}
           >
-            {entry.icon && (
+            {Glyph && (
               <span className="sd-menu-item-icon">
-                <Mark icon={entry.icon} size={14} />
+                <Glyph aria-hidden="true" size={14} strokeWidth={1.75} />
               </span>
             )}
             <span className="sd-menu-item-label">{entry.label}</span>
-            {entry.shortcut && <span className="sd-menu-shortcut">{entry.shortcut}</span>}
+            {entry.shortcut && <kbd className="sd-menu-shortcut">{entry.shortcut}</kbd>}
           </div>
         )
       })}

@@ -5,8 +5,12 @@
 // — the existing load/save round-trip migrates stored values unchanged.
 
 import { observer, useService } from '@rabjs/react'
+import { CircleAlert, CircleCheck } from 'lucide-react'
 import { useState } from 'react'
 import { SettingsService } from '../../../services/panels.service'
+import { Button } from '../../button'
+import { Mark } from '../../icon'
+import { Input } from '../../input'
 import './git.css'
 
 const MAX_AUTO_PULL_MINUTES = 1440
@@ -33,13 +37,13 @@ function NumberRow(props: {
   onChange: (next: string) => void
 }) {
   const inputId = `${props.testId}-input`
+  const hintId = `${props.testId}-hint`
+  const errorId = `${props.testId}-error`
   return (
     <div className="sgit-field">
-      <label className="sgit-label" htmlFor={inputId}>
-        {props.label}
-      </label>
-      <input
+      <Input
         id={inputId}
+        label={props.label}
         className="sgit-input"
         type="text"
         inputMode="numeric"
@@ -47,14 +51,16 @@ function NumberRow(props: {
         data-testid={props.testId}
         value={props.value}
         aria-invalid={props.error ? true : undefined}
+        aria-describedby={props.error ? undefined : hintId}
+        aria-errormessage={props.error ? errorId : undefined}
         onChange={(event) => props.onChange(event.target.value)}
       />
       {props.error ? (
-        <p className="sgit-error" data-testid={`${props.testId}-error`}>
+        <p className="sgit-error" id={errorId} role="alert" data-testid={errorId}>
           {props.error}
         </p>
       ) : (
-        <p className="sgit-hint">{props.hint}</p>
+        <p className="sgit-hint" id={hintId}>{props.hint}</p>
       )}
     </div>
   )
@@ -69,8 +75,9 @@ function ToggleRow(props: {
 }) {
   return (
     <div className="sgit-field">
-      <label className="sgit-check">
+      <label className="sgit-check settings-choice">
         <input
+          className="settings-choice-control"
           type="checkbox"
           data-testid={props.testId}
           checked={props.checked}
@@ -174,16 +181,17 @@ export const GitSection = observer(function GitSection() {
         onChange={(next) => setDraft('blur', next)}
       />
       <div className="sgit-actions">
-        <button type="button" className="sgit-save" data-testid="settings-git-save" onClick={() => void save()}>
+        <Button tone="primary" size="lg" data-testid="settings-git-save" onClick={() => void save()}>
           Save
-        </button>
+        </Button>
         {status && (
-          <p className="sgit-status" data-testid="settings-git-status">
-            {status}
+          <p className="sgit-status" data-tone={status === 'Saved.' ? 'success' : 'error'} data-testid="settings-git-status" role="status">
+            <Mark icon={status === 'Saved.' ? CircleCheck : CircleAlert} size={14} />
+            <span>{status}</span>
           </p>
         )}
         {settings.notice && (
-          <p className="sgit-error" data-testid="settings-git-notice">
+          <p className="sgit-error" data-testid="settings-git-notice" role="alert">
             {settings.notice}
           </p>
         )}

@@ -1,8 +1,9 @@
 import { Service } from '@rabjs/react'
 import { Extension, type Editor } from '@tiptap/core'
 import type { Node as PmNode } from '@tiptap/pm/model'
-import { Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
+import { NodeSelection, Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
+import { applyHitsReplace, findKeywordHits, type FindHit } from './find-hits'
 
 export type TextMatch = { from: number; to: number }
 
@@ -17,47 +18,10 @@ export function isFindShortcut(event: KeyboardEvent): boolean {
   return event.key === 'f' || event.key === 'F'
 }
 
-type TextRun = { text: string; positions: number[] }
-
-// Adjacent text nodes stay one run. A block or atom between them is not a character.
-function textRuns(doc: PmNode): TextRun[] {
-  const runs: TextRun[] = []
-  let run: TextRun | null = null
-  let end = -1
-  doc.descendants((node, pos) => {
-    if (!node.isText) return true
-    const text = node.text ?? ''
-    if (!text) return false
-    if (!run || end !== pos) {
-      run = { text: '', positions: [] }
-      runs.push(run)
-    }
-    for (let index = 0; index < text.length; index += 1) {
-      run.text += text[index] ?? ''
-      run.positions.push(pos + index)
-    }
-    end = pos + text.length
-    return false
-  })
-  return runs
-}
-
-export function findTextMatches(doc: PmNode, query: string): TextMatch[] {
+/** Case-insensitive unless `caseSensitive` is set. Atoms (wikilink) still break a run. */
+export function findTextMatches(doc: PmNode, query: string, caseSensitive = false): TextMatch[] {
   if (!query) return []
-  const matches: TextMatch[] = []
-  for (const run of textRuns(doc)) {
-    let cursor = 0
-    while (cursor <= run.text.length - query.length) {
-      const found = run.text.indexOf(query, cursor)
-      if (found < 0) break
-      const from = run.positions[found]
-      const last = run.positions[found + query.length - 1]
-      if (from === undefined || last === undefined) break
-      matches.push({ from, to: last + 1 })
-      cursor = found + query.length
-    }
-  }
-  return matches
+  return findKeywordHits(doc, query, caseSensitive).map((hit) => ({ from: hit.from, to: hit.to }))
 }
 
 function clampPos(doc: PmNode, pos: number): number {
@@ -71,11 +35,16 @@ function mod(index: number, length: number): number {
 
 function highlightDecorations(doc: PmNode, from: number, to: number): Decoration[] {
   if (to <= from) return []
+  const node = doc.nodeAt(from)
+  if (node?.isAtom && from + node.nodeSize === to) {
+    if (node.isInline) return [Decoration.inline(from, to, { class: 'find-hit' })]
+    return [Decoration.node(from, to, { class: 'find-hit' })]
+  }
   const decorations: Decoration[] = []
-  doc.nodesBetween(from, to, (node, pos) => {
-    if (!node.isText) return
+  doc.nodesBetween(from, to, (child, pos) => {
+    if (!child.isText) return
     const start = Math.max(from, pos)
-    const end = Math.min(to, pos + node.nodeSize)
+    const end = Math.min(to, pos + child.nodeSize)
     if (end > start) decorations.push(Decoration.inline(start, end, { class: 'find-hit' }))
   })
   return decorations
@@ -120,56 +89,78 @@ export function clearFindHighlight(editor: Editor): void {
   )
 }
 
-export function selectMatch(editor: Editor, match: TextMatch): void {
-  if (editor.isDestroyed) return
-  const from = clampPos(editor.state.doc, match.from)
-  const to = clampPos(editor.state.doc, match.to)
-  const anchor = Math.min(from, to)
-  const head = Math.max(from, to)
+function selectRange(editor: Editor, from: number, to: number): void {
   const tr = editor.state.tr.setMeta('addToHistory', false)
-  tr.setSelection(TextSelection.create(tr.doc, anchor, head))
-  tr.setMeta(findHighlightKey, head > anchor ? { from: anchor, to: head } : null)
+  const node = tr.doc.nodeAt(from)
+  if (node?.isAtom && from + node.nodeSize === to) tr.setSelection(NodeSelection.create(tr.doc, from))
+  else tr.setSelection(TextSelection.create(tr.doc, from, Math.max(from, to)))
+  tr.setMeta(findHighlightKey, to > from ? { from, to } : null)
   tr.scrollIntoView()
   editor.view.dispatch(tr)
 }
 
-// One transaction so autosave and undo see a single edit. Later matches go first so earlier positions stay valid.
-export function replaceMatches(editor: Editor, matches: readonly TextMatch[], replacement: string): boolean {
-  if (matches.length === 0 || editor.isDestroyed) return false
-  const ordered = [...matches].sort((left, right) => left.from - right.from)
-  const tr = editor.state.tr
-  for (let index = ordered.length - 1; index >= 0; index -= 1) {
-    const match = ordered[index]
-    if (!match) continue
-    tr.insertText(replacement, match.from, match.to)
+export function selectMatch(editor: Editor, match: TextMatch): void {
+  if (editor.isDestroyed) return
+  const from = clampPos(editor.state.doc, match.from)
+  const to = clampPos(editor.state.doc, match.to)
+  selectRange(editor, Math.min(from, to), Math.max(from, to))
+}
+
+function placeReplaced(tr: ReturnType<Editor['state']['tr']['setMeta']>, hit: FindHit, replacement: string) {
+  if (hit.kind === 'attr') {
+    const node = tr.doc.nodeAt(hit.from)
+    if (!node) return
+    tr.setSelection(NodeSelection.create(tr.doc, hit.from))
+    tr.setMeta(findHighlightKey, { from: hit.from, to: hit.from + node.nodeSize })
+    return
   }
+  const from = hit.from
+  const to = from + replacement.length
+  if (to > from) tr.setSelection(TextSelection.create(tr.doc, from, to))
+  else tr.setSelection(TextSelection.create(tr.doc, clampPos(tr.doc, from)))
+  tr.setMeta(findHighlightKey, to > from ? { from, to } : null)
+}
+
+// One transaction so autosave and undo see a single edit. Later matches go first so earlier positions stay valid.
+// The replacement keeps the marks on the matched text. Text outside the match is left alone.
+function replaceHits(editor: Editor, hits: readonly FindHit[], replacement: string): boolean {
+  if (hits.length === 0 || editor.isDestroyed) return false
+  const ordered = [...hits].sort((left, right) => left.from - right.from || left.attrFrom - right.attrFrom)
+  const tr = editor.state.tr
+  applyHitsReplace(tr, ordered, replacement)
   const first = ordered[0]
   if (!first) return false
-  const anchor = clampPos(tr.doc, first.from)
-  const head = clampPos(tr.doc, first.from + replacement.length)
-  const from = Math.min(anchor, head)
-  const to = Math.max(anchor, head)
-  tr.setSelection(TextSelection.create(tr.doc, from, to))
-  tr.setMeta(findHighlightKey, to > from ? { from, to } : null)
+  placeReplaced(tr, first, replacement)
   tr.scrollIntoView()
   editor.view.dispatch(tr)
   return true
 }
 
-export function replaceOneMatch(editor: Editor, query: string, index: number, replacement: string): boolean {
+export function replaceOneMatch(
+  editor: Editor,
+  query: string,
+  index: number,
+  replacement: string,
+  caseSensitive = false,
+): boolean {
   if (!query || editor.isDestroyed) return false
-  const matches = findTextMatches(editor.state.doc, query)
-  if (matches.length === 0) return false
-  const match = matches[mod(index, matches.length)]
-  if (!match) return false
-  return replaceMatches(editor, [match], replacement)
+  const hits = findKeywordHits(editor.state.doc, query, caseSensitive)
+  if (hits.length === 0) return false
+  const hit = hits[mod(index, hits.length)]
+  if (!hit) return false
+  return replaceHits(editor, [hit], replacement)
 }
 
-export function replaceAllMatches(editor: Editor, query: string, replacement: string): number {
+export function replaceAllMatches(
+  editor: Editor,
+  query: string,
+  replacement: string,
+  caseSensitive = false,
+): number {
   if (!query || editor.isDestroyed) return 0
-  const matches = findTextMatches(editor.state.doc, query)
-  if (matches.length === 0) return 0
-  return replaceMatches(editor, matches, replacement) ? matches.length : 0
+  const hits = findKeywordHits(editor.state.doc, query, caseSensitive)
+  if (hits.length === 0) return 0
+  return replaceHits(editor, hits, replacement) ? hits.length : 0
 }
 
 export function matchIndex(index: number, count: number): number {
@@ -182,6 +173,7 @@ export class FindService extends Service {
   replacement = ''
   index = 0
   revision = 0
+  caseSensitive = false
 
   show() {
     this.open = true
@@ -202,6 +194,11 @@ export class FindService extends Service {
 
   setIndex(index: number) {
     this.index = index
+  }
+
+  toggleCase() {
+    this.caseSensitive = !this.caseSensitive
+    this.index = 0
   }
 
   bump() {

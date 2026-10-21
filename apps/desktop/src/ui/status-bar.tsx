@@ -1,13 +1,14 @@
-import { ArrowsClockwise, GearSix, GitBranch, House, MagnifyingGlass, Sparkle } from '@phosphor-icons/react'
 import { observer, useService } from '@rabjs/react'
 import { syncState } from '@stride/core'
 import type { GitSurface, SyncState } from '@stride/core'
+import { GitBranch, Home, RefreshCw, Search, Settings, Sparkles } from 'lucide-react'
 import { LayoutService } from '../services/layout.service'
 import { GitService } from '../services/panels.service'
 import { SettingsPageService } from '../services/settings-page.service'
 import { UpdateCheckService } from '../services/update-check'
 import { VaultService } from '../services/vault.service'
 import { APP_VERSION } from '../version'
+import { Button } from './button'
 import { Mark } from './icon'
 import { Popover, PopoverContent, PopoverTrigger } from './popover'
 
@@ -38,7 +39,9 @@ export const GitStatusBadge = observer(function GitStatusBadge() {
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <button type="button" className="git-status-badge" data-testid="git-status-badge">{gitBadge(git.surface, state)}</button>
+        <Button tone="quiet" size="sm" className="git-status-badge" data-testid="git-status-badge">
+          {gitBadge(git.surface, state)}
+        </Button>
       </PopoverTrigger>
       <PopoverContent className="git-sync-popover" side="top" data-testid="git-sync-popover">
         <p>{git.branch}</p>
@@ -66,73 +69,77 @@ export const StatusBar = observer(function StatusBar() {
   return (
     <footer className="statusbar" data-testid="statusbar">
       <span className="statusbar-item">
-        <Mark icon={House} size={13} />
+        <Mark icon={Home} size={14} />
         {vault.currentVaultLabel}
       </span>
       {git.branch ? (
         <span className="statusbar-item" data-testid="statusbar-branch">
-          <Mark icon={GitBranch} size={13} />
+          <Mark icon={GitBranch} size={14} />
           {git.branch}
         </span>
       ) : null}
       <GitStatusBadge />
       {vault.indexPhase === 'error' ? (
-        <button
-          type="button"
+        <Button
+          tone="quiet"
+          size="sm"
           className="statusbar-item statusbar-action statusbar-index-error"
           data-testid="index-status"
           title="索引失败,点击重建"
+          icon={<Mark icon={Search} size={14} />}
           onClick={() => vault.retryIndex()}
         >
-          <Mark icon={MagnifyingGlass} size={13} />
           {indexStatusLabel(vault.indexPhase, vault.indexDone, vault.indexTotal)}
           <span data-testid="index-retry">重试</span>
-        </button>
+        </Button>
       ) : (
         <span className="statusbar-item" data-testid="index-status">
-          <Mark icon={MagnifyingGlass} size={13} />
+          <Mark icon={Search} size={14} />
           {indexStatusLabel(vault.indexPhase, vault.indexDone, vault.indexTotal)}
         </span>
       )}
       <span className="statusbar-spacer" />
       {updateCheck.supported ? (
-        <button
-          type="button"
+        <Button
+          tone="quiet"
+          size="sm"
           className="statusbar-item statusbar-action"
           data-testid="statusbar-update-check"
           disabled={updateCheck.feedback === 'checking'}
           title="Check for updates"
+          icon={<Mark icon={RefreshCw} size={14} />}
           onClick={() => void updateCheck.manualCheck()}
         >
-          <Mark icon={ArrowsClockwise} size={13} />
           {updateCheck.feedback === 'checking' ? '检查中…' : '检查更新'}
-        </button>
+        </Button>
       ) : null}
       {updateCheck.feedbackText ? (
         <span className="statusbar-item" data-testid="statusbar-update-feedback">
           {updateCheck.feedbackText}
         </span>
       ) : null}
-      <button
-        type="button"
+      <Button
+        tone="quiet"
+        size="sm"
         className="statusbar-item statusbar-action"
         data-testid="statusbar-ai"
+        icon={<Mark icon={Sparkles} size={14} />}
         onClick={() => layout.setRightPanelTab('chat')}
       >
-        <Mark icon={Sparkle} size={13} />
         Ask AI
-      </button>
-      <button
-        type="button"
+      </Button>
+      <Button
+        tone="quiet"
+        size="sm"
         className="statusbar-item statusbar-action"
         data-testid="statusbar-settings"
         aria-label="Settings"
         title="Settings"
+        icon={<Mark icon={Settings} size={14} />}
         onClick={() => settingsPage.show()}
       >
-        <Mark icon={GearSix} size={13} />
         Settings
-      </button>
+      </Button>
       <span className="statusbar-item statusbar-version" data-testid="statusbar-version">v{APP_VERSION}</span>
     </footer>
   )

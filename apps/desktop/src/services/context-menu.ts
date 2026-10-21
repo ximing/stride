@@ -12,22 +12,22 @@
 // the toolbar's `editorTools` chords, formatted via formatShortcut.
 
 import {
-  ArrowSquareOut,
-  ClipboardText,
+  Archive,
+  Bold,
+  Clipboard,
   Copy,
+  ExternalLink,
   FilePlus,
   FolderPlus,
   Highlighter,
+  Italic,
   Link as LinkIcon,
-  NotePencil,
-  PencilSimple,
-  Archive,
-  SelectionAll,
-  TextB,
-  TextItalic,
-  Trash,
-  type Icon,
-} from '@phosphor-icons/react'
+  NotebookPen,
+  Pencil,
+  TextSelect,
+  Trash2,
+  type LucideIcon,
+} from 'lucide-react'
 import { formatShortcut, type AppCommand } from './commands'
 
 export interface ContextMenuItem {
@@ -35,7 +35,7 @@ export interface ContextMenuItem {
   /** Stable id — drives data-testid={`context-menu-item-${id}`}. */
   id: string
   label: string
-  icon?: Icon
+  icon?: LucideIcon
   /** Pre-formatted chord hint (⌘B / Ctrl+B), rendered right-aligned. */
   shortcut?: string | null
   disabled?: boolean
@@ -112,7 +112,7 @@ export function buildNoteListMenu(
         kind: 'item',
         id: 'retype-selected',
         label: retype.title,
-        icon: NotePencil,
+        icon: NotebookPen,
         shortcut: retype.shortcut,
         onSelect: () => actions.retypeSelected(),
       },
@@ -121,7 +121,7 @@ export function buildNoteListMenu(
         kind: 'item',
         id: 'delete-selected',
         label: remove.title,
-        icon: Trash,
+        icon: Trash2,
         shortcut: remove.shortcut,
         danger: true,
         onSelect: () => actions.deleteSelected(),
@@ -133,14 +133,14 @@ export function buildNoteListMenu(
       kind: 'item',
       id: 'open',
       label: 'Open',
-      icon: ArrowSquareOut,
+      icon: ExternalLink,
       onSelect: () => actions.open(noteId),
     },
     {
       kind: 'item',
       id: 'rename',
       label: 'Rename',
-      icon: PencilSimple,
+      icon: Pencil,
       onSelect: () => actions.rename(noteId),
     },
     separator('note-actions'),
@@ -164,7 +164,7 @@ export function buildNoteListMenu(
       kind: 'item',
       id: 'delete',
       label: 'Delete…',
-      icon: Trash,
+      icon: Trash2,
       danger: true,
       onSelect: () => actions.deleteNote(noteId),
     },
@@ -223,7 +223,7 @@ export function buildEditorMenu(
             kind: 'item',
             id: 'open-link',
             label: '打开链接',
-            icon: ArrowSquareOut,
+            icon: ExternalLink,
             onSelect: () => actions.openLink(link.target),
           },
           {
@@ -260,7 +260,7 @@ export function buildEditorMenu(
         kind: 'item',
         id: 'bold',
         label: '粗体',
-        icon: TextB,
+        icon: Bold,
         shortcut: input.shortcuts.bold,
         disabled: locked,
         onSelect: () => actions.format('bold'),
@@ -269,7 +269,7 @@ export function buildEditorMenu(
         kind: 'item',
         id: 'italic',
         label: '斜体',
-        icon: TextItalic,
+        icon: Italic,
         shortcut: input.shortcuts.italic,
         disabled: locked,
         onSelect: () => actions.format('italic'),
@@ -307,7 +307,7 @@ export function buildEditorMenu(
       kind: 'item',
       id: 'paste',
       label: '粘贴',
-      icon: ClipboardText,
+      icon: Clipboard,
       disabled: !input.editable || !input.clipboardRead,
       onSelect: () => actions.paste(),
     },
@@ -315,7 +315,7 @@ export function buildEditorMenu(
       kind: 'item',
       id: 'select-all',
       label: '全选',
-      icon: SelectionAll,
+      icon: TextSelect,
       onSelect: () => actions.selectAll(),
     },
   ]
@@ -345,7 +345,7 @@ export function buildFolderMenu(
       kind: 'item',
       id: 'new-note-here',
       label: 'New Note Here',
-      icon: NotePencil,
+      icon: NotebookPen,
       onSelect: () => actions.newNoteHere(path),
     },
     {
@@ -360,14 +360,14 @@ export function buildFolderMenu(
       kind: 'item',
       id: 'rename-folder',
       label: 'Rename',
-      icon: PencilSimple,
+      icon: Pencil,
       onSelect: () => actions.renameFolder(path),
     },
     {
       kind: 'item',
       id: 'delete-folder',
       label: 'Delete…',
-      icon: Trash,
+      icon: Trash2,
       danger: true,
       onSelect: () => actions.deleteFolder(path),
     },
@@ -396,7 +396,7 @@ export function buildFolderNoteMenu(
       kind: 'item',
       id: 'open',
       label: 'Open',
-      icon: ArrowSquareOut,
+      icon: ExternalLink,
       onSelect: () => actions.open(noteId),
     },
     {
@@ -419,7 +419,7 @@ export function buildFolderNoteMenu(
       kind: 'item',
       id: 'delete',
       label: 'Delete…',
-      icon: Trash,
+      icon: Trash2,
       danger: true,
       onSelect: () => actions.deleteNote(noteId),
     },

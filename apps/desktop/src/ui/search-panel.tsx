@@ -1,5 +1,5 @@
-import { MagnifyingGlass } from '@phosphor-icons/react'
 import { observer, useService } from '@rabjs/react'
+import { Search } from 'lucide-react'
 import { useEffect, useRef, type ReactNode } from 'react'
 import { CommandService } from '../services/command.service'
 import { SearchPanelService } from '../services/search-panel.service'
@@ -81,75 +81,81 @@ export const SearchPanel = observer(function SearchPanel() {
 
   return (
     <div
-      className="search-panel-backdrop"
+      className="search-panel-backdrop sd-command-backdrop"
       onClick={(event) => {
         if (event.target === event.currentTarget) service.close()
       }}
     >
       <div
-        className="search-panel"
+        className="search-panel sd-command-surface"
         data-testid="search-panel"
         role="dialog"
         aria-modal="true"
         aria-labelledby="search-panel-title"
         onClick={(event) => event.stopPropagation()}
       >
-        <h2 id="search-panel-title" className="search-panel-title">搜索</h2>
-        {vault.searchDegraded ? <p data-testid="search-degraded">已降级为 BM25</p> : null}
-        <input
-          ref={inputRef}
-          className="search-panel-input"
-          data-testid="search-panel-input"
-          placeholder="搜索笔记"
-          aria-label="搜索笔记"
-          autoFocus
-          autoComplete="off"
-          spellCheck={false}
-          value={service.query}
-          onChange={(event) => { void service.setQuery(event.target.value) }}
-        />
-        {results.length === 0 ? (
-          service.query.trim() === '' ? (
-            <EmptyState
-              compact
-              icon={MagnifyingGlass}
-              title="输入关键词开始搜索"
-              body="支持标题与全文;索引状态见底部状态栏。"
-              testId="search-panel-hint"
-            />
-          ) : service.pending ? (
-            <Skeleton rows={3} testId="search-panel-loading" />
+        <h2 id="search-panel-title" className="search-panel-title sd-command-title">搜索</h2>
+        <div className="sd-command-search">
+          <Search aria-hidden="true" size={16} strokeWidth={1.75} />
+          <input
+            ref={inputRef}
+            className="search-panel-input sd-command-input"
+            data-testid="search-panel-input"
+            placeholder="搜索笔记"
+            aria-label="搜索笔记"
+            autoFocus
+            autoComplete="off"
+            spellCheck={false}
+            value={service.query}
+            onChange={(event) => { void service.setQuery(event.target.value) }}
+          />
+        </div>
+        {vault.searchDegraded ? <p className="sd-command-notice" data-testid="search-degraded">已降级为 BM25</p> : null}
+        <div ref={listRef} className="search-panel-list sd-command-list" role="listbox" aria-label="搜索结果">
+          {results.length === 0 ? (
+            service.query.trim() === '' ? (
+              <EmptyState
+                compact
+                icon={Search}
+                title="输入关键词开始搜索"
+                body="支持标题与全文;索引状态见底部状态栏。"
+                testId="search-panel-hint"
+              />
+            ) : service.pending ? (
+              <Skeleton rows={3} testId="search-panel-loading" />
+            ) : (
+              <EmptyState
+                compact
+                icon={Search}
+                title="没有匹配的笔记"
+                testId="search-panel-empty"
+              />
+            )
           ) : (
-            <EmptyState
-              compact
-              icon={MagnifyingGlass}
-              title="没有匹配的笔记"
-              testId="search-panel-empty"
-            />
-          )
-        ) : (
-          <div ref={listRef} className="search-panel-list" role="listbox" aria-label="搜索结果">
-            {results.map((hit, index) => (
-              <button
-                key={hit.id}
-                type="button"
-                className="search-panel-result"
-                data-testid="search-result"
-                data-note-id={hit.id}
-                role="option"
-                aria-selected={index === selectedIndex}
-                onMouseDown={(event) => event.preventDefault()}
-                onClick={() => service.choose(hit.id)}
-              >
-                <span className="search-panel-result-row">
-                  <span className="search-panel-note-title">{titles.get(hit.id) || hit.id}</span>
-                  <span className="search-panel-score">{hit.score}</span>
-                </span>
-                {hit.snippet ? <span className="search-panel-snippet">{markQuery(hit.snippet, service.query)}</span> : null}
-              </button>
-            ))}
-          </div>
-        )}
+            <>
+              <p className="search-panel-section sd-command-section">搜索结果</p>
+              {results.map((hit, index) => (
+                <button
+                  key={hit.id}
+                  type="button"
+                  className="search-panel-result sd-command-item"
+                  data-testid="search-result"
+                  data-note-id={hit.id}
+                  role="option"
+                  aria-selected={index === selectedIndex}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => service.choose(hit.id)}
+                >
+                  <span className="search-panel-result-row">
+                    <span className="search-panel-note-title sd-command-item-title">{titles.get(hit.id) || hit.id}</span>
+                    <span className="search-panel-score">{hit.score}</span>
+                  </span>
+                  {hit.snippet ? <span className="search-panel-snippet">{markQuery(hit.snippet, service.query)}</span> : null}
+                </button>
+              ))}
+            </>
+          )}
+        </div>
       </div>
     </div>
   )

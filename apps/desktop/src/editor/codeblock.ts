@@ -1,28 +1,12 @@
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
-import { createLowlight } from 'lowlight'
-import javascript from 'highlight.js/lib/languages/javascript'
-import typescript from 'highlight.js/lib/languages/typescript'
-import json from 'highlight.js/lib/languages/json'
-import python from 'highlight.js/lib/languages/python'
-import bash from 'highlight.js/lib/languages/bash'
-import xml from 'highlight.js/lib/languages/xml'
-import css from 'highlight.js/lib/languages/css'
-import markdown from 'highlight.js/lib/languages/markdown'
+import { common, createLowlight } from 'lowlight'
+import { registerDocCodeAliases } from './code-language'
+import { attachCodeLanguageMenu } from './code-language-menu'
 
 export let lastCopiedText = ''
 
-const LANGUAGES = ['javascript', 'typescript', 'json', 'python', 'bash', 'xml', 'css', 'markdown'] as const
-
-const lowlight = createLowlight()
-lowlight.register('javascript', javascript)
-lowlight.register('typescript', typescript)
-lowlight.register('json', json)
-lowlight.register('python', python)
-lowlight.register('bash', bash)
-lowlight.register('xml', xml)
-lowlight.register('css', css)
-lowlight.register('markdown', markdown)
-lowlight.register('html', xml)
+const lowlight = createLowlight(common)
+registerDocCodeAliases(lowlight)
 
 type HastNode = {
   type: string
@@ -70,17 +54,26 @@ export const codeBlockExtension = CodeBlockLowlight.extend({
       const dom = document.createElement('div')
       dom.className = 'editor-code'
 
-      const select = document.createElement('select')
+      const select = document.createElement('button')
       select.dataset.testid = 'code-language'
-      for (const language of LANGUAGES) {
-        const option = document.createElement('option')
-        option.value = language
-        option.textContent = language
-        select.append(option)
-      }
+      select.className = 'editor-code-lang'
+      const languageMenu = attachCodeLanguageMenu({
+        trigger: select,
+        getLanguage: () => current.attrs.language,
+        setLanguage: (value) => {
+          const pos = getPos()
+          if (typeof pos !== 'number') return
+          editor.view.dispatch(editor.view.state.tr.setNodeMarkup(pos, undefined, {
+            ...current.attrs,
+            language: value,
+          }))
+        },
+        isEditable: () => editor.isEditable,
+      })
 
       const button = document.createElement('button')
       button.type = 'button'
+      button.className = 'editor-code-copy'
       button.dataset.testid = 'code-copy'
       button.textContent = '复制'
 
@@ -97,11 +90,6 @@ export const codeBlockExtension = CodeBlockLowlight.extend({
 
       frame.append(pre, overlay)
       dom.append(select, button, frame)
-
-      const syncLanguage = () => {
-        const language = current.attrs.language
-        select.value = typeof language === 'string' ? language : ''
-      }
 
       const cancel = () => {
         if (idleId != null && typeof cancelIdleCallback === 'function') cancelIdleCallback(idleId)
@@ -140,16 +128,6 @@ export const codeBlockExtension = CodeBlockLowlight.extend({
         }, 16)
       }
 
-      select.addEventListener('change', () => {
-        const pos = getPos()
-        if (typeof pos !== 'number') return
-        const tr = editor.view.state.tr.setNodeMarkup(pos, undefined, {
-          ...current.attrs,
-          language: select.value,
-        })
-        editor.view.dispatch(tr)
-      })
-
       button.addEventListener('click', () => {
         const text = code.textContent ?? ''
         lastCopiedText = text
@@ -163,7 +141,6 @@ export const codeBlockExtension = CodeBlockLowlight.extend({
         }
       })
 
-      syncLanguage()
       schedule()
 
       return {
@@ -172,7 +149,7 @@ export const codeBlockExtension = CodeBlockLowlight.extend({
         update(updated) {
           if (updated.type.name !== current.type.name) return false
           current = updated
-          syncLanguage()
+          languageMenu.sync()
           schedule()
           return true
         },
@@ -189,6 +166,7 @@ export const codeBlockExtension = CodeBlockLowlight.extend({
         },
         destroy() {
           destroyed = true
+          languageMenu.destroy()
           cancel()
         },
       }

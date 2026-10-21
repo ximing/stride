@@ -1,65 +1,85 @@
-/* This Vault settings section (T7.3). Colors come from the --sd-* tokens in
-   ui/tokens.css; the density segmented control reuses the .theme-picker
-   styles in styles.css. */
-
 .svault-section {
-  max-width: 560px;
+  width: 100%;
 }
 
 .svault-group + .svault-group {
-  margin-top: 22px;
+  margin-top: 28px;
 }
 
 .svault-heading {
-  margin: 0 0 8px;
-  font-size: 12px;
+  margin: 0 0 10px;
+  color: var(--sd-fg);
+  font-size: 13px;
   font-weight: 600;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--sd-muted);
 }
 
 .svault-hint {
+  max-width: 68ch;
   margin: 8px 0 0;
-  font-size: 12px;
   color: var(--sd-muted);
+  font-size: 12px;
+  line-height: 1.5;
 }
 
 .svault-zoom {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  color: var(--sd-muted);
+  width: 160px;
+  max-width: 100%;
 }
 
-.svault-zoom input {
-  width: 5.5rem;
-  padding: 4px 8px;
-  border: 1px solid var(--sd-border);
-  border-radius: var(--sd-radius);
-  background: var(--sd-bg-elevated);
-  color: var(--sd-fg);
+.svault-zoom .sd-field {
+  width: 100%;
+  min-width: 0;
+}
+
+.svault-zoom-input {
+  width: 100%;
 }
 
 .svault-radios {
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  align-items: flex-start;
+  gap: 10px;
 }
 
 .svault-radio {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.svault-radio input {
-  width: auto;
-  margin: 0;
-  accent-color: var(--sd-accent);
+  font-size: 13px;
 }
 
 .svault-section .error {
+  max-width: 64ch;
   margin: 8px 0 0;
+  color: var(--sd-danger);
   font-size: 12px;
+  line-height: 1.5;
+}
+
+.svault-empty {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 480px;
+  padding: 16px 0;
+  border-top: 1px solid var(--sd-border);
+  border-bottom: 1px solid var(--sd-border);
+  color: var(--sd-muted);
+}
+
+.svault-empty > svg {
+  flex: none;
+  margin-top: 1px;
+}
+
+.svault-empty-title {
+  margin: 0;
+  color: var(--sd-fg);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.svault-empty .svault-hint {
+  margin-top: 4px;
 }

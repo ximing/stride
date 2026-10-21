@@ -3,11 +3,22 @@ import type { Editor } from '@tiptap/core'
 import Highlight from '@tiptap/extension-highlight'
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
+import Subscript from '@tiptap/extension-subscript'
+import Superscript from '@tiptap/extension-superscript'
+import TextAlign from '@tiptap/extension-text-align'
+import { TextStyleKit } from '@tiptap/extension-text-style'
 import StarterKit from '@tiptap/starter-kit'
+import 'katex/dist/katex.min.css'
 import { codeBlockExtension } from './codeblock'
 import { calloutNode, calloutSlashCommand, highlightInputExtension } from './callout'
+import { externalLinkOpen } from './external-link-plugin'
 import { findHighlightExtension } from './find'
 import { createImageExtension, imageSlashCommand } from './image'
+import { createDocMathExtensions } from './math'
+import { MermaidBlock } from './mermaid-block'
+import { mermaidBlockNodeView } from './mermaid-block-view'
+import { insertMermaid } from './mermaid-insert'
+import { createPasteExtension } from './paste-plugin'
 import { registerSlashCommand, slashMenu } from './slash'
 import { tableExtensions, tableSlashCommand } from './table'
 import { createTaskExtensions, taskSlashCommand } from './task'
@@ -17,6 +28,56 @@ registerSlashCommand(taskSlashCommand)
 registerSlashCommand(tableSlashCommand)
 registerSlashCommand(calloutSlashCommand)
 registerSlashCommand(imageSlashCommand)
+registerSlashCommand({
+  id: 'math',
+  title: '公式',
+  keywords: 'math latex katex 公式 数学',
+  run: () => {
+    window.dispatchEvent(new CustomEvent('stride-editor-math'))
+  },
+})
+registerSlashCommand({
+  id: 'mermaid',
+  title: 'Mermaid',
+  keywords: 'mermaid diagram 流程图 图',
+  run: (editor) => {
+    insertMermaid(editor)
+  },
+})
+
+// Mod-, is the app settings chord. These marks stay on the toolbar only.
+const DocSubscript = Subscript.extend({
+  addKeyboardShortcuts() {
+    return {}
+  },
+})
+
+const DocSuperscript = Superscript.extend({
+  addKeyboardShortcuts() {
+    return {}
+  },
+})
+
+// Link's default priority keeps color and font size inside the anchor.
+// No Mod-k: the command palette owns that chord app-wide.
+const DocLink = Link.extend({
+  priority: 1000,
+  addKeyboardShortcuts() {
+    return {}
+  },
+}).configure({
+  openOnClick: false,
+  autolink: true,
+  linkOnPaste: true,
+  enableClickSelection: true,
+  HTMLAttributes: {},
+})
+
+const mermaidBlock = MermaidBlock.extend({
+  addNodeView() {
+    return mermaidBlockNodeView
+  },
+})
 
 export type FormatName =
   | 'bold'
@@ -48,14 +109,23 @@ export function createEditorExtensions(options: {
   const getNotes = options.getNotes ?? (() => [])
   const onOpen = options.onOpen ?? (() => {})
 
+  const getFs = options.getFs ?? (() => null)
+
   return [
-    StarterKit.configure({ link: false, codeBlock: false }),
-    Link.configure({
-      openOnClick: false,
-      autolink: false,
-      linkOnPaste: true,
-      HTMLAttributes: {},
+    StarterKit.configure({
+      link: false,
+      codeBlock: false,
+      heading: { levels: [1, 2, 3, 4, 5, 6] },
     }),
+    DocLink,
+    TextStyleKit.configure({ fontFamily: false, lineHeight: false }),
+    TextAlign.configure({
+      types: ['heading', 'paragraph', 'blockquote'],
+      alignments: ['left', 'center', 'right'],
+      defaultAlignment: null,
+    }),
+    DocSubscript,
+    DocSuperscript,
     Highlight.configure({ multicolor: false }),
     Placeholder.configure({ placeholder: 'Write in the vault…' }),
     createWikilinkNode({ getNotes, onOpen }),
@@ -65,10 +135,82 @@ export function createEditorExtensions(options: {
     ...tableExtensions(),
     calloutNode,
     highlightInputExtension,
-    createImageExtension({ getFs: options.getFs ?? (() => null) }),
+    createImageExtension({ getFs }),
     codeBlockExtension,
+    ...createDocMathExtensions(),
+    mermaidBlock,
+    externalLinkOpen,
     findHighlightExtension,
+    createPasteExtension(getFs),
   ]
+}
+
+const FORMAT_MARKS = [
+  'bold',
+  'italic',
+  'strike',
+  'code',
+  'link',
+  'underline',
+  'subscript',
+  'superscript',
+  'textStyle',
+  'highlight',
+] as const
+
+const BLOCK_FORMATS = new Set([
+  'heading',
+  'blockquote',
+  'bulletList',
+  'orderedList',
+  'taskList',
+  'listItem',
+  'taskItem',
+  'codeBlock',
+  'mermaid',
+])
+
+function ancestorHasBlockFormat(pos: Editor['state']['selection']['$from']): boolean {
+  for (let depth = pos.depth; depth > 0; depth -= 1) {
+    if (BLOCK_FORMATS.has(pos.node(depth).type.name)) return true
+  }
+  return false
+}
+
+function blockStructureActive(editor: Editor): boolean {
+  const { selection } = editor.state
+  if (ancestorHasBlockFormat(selection.$from) || ancestorHasBlockFormat(selection.$to)) return true
+  if (selection.empty) return false
+  let found = false
+  editor.state.doc.nodesBetween(selection.from, selection.to, (node) => {
+    if (BLOCK_FORMATS.has(node.type.name)) found = true
+  })
+  return found
+}
+
+/** Clear marks on the selection, or the whole text block when the caret is empty. Block structure lifts only when one is active. */
+export function clearFormatting(editor: Editor): boolean {
+  const chain = editor.chain().focus()
+  chain.command(({ tr, state }) => {
+    const { selection } = state
+    const ranges = selection.empty
+      ? [{ from: selection.$from.start(), to: selection.$from.end() }]
+      : selection.ranges.map((range) => ({ from: range.$from.pos, to: range.$to.pos }))
+    for (const name of FORMAT_MARKS) {
+      const type = state.schema.marks[name]
+      if (!type) continue
+      for (const range of ranges) {
+        if (range.from < range.to) tr.removeMark(range.from, range.to, type)
+      }
+      tr.removeStoredMark(type)
+    }
+    return true
+  })
+  if (editor.isActive({ textAlign: 'center' }) || editor.isActive({ textAlign: 'right' })) {
+    chain.unsetTextAlign()
+  }
+  if (blockStructureActive(editor)) chain.clearNodes()
+  return chain.run()
 }
 
 export function runFormat(editor: Editor, name: FormatName): boolean {

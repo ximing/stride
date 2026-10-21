@@ -17,10 +17,13 @@
 import { useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 'react'
 import type { Editor } from '@tiptap/core'
 import type { StrideNote } from '@stride/core/note'
+import type { FileSystemBackend } from '@stride/platform'
 import { formatShortcut } from '../services/commands'
 import { buildEditorMenu, type ContextMenuEntry } from '../services/context-menu'
 import { ContextMenu } from '../ui/context-menu'
 import { runFormat } from './extensions'
+import { insertStoredImages, localizeHttpImages, localizeRemoteImage, pastedImageUrl } from './image'
+import { dispatchMarkdownPaste } from './paste-dispatch'
 import { editorTools } from './toolbar'
 import { resolveWikilinkClick, wikilinkAt } from './wikilink'
 
@@ -39,6 +42,8 @@ export interface EditorContextMenuDeps {
   notes: readonly StrideNote[]
   /** Opens the toolbar's link form for the current selection. */
   openLinkRef: { current: () => boolean }
+  /** Saves pasted images into the vault. Omitted in tests that have no files. */
+  getFs?: () => FileSystemBackend | null
   /** Same behavior as a wikilink click: open, or create-then-open. */
   onOpen: (target: string) => void
   /** Open a resolved note in its own tab (TabsService.openNote). */
@@ -55,6 +60,8 @@ export function useEditorContextMenu(deps: EditorContextMenuDeps): {
     const editor = deps.editor
     if (!editor || editor.isDestroyed) return
     event.preventDefault()
+    const target = event.target
+    if (target instanceof Element && target.closest('td, th')) return
     // posAtCoords needs DOM geometry; a detached view (or jsdom) throws
     // instead of returning null, and a failed hit test must not kill the menu.
     let hit: { target: string; alias: string } | null = null
@@ -86,8 +93,33 @@ export function useEditorContextMenu(deps: EditorContextMenuDeps): {
         paste: () => {
           void navigator.clipboard
             ?.readText()
-            .then((text) => {
-              if (text && !editor.isDestroyed) editor.commands.insertContent(text)
+            .then(async (text) => {
+              if (!text || editor.isDestroyed) return
+              const clipboard = {
+                getData: (type: string) =>
+                  type === 'text/plain' || type === 'text/markdown' || type === 'text/x-markdown' ? text : '',
+              }
+              if (dispatchMarkdownPaste(editor.view, clipboard)) {
+                const fs = deps.getFs?.()
+                if (fs) queueMicrotask(() => {
+                  void localizeHttpImages(editor, fs)
+                })
+                return
+              }
+              const url = pastedImageUrl(text)
+              const fs = deps.getFs?.() ?? null
+              if (url && fs) {
+                const { from, to } = editor.state.selection
+                let src = url
+                try {
+                  src = await localizeRemoteImage(fs, url)
+                } catch {
+                  src = url
+                }
+                if (!editor.isDestroyed) insertStoredImages(editor, [src], from, to)
+                return
+              }
+              if (!editor.isDestroyed) editor.commands.insertContent(text)
             })
             .catch(() => {})
         },

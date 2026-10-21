@@ -1,8 +1,11 @@
-import { CheckCircle, GitBranch, WarningCircle } from '@phosphor-icons/react'
+import { ArrowDown, ArrowUp, CircleAlert, CircleCheck, GitBranch } from 'lucide-react'
 import { useState } from 'react'
 import type { GitChange } from '../../../../packages/core/src/git-changes.ts'
 import { EmptyState } from './empty-state'
-import { Modal, ModalContent } from './modal'
+import { Button } from './button'
+import { Mark } from './icon'
+import { Input } from './input'
+import { Modal, ModalClose, ModalContent } from './modal'
 
 function diffLineClass(line: string): string {
   if (line.startsWith('@@')) return 'diff-line diff-hunk'
@@ -66,16 +69,19 @@ export function GitPanelView(props: {
   const canSuggest = canOpen && !props.suggesting
   const canConfirm = canOpen && props.message.trim().length > 0
   return (
-    <div data-testid="git-panel">
-      <h2>Git</h2>
+    <div className="git-panel" data-testid="git-panel">
+      <h2 className="panel-heading">Git</h2>
       {props.branch ? (
-        <p className="meta" data-testid="git-branch">{props.branch}</p>
+        <div className="git-branch-row">
+          <Mark icon={GitBranch} size={14} />
+          <p className="meta" data-testid="git-branch">{props.branch}</p>
+        </div>
       ) : null}
       {props.surface === 'unavailable' && (
         <>
           <EmptyState
             compact
-            icon={WarningCircle}
+            icon={CircleAlert}
             title="Git is not available in the browser"
             testId="git-unavailable"
           />
@@ -88,7 +94,7 @@ export function GitPanelView(props: {
         <EmptyState compact icon={GitBranch} title="Git is turned off." testId="git-disabled" />
       )}
       {props.surface === 'blocked' && (
-        <EmptyState compact tone="error" icon={WarningCircle} title={props.notice} testId="git-blocked" />
+        <EmptyState compact tone="error" icon={CircleAlert} title={props.notice} testId="git-blocked" />
       )}
       {props.surface === 'needs-init' && (
         <EmptyState
@@ -103,66 +109,83 @@ export function GitPanelView(props: {
       )}
       {props.surface === 'ready' && (
         <>
-          <p className="meta" data-testid="git-ahead">ahead {props.ahead}</p>
-          <p className="meta" data-testid="git-behind">behind {props.behind}</p>
-          {props.notice ? <p className="meta" data-testid="git-notice">{props.notice}</p> : null}
-          <label className="field">
-            <span>Remote</span>
-            <input
+          <div className="git-sync-stats">
+            <p className="meta" data-testid="git-ahead"><Mark icon={ArrowUp} size={13} />ahead {props.ahead}</p>
+            <p className="meta" data-testid="git-behind"><Mark icon={ArrowDown} size={13} />behind {props.behind}</p>
+          </div>
+          {props.notice ? <p className="meta git-notice" data-testid="git-notice">{props.notice}</p> : null}
+          <section className="git-section" aria-label="Remote settings">
+            <Input
+              label="Remote"
               type="text"
               data-testid="git-remote"
               value={props.remote}
               onChange={(event) => props.onRemote(event.target.value)}
             />
-          </label>
-          <div className="editor-tools">
-            <button type="button" data-testid="git-remote-add" onClick={() => props.onAddRemote()}>Add remote</button>
-            <button type="button" data-testid="git-pull" onClick={() => props.onPull()}>Pull</button>
-            <button type="button" data-testid="git-push" onClick={() => props.onPush()}>Push</button>
-          </div>
-          {props.changes.length === 0 ? (
-            <EmptyState compact icon={CheckCircle} title="Working tree clean" testId="git-clean" />
-          ) : (
-            props.changes.map((change) => (
-              <div
-                key={change.path}
-                className="field"
-                data-testid="git-change"
-                data-path={change.path}
-                onClick={() => props.onOpenFileDiff(change.path)}
-              >
-                <input
-                  type="checkbox"
-                  checked={selected.includes(change.path)}
-                  onChange={() => props.onToggle(change.path)}
-                  onClick={(event) => event.stopPropagation()}
-                />
-                <span>{change.path}</span>
-              </div>
-            ))
-          )}
-          <pre className="diff" data-testid="git-diff"><DiffLines diff={props.diff} /></pre>
-          <div className="editor-tools">
-            <button type="button" data-testid="git-history" onClick={() => props.onLoadHistory?.()}>History</button>
-          </div>
-          {historyEntries.map((entry) => (
-            <button
-              key={entry.hash}
-              type="button"
-              data-testid="git-history-row"
-              data-hash={entry.hash}
-              onClick={() => props.onShowHistory?.(entry.hash)}
-            >
-              {entry.subject}
-            </button>
-          ))}
-          <pre data-testid="git-history-text">{props.historyText ?? ''}</pre>
-          <button type="button" data-testid="git-history-restore" onClick={() => setRestoreOpen(true)}>Restore</button>
+            <div className="editor-tools git-actions">
+              <Button size="sm" tone="secondary" data-testid="git-remote-add" onClick={() => props.onAddRemote()}>Add remote</Button>
+              <Button size="sm" tone="secondary" data-testid="git-pull" onClick={() => props.onPull()}>Pull</Button>
+              <Button size="sm" tone="secondary" data-testid="git-push" onClick={() => props.onPush()}>Push</Button>
+            </div>
+          </section>
+          <section className="git-section" aria-label="Working tree">
+            <h3 className="panel-subheading">Changes</h3>
+            <div className="git-changes">
+              {props.changes.length === 0 ? (
+                <EmptyState compact icon={CircleCheck} title="Working tree clean" testId="git-clean" />
+              ) : (
+                props.changes.map((change) => (
+                  <div
+                    key={change.path}
+                    className={selected.includes(change.path) ? 'field git-change is-selected' : 'field git-change'}
+                    data-testid="git-change"
+                    data-path={change.path}
+                    onClick={() => props.onOpenFileDiff(change.path)}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selected.includes(change.path)}
+                      onChange={() => props.onToggle(change.path)}
+                      onClick={(event) => event.stopPropagation()}
+                    />
+                    <span className="git-change-path">{change.path}</span>
+                  </div>
+                ))
+              )}
+            </div>
+          </section>
+          <pre className="diff git-diff" data-testid="git-diff"><DiffLines diff={props.diff} /></pre>
+          <section className="git-section" aria-label="History">
+            <div className="git-section-head">
+              <h3 className="panel-subheading">History</h3>
+              <Button size="sm" tone="quiet" data-testid="git-history" onClick={() => props.onLoadHistory?.()}>History</Button>
+            </div>
+            <div className="git-history-list">
+              {historyEntries.map((entry) => (
+                <Button
+                  key={entry.hash}
+                  className="git-history-row"
+                  size="sm"
+                  tone="quiet"
+                  data-testid="git-history-row"
+                  data-hash={entry.hash}
+                  onClick={() => props.onShowHistory?.(entry.hash)}
+                >
+                  {entry.subject}
+                </Button>
+              ))}
+            </div>
+            <pre className="history git-history-text" data-testid="git-history-text">{props.historyText ?? ''}</pre>
+            <Button size="sm" tone="secondary" data-testid="git-history-restore" onClick={() => setRestoreOpen(true)}>Restore</Button>
+          </section>
           <Modal open={restoreOpen} onOpenChange={setRestoreOpen}>
             <ModalContent title="Restore version" description="Replace the current file with the shown revision. Nothing is committed.">
-              <div className="editor-tools">
-                <button
-                  type="button"
+              <div className="sd-modal-actions">
+                <ModalClose asChild>
+                  <Button tone="secondary">Cancel</Button>
+                </ModalClose>
+                <Button
+                  tone="danger"
                   data-testid="git-history-restore-confirm"
                   onClick={() => {
                     props.onRestoreHistory?.()
@@ -170,14 +193,14 @@ export function GitPanelView(props: {
                   }}
                 >
                   Restore
-                </button>
+                </Button>
               </div>
             </ModalContent>
           </Modal>
-          <div className="editor-tools">
-            <button
-              type="button"
-              className="primary"
+          <div className="editor-tools git-commit-action">
+            <Button
+              size="sm"
+              tone="primary"
               data-testid="git-commit-open"
               disabled={!canOpen}
               onClick={() => {
@@ -186,7 +209,7 @@ export function GitPanelView(props: {
               }}
             >
               Commit
-            </button>
+            </Button>
           </div>
           <Modal
             open={commitOpen}
@@ -196,17 +219,19 @@ export function GitPanelView(props: {
             }}
           >
             <ModalContent title="Commit" description="Commit the selected paths.">
-              <label className="field">
+              <label className="field git-commit-message-field">
                 <span>Message</span>
                 <textarea
+                  className="git-commit-message"
                   data-testid="git-commit-message"
                   value={props.message}
                   onChange={(event) => props.onMessage(event.target.value)}
                 />
               </label>
-              <div className="editor-tools">
-                <button
-                  type="button"
+              <div className="sd-modal-actions">
+                <Button
+                  size="sm"
+                  tone="secondary"
                   data-testid="git-suggest-message"
                   disabled={!canSuggest}
                   onClick={() => {
@@ -215,10 +240,13 @@ export function GitPanelView(props: {
                   }}
                 >
                   Suggest message
-                </button>
-                <button
-                  type="button"
-                  className="primary"
+                </Button>
+                <ModalClose asChild>
+                  <Button size="sm" tone="secondary">Cancel</Button>
+                </ModalClose>
+                <Button
+                  size="sm"
+                  tone="primary"
                   data-testid="git-commit-confirm"
                   disabled={!canConfirm}
                   onClick={() => {
@@ -227,7 +255,7 @@ export function GitPanelView(props: {
                   }}
                 >
                   Commit
-                </button>
+                </Button>
               </div>
             </ModalContent>
           </Modal>
@@ -243,25 +271,27 @@ export function GitPanelView(props: {
           <ModalContent title="Resolve conflicts" description="Keep ours or theirs for each file.">
             <div data-testid="git-conflict">
               {conflicts.map((path) => (
-                <div key={path} className="field">
+                <div key={path} className="field git-conflict-row">
                   <span>{path}</span>
                   <div className="editor-tools">
-                    <button
-                      type="button"
+                    <Button
+                      size="sm"
+                      tone="secondary"
                       data-testid="git-keep-ours"
                       data-path={path}
                       onClick={() => props.onKeepSide?.(path, 'ours')}
                     >
                       Keep ours
-                    </button>
-                    <button
-                      type="button"
+                    </Button>
+                    <Button
+                      size="sm"
+                      tone="secondary"
                       data-testid="git-keep-theirs"
                       data-path={path}
                       onClick={() => props.onKeepSide?.(path, 'theirs')}
                     >
                       Keep theirs
-                    </button>
+                    </Button>
                   </div>
                 </div>
               ))}
@@ -273,9 +303,9 @@ export function GitPanelView(props: {
         <div className="git-error-row">
           <p className="error" data-testid="git-error" role="alert">{props.error}</p>
           {props.onRetryError ? (
-            <button type="button" className="save-retry" data-testid="git-error-retry" onClick={() => props.onRetryError?.()}>
+            <Button size="sm" tone="secondary" className="save-retry" data-testid="git-error-retry" onClick={() => props.onRetryError?.()}>
               重试
-            </button>
+            </Button>
           ) : null}
         </div>
       ) : null}

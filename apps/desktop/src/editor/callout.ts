@@ -75,6 +75,7 @@ export const calloutNode = Node.create({
 
       const button = document.createElement('button')
       button.type = 'button'
+      button.className = 'callout-kind'
       button.dataset.testid = 'callout-kind'
       button.contentEditable = 'false'
 
