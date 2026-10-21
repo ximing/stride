@@ -213,6 +213,10 @@ export function createVaneSearchOpener(
   }
 }
 
-export function vaneWebSearchOpener(): SearchBackendOpener {
-  return createVaneSearchOpener(createVane, 'opfs')
+// Memory, not OPFS. vane 0.4.4 awaits an IDBOpenDBRequest when OPFS init fails,
+// which throws `arg0.then is not a function` and aborts vault open. A leftover
+// SyncAccessHandle makes that miss happen on the next open. The index is
+// rebuilt from the notes every time a vault opens.
+export function vaneWebSearchOpener(factory: VaneFactory = createVane): SearchBackendOpener {
+  return createVaneSearchOpener(factory, 'memory')
 }

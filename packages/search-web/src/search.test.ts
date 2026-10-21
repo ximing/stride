@@ -406,8 +406,12 @@ describe('vane web search', () => {
     expect(called).toBe(false)
   })
 
-  it('exposes an opfs opener', () => {
-    expect(typeof vaneWebSearchOpener().open).toBe('function')
+  it('opens the browser index in memory so a stuck OPFS handle cannot abort vault open', async () => {
+    const memory = createMemoryVane()
+    const backend = await vaneWebSearchOpener(memory.factory).open({ vaultKey: 'vault-web', dim: 0 })
+    backends.push(backend)
+    expect(memory.workerOpts[0]?.vfs).toBe('memory')
+    expect(memory.opened[0]?.vfs).toBe('memory')
   })
 
   it('searches with the real wasm memory vfs when the worker can start', async () => {
