@@ -1,0 +1,26 @@
+/* Surviving rules moved from src/styles so each class has one source. */
+.col-resize {
+  flex: none;
+  width: 5px;
+  margin: 0 -1px;
+  z-index: 5;
+  cursor: col-resize;
+  border-left: 1px solid var(--sd-border);
+  background: transparent;
+  transition: background-color 120ms ease;
+}
+
+.col-resize:hover {
+  background: color-mix(in srgb, var(--sd-accent) 30%, transparent);
+  outline: none;
+}
+
+.col-resize:active {
+  background: color-mix(in srgb, var(--sd-accent) 30%, transparent);
+  outline: none;
+}
+
+.col-resize:focus-visible {
+  background: color-mix(in srgb, var(--sd-accent) 30%, transparent);
+  outline: none;
+}

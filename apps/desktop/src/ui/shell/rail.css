@@ -1,3 +1,185 @@
+/* Surviving rules moved from src/styles so each class has one source. */
+.rail {
+  background: var(--sd-bg);
+}
+
+.rail button {
+  border-color: transparent;
+  color: inherit;
+  width: 100%;
+  text-align: left;
+  border-radius: var(--sd-radius);
+  padding: 0.34rem 0.45rem;
+}
+
+.rail button.active {
+  background: var(--sd-bg-elevated);
+}
+
+.rail button:hover:not(:disabled) {
+  background: var(--sd-bg-elevated);
+  border-color: transparent;
+}
+
+.group-label {
+  margin: 1rem 0 0.25rem;
+  padding: 0 0.45rem;
+  font-size: 0.72rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--sd-muted);
+}
+
+.advance-inbox {
+  display: flex;
+  align-items: center;
+  color: var(--sd-muted);
+}
+
+.advance-inbox input {
+  border: none;
+  padding: 0;
+  margin: 0;
+  accent-color: var(--sd-accent);
+}
+
+.type-row {
+  display: flex;
+  align-items: center;
+}
+
+.rail .type-row button {
+  width: auto;
+}
+
+.rail .type-row button[data-testid="type-link"] {
+  order: 0;
+}
+
+.rail .type-row .type-collapse {
+  order: -1;
+  flex: none;
+  width: 1.6rem;
+  padding: 0.2rem 0;
+  text-align: center;
+  color: var(--sd-muted);
+}
+
+.rail .type-row .type-add {
+  order: 1;
+  flex: none;
+  width: 1.6rem;
+  padding: 0.2rem 0;
+  text-align: center;
+  color: var(--sd-muted);
+}
+
+.rail .type-row .type-collapse:hover {
+  color: var(--sd-fg);
+}
+
+.rail .type-row .type-add:hover {
+  color: var(--sd-fg);
+}
+
+.type-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.type-icon {
+  color: var(--sd-muted);
+}
+
+.type-dot {
+  border-radius: 99px;
+  flex: none;
+  background: var(--sd-dot-gray);
+}
+
+.type-dot-gray {
+  background: var(--sd-dot-gray);
+}
+
+.type-dot-blue {
+  background: var(--sd-dot-blue);
+}
+
+.type-dot-teal {
+  background: var(--sd-dot-teal);
+}
+
+.type-dot-green {
+  background: var(--sd-dot-green);
+}
+
+.type-dot-orange {
+  background: var(--sd-dot-orange);
+}
+
+.type-dot-purple {
+  background: var(--sd-dot-purple);
+}
+
+.type-dot-red {
+  background: var(--sd-dot-red);
+}
+
+.type-dot-pink {
+  background: var(--sd-dot-pink);
+}
+
+.type-dot-yellow {
+  background: var(--sd-dot-yellow);
+}
+
+.type-instances p {
+  color: var(--sd-muted);
+  margin: 0.2rem 0 0.4rem;
+  padding: 0 0.45rem;
+  font-size: 0.85rem;
+}
+
+.view-row {
+  display: flex;
+  align-items: center;
+  border-radius: var(--sd-radius);
+}
+
+.rail .view-row button {
+  width: auto;
+}
+
+.rail .view-row .view-edit {
+  flex: none;
+  width: 1.6rem;
+  padding: 0.2rem 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sd-muted);
+}
+
+.rail .view-row .view-edit:hover {
+  color: var(--sd-fg);
+}
+
+.view-filter-row .sd-field-input {
+  flex: 1;
+}
+
+.menu-hint {
+  padding: 0.3rem 0.6rem;
+  font-size: 0.75rem;
+  color: var(--sd-muted);
+}
+
+.folder-overflow {
+  color: var(--sd-muted);
+  padding: 0 0.45rem;
+}
+
 /* ---------- navigation rail ---------- */
 
 .rail-inner {

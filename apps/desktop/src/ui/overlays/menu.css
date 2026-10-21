@@ -1,3 +1,12 @@
+/* Surviving rules moved from src/styles so each class has one source. */
+.sd-menu-item[data-danger='true'] {
+  color: var(--sd-danger);
+}
+
+.sd-menu-item[data-danger='true'] .sd-menu-item-icon {
+  color: var(--sd-danger);
+}
+
 /* Dropdowns and the self-managed context menu share one menu language. */
 .sd-menu {
   z-index: var(--sd-z-dropdown);

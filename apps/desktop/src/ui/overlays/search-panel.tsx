@@ -135,7 +135,7 @@ export const SearchPanel = observer(function SearchPanel() {
             )
           ) : (
             <>
-              <p className="search-panel-section sd-command-section">{t('search.results')}</p>
+              <p className="sd-command-section">{t('search.results')}</p>
               {results.map((hit, index) => (
                 <button
                   key={hit.id}

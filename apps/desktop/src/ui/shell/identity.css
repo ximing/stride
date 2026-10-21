@@ -1,3 +1,127 @@
+/* Surviving rules moved from src/styles so each class has one source. */
+.topbar {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--sd-border);
+}
+
+.update-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.45rem 0.8rem;
+  border-bottom: 1px solid var(--sd-border);
+}
+
+.topbar-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--sd-radius);
+  color: var(--sd-muted);
+}
+
+.topbar-icon:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--sd-bg-elevated);
+  color: var(--sd-fg);
+}
+
+.topbar-icon[aria-pressed="true"] {
+  color: var(--sd-fg);
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+}
+
+.vault-switcher {
+  position: relative;
+}
+
+.vault-switcher > button {
+  border-color: transparent;
+  color: var(--sd-muted);
+  padding: 0.3rem 0.55rem;
+}
+
+.vault-switcher > button:hover {
+  border-color: transparent;
+  background: var(--sd-bg-elevated);
+  color: var(--sd-fg);
+}
+
+.vault-switcher-list {
+  position: absolute;
+  left: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--sd-border);
+}
+
+.vault-switcher-list button {
+  border-color: transparent;
+  text-align: left;
+  border-radius: var(--sd-radius);
+}
+
+.vault-switcher-list button:hover {
+  background: var(--sd-bg);
+  border-color: transparent;
+}
+
+.vault-switcher-list button.active {
+  background: var(--sd-bg);
+  border-color: transparent;
+}
+
+.search {
+  display: flex;
+  align-items: center;
+}
+
+.search input {
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+  background: var(--sd-bg-elevated);
+  padding: 0.32rem 0.6rem;
+  width: 15rem;
+}
+
+.search input:focus {
+  border-color: var(--sd-accent);
+}
+
+.search button {
+  padding: 0.3rem 0.65rem;
+}
+
+.search-mode {
+  white-space: nowrap;
+}
+
+.search-degraded {
+  white-space: nowrap;
+}
+
+.search-mode {
+  color: var(--sd-muted);
+}
+
+.search-mode:empty {
+  display: none;
+}
+
+.search-degraded {
+  color: var(--sd-danger);
+}
+
 /* ---------- identity, vault switcher and global search ---------- */
 
 .topbar {

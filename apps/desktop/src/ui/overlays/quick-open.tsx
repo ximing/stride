@@ -109,7 +109,7 @@ export const QuickOpen = observer(function QuickOpen() {
             )
           ) : (
             <>
-              <p className="quick-open-section sd-command-section">{t('quickOpen.notes')}</p>
+              <p className="sd-command-section">{t('quickOpen.notes')}</p>
               {results.map((note, index) => (
                 <button
                   key={note.id}
@@ -122,7 +122,7 @@ export const QuickOpen = observer(function QuickOpen() {
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => service.choose(note.id)}
                 >
-                  <span className="quick-open-result-title sd-command-item-title">{note.title}</span>
+                  <span className="sd-command-item-title">{note.title}</span>
                 </button>
               ))}
             </>

@@ -1,3 +1,17 @@
+/* Surviving rules moved from src/styles so each class has one source. */
+.chooser h1 {
+  font-family: var(--sd-font-serif);
+  font-weight: 500;
+}
+
+.chooser-form label {
+  display: block;
+  margin-bottom: var(--sd-space-1);
+  color: var(--sd-muted);
+  font-size: var(--sd-text-xs);
+  font-weight: 500;
+}
+
 /* Final app-shell treatment. Loaded after styles.css by main.tsx.
    Every color is derived from the semantic tokens in ui/tokens.css. */
 

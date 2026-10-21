@@ -1,3 +1,180 @@
+/* Surviving rules moved from src/styles so each class has one source. */
+.note-title {
+  font-family: var(--sd-font-serif);
+  font-weight: 500;
+}
+
+.tab-strip {
+  display: flex;
+  overflow-x: auto;
+  flex: none;
+  margin: -1.4rem -1.8rem 1rem;
+  border-bottom: 1px solid var(--sd-border);
+  scrollbar-width: thin;
+}
+
+.stage-head {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  max-width: var(--sd-note-max-width);
+}
+
+.note-title {
+  border: none;
+  background: transparent;
+  font-size: var(--sd-text-note-title);
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+}
+
+.note-title:focus {
+  border-bottom-color: transparent;
+}
+
+.rename-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: var(--sd-muted);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.rename-toggle input {
+  width: auto;
+  margin: 0;
+  accent-color: var(--sd-accent);
+}
+
+.editor {
+  max-width: var(--sd-note-max-width);
+}
+
+.editor .ProseMirror {
+  min-height: 50vh;
+  outline: none;
+  color: var(--sd-fg);
+  caret-color: var(--sd-accent);
+  font-family: var(--sd-font-serif);
+  font-size: var(--sd-note-font-size);
+  line-height: 1.7;
+  text-wrap: pretty;
+}
+
+.editor .ProseMirror p {
+  margin: 0 0 0.75em;
+}
+
+.editor .ProseMirror h1 {
+  margin: 1.5em 0 0.55em;
+  color: var(--sd-fg);
+  font-family: var(--sd-font-serif);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+.editor .ProseMirror h2 {
+  margin: 1.5em 0 0.55em;
+  color: var(--sd-fg);
+  font-family: var(--sd-font-serif);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+.editor .ProseMirror h3 {
+  margin: 1.5em 0 0.55em;
+  color: var(--sd-fg);
+  font-family: var(--sd-font-serif);
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.01em;
+}
+
+.editor .ProseMirror h1 {
+  font-size: 1.75em;
+}
+
+.editor .ProseMirror h2 {
+  font-size: 1.4em;
+}
+
+.editor .ProseMirror h3 {
+  font-size: 1.18em;
+}
+
+.editor .ProseMirror > :first-child {
+  margin-top: 0;
+}
+
+.editor .ProseMirror ul {
+  padding-left: 1.5em;
+}
+
+.editor .ProseMirror ol {
+  padding-left: 1.5em;
+}
+
+.editor .ProseMirror blockquote {
+  margin: 1em 0;
+  padding: var(--sd-space-1) var(--sd-space-4);
+  border-left: 2px solid var(--sd-accent);
+  color: var(--sd-muted);
+}
+
+.editor .ProseMirror code {
+  font-family: var(--sd-font-mono);
+  font-size: 0.9em;
+}
+
+.editor .ProseMirror :not(pre) > code {
+  padding: 0.1em 0.3em;
+  border-radius: var(--sd-radius);
+  background: var(--sd-surface-hover);
+}
+
+.editor .ProseMirror pre {
+  padding: var(--sd-space-3) var(--sd-space-4);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-panel);
+  background: var(--sd-bg);
+  overflow: auto;
+}
+
+.editor .ProseMirror hr {
+  margin: var(--sd-space-6) 0;
+  border: 0;
+  border-top: 1px solid var(--sd-border);
+}
+
+.editor .ProseMirror p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--sd-muted);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+
+.editor-tools {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.8rem;
+  flex-wrap: wrap;
+}
+
+.wikilink {
+  color: var(--sd-accent);
+  border-bottom: 1px dashed var(--sd-accent);
+  cursor: pointer;
+}
+
+.wikilink.is-unresolved {
+  color: var(--sd-danger);
+  border-bottom: 1px dashed var(--sd-danger);
+}
+
 /* ---------- editor and inspector tabs ---------- */
 
 /* Column header band contract: the tab strip, note-list head, rail head and

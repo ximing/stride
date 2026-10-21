@@ -1,5 +1,4 @@
-/* ---------- empty / loading / error states ---------- */
-
+/* Surviving rules moved from src/styles so each class has one source. */
 .sd-empty-state {
   display: flex;
   flex-direction: column;
@@ -17,17 +16,32 @@
 
 .sd-empty-state-icon {
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 99px;
+  background: var(--sd-inset);
   color: var(--sd-muted);
+}
+
+.sd-empty-state-compact .sd-empty-state-icon {
+  width: auto;
+  height: auto;
+  background: none;
   opacity: 0.75;
 }
 
 .sd-empty-state-title {
   margin: 0;
-  font-size: 0.9rem;
+  font-family: var(--sd-font-serif);
+  font-size: 1rem;
+  font-weight: 500;
   color: var(--sd-fg);
 }
 
 .sd-empty-state-compact .sd-empty-state-title {
+  font-family: var(--sd-font-sans);
   font-size: 0.84rem;
   color: var(--sd-muted);
 }
@@ -43,12 +57,15 @@
   width: auto;
 }
 
-.sd-empty-state[data-tone="error"] .sd-empty-state-icon,
+.sd-empty-state[data-tone="error"] .sd-empty-state-icon {
+  background: var(--sd-danger-soft);
+  color: var(--sd-danger);
+}
+
 .sd-empty-state[data-tone="error"] .sd-empty-state-title {
   color: var(--sd-danger);
 }
 
-/* The editor stage placeholder fills the whole column. */
 .sd-empty-state-stage {
   flex: 1;
   min-height: 40vh;
@@ -80,4 +97,3 @@
   0%, 100% { opacity: 1; }
   50% { opacity: 0.45; }
 }
-

@@ -1,3 +1,35 @@
+/* Surviving rules moved from src/styles so each class has one source. */
+.chat-messages {
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-thinking {
+  color: var(--sd-muted);
+}
+
+.chat-compose {
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-compose textarea {
+  min-height: 5rem;
+  width: 100%;
+}
+
+.chat-tool {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+}
+
+.chat-tool.is-error {
+  color: var(--sd-danger);
+}
+
 /* ---------- agent chat ---------- */
 
 .chat-panel {

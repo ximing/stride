@@ -171,3 +171,22 @@
     padding-left: 0;
   }
 }
+
+/* Surviving rules moved from src/styles so each class has one source. */
+.progress {
+  flex: 1;
+  height: 6px;
+  background: color-mix(in srgb, var(--sd-muted) 20%, transparent);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.progress span {
+  display: block;
+  height: 100%;
+  background: var(--sd-accent);
+}
+
+.update-banner {
+  background: var(--sd-bg-elevated);
+}

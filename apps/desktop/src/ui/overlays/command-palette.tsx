@@ -139,7 +139,7 @@ export const CommandPalette = observer(function CommandPalette() {
                   onMouseDown={(event) => event.preventDefault()}
                   onClick={() => service.activate(item)}
                 >
-                  <span className="command-item-title sd-command-item-title">{paletteItemTitle(item)}</span>
+                  <span className="sd-command-item-title">{paletteItemTitle(item)}</span>
                   {item.kind === 'command' && item.command.shortcut ? (
                     <kbd className="command-item-shortcut sd-command-kbd">{formatShortcut(item.command.shortcut)}</kbd>
                   ) : null}

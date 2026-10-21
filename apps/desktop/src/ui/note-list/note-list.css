@@ -1,3 +1,166 @@
+/* Surviving rules moved from src/styles so each class has one source. */
+.note-list-col {
+  flex: none;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--sd-bg);
+  display: flex;
+  flex-direction: column;
+}
+
+.note-list {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.note-list-head {
+  display: flex;
+  height: 44px;
+  border-bottom: 1px solid var(--sd-border);
+}
+
+.note-list-title {
+  margin: 0;
+  font-family: var(--sd-font-serif);
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.note-list-count {
+  color: var(--sd-muted);
+  font-variant-numeric: tabular-nums;
+}
+
+.note-list-items {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.note-list-spacer {
+  flex: none;
+  pointer-events: none;
+}
+
+.note-list-item {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  justify-content: center;
+  overflow: hidden;
+  text-align: left;
+}
+
+.note-list-item[aria-current="true"] {
+  background: var(--sd-accent-soft);
+  border-color: transparent;
+}
+
+.note-list-item[data-selected="true"] {
+  background: var(--sd-surface-selected);
+  border-color: transparent;
+}
+
+.note-list-item-title {
+  font-family: var(--sd-font-serif);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-list-item-meta {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.note-list-item-snippet {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-list.is-compact .note-list-item-snippet {
+  display: none;
+}
+
+.note-chip {
+  display: inline-flex;
+  align-items: center;
+  color: var(--sd-muted);
+  overflow: hidden;
+}
+
+.note-chip-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-chip-status {
+  color: var(--sd-fg);
+}
+
+.note-list-sort {
+  border-color: transparent;
+  color: var(--sd-muted);
+  border-radius: var(--sd-radius);
+  display: inline-flex;
+}
+
+.note-list-sort:hover:not(:disabled) {
+  background: var(--sd-bg-elevated);
+  border-color: transparent;
+  color: var(--sd-fg);
+}
+
+.menu-check {
+  color: var(--sd-accent);
+}
+
+.note-list-batch {
+  display: flex;
+  align-items: center;
+  border-top: 1px solid var(--sd-border);
+  border-bottom: 1px solid var(--sd-border);
+  font-size: 0.8rem;
+  color: var(--sd-muted);
+}
+
+.note-list-batch-count {
+  margin-right: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.note-list-batch button {
+  border-color: transparent;
+  color: var(--sd-fg);
+  padding: 0.15rem 0.45rem;
+  border-radius: var(--sd-radius);
+  font-size: 0.8rem;
+}
+
+.note-list-batch button:hover:not(:disabled) {
+  border-color: var(--sd-border);
+}
+
+.note-list-batch .note-list-batch-delete {
+  color: var(--sd-danger);
+}
+
+.note-list-batch .note-list-batch-clear {
+  color: var(--sd-muted);
+  display: inline-flex;
+}
+
+.note-list .sd-empty-state {
+  align-items: flex-start;
+  text-align: left;
+}
+
 /* ---------- note list ---------- */
 
 .note-list {

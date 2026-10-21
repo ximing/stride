@@ -1,3 +1,12 @@
+/* Surviving rules moved from src/styles so each class has one source. */
+.stage {
+  flex: 1;
+  min-width: 320px;
+  background: var(--sd-surface);
+  padding: 1.4rem 1.8rem 2.5rem;
+  zoom: var(--sd-stage-zoom, 1);
+}
+
 /* ---------- editor stage fit ---------- */
 
 .stage-head {

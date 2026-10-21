@@ -42,3 +42,36 @@
   font-size: 12px;
   line-height: 1.5;
 }
+
+/* Surviving rules moved from src/styles so each class has one source. */
+.theme-picker {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+  padding: 0.15rem;
+  border: 1px solid var(--sd-border);
+  border-radius: 8px;
+}
+
+.theme-picker button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  width: auto;
+  padding: 0.32rem 0.62rem;
+  border-color: transparent;
+  border-radius: var(--sd-radius);
+  color: var(--sd-muted);
+}
+
+.theme-picker button:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--sd-bg-elevated);
+  color: var(--sd-fg);
+}
+
+.theme-picker button[aria-pressed='true'] {
+  background: var(--sd-accent);
+  color: var(--sd-bg);
+  border-color: transparent;
+}

@@ -201,12 +201,12 @@ describe('command palette', () => {
 
     // Commands render their manifest title as visible text, with the shortcut right-aligned.
     const quickOpenItem = host?.querySelector('[data-command-id="nav.quickOpen"]')
-    expect(quickOpenItem?.querySelector('.command-item-title')?.textContent).toBe('Quick Open')
+    expect(quickOpenItem?.querySelector('.sd-command-item-title')?.textContent).toBe('Quick Open')
     expect(quickOpenItem?.querySelector('kbd')?.textContent).toBe(formatShortcut('Mod+P'))
     const commandItems = [...(host?.querySelectorAll('[data-testid="command-item"]') ?? [])]
     expect(commandItems.length).toBeGreaterThan(0)
     for (const item of commandItems) {
-      expect(item.querySelector('.command-item-title')?.textContent?.trim().length).toBeGreaterThan(0)
+      expect(item.querySelector('.sd-command-item-title')?.textContent?.trim().length).toBeGreaterThan(0)
     }
     expect(host?.textContent).toContain('New Note')
     expect(host?.textContent).toContain('Search Vault')
@@ -277,7 +277,7 @@ describe('command palette', () => {
     })
     const item = host?.querySelector('[data-command-id="file.newInstance:项目"]') as HTMLButtonElement
     expect(item).not.toBeNull()
-    expect(item.querySelector('.command-item-title')?.textContent).toBe('New 项目')
+    expect(item.querySelector('.sd-command-item-title')?.textContent).toBe('New 项目')
     expect(item.disabled).toBe(false)
     await act(async () => {
       item.click()
@@ -359,7 +359,7 @@ describe('command palette', () => {
       if (command.id === 'file.newInstance') continue
       expect(domIds).toContain(command.id)
       const rendered = domItems.find((item) => item.getAttribute('data-command-id') === command.id)
-      expect(rendered?.querySelector('.command-item-title')?.textContent).toBe(command.title)
+      expect(rendered?.querySelector('.sd-command-item-title')?.textContent).toBe(command.title)
     }
 
     // Dispatcher ⇐ manifest: every manifest shortcut resolves back to its own command.

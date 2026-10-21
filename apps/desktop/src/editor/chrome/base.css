@@ -1,3 +1,763 @@
+/* Surviving rules moved from src/styles so each class has one source. */
+.editor-toolbar {
+  display: flex;
+}
+
+.editor-tool {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--sd-radius);
+  color: inherit;
+}
+
+.editor-tool:hover:not(:disabled) {
+  background: var(--sd-bg-elevated);
+  border-color: transparent;
+}
+
+.editor-tool-text {
+  width: auto;
+  padding: 0 0.65rem;
+}
+
+.editor-toolbar .editor-tool[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--sd-accent) 18%, var(--sd-bg));
+  color: var(--sd-accent);
+}
+
+.editor-bubble .editor-tool[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--sd-accent) 18%, var(--sd-bg));
+  color: var(--sd-accent);
+}
+
+.editor-bubble {
+  position: absolute;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.editor mark {
+  background: var(--sd-mark);
+  color: inherit;
+}
+
+.find-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.find-bar input {
+  width: auto;
+  flex: 1 1 7rem;
+  min-width: 0;
+  margin: 0;
+  padding: 0.25rem 0;
+}
+
+.find-bar button {
+  width: auto;
+}
+
+.find-count {
+  flex: none;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+}
+
+.editor .find-hit {
+  background: var(--sd-mark-strong);
+  border-radius: 2px;
+}
+
+.wikilink-menu {
+  position: fixed;
+  z-index: 30;
+  min-width: 12rem;
+  margin: 0;
+}
+
+.wikilink-menu button {
+  margin: 0;
+}
+
+.wikilink-menu button[aria-selected="true"] {
+  background: color-mix(in srgb, var(--sd-accent) 18%, var(--sd-bg));
+  color: var(--sd-accent);
+}
+
+.editor a {
+  color: var(--sd-accent);
+  text-decoration: underline;
+}
+
+.editor .ProseMirror .task-list-block {
+  margin: 0.2rem 0 0.45rem;
+}
+
+.editor .ProseMirror .task-progress {
+  display: block;
+  margin-bottom: 0.15rem;
+  font-family: var(--sd-font-sans);
+  font-size: 0.75rem;
+  line-height: 1.2;
+  color: var(--sd-muted);
+  user-select: none;
+  pointer-events: none;
+}
+
+.editor .ProseMirror ul[data-type='taskList'] {
+  list-style: none;
+  margin: 0;
+  padding-left: 0;
+}
+
+.editor .ProseMirror ul[data-type='taskList'] > li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.4rem;
+  margin: 0.1rem 0;
+}
+
+.editor .ProseMirror ul[data-type='taskList'] > li > label {
+  display: flex;
+  flex: none;
+  margin-top: 0.35rem;
+}
+
+.editor .ProseMirror ul[data-type='taskList'] > li > label > input[type='checkbox'] {
+  flex: none;
+  width: 0.95rem;
+  height: 0.95rem;
+  max-width: 0.95rem;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--sd-muted);
+  border-radius: 2px;
+  accent-color: var(--sd-accent);
+  pointer-events: auto;
+  cursor: pointer;
+}
+
+.editor .ProseMirror ul[data-type='taskList'] > li > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.editor .ProseMirror ul[data-type='taskList'] > li .task-list-block {
+  margin-top: 0.15rem;
+}
+
+.slash-menu {
+  position: fixed;
+  z-index: 30;
+  min-width: 11rem;
+  max-width: 18rem;
+  max-height: 16rem;
+  overflow: auto;
+}
+
+.slash-menu-item {
+  cursor: pointer;
+}
+
+.slash-menu [role="option"][aria-selected="true"] {
+  background: color-mix(in srgb, var(--sd-accent) 18%, var(--sd-bg));
+  color: var(--sd-accent);
+}
+
+.slash-menu .sd-empty-state {
+  padding: 0.4rem 0.65rem;
+  align-items: flex-start;
+}
+
+.editor .ProseMirror .callout-block {
+  border: 1px solid var(--sd-border);
+  border-radius: 8px;
+  padding: 0.4rem 0.6rem;
+  margin: 0.4rem 0;
+}
+
+.editor .ProseMirror .callout-block[data-kind="warning"] {
+  border-color: var(--sd-danger);
+}
+
+.editor .ProseMirror .callout-block[data-kind="tip"] {
+  border-color: var(--sd-accent);
+}
+
+.editor .ProseMirror table {
+  border-collapse: collapse;
+  margin: 0.4rem 0;
+}
+
+.editor .ProseMirror th {
+  position: relative;
+  border: 1px solid var(--sd-border);
+  padding: 0.3rem 0.55rem;
+}
+
+.editor .ProseMirror td {
+  position: relative;
+  border: 1px solid var(--sd-border);
+  padding: 0.3rem 0.55rem;
+}
+
+.editor .ProseMirror th {
+  background: var(--sd-bg);
+  text-align: left;
+}
+
+.editor .ProseMirror .selectedCell::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: color-mix(in srgb, var(--sd-accent) 18%, transparent);
+  pointer-events: none;
+}
+
+.editor .ProseMirror .editor-image {
+  margin: 0.4rem 0;
+}
+
+.editor .ProseMirror img {
+  max-width: 100%;
+}
+
+.editor .ProseMirror .editor-image-pick {
+  cursor: pointer;
+  width: auto;
+}
+
+.editor .ProseMirror .editor-image input[type='file'] {
+  display: none;
+}
+
+.image-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--sd-overlay);
+}
+
+.image-lightbox img {
+  max-width: 90vw;
+  max-height: 90vh;
+}
+
+.save-status {
+  color: var(--sd-muted);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.save-status:empty {
+  display: none;
+}
+
+.save-retry {
+  width: auto;
+  padding: 0.1rem 0.5rem;
+  font-size: 0.78rem;
+  color: var(--sd-danger);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+}
+
+.git-error-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.git-error-row .error {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+}
+
+.git-error-row .save-retry {
+  flex: none;
+}
+
+.save-retry:hover {
+  border-color: var(--sd-danger);
+}
+
+.save-status.is-error {
+  color: var(--sd-danger);
+}
+
+.editor .ProseMirror .editor-code {
+  position: relative;
+  margin: 0.4rem 0;
+}
+
+.editor .ProseMirror .editor-code pre {
+  margin: 0;
+  font-family: var(--sd-font-mono);
+  white-space: pre;
+}
+
+.editor .ProseMirror .editor-code-overlay {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  margin: 0;
+  color: var(--sd-fg);
+}
+
+.editor .ProseMirror .editor-code select {
+  width: auto;
+}
+
+.editor .ProseMirror .editor-code button {
+  width: auto;
+}
+
+.editor-code-overlay .hljs-keyword {
+  color: var(--sd-syntax-keyword);
+}
+
+.editor-code-overlay .hljs-selector-tag {
+  color: var(--sd-syntax-keyword);
+}
+
+.editor-code-overlay .hljs-built_in {
+  color: var(--sd-syntax-keyword);
+}
+
+.editor-code-overlay .hljs-meta {
+  color: var(--sd-syntax-keyword);
+}
+
+.editor-code-overlay .hljs-string {
+  color: var(--sd-syntax-string);
+}
+
+.editor-code-overlay .hljs-regexp {
+  color: var(--sd-syntax-string);
+}
+
+.editor-code-overlay .hljs-number {
+  color: var(--sd-syntax-number);
+}
+
+.editor-code-overlay .hljs-literal {
+  color: var(--sd-syntax-number);
+}
+
+.editor-code-overlay .hljs-comment {
+  color: var(--sd-syntax-comment);
+}
+
+.editor-code-overlay .hljs-quote {
+  color: var(--sd-syntax-comment);
+}
+
+.editor-code-overlay .hljs-title {
+  color: var(--sd-syntax-function);
+}
+
+.editor-code-overlay .hljs-section {
+  color: var(--sd-syntax-function);
+}
+
+.editor-code-overlay .hljs-attr {
+  color: var(--sd-syntax-attr);
+}
+
+.editor-code-overlay .hljs-attribute {
+  color: var(--sd-syntax-attr);
+}
+
+.editor-code-overlay .hljs-name {
+  color: var(--sd-syntax-attr);
+}
+
+.editor-code-overlay .hljs-variable {
+  color: var(--sd-syntax-attr);
+}
+
+.editor-code-overlay .hljs-template-variable {
+  color: var(--sd-syntax-attr);
+}
+
+.editor-code-overlay .hljs-type {
+  color: var(--sd-syntax-attr);
+}
+
+.editor-code-overlay .hljs-selector-class {
+  color: var(--sd-syntax-attr);
+}
+
+.editor-code-overlay .hljs-selector-id {
+  color: var(--sd-syntax-attr);
+}
+
+.editor-toolbar {
+  flex-direction: column;
+  align-items: stretch;
+  flex-wrap: nowrap;
+}
+
+.editor-toolbar-inner {
+  position: relative;
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.editor-toolbar-measure {
+  position: absolute;
+  left: 0;
+  top: 0;
+  display: flex;
+  height: 0;
+  overflow: hidden;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.editor-tool-live {
+  display: contents;
+}
+
+.editor-tool.is-wide {
+  width: auto;
+  padding: 0 0.55rem;
+}
+
+.editor-tool-sep {
+  flex: none;
+}
+
+.editor-tool-select:hover {
+  background: var(--sd-bg-elevated);
+}
+
+.editor-prompt {
+  background: var(--sd-bg-elevated);
+  color: var(--sd-fg);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-lg);
+  box-shadow: var(--sd-shadow);
+}
+
+.editor-toolbar-more {
+  position: fixed;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  min-width: 11rem;
+  max-width: min(16rem, calc(100vw - 16px));
+  max-height: min(26rem, calc(100vh - 16px));
+  overflow: auto;
+}
+
+.editor-select-menu {
+  position: fixed;
+  z-index: 45;
+  display: flex;
+  flex-direction: column;
+  min-width: 7rem;
+  max-height: 16rem;
+  overflow: auto;
+}
+
+.editor-select-menu button {
+  width: 100%;
+  text-align: left;
+}
+
+.editor-select-menu button:focus {
+  outline: none;
+}
+
+.editor-select-menu button:hover {
+  background: color-mix(in srgb, var(--sd-accent) 18%, var(--sd-bg));
+  color: var(--sd-accent);
+}
+
+.editor-color-tool {
+  position: relative;
+}
+
+.editor-color-bar {
+  position: absolute;
+  left: 7px;
+  right: 7px;
+  bottom: 5px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--sd-accent);
+}
+
+.editor-color-bar.is-empty {
+  background: var(--sd-border);
+}
+
+.editor-color-pop {
+  position: fixed;
+  z-index: 46;
+  display: flex;
+  flex-direction: column;
+  width: 11.5rem;
+}
+
+.editor-color-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.editor-table-menu-colors {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.editor-color-custom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.editor-color-custom input[type='color'] {
+  padding: 0;
+}
+
+.editor-color-clear {
+  width: auto;
+  align-self: flex-start;
+}
+
+.editor-table-menu-clear {
+  width: auto;
+  align-self: flex-start;
+}
+
+.editor-table-menu {
+  position: fixed;
+  z-index: 50;
+  min-width: 12.5rem;
+}
+
+.editor-table-menu-sep {
+  height: 1px;
+}
+
+.editor-table-menu-item {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+}
+
+.editor-prompt-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 14vh;
+  background: var(--sd-overlay);
+}
+
+.editor-prompt-title {
+  font-weight: 600;
+}
+
+.editor-prompt input {
+  width: 100%;
+}
+
+.editor-prompt-actions button {
+  width: auto;
+  padding: 0.25rem 0.7rem;
+}
+
+.editor .ProseMirror .column-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -2px;
+  bottom: 0;
+  width: 4px;
+  background: var(--sd-accent);
+  pointer-events: none;
+  z-index: 2;
+}
+
+.editor .ProseMirror.resize-cursor {
+  cursor: col-resize;
+}
+
+.editor .ProseMirror .editor-image {
+  position: relative;
+  display: inline-block;
+  max-width: 100%;
+}
+
+.editor .ProseMirror .editor-image.is-selected img {
+  outline: 1px solid var(--sd-accent);
+}
+
+.editor .ProseMirror .editor-image-handle {
+  display: none;
+  position: absolute;
+  width: 10px;
+  height: 10px;
+  background: var(--sd-bg);
+  border: 1px solid var(--sd-accent);
+  z-index: 2;
+}
+
+.editor .ProseMirror .editor-image.is-selected .editor-image-handle {
+  display: block;
+}
+
+.editor .ProseMirror .editor-image-handle.is-nw {
+  top: -5px;
+  left: -5px;
+  cursor: nwse-resize;
+}
+
+.editor .ProseMirror .editor-image-handle.is-se {
+  right: -5px;
+  bottom: -5px;
+  cursor: nwse-resize;
+}
+
+.editor .ProseMirror .editor-image-handle.is-ne {
+  top: -5px;
+  right: -5px;
+  cursor: nesw-resize;
+}
+
+.editor .ProseMirror .editor-image-handle.is-sw {
+  left: -5px;
+  bottom: -5px;
+  cursor: nesw-resize;
+}
+
+.editor .ProseMirror .doc-ext-link-jump {
+  display: inline-flex;
+  margin-left: 0.15em;
+  color: var(--sd-muted);
+  cursor: pointer;
+  vertical-align: middle;
+}
+
+.editor .ProseMirror .doc-mermaid-block {
+  margin: 0.6rem 0;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-lg);
+  background: var(--sd-bg);
+}
+
+.editor .ProseMirror .doc-mermaid-modes {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.3rem;
+  border-bottom: 1px solid var(--sd-border);
+}
+
+.editor .ProseMirror .doc-mermaid-mode {
+  width: auto;
+  height: auto;
+}
+
+.editor .ProseMirror .doc-mermaid-mode.is-on {
+  border-color: var(--sd-border);
+}
+
+.editor .ProseMirror .doc-mermaid-block.is-split .doc-mermaid-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.editor .ProseMirror .doc-mermaid-body > pre {
+  margin: 0;
+  padding: 0.6rem;
+  overflow: auto;
+  font-family: var(--sd-font-mono);
+  white-space: pre;
+}
+
+.editor .ProseMirror .doc-mermaid[hidden] {
+  display: none;
+}
+
+.editor .ProseMirror .doc-mermaid-body > pre[hidden] {
+  display: none;
+}
+
+.editor .ProseMirror .doc-mermaid-stage svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.editor .ProseMirror .doc-mermaid-status {
+  padding: 0.6rem;
+  color: var(--sd-muted);
+}
+
+.editor .ProseMirror .editor-code-lang {
+  width: auto;
+  margin: 0 0.35rem 0.25rem 0;
+}
+
+.editor-code-menu {
+  position: fixed;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  width: 14rem;
+  max-height: 16rem;
+}
+
+.editor-code-menu-filter {
+  width: 100%;
+}
+
+.editor-code-menu-list {
+  overflow: auto;
+}
+
+.editor-code-menu-option {
+  width: 100%;
+  text-align: left;
+}
+
+.editor-code-menu-empty {
+  display: block;
+  width: 100%;
+  text-align: left;
+}
+
+.editor .ProseMirror .katex-display {
+  margin: 0.4rem 0;
+  overflow-x: auto;
+}
+
 /* Quiet, compact editor chrome. Colors and elevation come from semantic tokens. */
 
 .editor-toolbar {

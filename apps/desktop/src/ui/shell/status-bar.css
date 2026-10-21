@@ -1,3 +1,74 @@
+/* Surviving rules moved from src/styles so each class has one source. */
+.statusbar {
+  display: flex;
+  align-items: center;
+  border-top: 1px solid var(--sd-border);
+  background: var(--sd-bg);
+  color: var(--sd-muted);
+}
+
+.statusbar-item {
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+  white-space: nowrap;
+}
+
+.statusbar-spacer {
+  flex: 1;
+}
+
+.statusbar-action {
+  border: 1px solid transparent;
+  border-radius: var(--sd-radius);
+  padding: 0.15rem 0.5rem;
+  font-size: inherit;
+  color: var(--sd-muted);
+}
+
+.statusbar-action:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--sd-bg-elevated);
+  color: var(--sd-accent);
+}
+
+.statusbar-index-error {
+  color: var(--sd-danger);
+}
+
+.statusbar-index-error:hover:not(:disabled) {
+  color: var(--sd-danger);
+}
+
+.statusbar-index-error [data-testid="index-retry"] {
+  text-decoration: underline;
+}
+
+.statusbar-version {
+  font-variant-numeric: tabular-nums;
+}
+
+.git-status-badge {
+  font-size: inherit;
+  padding: 0.1rem 0.55rem;
+  border-radius: 99px;
+}
+
+.git-sync-popover {
+  background: var(--sd-bg-elevated);
+  color: var(--sd-fg);
+  border: 1px solid var(--sd-border);
+  border-radius: 8px;
+  box-shadow: var(--sd-shadow);
+  padding: 0.55rem 0.7rem;
+  font-size: 0.75rem;
+  z-index: 30;
+}
+
+.git-sync-popover p {
+  margin: 0.15rem 0;
+}
+
 /* ---------- quiet status bar ---------- */
 
 .statusbar {

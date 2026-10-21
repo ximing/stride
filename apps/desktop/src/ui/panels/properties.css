@@ -1,3 +1,32 @@
+/* Surviving rules moved from src/styles so each class has one source. */
+.relation-row {
+  display: block;
+  width: 100%;
+  margin: 0 0 0.35rem;
+  text-align: left;
+  border-color: transparent;
+  border-radius: var(--sd-radius);
+}
+
+.relation-row:hover:not(:disabled) {
+  background: var(--sd-bg-elevated);
+  border-color: transparent;
+}
+
+.toc-item {
+  display: block;
+  width: 100%;
+  overflow: hidden;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: var(--sd-radius);
+}
+
+.toc-item[data-level='1'] {
+  font-family: var(--sd-font-serif);
+}
+
 /* ---------- properties, relationships and outline ---------- */
 
 .properties-panel-head {

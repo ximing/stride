@@ -1,0 +1,30 @@
+/* Workspace column grid. Visual rules live next to the shell components. */
+
+.workspace {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+}
+
+.rail {
+  min-height: 0;
+  overflow: auto;
+}
+
+.note-list-col {
+  min-height: 0;
+}
+
+.stage {
+  min-height: 0;
+  overflow: auto;
+}
+
+.panel {
+  min-height: 0;
+}
+
+.rail {
+  flex: none;
+  min-width: 0;
+}
