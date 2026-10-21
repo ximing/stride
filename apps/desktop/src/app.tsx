@@ -66,7 +66,7 @@ const Chooser = observer(function Chooser() {
                 {t('chooser.newVault')}
               </Button>
               <Button
-                tone="secondary"
+                tone="quiet"
                 size="lg"
                 icon={<Mark icon={FolderOpen} size={16} />}
                 data-testid="open-vault"
@@ -97,7 +97,7 @@ const Chooser = observer(function Chooser() {
                 spellCheck={false}
               />
               <Button
-                tone="secondary"
+                tone="quiet"
                 size="md"
                 icon={<Mark icon={GitBranch} size={16} />}
                 data-testid="git-clone"

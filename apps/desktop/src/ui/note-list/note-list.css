@@ -38,19 +38,27 @@
 }
 
 .list-filter {
+  display: flex;
+  align-items: center;
   gap: 4px;
   min-width: 0;
   min-height: 32px;
-  margin: 0 12px 8px;
+  margin: 8px 12px;
   padding: 0 2px 0 8px;
   box-sizing: border-box;
-  background: var(--sd-bg-elevated);
-  border: 1px solid var(--sd-border);
+  background: var(--sd-inset);
+  border: 1px solid transparent;
   border-radius: var(--sd-radius);
+  color: var(--sd-muted);
+}
+
+.list-filter:hover:not(:focus-within) {
+  background: var(--sd-inset-hover);
 }
 
 .list-filter:focus-within {
   border-color: var(--sd-accent);
+  background: var(--sd-surface);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--sd-accent) 18%, transparent);
 }
 
@@ -173,7 +181,6 @@
 .note-list-item.is-selected {
   background: color-mix(in srgb, var(--sd-accent) 11%, transparent);
   border-color: transparent;
-  box-shadow: inset 2px 0 0 var(--sd-accent);
 }
 
 .note-list-item.is-selected:hover:not(:disabled) {

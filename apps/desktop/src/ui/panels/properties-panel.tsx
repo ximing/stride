@@ -69,7 +69,7 @@ export const PropertiesPanel = observer(function PropertiesPanel() {
         <div className="properties-actions">
           <Button
             size="sm"
-            tone="secondary"
+            tone="quiet"
             icon={<Mark icon={Archive} size={14} />}
             data-testid="archive-note"
             onClick={() => vault.updateBooleanProperty('archived', !isArchived(note))}
@@ -201,7 +201,7 @@ export const PropertiesPanel = observer(function PropertiesPanel() {
             placeholder={vault.propertyType === 'list' ? t('panels.valueList') : t('panels.valueNote')}
           />
         )}
-        <Button className="property-add" size="sm" tone="secondary" type="submit" data-testid="add-property">
+        <Button className="property-add" size="sm" tone="quiet" type="submit" data-testid="add-property">
           {t('panels.addField')}
         </Button>
       </form>

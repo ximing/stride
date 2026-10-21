@@ -35,11 +35,11 @@
 
 .wordmark {
   color: var(--sd-fg);
-  font-family: var(--sd-font-sans);
-  font-size: 16px;
-  font-weight: 650;
+  font-family: var(--sd-font-serif);
+  font-size: 18px;
+  font-weight: 600;
   line-height: 1;
-  letter-spacing: -0.02em;
+  letter-spacing: -0.01em;
 }
 
 .vault-switcher {
@@ -155,16 +155,21 @@
   height: 32px;
   min-width: 0;
   padding: 0 34px 0 32px;
-  border: 1px solid var(--sd-border);
+  border: 1px solid transparent;
   border-radius: var(--sd-radius);
-  background: var(--sd-bg-elevated);
+  background: var(--sd-inset);
   color: var(--sd-fg);
   font-size: 13px;
   line-height: 30px;
 }
 
+.search .search-field input:hover:not(:focus) {
+  background: var(--sd-inset-hover);
+}
+
 .search .search-field input:focus {
   border-color: var(--sd-accent);
+  background: var(--sd-surface);
 }
 
 .search .search-field input:focus-visible {

@@ -32,8 +32,8 @@
   margin: 0;
   padding: 2px;
   overflow-x: auto;
-  background: color-mix(in srgb, var(--sd-bg-elevated) 56%, transparent);
-  border: 1px solid var(--sd-border);
+  background: var(--sd-inset);
+  border: 1px solid transparent;
   border-radius: 8px;
 }
 
@@ -42,19 +42,27 @@
   min-width: 0;
   max-width: 160px;
   min-height: 28px;
-  padding: 4px 8px;
+  margin: 0;
+  padding: 4px 10px;
   overflow: hidden;
   color: var(--sd-muted);
   font-size: 12px;
   text-overflow: ellipsis;
   white-space: nowrap;
   border: 1px solid transparent;
+  border-radius: var(--sd-radius);
+}
+
+.chat-tab:hover:not(:disabled):not([data-state='active']) {
+  color: var(--sd-fg);
 }
 
 .chat-tab[data-state='active'] {
-  color: var(--sd-accent);
+  color: var(--sd-fg);
+  font-weight: 500;
   background: var(--sd-bg-elevated);
-  border-color: var(--sd-border);
+  border-color: transparent;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--sd-fg) 18%, transparent);
 }
 
 .chat-messages {
@@ -194,40 +202,54 @@
   gap: 2px;
   max-width: 100%;
   padding: 2px;
-  background: color-mix(in srgb, var(--sd-bg-elevated) 56%, transparent);
-  border: 1px solid var(--sd-border);
+  background: var(--sd-inset);
+  border: 1px solid transparent;
   border-radius: 8px;
 }
 
 .chat-mode-trigger {
   min-height: 28px;
+  margin: 0;
   padding: 4px 10px;
   color: var(--sd-muted);
   font-size: 12px;
   border: 1px solid transparent;
+  border-bottom: 1px solid transparent;
+  border-radius: var(--sd-radius);
+}
+
+.chat-mode-trigger:hover:not(:disabled):not([data-state='active']) {
+  color: var(--sd-fg);
 }
 
 .chat-mode-trigger[data-state='active'] {
-  color: var(--sd-accent);
+  color: var(--sd-fg);
+  font-weight: 500;
   background: var(--sd-bg-elevated);
-  border-color: var(--sd-border);
+  border-color: transparent;
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--sd-fg) 18%, transparent);
 }
 
 .chat-compose .chat-draft {
   width: 100%;
   min-height: 96px;
   max-height: 240px;
-  padding: 8px;
+  padding: 8px 10px;
   color: var(--sd-fg);
   font-size: 13px;
   line-height: 1.5;
-  background: var(--sd-bg-elevated);
-  border: 1px solid var(--sd-border);
+  background: var(--sd-inset);
+  border: 1px solid transparent;
   border-radius: var(--sd-radius);
   resize: vertical;
 }
 
+.chat-compose .chat-draft:hover:not(:focus) {
+  background: var(--sd-inset-hover);
+}
+
 .chat-compose .chat-draft:focus {
+  background: var(--sd-surface);
   border-color: var(--sd-accent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--sd-accent) 18%, transparent);
 }

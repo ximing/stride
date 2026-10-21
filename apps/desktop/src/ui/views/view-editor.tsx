@@ -140,7 +140,7 @@ export const ViewEditorModal = observer(function ViewEditorModal() {
                 </div>
               ))}
               <Button
-                tone="secondary"
+                tone="quiet"
                 size="sm"
                 className="view-filter-add"
                 data-testid="view-filter-add"
@@ -162,7 +162,7 @@ export const ViewEditorModal = observer(function ViewEditorModal() {
                 </Button>
               )}
               <ModalClose asChild>
-                <Button tone="secondary" className="view-editor-cancel" data-testid="view-cancel">{t('common.cancel')}</Button>
+                <Button tone="quiet" className="view-editor-cancel" data-testid="view-cancel">{t('common.cancel')}</Button>
               </ModalClose>
               <Button tone="primary" className="view-editor-save" data-testid="view-save" onClick={() => void views.saveDraft()}>
                 {t('views.save')}

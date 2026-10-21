@@ -130,7 +130,7 @@ export const TopBar = observer(function TopBar() {
         </div>
         <Button
           type="submit"
-          tone="secondary"
+          tone="quiet"
           size="sm"
           className="search-submit"
           data-testid="run-search"

@@ -116,10 +116,9 @@
 .sd-btn[aria-pressed="true"],
 .sd-btn[data-state="open"],
 .sd-btn.is-active {
-  border-color: var(--sd-accent);
+  border-color: color-mix(in srgb, var(--sd-accent) 35%, transparent);
   background: var(--sd-accent-soft);
   color: var(--sd-accent);
-  box-shadow: inset 0 0 0 1px var(--sd-accent);
 }
 
 .sd-btn:focus-visible {

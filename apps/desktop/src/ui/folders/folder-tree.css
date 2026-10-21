@@ -136,7 +136,6 @@
   color: var(--sd-fg);
   background: color-mix(in srgb, var(--sd-accent) 9%, transparent);
   border-color: transparent;
-  box-shadow: inset 2px 0 0 var(--sd-accent);
 }
 
 .folder-overflow {

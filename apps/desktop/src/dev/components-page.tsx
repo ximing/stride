@@ -122,7 +122,7 @@ const ComponentsPreview = observer(function ComponentsPreview() {
               <section className="sd-component-section" aria-labelledby="fields-title">
                 <div className="sd-component-section-heading">
                   <h2 id="fields-title" className="sd-component-section-title">Fields</h2>
-                  <p className="sd-component-section-copy">Text inputs and Select share labels, focus, and bordered surfaces.</p>
+                  <p className="sd-component-section-copy">Text inputs and Select share labels, focus, and inset surfaces that rise to paper on focus.</p>
                 </div>
                 <div className="sd-component-fields">
                   <div className="sd-component-field">

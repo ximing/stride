@@ -20,7 +20,7 @@ export const ChatPanel = observer(function ChatPanel() {
         <h2 className="panel-heading">{t('chat.heading')}</h2>
         <Button
           size="sm"
-          tone="secondary"
+          tone="quiet"
           icon={<Mark icon={Plus} size={14} />}
           data-testid="chat-new"
           onClick={() => chat.newSession()}
@@ -125,7 +125,7 @@ export const ChatPanel = observer(function ChatPanel() {
           </Button>
           <Button
             size="sm"
-            tone="secondary"
+            tone="quiet"
             icon={<Mark icon={Square} size={14} />}
             data-testid="chat-abort"
             disabled={!chat.running}

@@ -147,16 +147,18 @@ export const Rail = observer(function Rail() {
   const showInstances = vault.active?.type === 'Type'
   return (
     <div className="rail-inner">
-      <Button
-        tone="primary"
-        size="lg"
-        className="rail-new-note"
-        data-testid="new-note"
-        icon={<Mark icon={SquarePen} size={16} />}
-        onClick={() => vault.createNote()}
-      >
-        {t('shell.newNote')}
-      </Button>
+      <div className="rail-head">
+        <Button
+          tone="primary"
+          size="lg"
+          className="rail-new-note"
+          data-testid="new-note"
+          icon={<Mark icon={SquarePen} size={16} />}
+          onClick={() => vault.createNote()}
+        >
+          {t('shell.newNote')}
+        </Button>
+      </div>
       <div className="group-label">{t('sidebar.views')}</div>
       <button
         type="button"

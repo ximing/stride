@@ -84,6 +84,8 @@
   --sd-surface-hover: color-mix(in srgb, var(--sd-fg) 4%, var(--sd-surface));
   --sd-surface-selected: color-mix(in srgb, var(--sd-accent) 10%, var(--sd-surface));
   --sd-surface-active: color-mix(in srgb, var(--sd-fg) 8%, var(--sd-surface));
+  --sd-inset: color-mix(in srgb, var(--sd-fg) 4%, transparent);
+  --sd-inset-hover: color-mix(in srgb, var(--sd-fg) 6%, transparent);
   --sd-hover: var(--sd-surface-hover);
   --sd-selected: var(--sd-surface-selected);
   --sd-focus: var(--sd-accent);
@@ -139,6 +141,8 @@
   --sd-surface-hover: color-mix(in srgb, var(--sd-fg) 6%, var(--sd-surface));
   --sd-surface-selected: color-mix(in srgb, var(--sd-accent) 14%, var(--sd-surface));
   --sd-surface-active: color-mix(in srgb, var(--sd-fg) 10%, var(--sd-surface));
+  --sd-inset: color-mix(in srgb, var(--sd-fg) 5%, transparent);
+  --sd-inset-hover: color-mix(in srgb, var(--sd-fg) 8%, transparent);
   --sd-hover: var(--sd-surface-hover);
   --sd-selected: var(--sd-surface-selected);
   --sd-focus: var(--sd-accent);
@@ -195,6 +199,8 @@
     --sd-surface-hover: color-mix(in srgb, var(--sd-fg) 6%, var(--sd-surface));
     --sd-surface-selected: color-mix(in srgb, var(--sd-accent) 14%, var(--sd-surface));
     --sd-surface-active: color-mix(in srgb, var(--sd-fg) 10%, var(--sd-surface));
+    --sd-inset: color-mix(in srgb, var(--sd-fg) 5%, transparent);
+    --sd-inset-hover: color-mix(in srgb, var(--sd-fg) 8%, transparent);
     --sd-hover: var(--sd-surface-hover);
     --sd-selected: var(--sd-surface-selected);
     --sd-focus: var(--sd-accent);
@@ -337,8 +343,9 @@
   align-items: center;
   gap: 0.1rem;
   padding: 0.15rem;
-  border: 1px solid var(--border);
+  border: 1px solid transparent;
   border-radius: 8px;
+  background: var(--sd-inset, color-mix(in srgb, var(--fg) 5%, transparent));
 }
 
 .sd-preview .sd-theme {
@@ -349,8 +356,9 @@
 }
 
 .sd-preview .sd-theme[aria-pressed="true"] {
-  background: var(--accent);
-  color: var(--bg);
+  background: var(--bg-elevated);
+  color: var(--fg);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--fg) 18%, transparent);
 }
 
 .sd-gallery {

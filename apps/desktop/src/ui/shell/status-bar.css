@@ -50,7 +50,7 @@
   padding: 0 8px;
   border: 1px solid transparent;
   border-radius: 99px;
-  background: color-mix(in srgb, var(--sd-fg) 4%, transparent);
+  background: var(--sd-inset);
   color: var(--sd-muted);
   font-size: 12px;
   font-weight: 400;
@@ -58,7 +58,7 @@
 
 .statusbar .git-status-badge.sd-btn:hover:not(:disabled) {
   border-color: transparent;
-  background: color-mix(in srgb, var(--sd-fg) 7%, transparent);
+  background: var(--sd-inset-hover);
   color: var(--sd-fg);
 }
 

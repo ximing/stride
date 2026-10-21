@@ -23,9 +23,9 @@
   min-height: var(--sd-control-md);
   margin: 0;
   padding: var(--sd-space-1) var(--sd-space-2);
-  border: 1px solid var(--sd-border);
+  border: 1px solid transparent;
   border-radius: var(--sd-radius);
-  background: var(--sd-surface);
+  background: var(--sd-inset);
   color: var(--sd-fg);
   font-family: var(--sd-font-sans);
   font-size: var(--sd-text-md);
@@ -38,13 +38,14 @@
 
 .sd-field-input:hover:not(:disabled),
 .sd-select-trigger:hover:not(:disabled) {
-  border-color: var(--sd-border-strong);
+  background: var(--sd-inset-hover);
 }
 
 .sd-field-input:focus,
 .sd-select-trigger:focus,
 .sd-select-trigger[data-state="open"] {
   border-color: var(--sd-accent);
+  background: var(--sd-surface);
 }
 
 .sd-field-input:focus-visible,
@@ -61,8 +62,7 @@
 
 .sd-field-input:disabled,
 .sd-select-trigger:disabled {
-  border-color: var(--sd-border);
-  background: var(--sd-surface-hover);
+  background: var(--sd-inset);
   color: var(--sd-muted);
   opacity: 0.65;
   cursor: not-allowed;

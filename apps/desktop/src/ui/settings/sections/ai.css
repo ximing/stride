@@ -48,8 +48,7 @@
 }
 
 .settings-ai-row[aria-selected='true'] {
-  background: var(--sd-bg-elevated);
-  box-shadow: inset 2px 0 0 var(--sd-accent);
+  background: color-mix(in srgb, var(--sd-accent) 11%, transparent);
 }
 
 .settings-ai-row-name {

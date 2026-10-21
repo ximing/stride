@@ -38,6 +38,5 @@
 .wikilink-menu button[aria-selected='true'] {
   background: color-mix(in srgb, var(--sd-accent) 13%, transparent);
   color: var(--sd-accent);
-  box-shadow: inset 2px 0 var(--sd-accent);
 }
 

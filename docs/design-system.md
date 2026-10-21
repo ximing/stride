@@ -2,11 +2,14 @@
 
 Stride is a local-first note workspace, not a marketing site. The interface should feel like a well-made desktop tool: quiet navigation, compact controls, readable dense information, and a generous paper-like editor. The editor is the only visually expressive surface; the surrounding chrome stays neutral and precise.
 
+The working metaphor is the writing desk (案头纸墨): the note page is the protagonist, and the tools around it recede. Four laws follow from it.
+
 ## Design principles
 
 - **Content before chrome.** Use spacing, alignment, and subtle surface changes to create hierarchy. Do not wrap every region in a card.
-- **One accent, used semantically.** Moss green marks selection, focus, and primary actions. It is not decorative.
-- **Two voices.** Avenir Next/system sans for UI; Iowan Old Style/system serif for note titles and note body only.
+- **Three planes, no boxes.** Plane 0 is the workbench (`--sd-bg`: rails, strips, tool rows); plane 1 is paper (`--sd-surface`: reading/writing surfaces); plane 2 is floating (`--sd-bg-elevated`: transient overlays and raised thumbs only). Controls never get their own white boxes — inputs are carved into the workbench with `--sd-inset` (a 4–6% foreground tint), a transparent border, and on focus they rise to paper with an accent ring.
+- **One accent, used semantically.** Moss green is ink: it marks the single primary action per view, focus rings, wikilinks, and active icon marks. It is never decorative, never large fills, never green text on a green tint.
+- **Two voices.** Avenir Next/system sans for UI; Iowan Old Style/system serif for note titles, note body, and the Stride wordmark — the brand reads as a publication name.
 - **Predictable interaction.** Every control has default, hover, active/selected, focus-visible, disabled, and (where relevant) destructive states.
 - **Compact but comfortable.** Base spacing is 4px. Common controls are 32px high, dense controls 28px, and primary standalone actions 36px.
 - **Accessible by default.** Keyboard focus is always visible, icon-only buttons have accessible names, overlays trap/restore focus, and reduced motion is respected.
@@ -15,15 +18,15 @@ Stride is a local-first note workspace, not a marketing site. The interface shou
 
 | Token role | Light | Dark | Use |
 | --- | --- | --- | --- |
-| Canvas | `#F3F4F1` | `#171A18` | App background and navigation |
-| Surface | `#FCFDFB` | `#202421` | Editor, inputs, raised surfaces |
-| Elevated | `#FFFFFF` | `#272C28` | Menus, dialogs, popovers |
+| Canvas | `#F3F4F1` | `#171A18` | App background and navigation (plane 0) |
+| Surface | `#FCFDFB` | `#202421` | Editor, paper, focused inputs (plane 1) |
+| Elevated | `#FFFFFF` | `#272C28` | Menus, dialogs, segmented thumbs (plane 2) |
 | Text | `#252A26` | `#EDF0EB` | Primary copy |
 | Muted | `#697169` | `#9CA59C` | Secondary copy and inactive icons |
-| Border | `#DDE1DA` | `#353C36` | Separators and control outlines |
+| Border | `#DDE1DA` | `#353C36` | Separators and hairlines |
 | Accent | `#356854` | `#94BFA7` | Primary action, focus, selection |
 
-Use semantic tokens (`--sd-bg`, `--sd-bg-elevated`, `--sd-fg`, `--sd-muted`, `--sd-border`, `--sd-accent`) rather than literal values. Add semantic derivatives for subtle hover, selected background, focus ring, danger, and overlays. Keep syntax, diff, mark, and note-type colors theme-aware.
+Use semantic tokens (`--sd-bg`, `--sd-bg-elevated`, `--sd-fg`, `--sd-muted`, `--sd-border`, `--sd-accent`) rather than literal values. `--sd-inset` / `--sd-inset-hover` are the resting/hover fills for embedded controls (inputs, segmented tracks). Keep syntax, diff, mark, and note-type colors theme-aware.
 
 ## Type, spacing, shape, motion
 
@@ -47,7 +50,7 @@ Shared primitives live in `src/ui/primitives` and use the `sd-` prefix. Feature 
 
 ### Input and Textarea
 
-Inputs have a visible bordered surface, 32px default height, 8px horizontal minimum padding, and a token-driven focus ring. `Input` keeps the existing optional-label wrapper pattern and supports hint/error content without changing native input behavior. Search fields may visually contain icons, but the input retains its accessible name.
+Inputs are embedded in the workbench, not boxed: `--sd-inset` fill, transparent border, 32px default height, 8px horizontal minimum padding. On hover the fill deepens (`--sd-inset-hover`); on focus the control rises to paper (`--sd-surface`) with an accent border/ring. `Input` keeps the existing optional-label wrapper pattern and supports hint/error content without changing native input behavior. Search fields may visually contain icons, but the input retains its accessible name.
 
 ### Select
 
@@ -67,7 +70,12 @@ Unknown trigger props such as `data-testid`, `aria-label`, `id`, and `className`
 
 ### Tabs
 
-Use the Radix-backed wrappers from `src/ui/primitives/tabs.tsx`: `Tabs`, `TabsList`, `TabsTrigger`, and `TabsContent`. They preserve Radix props, add `sd-tabs*` classes, and support icon + label content. Note editor tabs may keep their specialized close-button behavior but must use the same size, hover, selected, and focus tokens.
+Use the Radix-backed wrappers from `src/ui/primitives/tabs.tsx`: `Tabs`, `TabsList`, `TabsTrigger`, and `TabsContent`. Two idioms, chosen by metaphor:
+
+- **Panel-switch tabs** (the default `sd-tabs*` styling): a quiet text row over a hairline, the active item marked by a crisp 2px accent underline and primary text. No pills, no inset shadow edges.
+- **Value pickers** (chat session tabs, agent mode): the track-and-thumb segmented idiom — an `--sd-inset` track with 2px padding, the selected thumb raised to `--sd-bg-elevated` with a crisp 1px ambient shadow and primary text. Inactive items are muted text only.
+
+Note editor tabs keep their specialized connected-to-page shape (active tab shares the editor paper surface and overlaps the strip hairline) but use the same size, hover, selected, and focus tokens.
 
 ### Dialog, Menu, Toast, Tooltip
 
@@ -87,15 +95,17 @@ All new and migrated UI icons come from `lucide-react`, rendered through `Mark` 
 ```
 
 - Align headers and control baselines across columns. Avoid arbitrary vertical gaps.
-- Navigation selected state: accent-tinted surface and primary text; hover uses a weaker neutral surface.
+- Navigation selected state: accent-tinted surface and primary text; hover uses a weaker neutral surface. Never a solid accent edge bar — selection is expressed by tint, weight, and accent icon color only.
+- Row-level actions (add instance, edit view) stay hidden until their row is hovered or focus lands inside it; persistent state affordances (collapse chevrons) stay visible.
 - Note-list selected state: subtle accent surface, clear title, no heavy outline. Hover and selected must remain distinguishable.
 - Editor tabs: 32–36px high, compact close affordance, active surface connected to the editor.
 - Menus and dialog surfaces share border, radius, elevation, item height, and selected/hover treatment.
-- Empty states explain the next useful action with concise copy and at most one primary action.
+- Empty states pair a quiet inset icon disc with a serif title, explain the next useful action with concise copy, and offer at most one primary action.
 
 ## Engineering rules
 
 - Preserve service logic, virtualization row heights, command manifests, keyboard shortcuts, and existing `data-testid` attributes.
+- Keep component CSS next to the component. `src/styles/` holds only the global base (reset, scrollbars, bare inputs) and the workspace column grid.
 - No hard-coded colors in component CSS; consume semantic tokens.
 - Avoid global element selectors for new component styles. Style shared classes explicitly and scope product-specific overrides.
 - Do not add font downloads or external runtime dependencies for visual effects.
