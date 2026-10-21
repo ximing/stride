@@ -13,10 +13,8 @@
 - 面板的私有状态不要写进原语。跨面板共享的状态放进对应 Service。
 - 颜色只用 `tokens.css` 的 `--sd-*`。`tokens.css` 保持单文件。
 - `primitives.css`、`shell.css`、`panels.css`、`overlays.css` 只保留 `@import`。新规则写进该入口已经引入的分片；分片和组件放在同一功能目录。
-- 应用壳层（Chooser、顶栏、列表栏、状态栏等）的规则在 `src/styles/`，入口仍是 `src/styles.css`。不要把设计系统原语的类写进 `src/styles/`。
+- 样式与组件放在同一目录。`src/styles/` 只保留全局基础（`base.css`：reset、滚动条、裸 `input` / `textarea`）和栏布局网格（`layout.css`）。不要把组件规则写回 `src/styles/`。
 
 ## 开发偏好
 
-- 产品里的下拉用 `primitives/select.tsx`，标签页用 `primitives/tabs.tsx`，确认和输入用 `primitives/modal.tsx`。不要用原生 `select`，也不要调用 `window.alert`、`window.prompt`、`window.confirm`。
-- 图标走 `primitives/icon.tsx` 的 `Mark`，来源是 `lucide-react`。
-- 改已有面板时保留 `data-testid`、虚拟列表行高和键盘行为。
+视觉、组件 API 和图标规则在 `.claude/rules/ui-design-system.md`。本文件只写文件放在哪个目录。

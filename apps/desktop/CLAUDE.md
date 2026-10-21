@@ -8,7 +8,8 @@
 - `src/services/`：按业务域分目录的响应式服务（`vault/`、`notes/`、`layout/`、`views/`、`search/`、`commands/`、`git/`、`chat/`、`settings/`、`update/`、`appearance/`、`platform/`）。放置规则见 `src/services/CLAUDE.md`。
 - `src/ui/`：原语在 `src/ui/primitives/`，壳层在 `src/ui/shell/`，列表、文件夹、右栏、Git、对话、浮层、设置各自一个目录。放置规则见 `src/ui/CLAUDE.md`。
 - `src/editor/`：TipTap 3 编辑器。根目录只留装配，扩展在 `wikilink/`、`table/`、`math/` 等子目录。详见 `src/editor/CLAUDE.md`。
-- `src/styles.css` 与 `src/styles/`：应用壳层样式。入口文件只做 `@import`。
+- `src/styles.css` 与 `src/styles/`：全局基础和栏布局网格。入口文件只做 `@import`。组件样式与组件放在同一目录。
+- `src/i18n/`：英文和中文界面文案。细则在 `.claude/rules/i18n.md`。
 - `src/dev/`：组件预览画布（访问 `/dev/components` 渲染）。
 - `inspect/` & `src/inspect-*.ts`：供自动化与调试代理使用的页面检查与操控通道。
 - `e2e/`：Playwright 浏览器端到端测试。
@@ -23,6 +24,7 @@
 - **不应该放这里**：
   - 纯粹的领域算法与数据格式解析（如双链图计算、笔记 JSON 迁移、重命名事务、Git porcelain 解析）应下沉到 `packages/core`，保持可独立单测。
   - 在 `src/ui/primitives/` 中不要耦合具体某个业务面板的私有状态，也不要引用 `src/services/` 里的业务 Service。
+  - 不要在 `src-tauri/` 写笔记、Git 或密钥逻辑。Rust 侧只注册插件、权限和打包配置。
 
 ## 开发偏好
 
@@ -30,3 +32,4 @@
 2. **命令驱动交互**：新增全局可触发操作或快捷键时，先在 `src/appCommandManifest.json` 注册，再由 `services/commands/command.service.ts` 与 `services/commands/commands.ts` 绑定实现，并确保通过 `services/commands/command-matrix.test.ts`。
 3. **遵循设计系统**：UI 修改必须使用 `src/ui/tokens.css` 中的 `--sd-*` 语义变量和 `src/ui/primitives/` 下的封装组件，严禁硬编码色值或调用原生 `window.alert/confirm/prompt`。样式入口文件只保留 `@import`。
 4. **保持四栏布局契约**：右侧面板（属性、TOC、Git、Chat）互斥切换，当前面板记在 `VaultService.panel`。栏宽和折叠由 `services/layout/layout.service.ts` 的 `LayoutService` 管。Git、Chat、Settings、Update 各自一个 Service，不要再合成一个文件。
+5. **界面文案走目录**：新增用户可见文案时同时改 `src/i18n/en.ts` 和 `zh.ts`。语言存在本机 `localStorage`，不进 Vault。细则见 `.claude/rules/i18n.md`。

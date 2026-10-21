@@ -34,3 +34,4 @@
    - 编辑器内需要用户输入（如插入链接、编辑公式）时，必须使用根目录的 `prompt.tsx`（基于 `src/ui/primitives/modal.tsx`），严禁使用 `window.prompt` / `window.confirm`。
 4. **中文输入法（IME）兼容**：
    - 涉及回车、斜杠或括号触发的键盘插件时，注意参考 `ime-enter.ts` 检查 `isComposing` 状态，避免打断中文输入法选词。
+5. **界面文案**：菜单、工具栏、占位和 `aria-label` 走 `src/i18n`。细则在 `.claude/rules/i18n.md`。

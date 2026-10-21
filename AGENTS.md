@@ -20,4 +20,4 @@
 - 根 `CLAUDE.md`：全仓库都要遵守的约束和常用命令。
 - `apps/desktop/CLAUDE.md`、`packages/core/CLAUDE.md`、`packages/platform/CLAUDE.md`：子系统约束。
 - `apps/desktop/src/{services,ui,editor}/CLAUDE.md`：进入该目录时的放置规则。
-- `.claude/rules/*.md`：按 glob 命中的横切规则（Service、设计系统、测试、适配器）。
+- `.claude/rules/*.md`：按 glob 命中的横切规则（Service、设计系统、测试、适配器、界面文案）。

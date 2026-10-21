@@ -4,6 +4,7 @@ paths:
   - "apps/desktop/src/editor/**/*.tsx"
   - "apps/desktop/src/editor/**/*.css"
   - "apps/desktop/src/dev/**/*"
+  - "apps/desktop/src/styles/**/*.css"
   - "apps/desktop/src/*.tsx"
   - "apps/desktop/src/*.css"
 ---
@@ -19,12 +20,12 @@ paths:
 
 ## 共享原语契约（`apps/desktop/src/ui/primitives/`）
 
-原语不引用 `src/services/` 的业务 Service，也不引用业务面板。业务面板放在 `ui/shell/`、`ui/note-list/`、`ui/folders/`、`ui/panels/`、`ui/git/`、`ui/chat/`、`ui/overlays/`、`ui/settings/`。
+原语、壳层和业务面板放在哪个目录，见 `apps/desktop/src/ui/CLAUDE.md`。原语不引用业务 Service，也不引用业务面板。
 
 - **Button / IconButton**（`ui/primitives/button.tsx`）：使用 `tone="primary" | "secondary" | "quiet" | "danger"` 与 `size="sm" | "md" | "lg"`；纯图标按钮必须使用 `IconButton` 并传入无障碍 `label`。
 - **Select**（`ui/primitives/select.tsx`）：产品 UI 中必须使用封装自 Radix 的 `Select` 组件，**禁止直接使用原生 `<select>`**。
 - **Tabs**（`ui/primitives/tabs.tsx`）：使用 `Tabs`、`TabsList`、`TabsTrigger`、`TabsContent` 封装，保持 `sd-tabs*` 样式与键盘导航一致。
 - **Modal / Menu / Toast / Tooltip**：必须复用现有 Radix 封装（`ui/primitives/modal.tsx`、`ui/primitives/menu.tsx`、`ui/primitives/toast.tsx`、`ui/primitives/tooltip.tsx`），**严禁调用 `window.alert`、`window.prompt` 或 `window.confirm`**。
 - **Icons**（`ui/primitives/icon.tsx`）：统一从 `lucide-react` 引入图标并通过 `Mark` 组件渲染（常规控件 16px，紧凑/状态栏 14px，空态 18–20px）。**禁止使用 `+`、`×`、`▸`、`▾`、`✓` 或 emoji 充当独立 UI 图标**。
-- **样式入口**：`ui/tokens.css` 是 `--sd-*` 的唯一来源。`ui/primitives.css`、`ui/shell.css`、`ui/panels.css`、`ui/overlays.css`、`src/styles.css`、`editor/chrome.css` 只做 `@import`，新规则写进对应分片。
+- **样式入口**：`ui/tokens.css` 是 `--sd-*` 的唯一来源。`ui/primitives.css`、`ui/shell.css`、`ui/panels.css`、`ui/overlays.css`、`src/styles.css`、`editor/chrome.css` 只做 `@import`。样式与组件放在同一目录：壳层在 `ui/shell/`，业务面板在各自功能目录，编辑器 chrome 在 `editor/chrome/`，原语在 `ui/primitives/`。`src/styles/` 只保留全局基础和栏布局网格。
 - **测试稳定性**：修改已有组件或面板时，保持既有的 `data-testid` 属性、虚拟列表行高及键盘快捷键行为不变。

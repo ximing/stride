@@ -17,6 +17,4 @@
 
 ## 开发偏好
 
-- 新的全局 Service 在 `src/main.tsx` 里 `register`。
-- 大对象、平台句柄和第三方实例用 `raw()` 包住，避免整棵树被代理。
-- 全局命令先改 `src/appCommandManifest.json`，再改 `commands/command.service.ts` 与 `commands/commands.ts`，并跑 `commands/command-matrix.test.ts`。
+`raw()`、`register`、`observer` / `useService`，以及命令清单怎么和实现保持同步，见 `.claude/rules/rabjs-services.md`。

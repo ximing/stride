@@ -7,7 +7,8 @@
 - `main.tsx`：注册 Service、按固定顺序引入样式、挂载应用。
 - `app.tsx`：Chooser 与四栏工作台。对外重新导出测试用的 `Rail`、`GitStatusBadge`、`UpdateBanner`。
 - `appCommandManifest.json`：全局命令和快捷键的唯一清单。
-- `styles.css`：应用壳层样式的 `@import` 入口，分片在 `styles/`。不要把选择器写回入口文件。
+- `styles.css`：全局基础和栏布局的 `@import` 入口，分片在 `styles/`（`base.css`、`layout.css`）。不要把选择器写回入口文件。组件样式与组件放在同一目录。
+- `i18n/`：英文和中文界面文案。行为约束在 `.claude/rules/i18n.md`。
 - `dev/`：`/dev/components` 组件画布。
 - `inspect-*.ts` 与仓库里的 `inspect/`：调试代理通道。
 

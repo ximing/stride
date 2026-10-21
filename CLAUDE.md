@@ -47,3 +47,4 @@
 - `.claude/rules/rabjs-services.md`：`@rabjs/react` Service 状态管理、`observer`/`useService` 模式与命令清单同步约定
 - `.claude/rules/platform-adapters.md`：跨平台端口与 Tauri/Web 适配器实现约束
 - `.claude/rules/testing.md`：Vitest 单元测试、内存替身用法、序列化往返测试与 Playwright E2E 规范
+- `.claude/rules/i18n.md`：桌面端中英文文案目录、`t()` / `commandTitle`，以及语言偏好不进 Vault

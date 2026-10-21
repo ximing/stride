@@ -5,6 +5,8 @@ paths:
   - "apps/desktop/src/main.tsx"
   - "apps/desktop/src/app.tsx"
   - "apps/desktop/src/ui/**/*.tsx"
+  - "apps/desktop/src/editor/**/*.tsx"
+  - "apps/desktop/src/dev/**/*.tsx"
 ---
 
 # `@rabjs/react` Service 状态管理与命令规范
