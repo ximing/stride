@@ -1,5 +1,7 @@
 import { ArrowDown, ArrowUp, CircleAlert, CircleCheck, GitBranch } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { DEDICATED_ERROR } from '@stride/core'
 import type { GitChange } from '../../../../../packages/core/src/git-changes.ts'
 import { EmptyState } from '../primitives/empty-state'
 import { Button } from '../primitives/button'
@@ -60,8 +62,16 @@ export function GitPanelView(props: {
   conflicts?: readonly string[]
   onKeepSide?: (path: string, side: 'ours' | 'theirs') => void
 }) {
+  const { t } = useTranslation()
   const [commitOpen, setCommitOpen] = useState(false)
   const [restoreOpen, setRestoreOpen] = useState(false)
+  const statusCopy = (value: string) => {
+    if (value === 'Git is not available in the browser') return t('git.unavailable')
+    if (value === 'Git is turned off.') return t('git.off')
+    if (value === DEDICATED_ERROR) return t('git.broadFolder')
+    if (value === 'Add a model provider, base URL, model, and key in Settings') return t('chat.needProvider')
+    return value
+  }
   const historyEntries = props.historyEntries ?? []
   const conflicts = props.conflicts ?? []
   const selected = props.selected
@@ -70,7 +80,7 @@ export function GitPanelView(props: {
   const canConfirm = canOpen && props.message.trim().length > 0
   return (
     <div className="git-panel" data-testid="git-panel">
-      <h2 className="panel-heading">Git</h2>
+      <h2 className="panel-heading">{t('git.heading')}</h2>
       {props.branch ? (
         <div className="git-branch-row">
           <Mark icon={GitBranch} size={14} />
@@ -82,26 +92,26 @@ export function GitPanelView(props: {
           <EmptyState
             compact
             icon={CircleAlert}
-            title="Git is not available in the browser"
+            title={t('git.unavailable')}
             testId="git-unavailable"
           />
           {props.browserNeedsInit ? (
-            <p data-testid="git-needs-init">This vault is not a Git repository. Initialize it in the desktop app.</p>
+            <p data-testid="git-needs-init">{t('git.needsInitBrowser')}</p>
           ) : null}
         </>
       )}
       {props.surface === 'disabled' && (
-        <EmptyState compact icon={GitBranch} title="Git is turned off." testId="git-disabled" />
+        <EmptyState compact icon={GitBranch} title={t('git.off')} testId="git-disabled" />
       )}
       {props.surface === 'blocked' && (
-        <EmptyState compact tone="error" icon={CircleAlert} title={props.notice} testId="git-blocked" />
+        <EmptyState compact tone="error" icon={CircleAlert} title={statusCopy(props.notice)} testId="git-blocked" />
       )}
       {props.surface === 'needs-init' && (
         <EmptyState
           compact
           icon={GitBranch}
-          title="This vault is not a Git repository."
-          actionLabel="Initialize Git"
+          title={t('git.notRepo')}
+          actionLabel={t('git.init')}
           actionTestId="git-init"
           onAction={() => props.onInit()}
           testId="git-needs-init-surface"
@@ -110,29 +120,29 @@ export function GitPanelView(props: {
       {props.surface === 'ready' && (
         <>
           <div className="git-sync-stats">
-            <p className="meta" data-testid="git-ahead"><Mark icon={ArrowUp} size={13} />ahead {props.ahead}</p>
-            <p className="meta" data-testid="git-behind"><Mark icon={ArrowDown} size={13} />behind {props.behind}</p>
+            <p className="meta" data-testid="git-ahead"><Mark icon={ArrowUp} size={13} />{t('git.ahead', { count: props.ahead })}</p>
+            <p className="meta" data-testid="git-behind"><Mark icon={ArrowDown} size={13} />{t('git.behind', { count: props.behind })}</p>
           </div>
-          {props.notice ? <p className="meta git-notice" data-testid="git-notice">{props.notice}</p> : null}
-          <section className="git-section" aria-label="Remote settings">
+          {props.notice ? <p className="meta git-notice" data-testid="git-notice">{statusCopy(props.notice)}</p> : null}
+          <section className="git-section" aria-label={t('git.remoteSettings')}>
             <Input
-              label="Remote"
+              label={t('git.remote')}
               type="text"
               data-testid="git-remote"
               value={props.remote}
               onChange={(event) => props.onRemote(event.target.value)}
             />
             <div className="editor-tools git-actions">
-              <Button size="sm" tone="secondary" data-testid="git-remote-add" onClick={() => props.onAddRemote()}>Add remote</Button>
-              <Button size="sm" tone="secondary" data-testid="git-pull" onClick={() => props.onPull()}>Pull</Button>
-              <Button size="sm" tone="secondary" data-testid="git-push" onClick={() => props.onPush()}>Push</Button>
+              <Button size="sm" tone="secondary" data-testid="git-remote-add" onClick={() => props.onAddRemote()}>{t('git.addRemote')}</Button>
+              <Button size="sm" tone="secondary" data-testid="git-pull" onClick={() => props.onPull()}>{t('git.pull')}</Button>
+              <Button size="sm" tone="secondary" data-testid="git-push" onClick={() => props.onPush()}>{t('git.push')}</Button>
             </div>
           </section>
-          <section className="git-section" aria-label="Working tree">
-            <h3 className="panel-subheading">Changes</h3>
+          <section className="git-section" aria-label={t('git.workingTree')}>
+            <h3 className="panel-subheading">{t('git.changes')}</h3>
             <div className="git-changes">
               {props.changes.length === 0 ? (
-                <EmptyState compact icon={CircleCheck} title="Working tree clean" testId="git-clean" />
+                <EmptyState compact icon={CircleCheck} title={t('git.clean')} testId="git-clean" />
               ) : (
                 props.changes.map((change) => (
                   <div
@@ -155,10 +165,10 @@ export function GitPanelView(props: {
             </div>
           </section>
           <pre className="diff git-diff" data-testid="git-diff"><DiffLines diff={props.diff} /></pre>
-          <section className="git-section" aria-label="History">
+          <section className="git-section" aria-label={t('git.history')}>
             <div className="git-section-head">
-              <h3 className="panel-subheading">History</h3>
-              <Button size="sm" tone="quiet" data-testid="git-history" onClick={() => props.onLoadHistory?.()}>History</Button>
+              <h3 className="panel-subheading">{t('git.history')}</h3>
+              <Button size="sm" tone="quiet" data-testid="git-history" onClick={() => props.onLoadHistory?.()}>{t('git.history')}</Button>
             </div>
             <div className="git-history-list">
               {historyEntries.map((entry) => (
@@ -176,13 +186,13 @@ export function GitPanelView(props: {
               ))}
             </div>
             <pre className="history git-history-text" data-testid="git-history-text">{props.historyText ?? ''}</pre>
-            <Button size="sm" tone="secondary" data-testid="git-history-restore" onClick={() => setRestoreOpen(true)}>Restore</Button>
+            <Button size="sm" tone="secondary" data-testid="git-history-restore" onClick={() => setRestoreOpen(true)}>{t('git.restore')}</Button>
           </section>
           <Modal open={restoreOpen} onOpenChange={setRestoreOpen}>
-            <ModalContent title="Restore version" description="Replace the current file with the shown revision. Nothing is committed.">
+            <ModalContent title={t('git.restoreTitle')} description={t('git.restoreBody')}>
               <div className="sd-modal-actions">
                 <ModalClose asChild>
-                  <Button tone="secondary">Cancel</Button>
+                  <Button tone="secondary">{t('common.cancel')}</Button>
                 </ModalClose>
                 <Button
                   tone="danger"
@@ -192,7 +202,7 @@ export function GitPanelView(props: {
                     setRestoreOpen(false)
                   }}
                 >
-                  Restore
+                  {t('git.restore')}
                 </Button>
               </div>
             </ModalContent>
@@ -208,7 +218,7 @@ export function GitPanelView(props: {
                 setCommitOpen(true)
               }}
             >
-              Commit
+              {t('git.commit')}
             </Button>
           </div>
           <Modal
@@ -218,9 +228,9 @@ export function GitPanelView(props: {
               props.onCommitOpenChange?.(open)
             }}
           >
-            <ModalContent title="Commit" description="Commit the selected paths.">
+            <ModalContent title={t('git.commit')} description={t('git.commitBody')}>
               <label className="field git-commit-message-field">
-                <span>Message</span>
+                <span>{t('git.message')}</span>
                 <textarea
                   className="git-commit-message"
                   data-testid="git-commit-message"
@@ -239,10 +249,10 @@ export function GitPanelView(props: {
                     props.onSuggest()
                   }}
                 >
-                  Suggest message
+                  {t('git.suggest')}
                 </Button>
                 <ModalClose asChild>
-                  <Button size="sm" tone="secondary">Cancel</Button>
+                  <Button size="sm" tone="secondary">{t('common.cancel')}</Button>
                 </ModalClose>
                 <Button
                   size="sm"
@@ -254,7 +264,7 @@ export function GitPanelView(props: {
                     props.onCommit([...selected])
                   }}
                 >
-                  Commit
+                  {t('git.commit')}
                 </Button>
               </div>
             </ModalContent>
@@ -268,7 +278,7 @@ export function GitPanelView(props: {
             // Dismiss is not a choice. The list stays until each file keeps a side.
           }}
         >
-          <ModalContent title="Resolve conflicts" description="Keep ours or theirs for each file.">
+          <ModalContent title={t('git.conflictsTitle')} description={t('git.conflictsBody')}>
             <div data-testid="git-conflict">
               {conflicts.map((path) => (
                 <div key={path} className="field git-conflict-row">
@@ -281,7 +291,7 @@ export function GitPanelView(props: {
                       data-path={path}
                       onClick={() => props.onKeepSide?.(path, 'ours')}
                     >
-                      Keep ours
+                      {t('git.keepOurs')}
                     </Button>
                     <Button
                       size="sm"
@@ -290,7 +300,7 @@ export function GitPanelView(props: {
                       data-path={path}
                       onClick={() => props.onKeepSide?.(path, 'theirs')}
                     >
-                      Keep theirs
+                      {t('git.keepTheirs')}
                     </Button>
                   </div>
                 </div>
@@ -301,10 +311,10 @@ export function GitPanelView(props: {
       ) : null}
       {props.error ? (
         <div className="git-error-row">
-          <p className="error" data-testid="git-error" role="alert">{props.error}</p>
+          <p className="error" data-testid="git-error" role="alert">{statusCopy(props.error)}</p>
           {props.onRetryError ? (
             <Button size="sm" tone="secondary" className="save-retry" data-testid="git-error-retry" onClick={() => props.onRetryError?.()}>
-              重试
+              {t('common.retry')}
             </Button>
           ) : null}
         </div>

@@ -6,6 +6,7 @@
 import * as Dialog from '@radix-ui/react-dialog'
 import { observer, useService } from '@rabjs/react'
 import { X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { SettingsPageService } from '../../services/settings/settings-page.service'
 import { IconButton } from '../primitives/button'
 import { Mark } from '../primitives/icon'
@@ -14,6 +15,7 @@ import { SETTINGS_SECTIONS } from './sections'
 import './settings.css'
 
 export const SettingsPage = observer(function SettingsPage() {
+  const { t } = useTranslation()
   const service = useService(SettingsPageService)
   const restoreFocus = useDialogFocusRestore(service.open)
   const active = SETTINGS_SECTIONS.find((section) => section.id === service.section) ?? SETTINGS_SECTIONS[0]
@@ -29,15 +31,15 @@ export const SettingsPage = observer(function SettingsPage() {
         <Dialog.Content
           className="settings-page"
           data-testid="settings-page"
-          aria-label="Settings"
+          aria-label={t('settings.title')}
           onCloseAutoFocus={restoreFocus}
         >
           <Dialog.Description className="settings-sr-only">
-            Application settings, grouped by section.
+            {t('settings.description')}
           </Dialog.Description>
           <div className="settings-sidebar">
-            <Dialog.Title className="settings-title">Settings</Dialog.Title>
-            <nav className="settings-nav" aria-label="Settings sections">
+            <Dialog.Title className="settings-title">{t('settings.title')}</Dialog.Title>
+            <nav className="settings-nav" aria-label={t('settings.nav')}>
               {SETTINGS_SECTIONS.map((section) => (
                 <button
                   key={section.id}
@@ -48,7 +50,7 @@ export const SettingsPage = observer(function SettingsPage() {
                   onClick={() => service.select(section.id)}
                 >
                   <Mark icon={section.icon} size={16} />
-                  <span>{section.title}</span>
+                  <span>{t(`settings.sections.${section.id}`)}</span>
                 </button>
               ))}
             </nav>
@@ -56,11 +58,11 @@ export const SettingsPage = observer(function SettingsPage() {
           <div className="settings-content" data-testid="settings-content">
             <div className="settings-content-inner">
               <div className="settings-content-head">
-                <h2 className="settings-section-title">{active.title}</h2>
+                <h2 className="settings-section-title">{t(`settings.sections.${active.id}`)}</h2>
                 <Dialog.Close asChild>
                   <IconButton
                     icon={X}
-                    label="Close settings"
+                    label={t('settings.close')}
                     className="settings-close"
                     data-testid="settings-close"
                   />

@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 export type WikilinkMenuItem =
   | { kind: 'note'; id: string; title: string }
@@ -12,6 +13,7 @@ export const WikilinkMenu = forwardRef<WikilinkMenuHandle, {
   items: WikilinkMenuItem[]
   command: (item: WikilinkMenuItem) => void
 }>(function WikilinkMenu(props, ref) {
+  const { t } = useTranslation()
   const itemsRef = useRef(props.items)
   const commandRef = useRef(props.command)
   const selectedRef = useRef(0)
@@ -66,7 +68,7 @@ export const WikilinkMenu = forwardRef<WikilinkMenuHandle, {
           onMouseDown={(event) => event.preventDefault()}
           onClick={() => props.command(item)}
         >
-          {item.kind === 'note' ? item.title : `创建 “${item.title}”`}
+          {item.kind === 'note' ? item.title : t('editor.create', { title: item.title })}
         </button>
       ))}
     </div>

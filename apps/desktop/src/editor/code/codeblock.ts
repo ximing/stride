@@ -1,5 +1,6 @@
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
 import { common, createLowlight } from 'lowlight'
+import { t, watchLocale } from '../../i18n'
 import { registerDocCodeAliases } from './code-language'
 import { attachCodeLanguageMenu } from './code-language-menu'
 
@@ -75,7 +76,11 @@ export const codeBlockExtension = CodeBlockLowlight.extend({
       button.type = 'button'
       button.className = 'editor-code-copy'
       button.dataset.testid = 'code-copy'
-      button.textContent = '复制'
+      const applyCopy = () => {
+        button.textContent = t('editor.copy')
+      }
+      applyCopy()
+      const unwatchCopy = watchLocale(applyCopy)
 
       const frame = document.createElement('div')
       frame.style.position = 'relative'
@@ -166,6 +171,7 @@ export const codeBlockExtension = CodeBlockLowlight.extend({
         },
         destroy() {
           destroyed = true
+          unwatchCopy()
           languageMenu.destroy()
           cancel()
         },

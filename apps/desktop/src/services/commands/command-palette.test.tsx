@@ -195,8 +195,8 @@ describe('command palette', () => {
     const dialog = host?.querySelector('[data-testid="command-palette"]')
     expect(dialog?.getAttribute('role')).toBe('dialog')
     expect(document.activeElement).toBe(host?.querySelector('[data-testid="command-palette-input"]'))
-    expect(host?.textContent).toContain('命令')
-    expect(host?.textContent).toContain('笔记')
+    expect(host?.textContent).toContain('Commands')
+    expect(host?.textContent).toContain('Notes')
     expect(host?.textContent).toContain('AI')
 
     // Commands render their manifest title as visible text, with the shortcut right-aligned.

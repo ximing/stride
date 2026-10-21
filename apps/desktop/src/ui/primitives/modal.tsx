@@ -11,6 +11,7 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Mark } from './icon'
 import { useLayer } from './layer'
 
@@ -95,6 +96,7 @@ export const ModalContent = forwardRef<HTMLDivElement, ModalContentProps>(functi
   },
   ref,
 ) {
+  const { t } = useTranslation()
   const layer = useLayer()
   const modal = useContext(ModalContext)
   const restoreFocus = useDialogFocusRestore(modal?.open ?? true)
@@ -118,7 +120,7 @@ export const ModalContent = forwardRef<HTMLDivElement, ModalContentProps>(functi
         <Dialog.Title className="sd-modal-title">{title}</Dialog.Title>
         {description ? <Dialog.Description className="sd-modal-copy">{description}</Dialog.Description> : null}
         {children}
-        <Dialog.Close className="sd-modal-x" aria-label="Close">
+        <Dialog.Close className="sd-modal-x" aria-label={t('common.close')}>
           <Mark icon={X} size={16} />
         </Dialog.Close>
       </Dialog.Content>

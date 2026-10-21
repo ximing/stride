@@ -1,6 +1,7 @@
 // Pure command-palette item logic: which commands/notes/AI entries show for a
 // query. Reuses the quick-open title ranking for the note-jump section.
 import type { StrideNote } from '@stride/core/note'
+import { commandTitle, t } from '../../i18n'
 import { filterCommands, type AppCommand } from './commands'
 import { rankQuickOpenNotes } from '../search/quick-open.service'
 
@@ -14,16 +15,17 @@ export type PaletteItem =
   | { kind: 'ai'; key: string; prompt: string }
 
 export function paletteItemTitle(item: PaletteItem): string {
-  if (item.kind === 'ai') return item.prompt ? `Ask AI about “${item.prompt}”` : 'Ask AI…'
-  if (item.kind === 'command') return item.command.title
+  if (item.kind === 'ai') return item.prompt ? t('palette.askAbout', { prompt: item.prompt }) : t('palette.ask')
+  if (item.kind === 'command') return commandTitle(item.command.id, item.command.title)
+  if (item.kind === 'instance') return t('palette.newOfType', { type: item.typeTitle })
   return item.title
 }
 
 /** Palette section labels in fixed render order. */
 export function paletteItemSection(item: PaletteItem): string {
-  if (item.kind === 'note') return '笔记'
+  if (item.kind === 'note') return t('palette.notes')
   if (item.kind === 'ai') return 'AI'
-  return '命令'
+  return t('palette.commands')
 }
 
 /**

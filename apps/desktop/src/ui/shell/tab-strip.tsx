@@ -1,5 +1,7 @@
 import { observer, useService } from '@rabjs/react'
 import { X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { commandTitle } from '../../i18n'
 import { CommandService } from '../../services/commands/command.service'
 import { commandShortcut } from '../../services/commands/commands'
 import { TabsService } from '../../services/notes/tabs.service'
@@ -12,18 +14,20 @@ import { IconButton } from '../primitives/button'
  * exist. Close via the hover-revealed close button or middle click.
  */
 export const TabStrip = observer(function TabStrip() {
+  const { t } = useTranslation()
   const tabs = useService(TabsService)
   const vault = useService(VaultService)
   const commands = useService(CommandService)
   if (vault.phase !== 'ready' || tabs.tabs.length === 0) return null
   // Tooltip shortcut text comes from the manifest, never a hard-coded chord.
   const closeKeys = commandShortcut(commands.commands, 'tab.close')
-  const closeLabel = closeKeys ? `Close tab (${closeKeys})` : 'Close tab'
+  const closeName = commandTitle('tab.close', 'Close tab')
+  const closeLabel = closeKeys ? `${closeName} (${closeKeys})` : closeName
   return (
-    <div className="tab-strip" data-testid="tab-strip" role="tablist" aria-label="Open notes">
+    <div className="tab-strip" data-testid="tab-strip" role="tablist" aria-label={t('shell.openNotes')}>
       {tabs.tabs.map((tab) => {
         const note = vault.notes.find((item) => item.id === tab.noteId)
-        const title = note?.title || 'Untitled'
+        const title = note?.title || t('notes.untitled')
         const active = tab.id === tabs.activeTabId
         return (
           <div

@@ -1,6 +1,7 @@
 import { observer, useService } from '@rabjs/react'
 import { BookOpen, FolderOpen, FolderPlus, GitBranch, Notebook } from 'lucide-react'
 import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { NoteEditor } from './editor'
 import { LayoutService } from './services/layout/layout.service'
 import { GitService } from './services/git/git.service'
@@ -30,6 +31,7 @@ export { GitStatusBadge } from './ui/shell/status-bar'
 export { UpdateBanner } from './ui/shell/update-banner'
 
 const Chooser = observer(function Chooser() {
+  const { t } = useTranslation()
   const vault = useService(VaultService)
   const git = useService(GitService)
   return (
@@ -42,10 +44,8 @@ const Chooser = observer(function Chooser() {
             </span>
             <h1>Stride</h1>
           </div>
-          <p className="chooser-lead">A local-first workspace for your notes.</p>
-          <p className="chooser-description">
-            Keep rich-text notes in a folder you control. Use Git for history and sync when you need it—no account required.
-          </p>
+          <p className="chooser-lead">{t('chooser.lead')}</p>
+          <p className="chooser-description">{t('chooser.description')}</p>
         </div>
         <form
           className="chooser-form"
@@ -54,7 +54,7 @@ const Chooser = observer(function Chooser() {
           }}
         >
           <div className="chooser-start">
-            <div className="chooser-section-label">Start a workspace</div>
+            <div className="chooser-section-label">{t('chooser.start')}</div>
             <div className="chooser-actions">
               <Button
                 tone="primary"
@@ -63,7 +63,7 @@ const Chooser = observer(function Chooser() {
                 data-testid="new-vault"
                 onClick={() => void vault.createNewVault()}
               >
-                New vault
+                {t('chooser.newVault')}
               </Button>
               <Button
                 tone="secondary"
@@ -72,7 +72,7 @@ const Chooser = observer(function Chooser() {
                 data-testid="open-vault"
                 onClick={() => void vault.openFromDraft()}
               >
-                Open vault
+                {t('chooser.openVault')}
               </Button>
               <Button
                 tone="quiet"
@@ -81,14 +81,14 @@ const Chooser = observer(function Chooser() {
                 data-testid="clone-sample"
                 onClick={() => void vault.cloneSampleVault()}
               >
-                Clone sample
+                {t('chooser.cloneSample')}
               </Button>
             </div>
           </div>
           <div className="chooser-git">
             <div className="chooser-git-row">
               <Input
-                label="Git repository URL"
+                label={t('chooser.gitUrl')}
                 className="chooser-git-input"
                 data-testid="git-clone-url"
                 placeholder="https://github.com/you/notes.git"
@@ -107,11 +107,11 @@ const Chooser = observer(function Chooser() {
                   void git.cloneRemote()
                 }}
               >
-                Clone
+                {t('chooser.clone')}
               </Button>
             </div>
             {git.surface === 'unavailable' && (
-              <p className="chooser-hint" data-testid="git-clone-unavailable">git clone needs the desktop app</p>
+              <p className="chooser-hint" data-testid="git-clone-unavailable">{t('chooser.cloneNeedsDesktop')}</p>
             )}
             {git.cloneError && <p className="error chooser-error" data-testid="git-clone-error" role="alert">{git.cloneError}</p>}
           </div>
@@ -123,6 +123,7 @@ const Chooser = observer(function Chooser() {
 })
 
 const Workspace = observer(function Workspace() {
+  const { t } = useTranslation()
   const vault = useService(VaultService)
   const git = useService(GitService)
   const settings = useService(SettingsService)
@@ -153,13 +154,13 @@ const Workspace = observer(function Workspace() {
             <aside className="rail" data-testid="sidebar" style={{ width: layout.sidebarWidth }}>
               <Rail />
             </aside>
-            <ResizeHandle column="sidebar" label="Resize sidebar" onDoubleToggle={() => layout.toggleSidebar()} />
+            <ResizeHandle column="sidebar" label={t('shell.resizeSidebar')} onDoubleToggle={() => layout.toggleSidebar()} />
           </>
         )}
-        <section className="note-list-col" style={{ width: layout.noteListWidth }} aria-label="Notes">
+        <section className="note-list-col" style={{ width: layout.noteListWidth }} aria-label={t('shell.notes')}>
           <NoteList />
         </section>
-        <ResizeHandle column="noteList" label="Resize note list" />
+        <ResizeHandle column="noteList" label={t('shell.resizeNotes')} />
         <main className="stage">
           <TabStrip />
           {note ? (
@@ -177,11 +178,11 @@ const Workspace = observer(function Workspace() {
                   data-testid="save-status"
                 >
                   {vault.saveStatus === 'pending' || vault.saveStatus === 'saving'
-                    ? '保存中'
+                    ? t('shell.saving')
                     : vault.saveStatus === 'saved'
-                      ? '已保存'
+                      ? t('shell.saved')
                       : vault.saveStatus === 'error'
-                        ? '保存失败'
+                        ? t('shell.saveFailed')
                         : ''}
                 </span>
                 {vault.saveStatus === 'error' && (
@@ -192,7 +193,7 @@ const Workspace = observer(function Workspace() {
                     data-testid="save-retry"
                     onClick={() => { void vault.flush() }}
                   >
-                    重试
+                    {t('common.retry')}
                   </Button>
                 )}
                 <label className="rename-toggle">
@@ -202,7 +203,7 @@ const Workspace = observer(function Workspace() {
                     checked={vault.renameFromHeading}
                     onChange={(event) => { void vault.setRenameFromHeading(event.target.checked) }}
                   />
-                  Rename from heading
+                  {t('shell.renameFromHeading')}
                 </label>
               </div>
               <NoteEditor key={note.id} />
@@ -210,9 +211,9 @@ const Workspace = observer(function Workspace() {
           ) : (
             <EmptyState
               icon={Notebook}
-              title="No note selected"
-              body="Pick a note from the list, or create a new one."
-              actionLabel="New note"
+              title={t('shell.noNoteTitle')}
+              body={t('shell.noNoteBody')}
+              actionLabel={t('shell.newNote')}
               actionTestId="stage-new-note"
               onAction={() => vault.createNote()}
               className="sd-empty-state-stage"
@@ -220,7 +221,7 @@ const Workspace = observer(function Workspace() {
             />
           )}
           {vault.error && <p className="error" data-testid="vault-error" role="alert">{vault.error}</p>}
-          {vault.broad && <p className="meta">This folder is a broad personal root. Git init stays off unless it is already a dedicated vault.</p>}
+          {vault.broad && <p className="meta">{t('chooser.broadRoot')}</p>}
         </main>
         {layout.rightPanelCollapsed ? (
           <PanelRail />
@@ -229,7 +230,7 @@ const Workspace = observer(function Workspace() {
             <ResizeHandle
               column="rightPanel"
               edge="start"
-              label="Resize panel"
+              label={t('shell.resizePanel')}
               onDoubleToggle={() => layout.toggleRightPanel()}
             />
             <aside className="panel" style={{ width: layout.rightPanelWidth }}>

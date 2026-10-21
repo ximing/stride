@@ -72,7 +72,7 @@ describe('table', () => {
   it('inserts a 3x3 table with a header row from the slash command', () => {
     expect(tableSlashCommand).toMatchObject({
       id: 'table',
-      title: '表格',
+      title: 'Table',
       keywords: 'table 表格',
     })
     const editor = createEditor()

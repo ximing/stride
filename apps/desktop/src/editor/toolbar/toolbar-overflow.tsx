@@ -7,11 +7,10 @@ import {
   type ReactNode,
   type RefObject,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { Ellipsis } from 'lucide-react';
 import { toolbarFitCount, toolbarOverflowRange, type ToolbarItemMeasure } from './toolbar-fit';
-
-const MORE_LABEL = '更多';
 
 export type OverflowMeasure = 'icon' | 'select' | { className: string; text: string };
 
@@ -131,12 +130,13 @@ function MoreButton({
   buttonRef: RefObject<HTMLButtonElement | null>;
   onToggle: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <button
       ref={buttonRef}
       type="button"
       className={`editor-tool editor-toolbar-more-button${open || active ? ' is-active' : ''}`}
-      aria-label={MORE_LABEL}
+      aria-label={t('editor.more')}
       aria-haspopup="true"
       aria-expanded={open}
       aria-controls={menuId}
@@ -162,6 +162,7 @@ export function OverflowToolbar({
   slots: readonly OverflowSlot[];
   onClose?: () => void;
 }) {
+  const { t } = useTranslation();
   const menuId = useId();
   const signature = slots.map((slot) => `${slot.id}:${measureKey(slot)}`).join('|');
   const { barRef, measureRef, fit } = useToolbarFit(signature, slots);
@@ -289,7 +290,7 @@ export function OverflowToolbar({
               id={menuId}
               className="editor-toolbar-more"
               role="group"
-              aria-label={`${label}更多`}
+              aria-label={t('editor.moreOf', { label })}
               style={{
                 top: pos?.top ?? 0,
                 left: pos?.left ?? 0,

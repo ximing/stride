@@ -1,6 +1,7 @@
 import { ReactRenderer } from '@tiptap/react'
 import type { SuggestionKeyDownProps, SuggestionProps } from '@tiptap/suggestion'
 import { useLayoutEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { EmptyState } from '../../ui/primitives/empty-state'
 import { moveSlashSelection, type SlashCommand } from './slash'
 
@@ -12,6 +13,7 @@ type SlashMenuProps = {
 }
 
 export function SlashMenu({ items, selected, command, clientRect }: SlashMenuProps) {
+  const { t } = useTranslation()
   const rootRef = useRef<HTMLDivElement>(null)
   useLayoutEffect(() => {
     const node = rootRef.current
@@ -30,7 +32,7 @@ export function SlashMenu({ items, selected, command, clientRect }: SlashMenuPro
   return (
     <div ref={rootRef} data-testid="slash-menu" className="slash-menu" role="listbox">
       {items.length === 0 ? (
-        <EmptyState compact title="没有匹配" testId="slash-menu-empty" />
+        <EmptyState compact title={t('editor.slash.empty')} testId="slash-menu-empty" />
       ) : (
         items.map((item, index) => {
           const isSelected = index === selected
@@ -46,7 +48,7 @@ export function SlashMenu({ items, selected, command, clientRect }: SlashMenuPro
                 command(item)
               }}
             >
-              {item.title}
+              {t(`editor.slash.${item.id}`)}
             </div>
           )
         })

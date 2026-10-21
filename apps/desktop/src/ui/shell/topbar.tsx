@@ -1,6 +1,7 @@
 import { observer, useService } from '@rabjs/react'
 import { Check, ChevronDown, PanelLeft, Search, X } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { CommandService } from '../../services/commands/command.service'
 import { commandShortcut } from '../../services/commands/commands'
 import { LayoutService } from '../../services/layout/layout.service'
@@ -10,6 +11,7 @@ import { Mark } from '../primitives/icon'
 import { Tooltip, TooltipContent, TooltipTrigger } from '../primitives/tooltip'
 
 export const VaultSwitcher = observer(function VaultSwitcher() {
+  const { t } = useTranslation()
   const vault = useService(VaultService)
   const [open, setOpen] = useState(false)
   const rootRef = useRef<HTMLDivElement>(null)
@@ -51,7 +53,7 @@ export const VaultSwitcher = observer(function VaultSwitcher() {
         <Mark icon={ChevronDown} size={14} />
       </Button>
       {open && (
-        <div className="vault-switcher-list" id="vault-switcher-options" role="listbox" aria-label="Vaults">
+        <div className="vault-switcher-list" id="vault-switcher-options" role="listbox" aria-label={t('search.vaults')}>
           {vault.vaults.map((entry) => {
             const selected = entry.id === vault.activeVaultId
             return (
@@ -81,6 +83,7 @@ export const VaultSwitcher = observer(function VaultSwitcher() {
 })
 
 export const TopBar = observer(function TopBar() {
+  const { t } = useTranslation()
   const vault = useService(VaultService)
   const layout = useService(LayoutService)
   const commands = useService(CommandService)
@@ -90,7 +93,7 @@ export const TopBar = observer(function TopBar() {
     <header className="topbar">
       <IconButton
         icon={PanelLeft}
-        label={layout.sidebarCollapsed ? 'Show sidebar' : 'Hide sidebar'}
+        label={layout.sidebarCollapsed ? t('search.showSidebar') : t('search.hideSidebar')}
         className="topbar-icon"
         data-testid="sidebar-toggle"
         active={!layout.sidebarCollapsed}
@@ -108,18 +111,18 @@ export const TopBar = observer(function TopBar() {
             <TooltipTrigger asChild>
               <input
                 data-testid="vault-search"
-                aria-label="Search the vault"
+                aria-label={t('search.vault')}
                 value={vault.searchQuery}
                 onChange={(event) => { vault.searchQuery = event.target.value }}
-                placeholder="Search the vault"
+                placeholder={t('search.vault')}
               />
             </TooltipTrigger>
-            {searchKeys ? <TooltipContent>全库搜索面板 {searchKeys}</TooltipContent> : null}
+            {searchKeys ? <TooltipContent>{t('search.tooltip', { keys: searchKeys })}</TooltipContent> : null}
           </Tooltip>
           {vault.searchQuery.trim() !== '' && (
             <IconButton
               icon={X}
-              label="Clear search"
+              label={t('search.clear')}
               className="search-clear"
               onClick={() => vault.clearSearch()}
             />
@@ -133,10 +136,10 @@ export const TopBar = observer(function TopBar() {
           data-testid="run-search"
           icon={<Mark icon={Search} size={14} />}
         >
-          Search
+          {t('search.submit')}
         </Button>
-        <span className="search-mode" data-testid="search-mode">{vault.searchMode ? `Search mode ${vault.searchMode}` : ''}</span>
-        {vault.searchDegraded ? <span className="search-degraded" data-testid="search-degraded">已降级为 BM25</span> : null}
+        <span className="search-mode" data-testid="search-mode">{vault.searchMode ? t('search.mode', { mode: vault.searchMode }) : ''}</span>
+        {vault.searchDegraded ? <span className="search-degraded" data-testid="search-degraded">{t('search.degraded')}</span> : null}
       </form>
     </header>
   )

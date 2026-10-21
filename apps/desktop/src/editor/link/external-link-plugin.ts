@@ -2,6 +2,7 @@ import { Extension } from '@tiptap/core';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
+import { t, watchLocale } from '../../i18n';
 import {
   externalLinkOpenHref,
   externalOpenUrl,
@@ -15,6 +16,7 @@ const JUMP_ICON_SVG =
   '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>';
 
 const pluginKey = new PluginKey<DecorationSet>('externalLinkOpen');
+const jumpUnwatch = new WeakMap<Node, () => void>();
 
 let lastOpened = { url: '', at: 0 };
 
@@ -28,7 +30,11 @@ function openExternalUrl(url: string): void {
 function createJumpIcon(href: string): HTMLElement {
   const icon = document.createElement('span');
   icon.className = JUMP_ICON_CLASS;
-  icon.title = '打开链接';
+  const applyTitle = () => {
+    icon.title = t('editor.openLink');
+  };
+  applyTitle();
+  jumpUnwatch.set(icon, watchLocale(applyTitle));
   icon.dataset.href = href;
   icon.innerHTML = JUMP_ICON_SVG;
   const open = (event: Event) => {
@@ -77,6 +83,10 @@ function externalLinkDecorations(doc: ProseMirrorNode): DecorationSet {
       ignoreSelection: true,
       stopEvent: () => true,
       key: `${range.href}@${range.to}`,
+      destroy: (node) => {
+        jumpUnwatch.get(node)?.();
+        jumpUnwatch.delete(node);
+      },
     }),
   );
   return DecorationSet.create(doc, widgets);

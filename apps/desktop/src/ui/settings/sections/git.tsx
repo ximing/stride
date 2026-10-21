@@ -7,6 +7,7 @@
 import { observer, useService } from '@rabjs/react'
 import { CircleAlert, CircleCheck } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { SettingsService } from '../../../services/settings/settings.service'
 import { Button } from '../../primitives/button'
 import { Mark } from '../../primitives/icon'
@@ -16,17 +17,19 @@ import './git.css'
 const MAX_AUTO_PULL_MINUTES = 1440
 const MAX_AUTO_GIT_SECONDS = 3600
 
-type ParsedNumber = { ok: true; value: number } | { ok: false; error: string }
+type NumberError = '' | 'whole' | 'range'
+type ParsedNumber = { ok: true; value: number } | { ok: false; error: NumberError }
 
 function parseNonNegativeInt(text: string, max: number): ParsedNumber {
   const trimmed = text.trim()
-  if (!/^\d+$/.test(trimmed)) return { ok: false, error: 'Enter a whole number of 0 or more.' }
+  if (!/^\d+$/.test(trimmed)) return { ok: false, error: 'whole' }
   const value = Number(trimmed)
-  if (!Number.isSafeInteger(value) || value > max) return { ok: false, error: `Must be between 0 and ${max}.` }
+  if (!Number.isSafeInteger(value) || value > max) return { ok: false, error: 'range' }
   return { ok: true, value }
 }
 
 type GitNumberField = 'autoPull' | 'idle' | 'blur'
+type SaveStatus = '' | 'saved' | 'invalid'
 
 function NumberRow(props: {
   label: string
@@ -91,14 +94,21 @@ function ToggleRow(props: {
 }
 
 export const GitSection = observer(function GitSection() {
+  const { t } = useTranslation()
   const settings = useService(SettingsService)
   const [gitEnabled, setGitEnabled] = useState(settings.form.gitEnabled)
   const [autoPull, setAutoPull] = useState(String(settings.form.autoSyncMinutes))
   const [autoGitEnabled, setAutoGitEnabled] = useState(settings.form.autoGitEnabled)
   const [idle, setIdle] = useState(String(settings.form.autoGitIdleSeconds))
   const [blur, setBlur] = useState(String(settings.form.autoGitBlurSeconds))
-  const [errors, setErrors] = useState<Record<GitNumberField, string>>({ autoPull: '', idle: '', blur: '' })
-  const [status, setStatus] = useState('')
+  const [errors, setErrors] = useState<Record<GitNumberField, NumberError>>({ autoPull: '', idle: '', blur: '' })
+  const [status, setStatus] = useState<SaveStatus>('')
+
+  const numberError = (code: NumberError, max: number) => {
+    if (code === 'whole') return t('settings.git.wholeNumber')
+    if (code === 'range') return t('settings.git.range', { max })
+    return ''
+  }
 
   const setDraft = (field: GitNumberField, next: string) => {
     if (field === 'autoPull') setAutoPull(next)
@@ -120,7 +130,7 @@ export const GitSection = observer(function GitSection() {
       blur: blurParsed.ok ? '' : blurParsed.error,
     })
     if (!autoPullParsed.ok || !idleParsed.ok || !blurParsed.ok) {
-      setStatus('Fix the highlighted fields before saving.')
+      setStatus('invalid')
       return
     }
     setStatus('')
@@ -131,14 +141,16 @@ export const GitSection = observer(function GitSection() {
     settings.setAutoGitBlurSeconds(blurParsed.value)
     await settings.save()
     if (settings.notice) setStatus('')
-    else setStatus('Saved.')
+    else setStatus('saved')
   }
+
+  const statusText = status === 'saved' ? t('common.saved') : status === 'invalid' ? t('common.fixFields') : ''
 
   return (
     <div className="sgit" data-testid="settings-section-git">
       <ToggleRow
-        label="Enable Git integration"
-        hint="Master switch for version control. Off hides the Git panel and stops all background sync."
+        label={t('settings.git.enable')}
+        hint={t('settings.git.enableHint')}
         checked={gitEnabled}
         testId="settings-git-enabled"
         onChange={(next) => {
@@ -147,16 +159,16 @@ export const GitSection = observer(function GitSection() {
         }}
       />
       <NumberRow
-        label="Auto pull interval (minutes)"
-        hint={`Pull from the remote every N minutes. 0 disables auto pull. Max ${MAX_AUTO_PULL_MINUTES} (24h).`}
+        label={t('settings.git.autoPull')}
+        hint={t('settings.git.autoPullHint', { max: MAX_AUTO_PULL_MINUTES })}
         value={autoPull}
-        error={errors.autoPull}
+        error={numberError(errors.autoPull, MAX_AUTO_PULL_MINUTES)}
         testId="settings-git-auto-pull"
         onChange={(next) => setDraft('autoPull', next)}
       />
       <ToggleRow
-        label="Auto Git"
-        hint="Commit and push automatically when you stop typing or leave the window."
+        label={t('settings.git.autoGit')}
+        hint={t('settings.git.autoGitHint')}
         checked={autoGitEnabled}
         testId="settings-git-autogit-enabled"
         onChange={(next) => {
@@ -165,29 +177,29 @@ export const GitSection = observer(function GitSection() {
         }}
       />
       <NumberRow
-        label="Auto Git idle threshold (seconds)"
-        hint={`Commit after this many seconds without typing. 0 disables the idle trigger. Max ${MAX_AUTO_GIT_SECONDS}.`}
+        label={t('settings.git.idle')}
+        hint={t('settings.git.idleHint', { max: MAX_AUTO_GIT_SECONDS })}
         value={idle}
-        error={errors.idle}
+        error={numberError(errors.idle, MAX_AUTO_GIT_SECONDS)}
         testId="settings-git-autogit-idle"
         onChange={(next) => setDraft('idle', next)}
       />
       <NumberRow
-        label="Auto Git blur threshold (seconds)"
-        hint={`Commit when the window loses focus for at least this many seconds. 0 disables the blur trigger. Max ${MAX_AUTO_GIT_SECONDS}.`}
+        label={t('settings.git.blur')}
+        hint={t('settings.git.blurHint', { max: MAX_AUTO_GIT_SECONDS })}
         value={blur}
-        error={errors.blur}
+        error={numberError(errors.blur, MAX_AUTO_GIT_SECONDS)}
         testId="settings-git-autogit-blur"
         onChange={(next) => setDraft('blur', next)}
       />
       <div className="sgit-actions">
         <Button tone="primary" size="lg" data-testid="settings-git-save" onClick={() => void save()}>
-          Save
+          {t('common.save')}
         </Button>
-        {status && (
-          <p className="sgit-status" data-tone={status === 'Saved.' ? 'success' : 'error'} data-testid="settings-git-status" role="status">
-            <Mark icon={status === 'Saved.' ? CircleCheck : CircleAlert} size={14} />
-            <span>{status}</span>
+        {statusText && (
+          <p className="sgit-status" data-tone={status === 'saved' ? 'success' : 'error'} data-testid="settings-git-status" role="status">
+            <Mark icon={status === 'saved' ? CircleCheck : CircleAlert} size={14} />
+            <span>{statusText}</span>
           </p>
         )}
         {settings.notice && (

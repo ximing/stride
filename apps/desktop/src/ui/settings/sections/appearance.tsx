@@ -6,9 +6,9 @@
 // paint. All changes apply instantly via CSS variables on <html>.
 
 import { has, observer, useService } from '@rabjs/react'
-import type { NoteWidth } from '@stride/core'
 import { Monitor, Moon, Sun, type LucideIcon } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   applyAppearance,
   defaultAppearanceStorage,
@@ -19,6 +19,7 @@ import {
   writeStoredAppearance,
   type AppearancePrefs,
 } from '../../../services/appearance/appearance'
+import { LocaleService } from '../../../services/appearance/locale.service'
 import { SettingsService } from '../../../services/settings/settings.service'
 import { THEME_MODES, type ThemeMode } from '../../../services/appearance/theme'
 import { ThemeService } from '../../../services/appearance/theme.service'
@@ -27,37 +28,68 @@ import { SettingsSegmentedControl } from '../segmented-control'
 import './appearance.css'
 
 const THEME_ICONS: Record<ThemeMode, LucideIcon> = { light: Sun, dark: Moon, system: Monitor }
-const THEME_LABELS: Record<ThemeMode, string> = { light: 'Light', dark: 'Dark', system: 'System' }
-const WIDTH_LABELS: Record<NoteWidth, string> = { narrow: 'Narrow', standard: 'Standard', wide: 'Wide' }
 
-const THEME_OPTIONS = THEME_MODES.map((mode) => ({ value: mode, label: THEME_LABELS[mode], icon: THEME_ICONS[mode] }))
-const WIDTH_OPTIONS = NOTE_WIDTHS.map((width) => ({ value: width, label: WIDTH_LABELS[width] }))
-
-const ThemeGroup = observer(function ThemeGroup() {
-  const theme = useService(ThemeService)
+const LanguageGroup = observer(function LanguageGroup() {
+  const { t } = useTranslation()
+  const locale = useService(LocaleService)
+  const options = [
+    { value: 'en' as const, label: t('locale.en') },
+    { value: 'zh' as const, label: t('locale.zh') },
+  ]
   return (
     <div className="appearance-group">
-      <h3 className="appearance-heading">Theme</h3>
+      <h3 className="appearance-heading">{t('locale.label')}</h3>
       <SettingsSegmentedControl
-        label="Theme"
+        label={t('locale.label')}
+        value={locale.locale}
+        options={options}
+        testIdPrefix="locale"
+        onChange={(next) => locale.setLocale(next)}
+      />
+      <p className="appearance-hint">{t('locale.hint')}</p>
+    </div>
+  )
+})
+
+const ThemeGroup = observer(function ThemeGroup() {
+  const { t } = useTranslation()
+  const theme = useService(ThemeService)
+  const options = THEME_MODES.map((mode) => ({
+    value: mode,
+    label: t(`settings.appearance.${mode}`),
+    icon: THEME_ICONS[mode],
+  }))
+  return (
+    <div className="appearance-group">
+      <h3 className="appearance-heading">{t('settings.appearance.theme')}</h3>
+      <SettingsSegmentedControl
+        label={t('settings.appearance.theme')}
         value={theme.mode}
-        options={THEME_OPTIONS}
+        options={options}
         testIdPrefix="theme"
         onChange={(mode) => theme.setTheme(mode)}
       />
-      <p className="appearance-hint">System follows the OS appearance and tracks it live.</p>
+      <p className="appearance-hint">{t('settings.appearance.themeHint')}</p>
     </div>
   )
 })
 
 const AppearancePrefsForm = observer(function AppearancePrefsForm() {
+  const { t } = useTranslation()
   const settings = useService(SettingsService)
   // Local drafts keep invalid input visible without touching applied state.
   const [fontDraft, setFontDraft] = useState<string | null>(null)
-  const [fontError, setFontError] = useState('')
+  const [fontInvalid, setFontInvalid] = useState(false)
 
   const noteWidth = settings.form.appearance.noteWidth
   const fontSize = settings.form.appearance.fontSize
+  const fontError = fontInvalid
+    ? t('settings.appearance.fontError', { min: NOTE_FONT_SIZE_MIN, max: NOTE_FONT_SIZE_MAX })
+    : ''
+  const widthOptions = NOTE_WIDTHS.map((width) => ({
+    value: width,
+    label: t(`settings.appearance.${width}`),
+  }))
 
   // The settings file is canonical: once SettingsService finishes loading,
   // re-apply from form so values synced from another machine take over from
@@ -80,30 +112,30 @@ const AppearancePrefsForm = observer(function AppearancePrefsForm() {
     setFontDraft(text)
     const parsed = Number(text)
     if (text.trim() === '' || !isValidNoteFontSize(parsed)) {
-      setFontError(`Font size must be a whole number between ${NOTE_FONT_SIZE_MIN} and ${NOTE_FONT_SIZE_MAX}.`)
+      setFontInvalid(true)
       return
     }
-    setFontError('')
+    setFontInvalid(false)
     patchAppearance({ fontSize: parsed })
   }
 
   return (
     <>
       <div className="appearance-group">
-        <h3 className="appearance-heading">Note width</h3>
+        <h3 className="appearance-heading">{t('settings.appearance.width')}</h3>
         <SettingsSegmentedControl
-          label="Note width"
+          label={t('settings.appearance.width')}
           value={noteWidth}
-          options={WIDTH_OPTIONS}
+          options={widthOptions}
           testIdPrefix="note-width"
           onChange={(width) => patchAppearance({ noteWidth: width })}
         />
-        <p className="appearance-hint">Caps the editor column; wide removes the cap.</p>
+        <p className="appearance-hint">{t('settings.appearance.widthHint')}</p>
       </div>
       <div className="appearance-group">
         <div className="appearance-fontsize-field">
           <Input
-            label="Font size (px)"
+            label={t('settings.appearance.fontSize')}
             className="appearance-fontsize-input"
             data-testid="note-font-size"
             type="number"
@@ -119,7 +151,7 @@ const AppearancePrefsForm = observer(function AppearancePrefsForm() {
           />
         </div>
         <p className="appearance-hint" id="note-font-size-hint">
-          Editor body text, {NOTE_FONT_SIZE_MIN}–{NOTE_FONT_SIZE_MAX}px. Applies immediately.
+          {t('settings.appearance.fontHint', { min: NOTE_FONT_SIZE_MIN, max: NOTE_FONT_SIZE_MAX })}
         </p>
         {fontError && (
           <p className="error" id="note-font-size-error" role="alert" data-testid="note-font-size-error">
@@ -137,8 +169,10 @@ const AppearancePrefsForm = observer(function AppearancePrefsForm() {
 })
 
 export function AppearanceSection() {
+  const { t } = useTranslation()
   return (
-    <section className="appearance-section" data-testid="settings-section-appearance" aria-label="Appearance settings">
+    <section className="appearance-section" data-testid="settings-section-appearance" aria-label={t('settings.appearance.region')}>
+      <LanguageGroup />
       <ThemeGroup />
       {/* SettingsService is registered at app start; tests that mount the page
           without it still get the theme control. */}

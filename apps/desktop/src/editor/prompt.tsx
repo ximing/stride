@@ -1,6 +1,7 @@
 import * as Dialog from '@radix-ui/react-dialog'
 import { X } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button, IconButton } from '../ui/primitives/button'
 import { useLayer } from '../ui/primitives/layer'
 import { Modal, ModalClose } from '../ui/primitives/modal'
@@ -30,6 +31,7 @@ export function EditorPrompt({
   onExtra?: () => void
   onClose: () => void
 }) {
+  const { t } = useTranslation()
   const [value, setValue] = useState(initialValue)
   const inputRef = useRef<HTMLInputElement>(null)
   const layer = useLayer()
@@ -88,12 +90,12 @@ export function EditorPrompt({
                 </Button>
               ) : null}
               <ModalClose asChild>
-                <Button tone="secondary" className="editor-prompt-cancel">取消</Button>
+                <Button tone="secondary" className="editor-prompt-cancel">{t('editor.cancel')}</Button>
               </ModalClose>
-              <Button tone="primary" className="editor-prompt-submit" type="submit">应用</Button>
+              <Button tone="primary" className="editor-prompt-submit" type="submit">{t('editor.apply')}</Button>
             </div>
             <ModalClose asChild>
-              <IconButton className="sd-modal-x" icon={X} label="Close" />
+              <IconButton className="sd-modal-x" icon={X} label={t('editor.close')} />
             </ModalClose>
           </form>
         </Dialog.Content>

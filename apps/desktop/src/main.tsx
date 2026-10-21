@@ -1,3 +1,4 @@
+import './i18n'
 import { register, resolve } from '@rabjs/react'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
@@ -18,6 +19,7 @@ import { SearchPanelService } from './services/search/search-panel.service'
 import { SettingsPageService } from './services/settings/settings-page.service'
 import { TabsService } from './services/notes/tabs.service'
 import { applyStoredTheme } from './services/appearance/theme'
+import { LocaleService } from './services/appearance/locale.service'
 import { ThemeService } from './services/appearance/theme.service'
 import { scheduleUpdateAutocheck, UpdateCheckService } from './services/update/update-check'
 import { VaultService } from './services/vault/vault.service'
@@ -65,6 +67,7 @@ if (showComponents) {
   register(UpdateService)
   register(UpdateCheckService)
   register(ThemeService)
+  register(LocaleService)
 
   void resolve(VaultService).restoreOpened()
   void resolve(SettingsService).load()

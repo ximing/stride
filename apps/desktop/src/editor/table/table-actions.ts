@@ -7,13 +7,28 @@ import { CellSelection, cellAround, columnIsHeader, isInTable, rowIsHeader, sele
 const CELL_HEX = /^#[0-9a-fA-F]{6}$/;
 
 export const TABLE_CELL_COLORS = [
-  { label: '黄', value: '#f6e7a8' },
-  { label: '绿', value: '#d7efd4' },
-  { label: '蓝', value: '#d6e6f7' },
-  { label: '粉', value: '#f8d6d0' },
-  { label: '紫', value: '#e7dff6' },
-  { label: '灰', value: '#ece7df' },
+  { id: 'yellow', value: '#f6e7a8' },
+  { id: 'green', value: '#d7efd4' },
+  { id: 'blue', value: '#d6e6f7' },
+  { id: 'pink', value: '#f8d6d0' },
+  { id: 'purple', value: '#e7dff6' },
+  { id: 'gray', value: '#ece7df' },
 ] as const;
+
+/** Catalog keys for table commands. Translated at render, not stored as copy. */
+export const TABLE_COMMAND_KEY: Record<TableCommand, string> = {
+  addRowBefore: 'editor.table.addRowBefore',
+  addRowAfter: 'editor.table.addRowAfter',
+  deleteRow: 'editor.table.deleteRow',
+  addColumnBefore: 'editor.table.addColumnBefore',
+  addColumnAfter: 'editor.table.addColumnAfter',
+  deleteColumn: 'editor.table.deleteColumn',
+  mergeCells: 'editor.table.merge',
+  splitCell: 'editor.table.split',
+  toggleHeaderRow: 'editor.table.headerRow',
+  toggleHeaderColumn: 'editor.table.headerColumn',
+  deleteTable: 'editor.table.delete',
+};
 
 export type TableActionState = {
   headerRow: boolean;

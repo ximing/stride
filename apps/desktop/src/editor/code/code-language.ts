@@ -1,3 +1,5 @@
+import { t } from '../../i18n';
+
 export type CodeLanguageChoice = {
   value: string;
   label: string;
@@ -8,7 +10,7 @@ export type CodeLanguageChoice = {
  * The other ids are highlight.js languages from lowlight's common bundle.
  */
 export const CODE_LANGUAGES = [
-  { id: 'plaintext', label: '纯文本' },
+  { id: 'plaintext', label: 'Plain text' },
   { id: 'mermaid', label: 'Mermaid' },
   { id: 'javascript', label: 'JavaScript' },
   { id: 'typescript', label: 'TypeScript' },
@@ -45,7 +47,7 @@ export const CODE_LANGUAGES = [
   { id: 'vbnet', label: 'Visual Basic' },
   { id: 'wasm', label: 'WebAssembly' },
   { id: 'ini', label: 'INI' },
-  { id: 'php-template', label: 'PHP 模板' },
+  { id: 'php-template', label: 'PHP template' },
   { id: 'python-repl', label: 'Python REPL' },
 ] as const;
 
@@ -132,10 +134,22 @@ export function registerDocCodeAliases(lowlight: CodeAliasHost): void {
   });
 }
 
+const TRANSLATED_LANGUAGE: Record<string, string> = {
+  plaintext: 'editor.lang.plaintext',
+  'php-template': 'editor.lang.phpTemplate',
+};
+
+/** Display label. Proper nouns stay as stored; plaintext, PHP template, and auto are catalog strings. */
+export function codeLanguageLabel(id: string, fallback: string): string {
+  if (id === '') return t('editor.lang.auto');
+  const key = TRANSLATED_LANGUAGE[id];
+  return key ? t(key) : fallback;
+}
+
 export function codeLanguageChoices(language: string | null | undefined): CodeLanguageChoice[] {
   const choices: CodeLanguageChoice[] = [
-    { value: '', label: '自动' },
-    ...CODE_LANGUAGES.map((item) => ({ value: item.id, label: item.label })),
+    { value: '', label: codeLanguageLabel('', '') },
+    ...CODE_LANGUAGES.map((item) => ({ value: item.id, label: codeLanguageLabel(item.id, item.label) })),
   ];
   const extra = codeLanguageValue(language);
   if (extra !== '' && !choices.some((item) => item.value === extra)) {

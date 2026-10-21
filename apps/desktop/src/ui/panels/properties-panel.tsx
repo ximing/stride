@@ -1,5 +1,6 @@
 import { Archive, SlidersHorizontal, Trash2, X } from 'lucide-react'
 import { observer, useService } from '@rabjs/react'
+import { useTranslation } from 'react-i18next'
 import { relationsOf, resolveNote, type NoteRelations } from '@stride/core/graph'
 import { bodyWikilinks, isArchived, isHiddenProperty, propertyKind, type StrideNote } from '@stride/core/note'
 import { useState } from 'react'
@@ -34,25 +35,25 @@ function unresolvedRelations(
   return rows
 }
 
-const PROPERTY_TYPE_OPTIONS = [
-  { value: 'string', label: 'string' },
-  { value: 'number', label: 'number' },
-  { value: 'boolean', label: 'boolean' },
-  { value: 'list', label: 'list' },
-]
-
 export const PropertiesPanel = observer(function PropertiesPanel() {
+  const { t } = useTranslation()
   const vault = useService(VaultService)
   const tabs = useService(TabsService)
   const note = vault.active
   const [deleteOpen, setDeleteOpen] = useState(false)
+  const propertyTypeOptions = [
+    { value: 'string', label: t('panels.kindString') },
+    { value: 'number', label: t('panels.kindNumber') },
+    { value: 'boolean', label: t('panels.kindBoolean') },
+    { value: 'list', label: t('panels.kindList') },
+  ]
   if (!note) {
     return (
       <EmptyState
         compact
         icon={SlidersHorizontal}
-        title="Select a note"
-        body="Properties, relationships and backlinks show here."
+        title={t('panels.propertiesEmptyTitle')}
+        body={t('panels.propertiesEmptyBody')}
         testId="properties-empty"
       />
     )
@@ -64,7 +65,7 @@ export const PropertiesPanel = observer(function PropertiesPanel() {
   return (
     <div className="properties-panel">
       <div className="properties-panel-head">
-        <h2 className="panel-heading">Properties</h2>
+        <h2 className="panel-heading">{t('panels.properties')}</h2>
         <div className="properties-actions">
           <Button
             size="sm"
@@ -73,7 +74,7 @@ export const PropertiesPanel = observer(function PropertiesPanel() {
             data-testid="archive-note"
             onClick={() => vault.updateBooleanProperty('archived', !isArchived(note))}
           >
-            {isArchived(note) ? 'Unarchive' : 'Archive'}
+            {isArchived(note) ? t('panels.unarchive') : t('notes.archive')}
           </Button>
           <Button
             size="sm"
@@ -82,15 +83,15 @@ export const PropertiesPanel = observer(function PropertiesPanel() {
             data-testid="delete-note"
             onClick={() => setDeleteOpen(true)}
           >
-            Delete
+            {t('common.delete')}
           </Button>
         </div>
       </div>
       <Modal open={deleteOpen} onOpenChange={setDeleteOpen}>
-        <ModalContent title="Delete note" description="Delete this note permanently? This cannot be undone.">
+        <ModalContent title={t('panels.deleteNote')} description={t('panels.deleteNoteBody')}>
           <div className="sd-modal-actions">
             <ModalClose asChild>
-              <Button tone="secondary" data-testid="cancel-delete">Cancel</Button>
+              <Button tone="secondary" data-testid="cancel-delete">{t('common.cancel')}</Button>
             </ModalClose>
             <Button
               tone="danger"
@@ -100,12 +101,12 @@ export const PropertiesPanel = observer(function PropertiesPanel() {
                 setDeleteOpen(false)
               }}
             >
-              Delete
+              {t('common.delete')}
             </Button>
           </div>
         </ModalContent>
       </Modal>
-      <Input label="Type" value={note.type} onChange={(event) => vault.updateType(event.target.value)} />
+      <Input label={t('panels.type')} value={note.type} onChange={(event) => vault.updateType(event.target.value)} />
       {fields.map((field) => {
         const value = note.properties[field]
         const kind = propertyKind(value)
@@ -148,7 +149,7 @@ export const PropertiesPanel = observer(function PropertiesPanel() {
               className="property-remove"
               data-testid="remove-property"
               icon={X}
-              label={`Remove ${field}`}
+              label={t('panels.remove', { name: field })}
               size="sm"
               onClick={() => {
                 vault.removeProperty(field)
@@ -165,24 +166,24 @@ export const PropertiesPanel = observer(function PropertiesPanel() {
           vault.addProperty()
         }}
       >
-        <h3 className="panel-subheading">Add property</h3>
+        <h3 className="panel-subheading">{t('panels.addProperty')}</h3>
         <Input
-          label="Name"
+          label={t('panels.relationName')}
           data-testid="property-name"
           value={vault.propertyName}
           onChange={(event) => vault.setPropertyName(event.target.value)}
-          placeholder="supports"
+          placeholder={t('panels.relationNamePlaceholder')}
         />
         <Select
-          label="Type"
+          label={t('panels.relationType')}
           data-testid="property-type"
           value={vault.propertyType}
           onValueChange={(value) => vault.setPropertyType(value)}
-          options={PROPERTY_TYPE_OPTIONS}
+          options={propertyTypeOptions}
         />
         {vault.propertyType === 'boolean' ? (
           <Input
-            label="Value"
+            label={t('panels.relationValue')}
             className="property-check"
             type="checkbox"
             data-testid="property-value"
@@ -191,25 +192,26 @@ export const PropertiesPanel = observer(function PropertiesPanel() {
           />
         ) : (
           <Input
-            label="Value"
+            label={t('panels.relationValue')}
             data-testid="property-value"
             type={vault.propertyType === 'number' ? 'number' : 'text'}
             step={vault.propertyType === 'number' ? 'any' : undefined}
             value={vault.propertyValue}
             onChange={(event) => vault.setPropertyValue(event.target.value)}
-            placeholder={vault.propertyType === 'list' ? '[[Other note]] token' : '[[Other note]]'}
+            placeholder={vault.propertyType === 'list' ? t('panels.valueList') : t('panels.valueNote')}
           />
         )}
         <Button className="property-add" size="sm" tone="secondary" type="submit" data-testid="add-property">
-          Add field
+          {t('panels.addField')}
         </Button>
       </form>
-      <h2 className="panel-heading">Relationships</h2>
+      <h2 className="panel-heading">{t('panels.relationships')}</h2>
       {relations.shown.length === 0 && unresolved.length === 0 && (
-        <EmptyState compact title="No relationships yet." testId="relationships-empty" />
+        <EmptyState compact title={t('panels.noRelations')} testId="relationships-empty" />
       )}
       {relations.shown.map((link) => {
-        const label = `${link.derived ? `${link.field} (derived)` : link.field}: ${link.label}`
+        const fieldLabel = link.derived ? t('panels.derived', { field: link.field }) : link.field
+        const label = `${fieldLabel}: ${link.label}`
         if (!link.targetId) {
           return (
             <p key={`${link.field}-${link.label}-${link.derived}`} className="meta">
@@ -235,8 +237,8 @@ export const PropertiesPanel = observer(function PropertiesPanel() {
           {link.field}: {link.label}
         </p>
       ))}
-      <h2 className="panel-heading">Backlinks</h2>
-      {relations.backlinks.length === 0 && <EmptyState compact title="No backlinks." testId="backlinks-empty" />}
+      <h2 className="panel-heading">{t('panels.backlinks')}</h2>
+      {relations.backlinks.length === 0 && <EmptyState compact title={t('panels.noBacklinks')} testId="backlinks-empty" />}
       {relations.backlinks.map((link) => (
         <button
           key={`${link.sourceId}-${link.via}`}

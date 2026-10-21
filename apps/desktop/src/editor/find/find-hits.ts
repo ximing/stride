@@ -1,5 +1,6 @@
 import type { Mark, Node as PmNode } from '@tiptap/pm/model';
 import type { Transaction } from '@tiptap/pm/state';
+import { t } from '../../i18n';
 
 /**
  * 正文里按关键字能搜到字的原子节点。命中落在属性字符串上，高亮整颗节点。
@@ -154,7 +155,7 @@ export function findKeywordHits(doc: PmNode, query: string, caseSensitive: boole
 
 export function findResultLabel(index: number, total: number, query: string): string {
   if (query.length === 0) return '';
-  if (total <= 0) return '无匹配';
+  if (total <= 0) return t('editor.find.none');
   const current = Math.min(Math.max(index, 0), total - 1) + 1;
   return `${current}/${total}`;
 }

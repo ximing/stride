@@ -73,7 +73,7 @@ export function createTaskExtensions() {
 
 export const taskSlashCommand = {
   id: 'task',
-  title: '任务列表',
+  title: 'Task list',
   keywords: 'task todo 任务 待办',
   run(editor: Editor) {
     editor.chain().focus().toggleTaskList().run()

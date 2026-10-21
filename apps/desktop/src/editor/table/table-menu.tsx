@@ -3,9 +3,11 @@ import { useEditorState } from '@tiptap/react';
 import { isInTable } from '@tiptap/pm/tables';
 import { Check } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react';
+import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import {
   TABLE_CELL_COLORS,
+  TABLE_COMMAND_KEY,
   applyCellBackground,
   focusClickedTableCell,
   runTableCommand,
@@ -27,6 +29,7 @@ type MenuItem = {
 };
 
 export function TableContextMenu({ editor }: { editor: Editor }) {
+  const { t } = useTranslation();
   const [menu, setMenu] = useState<MenuPoint | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const state = useEditorState({
@@ -116,22 +119,27 @@ export function TableContextMenu({ editor }: { editor: Editor }) {
 
   if (!menu) return null;
 
+  const item = (command: TableCommand, extra?: Partial<MenuItem>): MenuItem => ({
+    command,
+    label: t(TABLE_COMMAND_KEY[command]),
+    ...extra,
+  });
   const items: Array<MenuItem | 'sep'> = [
-    { command: 'addRowBefore', label: '上方加行', shortcut: 'addRowBefore' },
-    { command: 'addRowAfter', label: '下方加行', shortcut: 'addRowAfter' },
-    { command: 'deleteRow', label: '删除行', shortcut: 'deleteRow', disabled: !state.canDeleteRow },
+    item('addRowBefore', { shortcut: 'addRowBefore' }),
+    item('addRowAfter', { shortcut: 'addRowAfter' }),
+    item('deleteRow', { shortcut: 'deleteRow', disabled: !state.canDeleteRow }),
     'sep',
-    { command: 'addColumnBefore', label: '左侧加列', shortcut: 'addColumnBefore' },
-    { command: 'addColumnAfter', label: '右侧加列', shortcut: 'addColumnAfter' },
-    { command: 'deleteColumn', label: '删除列', shortcut: 'deleteColumn', disabled: !state.canDeleteColumn },
+    item('addColumnBefore', { shortcut: 'addColumnBefore' }),
+    item('addColumnAfter', { shortcut: 'addColumnAfter' }),
+    item('deleteColumn', { shortcut: 'deleteColumn', disabled: !state.canDeleteColumn }),
     'sep',
-    { command: 'mergeCells', label: '合并单元格', disabled: !state.canMerge },
-    { command: 'splitCell', label: '拆分单元格', disabled: !state.canSplit },
+    item('mergeCells', { disabled: !state.canMerge }),
+    item('splitCell', { disabled: !state.canSplit }),
     'sep',
-    { command: 'toggleHeaderRow', label: '表头行', pressed: state.headerRow },
-    { command: 'toggleHeaderColumn', label: '表头列', pressed: state.headerColumn },
+    item('toggleHeaderRow', { pressed: state.headerRow }),
+    item('toggleHeaderColumn', { pressed: state.headerColumn }),
     'sep',
-    { command: 'deleteTable', label: '删除表格', danger: true },
+    item('deleteTable', { danger: true }),
   ];
 
   const onMenuKey = (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -159,7 +167,7 @@ export function TableContextMenu({ editor }: { editor: Editor }) {
       ref={menuRef}
       className="editor-table-menu"
       role="menu"
-      aria-label="表格菜单"
+      aria-label={t('editor.table.menu')}
       style={{ left: menu.x, top: menu.y }}
       onKeyDown={onMenuKey}
       onContextMenu={(event) => event.preventDefault()}
@@ -190,15 +198,15 @@ export function TableContextMenu({ editor }: { editor: Editor }) {
         ),
       )}
       <div className="editor-table-menu-sep" role="separator" />
-      <div className="editor-table-menu-colors" role="group" aria-label="单元格背景">
-        <span>背景</span>
+      <div className="editor-table-menu-colors" role="group" aria-label={t('editor.table.background')}>
+        <span>{t('editor.table.backgroundShort')}</span>
         {TABLE_CELL_COLORS.map((color) => (
           <button
             key={color.value}
             type="button"
             className={`editor-color-swatch${state.background === color.value ? ' is-on' : ''}`}
             style={{ background: color.value }}
-            aria-label={color.label}
+            aria-label={t(`editor.color.${color.id}`)}
             aria-pressed={state.background === color.value}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => {
@@ -216,7 +224,7 @@ export function TableContextMenu({ editor }: { editor: Editor }) {
             setMenu(null);
           }}
         >
-          无
+          {t('common.none')}
         </button>
       </div>
     </div>,

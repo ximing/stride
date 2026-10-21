@@ -1,6 +1,7 @@
 import type { Editor } from '@tiptap/core'
 import { bindServices, observer, useService } from '@rabjs/react'
 import { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronUp, X } from 'lucide-react'
 import { CommandService } from '../../services/commands/command.service'
 import { findKeywordHits, findSeedFromSelection, nextHitIndex } from './find-hits'
@@ -21,6 +22,7 @@ function countLabel(count: number, index: number): string {
 }
 
 const FindBar = observer(function FindBar({ editor }: { editor: Editor }) {
+  const { t } = useTranslation()
   const service = useService(FindService)
   const commands = useService(CommandService)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -190,8 +192,8 @@ const FindBar = observer(function FindBar({ editor }: { editor: Editor }) {
         ref={inputRef}
         className="find-input"
         data-testid="find-input"
-        aria-label="查找"
-        placeholder="查找"
+        aria-label={t('editor.find.find')}
+        placeholder={t('editor.find.find')}
         autoFocus
         autoComplete="off"
         spellCheck={false}
@@ -202,7 +204,7 @@ const FindBar = observer(function FindBar({ editor }: { editor: Editor }) {
         type="button"
         className="find-case"
         data-testid="find-case"
-        aria-label="区分大小写"
+        aria-label={t('editor.find.case')}
         aria-pressed={caseSensitive}
         onMouseDown={(event) => event.preventDefault()}
         onClick={toggleCase}
@@ -214,7 +216,7 @@ const FindBar = observer(function FindBar({ editor }: { editor: Editor }) {
         type="button"
         className="find-icon-button"
         data-testid="find-prev"
-        aria-label="上一个"
+        aria-label={t('editor.find.previous')}
         onMouseDown={(event) => event.preventDefault()}
         onClick={() => step(-1)}
       >
@@ -224,7 +226,7 @@ const FindBar = observer(function FindBar({ editor }: { editor: Editor }) {
         type="button"
         className="find-icon-button"
         data-testid="find-next"
-        aria-label="下一个"
+        aria-label={t('editor.find.next')}
         onMouseDown={(event) => event.preventDefault()}
         onClick={() => step(1)}
       >
@@ -233,20 +235,20 @@ const FindBar = observer(function FindBar({ editor }: { editor: Editor }) {
       <input
         className="replace-input"
         data-testid="replace-input"
-        aria-label="替换为"
-        placeholder="替换为"
+        aria-label={t('editor.find.replaceWith')}
+        placeholder={t('editor.find.replaceWith')}
         autoComplete="off"
         spellCheck={false}
         value={service.replacement}
         onChange={(event) => service.setReplacement(event.target.value)}
       />
-      <button type="button" className="find-action" data-testid="replace-one" aria-label="替换" onMouseDown={(event) => event.preventDefault()} onClick={replaceCurrent}>
-        替换
+      <button type="button" className="find-action" data-testid="replace-one" aria-label={t('editor.find.replace')} onMouseDown={(event) => event.preventDefault()} onClick={replaceCurrent}>
+        {t('editor.find.replace')}
       </button>
-      <button type="button" className="find-action" data-testid="replace-all" aria-label="全部替换" onMouseDown={(event) => event.preventDefault()} onClick={replaceEvery}>
-        全部替换
+      <button type="button" className="find-action" data-testid="replace-all" aria-label={t('editor.find.replaceAll')} onMouseDown={(event) => event.preventDefault()} onClick={replaceEvery}>
+        {t('editor.find.replaceAll')}
       </button>
-      <button type="button" className="find-icon-button" aria-label="关闭" onMouseDown={(event) => event.preventDefault()} onClick={() => service.close()}>
+      <button type="button" className="find-icon-button" aria-label={t('editor.find.close')} onMouseDown={(event) => event.preventDefault()} onClick={() => service.close()}>
         <X aria-hidden="true" size={14} strokeWidth={1.75} />
       </button>
     </div>

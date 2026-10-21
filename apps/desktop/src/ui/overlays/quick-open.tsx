@@ -1,12 +1,14 @@
 import { observer, useService } from '@rabjs/react'
 import { FileText, Search } from 'lucide-react'
 import { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { CommandService } from '../../services/commands/command.service'
 import { QuickOpenService, quickOpenResults } from '../../services/search/quick-open.service'
 import { VaultService } from '../../services/vault/vault.service'
 import { EmptyState } from '../primitives/empty-state'
 
 export const QuickOpen = observer(function QuickOpen() {
+  const { t } = useTranslation()
   const vault = useService(VaultService)
   const service = useService(QuickOpenService)
   const commands = useService(CommandService)
@@ -71,15 +73,15 @@ export const QuickOpen = observer(function QuickOpen() {
         aria-labelledby="quick-open-title"
         onClick={(event) => event.stopPropagation()}
       >
-        <h2 id="quick-open-title" className="quick-open-title sd-command-title">快速打开</h2>
+        <h2 id="quick-open-title" className="quick-open-title sd-command-title">{t('quickOpen.title')}</h2>
         <div className="sd-command-search">
           <Search aria-hidden="true" size={16} strokeWidth={1.75} />
           <input
             ref={inputRef}
             className="quick-open-input sd-command-input"
             data-testid="quick-open-input"
-            placeholder="跳到笔记"
-            aria-label="跳到笔记"
+            placeholder={t('quickOpen.placeholder')}
+            aria-label={t('quickOpen.placeholder')}
             autoFocus
             autoComplete="off"
             spellCheck={false}
@@ -87,27 +89,27 @@ export const QuickOpen = observer(function QuickOpen() {
             onChange={(event) => service.setQuery(event.target.value)}
           />
         </div>
-        <div ref={listRef} className="quick-open-list sd-command-list" role="listbox" aria-label="笔记">
+        <div ref={listRef} className="quick-open-list sd-command-list" role="listbox" aria-label={t('quickOpen.list')}>
           {results.length === 0 ? (
             service.query.trim() === '' ? (
               <EmptyState
                 compact
                 icon={FileText}
-                title="还没有笔记"
-                body="先新建一篇笔记，再用 Cmd+P 快速跳转。"
+                title={t('quickOpen.emptyTitle')}
+                body={t('quickOpen.emptyBody')}
                 testId="quick-open-empty"
               />
             ) : (
               <EmptyState
                 compact
                 icon={Search}
-                title="没有匹配的笔记"
+                title={t('quickOpen.noMatch')}
                 testId="quick-open-empty"
               />
             )
           ) : (
             <>
-              <p className="quick-open-section sd-command-section">笔记</p>
+              <p className="quick-open-section sd-command-section">{t('quickOpen.notes')}</p>
               {results.map((note, index) => (
                 <button
                   key={note.id}

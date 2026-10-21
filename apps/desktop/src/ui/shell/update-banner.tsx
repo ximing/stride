@@ -8,6 +8,7 @@
 import { observer, useService } from '@rabjs/react'
 import { CircleArrowUp, CircleAlert, Download, RefreshCw, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { UpdateService } from '../../services/update/update.service'
 import { Button, IconButton } from '../primitives/button'
 import { Mark } from '../primitives/icon'
@@ -21,9 +22,10 @@ function clampPercent(progress: number): number {
 }
 
 export const UpdateBanner = observer(function UpdateBanner() {
+  const { t } = useTranslation()
   const updates = useService(UpdateService)
   const [notesExpanded, setNotesExpanded] = useState(false)
-  // "稍后" hides the ready banner for this session only. dismiss() would
+  // "Later" hides the ready banner for this session only. dismiss() would
   // remember the version in localStorage and never re-offer it, which is too
   // strong for an already-downloaded update.
   const [snoozed, setSnoozed] = useState(false)
@@ -56,9 +58,9 @@ export const UpdateBanner = observer(function UpdateBanner() {
       <div className="ubn-body">
         {phase === 'available' && (
           <>
-            <div className="ubn-title">新版本 v{updates.version} 可用</div>
+            <div className="ubn-title">{t('update.available', { version: updates.version })}</div>
             <div className="ubn-meta">
-              当前 v{updates.current}
+              {t('update.current', { version: updates.current })}
               {updates.date ? ` · ${updates.date}` : ''}
             </div>
             {updates.body && (
@@ -76,7 +78,7 @@ export const UpdateBanner = observer(function UpdateBanner() {
                       setNotesExpanded((expanded) => !expanded)
                     }}
                   >
-                    {notesExpanded ? '收起' : `展开全部（${noteLines.length} 行）`}
+                    {notesExpanded ? t('update.collapse') : t('update.expand', { count: noteLines.length })}
                   </Button>
                 )}
               </div>
@@ -86,7 +88,7 @@ export const UpdateBanner = observer(function UpdateBanner() {
 
         {phase === 'downloading' && (
           <>
-            <div className="ubn-title">正在下载 v{updates.version}</div>
+            <div className="ubn-title">{t('update.downloading', { version: updates.version })}</div>
             <div className="ubn-progress-row">
               <div
                 className="progress"
@@ -102,15 +104,15 @@ export const UpdateBanner = observer(function UpdateBanner() {
                 {percent}%
               </span>
             </div>
-            <div className="ubn-meta">后台下载中，不影响使用</div>
+            <div className="ubn-meta">{t('update.background')}</div>
           </>
         )}
 
-        {phase === 'ready' && <div className="ubn-title">v{updates.version} 已就绪</div>}
+        {phase === 'ready' && <div className="ubn-title">{t('update.ready', { version: updates.version })}</div>}
 
         {phase === 'error' && (
           <div className="ubn-title ubn-error" data-testid="update-error">
-            更新失败：{updates.error || '未知错误'}
+            {t('update.failed', { error: updates.error || t('update.unknown') })}
           </div>
         )}
       </div>
@@ -127,7 +129,7 @@ export const UpdateBanner = observer(function UpdateBanner() {
                 void updates.download()
               }}
             >
-              下载更新
+              {t('update.download')}
             </Button>
             <Button
               tone="quiet"
@@ -137,7 +139,7 @@ export const UpdateBanner = observer(function UpdateBanner() {
                 void updates.dismiss()
               }}
             >
-              忽略此版本
+              {t('update.ignore')}
             </Button>
           </>
         )}
@@ -153,7 +155,7 @@ export const UpdateBanner = observer(function UpdateBanner() {
                 void updates.confirm()
               }}
             >
-              重启以更新到 v{updates.version}
+              {t('update.restart', { version: updates.version })}
             </Button>
             <Button
               tone="quiet"
@@ -163,7 +165,7 @@ export const UpdateBanner = observer(function UpdateBanner() {
                 setSnoozed(true)
               }}
             >
-              稍后
+              {t('update.later')}
             </Button>
           </>
         )}
@@ -179,11 +181,11 @@ export const UpdateBanner = observer(function UpdateBanner() {
                 void updates.check()
               }}
             >
-              重试
+              {t('common.retry')}
             </Button>
             <IconButton
               icon={X}
-              label="关闭"
+              label={t('update.close')}
               className="ubn-close"
               data-testid="update-close"
               onClick={() => {

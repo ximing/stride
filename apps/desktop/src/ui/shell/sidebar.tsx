@@ -19,6 +19,7 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { typeSidebarLabel } from '../../../../../packages/core/src/types'
 import { TabsService } from '../../services/notes/tabs.service'
 import { VaultService } from '../../services/vault/vault.service'
@@ -67,12 +68,13 @@ function typeColorKey(note: StrideNote): string {
  * rows (persisted to `.stride/views-order.json` by ViewsService).
  */
 const SavedViews = observer(function SavedViews() {
+  const { t } = useTranslation()
   const views = useService(ViewsService)
   const [dropTarget, setDropTarget] = useState('')
   return (
     <>
       {views.views.length === 0 && (
-        <EmptyState compact title="No saved views yet." testId="views-empty" />
+        <EmptyState compact title={t('sidebar.noViews')} testId="views-empty" />
       )}
       {views.views.map((item) => (
         <div
@@ -113,7 +115,7 @@ const SavedViews = observer(function SavedViews() {
           </button>
           <IconButton
             icon={Pencil}
-            label={`Edit ${item.view.name}`}
+            label={t('sidebar.editView', { name: item.view.name })}
             className="view-edit"
             data-testid="view-edit"
             data-view={item.file}
@@ -129,7 +131,7 @@ const SavedViews = observer(function SavedViews() {
         icon={<Mark icon={Plus} size={14} />}
         onClick={() => views.openNewEditor()}
       >
-        New view
+        {t('sidebar.newView')}
       </Button>
       <ViewEditorModal />
     </>
@@ -137,6 +139,7 @@ const SavedViews = observer(function SavedViews() {
 })
 
 export const Rail = observer(function Rail() {
+  const { t } = useTranslation()
   const vault = useService(VaultService)
   const tabs = useService(TabsService)
   const typeDocs = vault.sidebarTypes
@@ -152,9 +155,9 @@ export const Rail = observer(function Rail() {
         icon={<Mark icon={SquarePen} size={16} />}
         onClick={() => vault.createNote()}
       >
-        New note
+        {t('shell.newNote')}
       </Button>
-      <div className="group-label">Views</div>
+      <div className="group-label">{t('sidebar.views')}</div>
       <button
         type="button"
         className={vault.listFilter === 'all' ? 'rail-nav-item active' : 'rail-nav-item'}
@@ -162,7 +165,7 @@ export const Rail = observer(function Rail() {
         onClick={() => vault.setFilter('all')}
       >
         <span className="rail-nav-icon"><Mark icon={Files} size={16} /></span>
-        <span className="type-label">All</span>
+        <span className="type-label">{t('sidebar.all')}</span>
       </button>
       <button
         type="button"
@@ -171,7 +174,7 @@ export const Rail = observer(function Rail() {
         onClick={() => vault.setFilter('inbox')}
       >
         <span className="rail-nav-icon"><Mark icon={Inbox} size={16} /></span>
-        <span className="type-label">Inbox ({vault.inboxCount})</span>
+        <span className="type-label">{t('sidebar.inboxCount', { n: vault.inboxCount })}</span>
       </button>
       {vault.listFilter === 'inbox' && (
         <label className="advance-inbox">
@@ -181,13 +184,13 @@ export const Rail = observer(function Rail() {
             checked={vault.advanceInbox}
             onChange={(event) => { void vault.setAdvanceInbox(event.target.checked) }}
           />
-          Advance after organizing
+          {t('sidebar.advance')}
         </label>
       )}
       <SavedViews />
-      <div className="group-label">Types</div>
+      <div className="group-label">{t('sidebar.types')}</div>
       {typeDocs.length === 0 && fallbackTypes.length === 0 && (
-        <EmptyState compact title="No types yet." testId="types-empty" />
+        <EmptyState compact title={t('sidebar.noTypes')} testId="types-empty" />
       )}
       {typeDocs.map((note) => {
         const icon = typeIconKey(note)
@@ -215,7 +218,7 @@ export const Rail = observer(function Rail() {
             {collapsed ? null : (
               <IconButton
                 icon={Plus}
-                label={`New ${note.title}`}
+                label={t('sidebar.newOfType', { title: note.title })}
                 className="type-add"
                 data-testid="type-new-instance"
                 data-type={note.title}
@@ -224,7 +227,7 @@ export const Rail = observer(function Rail() {
             )}
             <IconButton
               icon={collapsed ? ChevronRight : ChevronDown}
-              label={collapsed ? `Expand ${note.title}` : `Collapse ${note.title}`}
+              label={collapsed ? t('sidebar.expand', { title: note.title }) : t('sidebar.collapse', { title: note.title })}
               className="type-collapse"
               data-testid="type-collapse"
               data-type={note.title}
@@ -242,12 +245,12 @@ export const Rail = observer(function Rail() {
         icon={<Mark icon={Plus} size={14} />}
         onClick={() => vault.createType()}
       >
-        New type
+        {t('sidebar.newType')}
       </Button>
       {showInstances && (
         <div className="type-instances" data-testid="type-instances">
-          <div className="group-label">Instances</div>
-          {vault.typeInstances.length === 0 && <EmptyState compact title="No instances yet." testId="instances-empty" />}
+          <div className="group-label">{t('sidebar.instances')}</div>
+          {vault.typeInstances.length === 0 && <EmptyState compact title={t('sidebar.noInstances')} testId="instances-empty" />}
           {vault.typeInstances.map((note) => (
             <button
               key={note.id}
@@ -275,7 +278,7 @@ export const Rail = observer(function Rail() {
           <span className="type-label">{type}</span>
         </button>
       ))}
-      <div className="group-label">Notes</div>
+      <div className="group-label">{t('shell.notes')}</div>
       <FolderTree />
     </div>
   )

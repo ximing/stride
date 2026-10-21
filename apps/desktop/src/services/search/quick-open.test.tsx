@@ -143,8 +143,8 @@ describe('quick open keyboard', () => {
       const dialog = host?.querySelector('[data-testid="quick-open"]')
       expect(dialog?.getAttribute('role')).toBe('dialog')
       expect(dialog?.getAttribute('aria-modal')).toBe('true')
-      expect(host?.textContent).toContain('快速打开')
-      expect(host?.querySelector('[data-testid="quick-open-input"]')?.getAttribute('placeholder')).toBe('跳到笔记')
+      expect(host?.textContent).toContain('Quick open')
+      expect(host?.querySelector('[data-testid="quick-open-input"]')?.getAttribute('placeholder')).toBe('Jump to a note')
       expect(host?.querySelector('[aria-selected="true"]')?.getAttribute('data-note-id')).toBe('alpha')
 
       const ignored = press({ key: 'f', metaKey: true })
@@ -213,7 +213,7 @@ describe('quick open keyboard', () => {
     await act(async () => {
       quick.setQuery('旧纪要')
     })
-    expect(host?.textContent).toContain('没有匹配的笔记')
+    expect(host?.textContent).toContain('No matching notes')
     const select = vi.spyOn(vault, 'select')
     await act(async () => {
       press({ key: 'Enter' })

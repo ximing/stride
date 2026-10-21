@@ -2,6 +2,8 @@ import { ArrowUpDown, Bookmark, Check, FileText, Inbox, Search, X } from 'lucide
 import { observer, raw, useService } from '@rabjs/react'
 import { plainText, type StrideNote } from '@stride/core/note'
 import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
+import { i18n, t } from '../../i18n'
 import { typeSidebarLabel } from '../../../../../packages/core/src/types'
 import { CommandService } from '../../services/commands/command.service'
 import { buildNoteListMenu, type ContextMenuEntry } from '../../services/commands/context-menu'
@@ -37,18 +39,23 @@ export function relativeDay(mtimeMs: number, now: number): string {
   const current = new Date(now)
   const startOfDay = (date: Date) => new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime()
   const days = Math.round((startOfDay(current) - startOfDay(then)) / 86_400_000)
-  if (days <= 0) return 'Today'
-  if (days === 1) return 'Yesterday'
-  if (days < 7) return `${days} days ago`
+  if (days <= 0) return t('notes.today')
+  if (days === 1) return t('notes.yesterday')
+  if (days < 7) return t('notes.daysAgo', { n: days })
   const sameYear = then.getFullYear() === current.getFullYear()
+  if (i18n.language === 'zh') {
+    const month = then.getMonth() + 1
+    const day = then.getDate()
+    return sameYear ? `${month}月${day}日` : `${then.getFullYear()}年${month}月${day}日`
+  }
   return `${then.getDate()} ${MONTHS[then.getMonth()]}${sameYear ? '' : ` ${then.getFullYear()}`}`
 }
 
 /** Header label for the current filter dimension. */
 export function noteListTitle(vault: VaultService): string {
-  if (vault.searchQuery.trim() && vault.searchHits.length > 0) return 'Search results'
-  if (vault.listFilter === 'all') return 'All notes'
-  if (vault.listFilter === 'inbox') return 'Inbox'
+  if (vault.searchQuery.trim() && vault.searchHits.length > 0) return t('search.results')
+  if (vault.listFilter === 'all') return t('notes.all')
+  if (vault.listFilter === 'inbox') return t('notes.inbox')
   const typeDoc = vault.typeDocuments.find((note) => note.title === vault.listFilter)
   if (typeDoc) return typeSidebarLabel(typeDoc)
   return vault.listFilter
@@ -86,15 +93,16 @@ function buildTypeInfo(vault: VaultService): Map<string, TypeChipInfo> {
 }
 
 export const ListFilterInput = observer(function ListFilterInput() {
+  const { t: translate } = useTranslation()
   const listFilter = useService(ListFilterService)
   return (
     <div className="list-filter">
       <Mark icon={Search} size={14} />
       <Input
-        label="过滤标题或属性"
+        label={translate('notes.filter')}
         className="list-filter-input"
         data-testid="list-filter"
-        placeholder="过滤标题或属性"
+        placeholder={translate('notes.filter')}
         value={listFilter.query}
         onChange={(event) => listFilter.setQuery(event.target.value)}
       />
@@ -103,7 +111,7 @@ export const ListFilterInput = observer(function ListFilterInput() {
           className="list-filter-clear"
           data-testid="list-filter-clear"
           icon={X}
-          label="清空过滤"
+          label={translate('notes.clearFilter')}
           size="sm"
           onClick={() => listFilter.clear()}
         />
@@ -112,10 +120,10 @@ export const ListFilterInput = observer(function ListFilterInput() {
   )
 })
 
-const SORT_LABELS: Record<ListSortKey, Record<ListSort['dir'], string>> = {
-  mtime: { desc: 'Modified: newest first', asc: 'Modified: oldest first' },
-  title: { asc: 'Title A–Z', desc: 'Title Z–A' },
-  created: { desc: 'Created: newest first', asc: 'Created: oldest first' },
+const SORT_KEYS: Record<ListSortKey, Record<ListSort['dir'], string>> = {
+  mtime: { desc: 'notes.modifiedNewest', asc: 'notes.modifiedOldest' },
+  title: { asc: 'notes.titleAz', desc: 'notes.titleZa' },
+  created: { desc: 'notes.createdNewest', asc: 'notes.createdOldest' },
 }
 
 const SORT_ORDER: { key: ListSortKey; dir: ListSort['dir'] }[] = [
@@ -128,6 +136,7 @@ const SORT_ORDER: { key: ListSortKey; dir: ListSort['dir'] }[] = [
 ]
 
 const SortMenu = observer(function SortMenu() {
+  const { t: translate } = useTranslation()
   const list = useService(NoteListService)
   const views = useService(ViewsService)
   // A view with its own sort wins over the manual `stride:list` sort. Picking a
@@ -142,14 +151,14 @@ const SortMenu = observer(function SortMenu() {
           className="note-list-sort"
           data-testid="note-list-sort"
           icon={ArrowUpDown}
-          label="Sort notes"
+          label={translate('notes.sort')}
           size="sm"
         />
       </MenuTrigger>
       <MenuContent align="end">
         {viewSort && (
           <div className="menu-hint" data-testid="sort-view-hint">
-            Sorting set by view “{views.activeView?.view.name}”
+            {translate('notes.sortByView', { name: views.activeView?.view.name ?? '' })}
           </div>
         )}
         {SORT_ORDER.map(({ key, dir }) => {
@@ -162,7 +171,7 @@ const SortMenu = observer(function SortMenu() {
               onSelect={() => list.setSort({ key, dir })}
             >
               <span className="menu-check">{active ? <Mark icon={Check} size={14} /> : null}</span>
-              {SORT_LABELS[key][dir]}
+              {translate(SORT_KEYS[key][dir])}
             </MenuItem>
           )
         })}
@@ -172,25 +181,26 @@ const SortMenu = observer(function SortMenu() {
 })
 
 const BatchBar = observer(function BatchBar() {
+  const { t: translate } = useTranslation()
   const vault = useService(VaultService)
   const list = useService(NoteListService)
   const types = vault.sidebarTypes
   return (
     <div className="note-list-batch" data-testid="note-list-batch">
       <span className="note-list-batch-count" data-testid="note-list-batch-count">
-        {list.selectionCount} selected
+        {translate('notes.selected', { n: list.selectionCount })}
       </span>
       <Button size="sm" tone="quiet" data-testid="batch-archive" onClick={() => void list.archiveSelected()}>
-        Archive
+        {translate('notes.archive')}
       </Button>
       <Menu open={list.retypeOpen} onOpenChange={(open) => { list.retypeOpen = open }}>
         <MenuTrigger asChild>
           <Button className="note-list-batch-retype" size="sm" tone="quiet" data-testid="batch-retype">
-            Type
+            {translate('notes.type')}
           </Button>
         </MenuTrigger>
         <MenuContent>
-          {types.length === 0 && <MenuItem disabled>No types yet</MenuItem>}
+          {types.length === 0 && <MenuItem disabled>{translate('notes.noTypes')}</MenuItem>}
           {types.map((type) => (
             <MenuItem
               key={type.id}
@@ -209,13 +219,13 @@ const BatchBar = observer(function BatchBar() {
         data-testid="batch-delete"
         onClick={() => { list.confirmingDelete = true }}
       >
-        Delete
+        {translate('notes.delete')}
       </Button>
       <IconButton
         className="note-list-batch-clear"
         data-testid="batch-clear"
         icon={X}
-        label="Clear selection"
+        label={translate('notes.clearSelection')}
         size="sm"
         onClick={() => list.clearSelection()}
       />
@@ -224,23 +234,24 @@ const BatchBar = observer(function BatchBar() {
 })
 
 const BatchDeleteModal = observer(function BatchDeleteModal() {
+  const { t: translate } = useTranslation()
   const list = useService(NoteListService)
   return (
     <Modal open={list.confirmingDelete} onOpenChange={(open) => { list.confirmingDelete = open }}>
       <ModalContent
-        title="Delete notes"
-        description={`Delete ${list.selectionCount} notes permanently? This cannot be undone.`}
+        title={translate('notes.deleteTitle')}
+        description={translate('notes.deleteBody', { n: list.selectionCount })}
       >
         <div className="sd-modal-actions">
           <ModalClose asChild>
-            <Button tone="secondary" data-testid="cancel-delete">Cancel</Button>
+            <Button tone="secondary" data-testid="cancel-delete">{translate('common.cancel')}</Button>
           </ModalClose>
           <Button
             tone="danger"
             data-testid="confirm-delete"
             onClick={() => { void list.deleteSelected() }}
           >
-            Delete
+            {translate('notes.delete')}
           </Button>
         </div>
       </ModalContent>
@@ -250,6 +261,7 @@ const BatchDeleteModal = observer(function BatchDeleteModal() {
 
 interface NoteRowProps {
   note: StrideNote
+  title: string
   dateLabel: string
   typeTitle: string
   typeColor: string
@@ -264,6 +276,7 @@ interface NoteRowProps {
 // memo keeps scroll re-renders cheap: rows whose props did not change bail out.
 const NoteRow = memo(function NoteRow({
   note,
+  title,
   dateLabel,
   typeTitle,
   typeColor,
@@ -289,7 +302,7 @@ const NoteRow = memo(function NoteRow({
         onRowMenu(note.id, event.clientX, event.clientY)
       }}
     >
-      <span className="note-list-item-title">{note.title || 'Untitled'}</span>
+      <span className="note-list-item-title">{title}</span>
       <span className="note-list-item-meta">
         <span className="note-list-item-date">{dateLabel}</span>
         {typeTitle !== '' && (
@@ -333,6 +346,7 @@ interface RowMenuState {
 }
 
 export const NoteList = observer(function NoteList() {
+  const { t: translate, i18n } = useTranslation()
   const vault = useService(VaultService)
   const listFilter = useService(ListFilterService)
   const list = useService(NoteListService)
@@ -383,7 +397,7 @@ export const NoteList = observer(function NoteList() {
   const typeInfo = useMemo(() => buildTypeInfo(vault), [vault.notes])
   const title = useMemo(
     () => activeView?.view.name ?? noteListTitle(vault),
-    [activeView, vault.searchQuery, vault.searchHits, vault.listFilter, typeInfo, views.views],
+    [activeView, vault.searchQuery, vault.searchHits, vault.listFilter, typeInfo, views.views, i18n.language],
   )
   const orderedIds = useMemo(() => notes.map((note) => note.id), [notes])
   const win = virtualWindow(notes.length, scrollTop, viewport, NOTE_ROW_OVERSCAN, rowHeight)
@@ -398,8 +412,8 @@ export const NoteList = observer(function NoteList() {
         <EmptyState
           compact
           icon={Search}
-          title={`No notes match “${filterQuery}”.`}
-          actionLabel="清空过滤"
+          title={translate('notes.noMatchQuery', { query: filterQuery })}
+          actionLabel={translate('notes.clearFilterAction')}
           actionTestId="note-list-empty-clear"
           onAction={() => listFilter.clear()}
           testId="note-list-empty-filter"
@@ -410,8 +424,8 @@ export const NoteList = observer(function NoteList() {
         <EmptyState
           compact
           icon={Search}
-          title={`No results for “${vault.searchQuery.trim()}”.`}
-          body="Try different keywords, or check the index status in the status bar."
+          title={translate('notes.noResultsQuery', { query: vault.searchQuery.trim() })}
+          body={translate('notes.searchEmptyBody')}
           testId="note-list-empty-search"
         />
       )
@@ -420,8 +434,8 @@ export const NoteList = observer(function NoteList() {
         <EmptyState
           compact
           icon={Bookmark}
-          title={`Nothing matches “${activeView.view.name}” yet.`}
-          body="Notes appear here when they satisfy this view's filters."
+          title={translate('notes.nothingMatchesView', { name: activeView.view.name })}
+          body={translate('notes.viewEmptyBody')}
           testId="note-list-empty-view"
         />
       )
@@ -430,16 +444,16 @@ export const NoteList = observer(function NoteList() {
         <EmptyState
           compact
           icon={FileText}
-          title="No notes yet"
-          body="Create your first note to get started."
-          actionLabel="New note"
+          title={translate('notes.emptyTitle')}
+          body={translate('notes.emptyBody')}
+          actionLabel={translate('shell.newNote')}
           actionTestId="note-list-empty-new"
           onAction={() => vault.createNote()}
           testId="note-list-empty-vault"
         />
       )
     } else {
-      emptyState = <EmptyState compact icon={Inbox} title="No notes here." testId="note-list-empty" />
+      emptyState = <EmptyState compact icon={Inbox} title={translate('notes.folderEmpty')} testId="note-list-empty" />
     }
   }
 
@@ -504,6 +518,7 @@ export const NoteList = observer(function NoteList() {
             <NoteRow
               key={note.id}
               note={note}
+              title={note.title || translate('notes.untitled')}
               dateLabel={relativeDay(vault.noteMtimes[note.id] ?? 0, Date.now())}
               typeTitle={chipType}
               typeColor={chip?.color ?? 'gray'}

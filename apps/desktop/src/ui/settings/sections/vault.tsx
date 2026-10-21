@@ -8,6 +8,7 @@
 import { has, observer, useService } from '@rabjs/react'
 import { FolderOpen } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   VAULT_ZOOM_MAX,
   VAULT_ZOOM_MIN,
@@ -20,33 +21,25 @@ import { Input } from '../../primitives/input'
 import { SettingsSegmentedControl } from '../segmented-control'
 import './vault.css'
 
-const PER_VAULT_HINT = 'This vault only — stored in .stride/vault.json and synced with the vault folder.'
-
 const VIEW_MODES: readonly ViewMode[] = ['comfortable', 'compact']
-const VIEW_MODE_LABELS: Record<ViewMode, string> = { comfortable: 'Comfortable', compact: 'Compact' }
-const VIEW_MODE_OPTIONS = VIEW_MODES.map((mode) => ({ value: mode, label: VIEW_MODE_LABELS[mode] }))
-
 const GIT_SETUP_OPTIONS: readonly GitSetupPreference[] = ['undecided', 'enabled', 'disabled']
-const GIT_SETUP_LABELS: Record<GitSetupPreference, string> = {
-  undecided: 'Not decided',
-  enabled: 'Set up git',
-  disabled: 'No git',
-}
 
 const ZoomField = observer(function ZoomField() {
+  const { t } = useTranslation()
   const vault = useService(VaultService)
   // Local draft keeps invalid input visible without touching applied state.
   const [draft, setDraft] = useState<string | null>(null)
-  const [error, setError] = useState('')
+  const [invalid, setInvalid] = useState(false)
+  const error = invalid ? t('settings.vault.zoomError', { min: VAULT_ZOOM_MIN, max: VAULT_ZOOM_MAX }) : ''
 
   const onChange = (text: string) => {
     setDraft(text)
     const parsed = Number(text)
     if (text.trim() === '' || !Number.isFinite(parsed) || parsed < VAULT_ZOOM_MIN || parsed > VAULT_ZOOM_MAX) {
-      setError(`Zoom must be a number between ${VAULT_ZOOM_MIN} and ${VAULT_ZOOM_MAX}.`)
+      setInvalid(true)
       return
     }
-    setError('')
+    setInvalid(false)
     void vault.setZoom(parsed)
   }
 
@@ -54,7 +47,7 @@ const ZoomField = observer(function ZoomField() {
     <div className="svault-group">
       <div className="svault-zoom">
         <Input
-          label="Zoom (×)"
+          label={t('settings.vault.zoom')}
           className="svault-zoom-input"
           data-testid="vault-zoom"
           type="number"
@@ -70,7 +63,11 @@ const ZoomField = observer(function ZoomField() {
         />
       </div>
       <p className="svault-hint" id="vault-zoom-hint">
-        Editor zoom, {VAULT_ZOOM_MIN}–{VAULT_ZOOM_MAX}×. Applies immediately. {PER_VAULT_HINT}
+        {t('settings.vault.zoomHint', {
+          min: VAULT_ZOOM_MIN,
+          max: VAULT_ZOOM_MAX,
+          perVault: t('settings.vault.perVault'),
+        })}
       </p>
       {error && (
         <p className="error" id="vault-zoom-error" role="alert" data-testid="vault-zoom-error">
@@ -82,28 +79,38 @@ const ZoomField = observer(function ZoomField() {
 })
 
 const ViewModeField = observer(function ViewModeField() {
+  const { t } = useTranslation()
   const vault = useService(VaultService)
+  const options = VIEW_MODES.map((mode) => ({ value: mode, label: t(`settings.vault.${mode}`) }))
   return (
     <div className="svault-group">
-      <h3 className="svault-heading">Note list density</h3>
+      <h3 className="svault-heading">{t('settings.vault.density')}</h3>
       <SettingsSegmentedControl
-        label="Note list density"
+        label={t('settings.vault.density')}
         value={vault.viewMode}
-        options={VIEW_MODE_OPTIONS}
+        options={options}
         testIdPrefix="vault-view-mode"
         onChange={(mode) => void vault.setViewMode(mode)}
       />
-      <p className="svault-hint">Compact tightens rows and drops the snippet line. {PER_VAULT_HINT}</p>
+      <p className="svault-hint">
+        {t('settings.vault.densityHint', { perVault: t('settings.vault.perVault') })}
+      </p>
     </div>
   )
 })
 
 const GitSetupField = observer(function GitSetupField() {
+  const { t } = useTranslation()
   const vault = useService(VaultService)
+  const labels: Record<GitSetupPreference, string> = {
+    undecided: t('settings.vault.undecided'),
+    enabled: t('settings.vault.enabled'),
+    disabled: t('settings.vault.disabled'),
+  }
   return (
     <div className="svault-group">
-      <h3 className="svault-heading">Git setup</h3>
-      <div className="svault-radios" role="radiogroup" aria-label="Git setup preference">
+      <h3 className="svault-heading">{t('settings.vault.gitSetup')}</h3>
+      <div className="svault-radios" role="radiogroup" aria-label={t('settings.vault.gitSetupLabel')}>
         {GIT_SETUP_OPTIONS.map((option) => (
           <label key={option} className="svault-radio settings-choice">
             <input
@@ -114,26 +121,27 @@ const GitSetupField = observer(function GitSetupField() {
               checked={vault.gitSetupPreference === option}
               onChange={() => void vault.setGitSetupPreference(option)}
             />
-            <span>{GIT_SETUP_LABELS[option]}</span>
+            <span>{labels[option]}</span>
           </label>
         ))}
       </div>
       <p className="svault-hint">
-        Remembered intent for this vault&apos;s git setup; it does not change git behavior yet. {PER_VAULT_HINT}
+        {t('settings.vault.gitSetupHint', { perVault: t('settings.vault.perVault') })}
       </p>
     </div>
   )
 })
 
 const VaultFields = observer(function VaultFields() {
+  const { t } = useTranslation()
   const vault = useService(VaultService)
   if (vault.phase !== 'ready') {
     return (
       <div className="svault-empty" data-testid="vault-settings-empty">
         <Mark icon={FolderOpen} size={20} />
         <div>
-          <p className="svault-empty-title">No vault open</p>
-          <p className="svault-hint">Open a vault to configure these settings.</p>
+          <p className="svault-empty-title">{t('settings.vault.emptyTitle')}</p>
+          <p className="svault-hint">{t('settings.vault.emptyBody')}</p>
         </div>
       </div>
     )
@@ -148,8 +156,9 @@ const VaultFields = observer(function VaultFields() {
 })
 
 export function VaultSection() {
+  const { t } = useTranslation()
   return (
-    <section className="svault-section" data-testid="settings-section-vault" aria-label="This vault settings">
+    <section className="svault-section" data-testid="settings-section-vault" aria-label={t('settings.vault.region')}>
       {/* VaultService is registered at app start; tests that mount the page
           without it render the section shell only. */}
       {has(VaultService) ? <VaultFields /> : null}

@@ -1,3 +1,4 @@
+import { t, watchLocale } from '../../i18n'
 import {
   codeLanguageChoices,
   codeLanguageValue,
@@ -46,7 +47,7 @@ export function attachCodeLanguageMenu(options: {
 
   const sync = () => {
     const value = codeLanguageValue(options.getLanguage())
-    label.textContent = value === '' ? '自动' : choiceLabel(value)
+    label.textContent = choiceLabel(value)
   }
 
   const choiceLabel = (value: string): string => {
@@ -92,7 +93,7 @@ export function attachCodeLanguageMenu(options: {
     if (items.length === 0) {
       const empty = document.createElement('div')
       empty.className = 'editor-code-menu-empty'
-      empty.textContent = '没有匹配的语言'
+      empty.textContent = t('editor.lang.empty')
       list.append(empty)
       filter.removeAttribute('aria-activedescendant')
       return
@@ -194,19 +195,19 @@ export function attachCodeLanguageMenu(options: {
 
     popup.className = 'editor-code-menu'
     popup.setAttribute('role', 'dialog')
-    popup.setAttribute('aria-label', '代码语言')
+    popup.setAttribute('aria-label', t('editor.lang.menu'))
     field.type = 'text'
     field.className = 'editor-code-menu-filter'
-    field.placeholder = '筛选语言'
+    field.placeholder = t('editor.lang.filter')
     field.autocomplete = 'off'
     field.spellcheck = false
-    field.setAttribute('aria-label', '筛选语言')
+    field.setAttribute('aria-label', t('editor.lang.filter'))
     field.setAttribute('aria-autocomplete', 'list')
     field.setAttribute('aria-controls', 'editor-code-lang-list')
     optionsBox.id = 'editor-code-lang-list'
     optionsBox.className = 'editor-code-menu-list'
     optionsBox.setAttribute('role', 'listbox')
-    optionsBox.setAttribute('aria-label', '代码语言')
+    optionsBox.setAttribute('aria-label', t('editor.lang.menu'))
     popup.append(field, optionsBox)
     popup.style.visibility = 'hidden'
     popup.addEventListener('mousedown', (event) => {
@@ -306,11 +307,23 @@ export function attachCodeLanguageMenu(options: {
     else openMenu()
   })
 
-  sync()
+  const applyLocale = () => {
+    sync()
+    if (!menu || !filter || !list) return
+    menu.setAttribute('aria-label', t('editor.lang.menu'))
+    filter.placeholder = t('editor.lang.filter')
+    filter.setAttribute('aria-label', t('editor.lang.filter'))
+    list.setAttribute('aria-label', t('editor.lang.menu'))
+    renderList(false)
+  }
+  applyLocale()
+  const unwatch = watchLocale(applyLocale)
+
   return {
     sync,
     destroy: () => {
       destroyed = true
+      unwatch()
       closeMenu(false)
     },
   }

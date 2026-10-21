@@ -7,6 +7,7 @@
 //   self-clearing feedback line for the status bar.
 
 import { has, register, resolve, Service } from '@rabjs/react'
+import { t } from '../../i18n'
 import { SettingsService } from '../settings/settings.service'
 import { UpdateService } from './update.service'
 
@@ -28,9 +29,11 @@ export class UpdateCheckService extends Service {
 
   /** Small status-bar text. `checking` is shown by the button itself. */
   get feedbackText(): string {
-    if (this.feedback === 'up-to-date') return '已是最新'
+    if (this.feedback === 'up-to-date') return t('shell.upToDate')
     if (this.feedback === 'available') {
-      return this.feedbackVersion ? `发现新版本 v${this.feedbackVersion}，见顶部横幅` : '发现新版本，见顶部横幅'
+      return this.feedbackVersion
+        ? t('shell.updateAvailableVersion', { version: this.feedbackVersion })
+        : t('shell.updateAvailable')
     }
     return ''
   }

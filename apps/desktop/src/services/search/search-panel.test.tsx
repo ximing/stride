@@ -172,7 +172,7 @@ describe('search panel confirm', () => {
     await act(async () => {
       vault.searchDegraded = true
     })
-    expect(host?.querySelector('[data-testid="search-degraded"]')?.textContent).toBe('已降级为 BM25')
+    expect(host?.querySelector('[data-testid="search-degraded"]')?.textContent).toBe('Fell back to BM25')
     await act(async () => {
       vault.searchDegraded = false
     })

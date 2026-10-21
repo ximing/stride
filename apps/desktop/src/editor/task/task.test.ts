@@ -213,7 +213,7 @@ describe('task list', () => {
   it('renders a task toolbar button outside the bubble menu', async () => {
     expect(taskSlashCommand).toMatchObject({
       id: 'task',
-      title: '任务列表',
+      title: 'Task list',
       keywords: 'task todo 任务 待办',
     })
     const openLinkRef: { current: () => boolean } = { current: () => true }
@@ -232,7 +232,7 @@ describe('task list', () => {
     })
     const button = host.querySelector('[data-testid="toolbar-task"]')
     expect(button).not.toBeNull()
-    expect(button?.getAttribute('aria-label')).toBe('任务列表')
+    expect(button?.getAttribute('aria-label')).toBe('Task list')
     expect(button?.getAttribute('type')).toBe('button')
     expect(document.querySelector('[data-testid="bubble-task"]')).toBeNull()
     await act(async () => {

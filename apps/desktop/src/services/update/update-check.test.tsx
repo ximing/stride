@@ -253,7 +253,7 @@ describe('UpdateCheckService manual entries (T8.3)', () => {
       expect(service.feedback).toBe('checking')
       await pending
       expect(service.feedback).toBe('up-to-date')
-      expect(service.feedbackText).toBe('已是最新')
+      expect(service.feedbackText).toBe('Up to date')
 
       vi.advanceTimersByTime(UPDATE_CHECK_FEEDBACK_CLEAR_MS)
       expect(service.feedback).toBe('')

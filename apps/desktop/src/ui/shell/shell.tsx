@@ -11,6 +11,7 @@ import {
   Search,
 } from 'lucide-react'
 import { observer, useService } from '@rabjs/react'
+import { useTranslation } from 'react-i18next'
 import { ComponentsPreviewService } from '../primitives/preview.service'
 
 type SampleNote = {
@@ -94,6 +95,7 @@ function noteById(id: string) {
 }
 
 export const Shell = observer(function Shell() {
+  const { t } = useTranslation()
   const preview = useService(ComponentsPreviewService)
   const note = noteById(preview.activeNoteId) ?? notes[0]
   const linked = note.linkId ? noteById(note.linkId) : undefined
@@ -132,7 +134,7 @@ export const Shell = observer(function Shell() {
             </button>
           </aside>
 
-          <section data-testid="region-notes" className="sd-col sd-notes" aria-label="Notes">
+          <section data-testid="region-notes" className="sd-col sd-notes" aria-label={t('shell.notes')}>
             <div className="sd-list-heading">
               <h2 className="sd-list-title">Field notes</h2>
               <p className="sd-list-count">{notes.length} notes</p>
@@ -157,7 +159,7 @@ export const Shell = observer(function Shell() {
           </section>
 
           <article data-testid="region-editor" className="sd-col sd-editor">
-            <div className="sd-editor-tabbar" aria-label="Open notes">
+            <div className="sd-editor-tabbar" aria-label={t('shell.openNotes')}>
               <div className="sd-editor-tab" aria-current="page">
                 <FileText {...statusIconProps} />
                 <span className="sd-editor-tab-label">{note.title}</span>
@@ -183,7 +185,7 @@ export const Shell = observer(function Shell() {
             </div>
           </article>
 
-          <aside data-testid="region-inspector" className="sd-col sd-inspector" aria-label="Inspector">
+          <aside data-testid="region-inspector" className="sd-col sd-inspector" aria-label={t('shell.inspector')}>
             <p className="sd-kicker">Properties</p>
             <dl className="sd-props">
               <div>
@@ -221,7 +223,7 @@ export const Shell = observer(function Shell() {
         </span>
         <span className="sd-status-item">
           <Search {...statusIconProps} />
-          Index ready
+          {t('shell.indexReady')}
         </span>
         <span className="sd-status-item">
           <MessageCircle {...statusIconProps} />
@@ -229,7 +231,7 @@ export const Shell = observer(function Shell() {
         </span>
         <span className="sd-status-item">
           <Check {...statusIconProps} />
-          Up to date
+          {t('shell.upToDate')}
         </span>
         <span className="sd-status-item sd-status-end">0.1.0</span>
       </footer>

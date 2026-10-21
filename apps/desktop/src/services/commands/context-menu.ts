@@ -28,6 +28,7 @@ import {
   Trash2,
   type LucideIcon,
 } from 'lucide-react'
+import { commandTitle, t } from '../../i18n'
 import { formatShortcut, type AppCommand } from './commands'
 
 export interface ContextMenuItem {
@@ -61,7 +62,7 @@ export function commandRef(
 ): { title: string; shortcut: string | null } {
   const command = commands.find((entry) => entry.id === id)
   return {
-    title: command?.title ?? id,
+    title: command ? commandTitle(command.id, command.title) : id,
     shortcut: command?.shortcut ? formatShortcut(command.shortcut) : null,
   }
 }
@@ -132,14 +133,14 @@ export function buildNoteListMenu(
     {
       kind: 'item',
       id: 'open',
-      label: 'Open',
+      label: t('folders.open'),
       icon: ExternalLink,
       onSelect: () => actions.open(noteId),
     },
     {
       kind: 'item',
       id: 'rename',
-      label: 'Rename',
+      label: t('folders.rename'),
       icon: Pencil,
       onSelect: () => actions.rename(noteId),
     },
@@ -147,7 +148,7 @@ export function buildNoteListMenu(
     {
       kind: 'item',
       id: 'copy-wikilink',
-      label: 'Copy Wikilink',
+      label: t('folders.copyWikilink'),
       icon: LinkIcon,
       disabled: !clipboard,
       onSelect: () => actions.copyWikilink(noteId),
@@ -156,14 +157,14 @@ export function buildNoteListMenu(
     {
       kind: 'item',
       id: 'archive',
-      label: 'Archive',
+      label: t('folders.archive'),
       icon: Archive,
       onSelect: () => actions.archive(noteId),
     },
     {
       kind: 'item',
       id: 'delete',
-      label: 'Delete…',
+      label: t('folders.delete'),
       icon: Trash2,
       danger: true,
       onSelect: () => actions.deleteNote(noteId),
@@ -222,14 +223,14 @@ export function buildEditorMenu(
           {
             kind: 'item',
             id: 'open-link',
-            label: '打开链接',
+            label: t('menu.openLink'),
             icon: ExternalLink,
             onSelect: () => actions.openLink(link.target),
           },
           {
             kind: 'item',
             id: 'open-link-new-tab',
-            label: '在新 Tab 打开',
+            label: t('menu.openInTab'),
             icon: FilePlus,
             onSelect: () => actions.openLinkInNewTab(link.target),
           },
@@ -238,7 +239,7 @@ export function buildEditorMenu(
           {
             kind: 'item',
             id: 'create-and-open',
-            label: '创建并打开',
+            label: t('menu.createAndOpen'),
             icon: FilePlus,
             onSelect: () => actions.openLink(link.target),
           },
@@ -246,7 +247,7 @@ export function buildEditorMenu(
     items.push(separator('wikilink'), {
       kind: 'item',
       id: 'copy-wikilink',
-      label: '复制 Wikilink',
+      label: t('menu.copyWikilink'),
       icon: Copy,
       disabled: !input.clipboardWrite,
       onSelect: () => actions.copyWikilink(wikilinkText(link)),
@@ -259,7 +260,7 @@ export function buildEditorMenu(
       {
         kind: 'item',
         id: 'bold',
-        label: '粗体',
+        label: t('editor.tool.bold'),
         icon: Bold,
         shortcut: input.shortcuts.bold,
         disabled: locked,
@@ -268,7 +269,7 @@ export function buildEditorMenu(
       {
         kind: 'item',
         id: 'italic',
-        label: '斜体',
+        label: t('editor.tool.italic'),
         icon: Italic,
         shortcut: input.shortcuts.italic,
         disabled: locked,
@@ -277,7 +278,7 @@ export function buildEditorMenu(
       {
         kind: 'item',
         id: 'highlight',
-        label: '高亮',
+        label: t('editor.tool.highlight'),
         icon: Highlighter,
         shortcut: input.shortcuts.highlight,
         disabled: locked,
@@ -286,7 +287,7 @@ export function buildEditorMenu(
       {
         kind: 'item',
         id: 'link',
-        label: '链接',
+        label: t('editor.tool.link'),
         icon: LinkIcon,
         disabled: locked,
         onSelect: () => actions.link(),
@@ -295,7 +296,7 @@ export function buildEditorMenu(
       {
         kind: 'item',
         id: 'copy',
-        label: '复制',
+        label: t('menu.copy'),
         icon: Copy,
         disabled: !input.clipboardWrite,
         onSelect: () => actions.copy(),
@@ -306,7 +307,7 @@ export function buildEditorMenu(
     {
       kind: 'item',
       id: 'paste',
-      label: '粘贴',
+      label: t('menu.paste'),
       icon: Clipboard,
       disabled: !input.editable || !input.clipboardRead,
       onSelect: () => actions.paste(),
@@ -314,7 +315,7 @@ export function buildEditorMenu(
     {
       kind: 'item',
       id: 'select-all',
-      label: '全选',
+      label: t('menu.selectAll'),
       icon: TextSelect,
       onSelect: () => actions.selectAll(),
     },
@@ -344,14 +345,14 @@ export function buildFolderMenu(
     {
       kind: 'item',
       id: 'new-note-here',
-      label: 'New Note Here',
+      label: t('folders.newNoteHere'),
       icon: NotebookPen,
       onSelect: () => actions.newNoteHere(path),
     },
     {
       kind: 'item',
       id: 'new-folder-inside',
-      label: 'New Folder Inside',
+      label: t('folders.newFolderInside'),
       icon: FolderPlus,
       onSelect: () => actions.newFolderInside(path),
     },
@@ -359,14 +360,14 @@ export function buildFolderMenu(
     {
       kind: 'item',
       id: 'rename-folder',
-      label: 'Rename',
+      label: t('folders.rename'),
       icon: Pencil,
       onSelect: () => actions.renameFolder(path),
     },
     {
       kind: 'item',
       id: 'delete-folder',
-      label: 'Delete…',
+      label: t('folders.delete'),
       icon: Trash2,
       danger: true,
       onSelect: () => actions.deleteFolder(path),
@@ -395,14 +396,14 @@ export function buildFolderNoteMenu(
     {
       kind: 'item',
       id: 'open',
-      label: 'Open',
+      label: t('folders.open'),
       icon: ExternalLink,
       onSelect: () => actions.open(noteId),
     },
     {
       kind: 'item',
       id: 'copy-wikilink',
-      label: 'Copy Wikilink',
+      label: t('folders.copyWikilink'),
       icon: LinkIcon,
       disabled: !clipboard,
       onSelect: () => actions.copyWikilink(noteId),
@@ -411,14 +412,14 @@ export function buildFolderNoteMenu(
     {
       kind: 'item',
       id: 'archive',
-      label: 'Archive',
+      label: t('folders.archive'),
       icon: Archive,
       onSelect: () => actions.archive(noteId),
     },
     {
       kind: 'item',
       id: 'delete',
-      label: 'Delete…',
+      label: t('folders.delete'),
       icon: Trash2,
       danger: true,
       onSelect: () => actions.deleteNote(noteId),
@@ -436,7 +437,7 @@ export function buildTreeRootMenu(actions: TreeRootMenuActions): ContextMenuEntr
     {
       kind: 'item',
       id: 'new-folder',
-      label: 'New Folder',
+      label: t('folders.newFolder'),
       icon: FolderPlus,
       onSelect: () => actions.newFolder(),
     },

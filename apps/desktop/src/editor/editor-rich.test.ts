@@ -178,7 +178,7 @@ describe('rich text aligned with inwit', () => {
     await act(async () => {
       heading.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true, cancelable: true }))
     })
-    expect(document.querySelector('[role="listbox"][aria-label="标题"]')).not.toBeNull()
+    expect(document.querySelector('[role="listbox"][aria-label="Heading"]')).not.toBeNull()
   })
 
   it('applies a swatch color, shows the find button pressed, and does not insert a second table', async () => {
@@ -199,7 +199,7 @@ describe('rich text aligned with inwit', () => {
       )
     })
     await act(async () => {
-      ;(document.querySelector('[aria-label="赤"]') as HTMLButtonElement).click()
+      ;(document.querySelector('[aria-label="Vermilion"]') as HTMLButtonElement).click()
     })
     expect(editor.getAttributes('textStyle').color).toBe('#b3402a')
 

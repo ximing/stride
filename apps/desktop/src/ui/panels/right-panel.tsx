@@ -1,4 +1,5 @@
 import { observer, useService } from '@rabjs/react'
+import { useTranslation } from 'react-i18next'
 import {
   GitBranch,
   List,
@@ -15,28 +16,30 @@ import { GitPanel } from '../git/git-panel-host'
 import { PropertiesPanel } from './properties-panel'
 import { TocPanel } from './toc-panel'
 
-const PANEL_TABS: { id: RightPanelTab; label: string; icon: LucideIcon }[] = [
-  { id: 'properties', label: 'Properties', icon: SlidersHorizontal },
-  { id: 'toc', label: 'Outline', icon: List },
-  { id: 'git', label: 'Git', icon: GitBranch },
-  { id: 'chat', label: 'Agent', icon: MessageCircle },
+const PANEL_TABS: { id: RightPanelTab; labelKey: string; icon: LucideIcon }[] = [
+  { id: 'properties', labelKey: 'panels.properties', icon: SlidersHorizontal },
+  { id: 'toc', labelKey: 'panels.outline', icon: List },
+  { id: 'git', labelKey: 'panels.git', icon: GitBranch },
+  { id: 'chat', labelKey: 'panels.agent', icon: MessageCircle },
 ]
 
 const TabButton = observer(function TabButton({ tab, collapsed }: { tab: (typeof PANEL_TABS)[number]; collapsed: boolean }) {
+  const { t } = useTranslation()
   const layout = useService(LayoutService)
+  const label = t(tab.labelKey)
   const active = !collapsed && layout.rightPanelTab === tab.id
   return (
     <IconButton
       key={tab.id}
       icon={tab.icon}
-      label={tab.label}
+      label={label}
       active={active}
       className="panel-tab"
       data-testid={`panel-tab-${tab.id}`}
       data-panel={tab.id}
       role="tab"
       aria-selected={active}
-      title={tab.label}
+      title={label}
       onClick={() => {
         if (!collapsed && layout.rightPanelTab === tab.id) layout.setRightPanelCollapsed(true)
         else layout.setRightPanelTab(tab.id)
@@ -46,8 +49,9 @@ const TabButton = observer(function TabButton({ tab, collapsed }: { tab: (typeof
 })
 
 const PanelTabs = observer(function PanelTabs({ collapsed }: { collapsed: boolean }) {
+  const { t } = useTranslation()
   return (
-    <div className="panel-tabs" role="tablist" aria-label="Inspector panels">
+    <div className="panel-tabs" role="tablist" aria-label={t('shell.inspectorTabs')}>
       {PANEL_TABS.map((tab) => (
         <TabButton key={tab.id} tab={tab} collapsed={collapsed} />
       ))}
@@ -65,6 +69,7 @@ export const PanelRail = observer(function PanelRail() {
 })
 
 export const RightPanel = observer(function RightPanel() {
+  const { t } = useTranslation()
   const layout = useService(LayoutService)
   return (
     <div className="panel-wrap" data-testid="right-panel">
@@ -72,7 +77,7 @@ export const RightPanel = observer(function RightPanel() {
         <PanelTabs collapsed={false} />
         <IconButton
           icon={PanelRightClose}
-          label="Hide panel"
+          label={t('shell.hidePanel')}
           className="panel-tab panel-collapse"
           data-testid="panel-collapse"
           onClick={() => layout.setRightPanelCollapsed(true)}

@@ -1,13 +1,14 @@
 import type { NodeViewRenderer, NodeViewRendererProps } from '@tiptap/core';
 import type { NodeView } from '@tiptap/pm/view';
 import { NodeSelection, TextSelection } from '@tiptap/pm/state';
+import { t, watchLocale } from '../../i18n';
 import { mermaidViewOf, type MermaidViewMode } from './mermaid-block';
 import { createMermaidFrame } from './mermaid-view';
 
-const MODES: ReadonlyArray<{ id: MermaidViewMode; label: string; hint: string }> = [
-  { id: 'code', label: '纯代码', hint: '只显示源码' },
-  { id: 'render', label: '渲染', hint: '只显示图形' },
-  { id: 'split', label: '混合', hint: '左侧图形，右侧源码' },
+const MODES: ReadonlyArray<{ id: MermaidViewMode; labelKey: string; hintKey: string }> = [
+  { id: 'code', labelKey: 'editor.mermaid.code', hintKey: 'editor.mermaid.codeHint' },
+  { id: 'render', labelKey: 'editor.mermaid.render', hintKey: 'editor.mermaid.renderHint' },
+  { id: 'split', labelKey: 'editor.mermaid.split', hintKey: 'editor.mermaid.splitHint' },
 ];
 
 function readPos(getPos: NodeViewRendererProps['getPos']): number | null {
@@ -31,15 +32,12 @@ export const mermaidBlockNodeView: NodeViewRenderer = ({ editor, node, getPos })
   bar.className = 'doc-mermaid-modes';
   bar.setAttribute('contenteditable', 'false');
   bar.setAttribute('role', 'group');
-  bar.setAttribute('aria-label', 'Mermaid 显示');
 
   const buttons = new Map<MermaidViewMode, HTMLButtonElement>();
   for (const mode of MODES) {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'doc-mermaid-mode';
-    button.textContent = mode.label;
-    button.setAttribute('aria-label', mode.hint);
     button.addEventListener('mousedown', (event) => {
       event.preventDefault();
       setMode(mode.id);
@@ -47,6 +45,18 @@ export const mermaidBlockNodeView: NodeViewRenderer = ({ editor, node, getPos })
     buttons.set(mode.id, button);
     bar.append(button);
   }
+
+  const paintModes = (): void => {
+    bar.setAttribute('aria-label', t('editor.mermaid.group'));
+    for (const mode of MODES) {
+      const button = buttons.get(mode.id);
+      if (!button) continue;
+      button.textContent = t(mode.labelKey);
+      button.setAttribute('aria-label', t(mode.hintKey));
+    }
+  };
+  paintModes();
+  const unwatch = watchLocale(paintModes);
 
   const body = document.createElement('div');
   body.className = 'doc-mermaid-body';
@@ -157,6 +167,7 @@ export const mermaidBlockNodeView: NodeViewRenderer = ({ editor, node, getPos })
       return target !== code && !code.contains(target);
     },
     destroy() {
+      unwatch();
       frame.destroy();
       editor.off('transaction', onEditor);
     },

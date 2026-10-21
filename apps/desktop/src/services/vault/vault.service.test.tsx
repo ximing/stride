@@ -617,27 +617,27 @@ describe('VaultService', () => {
     await act(async () => {
       vault.searchDegraded = true
     })
-    expect(host.querySelector('[data-testid="search-degraded"]')?.textContent).toBe('已降级为 BM25')
+    expect(host.querySelector('[data-testid="search-degraded"]')?.textContent).toBe('Fell back to BM25')
     await act(async () => {
       vault.searchDegraded = false
     })
     expect(host.querySelector('[data-testid="search-degraded"]')).toBeNull()
-    expect(host.querySelector('[data-testid="index-status"]')?.textContent).toBe('索引就绪')
+    expect(host.querySelector('[data-testid="index-status"]')?.textContent).toBe('Index ready')
     await act(async () => {
       vault.indexPhase = 'rebuilding'
       vault.indexDone = 2
       vault.indexTotal = 9
     })
-    expect(host.querySelector('[data-testid="index-status"]')?.textContent).toBe('索引 2/9')
+    expect(host.querySelector('[data-testid="index-status"]')?.textContent).toBe('Index 2/9')
     await act(async () => {
       vault.indexPhase = 'error'
     })
-    expect(host.querySelector('[data-testid="index-status"]')?.textContent).toContain('索引失败')
+    expect(host.querySelector('[data-testid="index-status"]')?.textContent).toContain('Index failed')
     expect(host.querySelector('[data-testid="index-retry"]')).not.toBeNull()
     await act(async () => {
       vault.indexPhase = 'ready'
     })
-    expect(host.querySelector('[data-testid="index-status"]')?.textContent).toBe('索引就绪')
+    expect(host.querySelector('[data-testid="index-status"]')?.textContent).toBe('Index ready')
     root.unmount()
     host.remove()
   })

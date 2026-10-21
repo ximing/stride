@@ -7,6 +7,8 @@
 import { observer, useService } from '@rabjs/react'
 import { catalogBaseUrl, catalogModelSuggestions, LLM_PROVIDERS, llmProviderInfo, type PublicLlmConfig } from '@stride/core'
 import { CircleAlert, CircleCheck, LoaderCircle, Plus, Star, Trash2 } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { t } from '../../../i18n'
 import { SettingsService } from '../../../services/settings/settings.service'
 import { Button } from '../../primitives/button'
 import { Mark } from '../../primitives/icon'
@@ -35,14 +37,14 @@ export function isHttpUrl(value: string): boolean {
  *  (the custom provider). */
 export function llmConfigErrors(config: PublicLlmConfig): LlmFieldErrors {
   const errors: LlmFieldErrors = {}
-  if (!config.name.trim()) errors.name = 'Name is required'
-  if (!config.provider.trim()) errors.provider = 'Provider is required'
-  if (!config.model.trim()) errors.model = 'Model is required'
+  if (!config.name.trim()) errors.name = t('settings.ai.nameRequired')
+  if (!config.provider.trim()) errors.provider = t('settings.ai.providerRequired')
+  if (!config.model.trim()) errors.model = t('settings.ai.modelRequired')
   const baseUrl = config.baseUrl.trim()
   if (baseUrl) {
-    if (!isHttpUrl(baseUrl)) errors.baseUrl = 'Base URL must be a valid http:// or https:// URL'
+    if (!isHttpUrl(baseUrl)) errors.baseUrl = t('settings.ai.baseUrlInvalid')
   } else if (!catalogBaseUrl(config.provider)) {
-    errors.baseUrl = 'Base URL is required for this provider'
+    errors.baseUrl = t('settings.ai.baseUrlRequired')
   }
   return errors
 }
@@ -52,6 +54,7 @@ export function hasLlmErrors(errors: LlmFieldErrors): boolean {
 }
 
 export const AiSection = observer(function AiSection() {
+  const { t } = useTranslation()
   const settings = useService(SettingsService)
   const configs = settings.form.llmConfigs
   const selected = configs.find((config) => config.id === settings.selectedLlmId)
@@ -60,16 +63,21 @@ export const AiSection = observer(function AiSection() {
   const selectedErrors = selected ? errorsById.get(selected.id) ?? {} : {}
   const testing = settings.$model.testSelectedLlm.loading
   const saving = settings.$model.save.loading
-  const testOk = settings.llmTestResult === '连接成功'
+  const testOk = settings.llmTestResult === 'ok'
+  const testText = testOk
+    ? t('common.connectionOk')
+    : settings.llmTestResult === 'missing'
+      ? t('settings.ai.missing')
+      : settings.llmTestResult
 
   return (
     <div className="settings-ai" data-testid="settings-section-ai">
       {configs.length === 0 ? (
         <p className="settings-ai-empty" data-testid="llm-empty">
-          No model providers yet. Add one to enable the agent and commit message suggestions.
+          {t('settings.ai.empty')}
         </p>
       ) : (
-        <div className="settings-ai-list" role="listbox" aria-label="LLM configurations">
+        <div className="settings-ai-list" role="listbox" aria-label={t('settings.ai.list')}>
           {configs.map((config) => {
             const invalid = hasLlmErrors(errorsById.get(config.id) ?? {})
             return (
@@ -85,14 +93,14 @@ export const AiSection = observer(function AiSection() {
                 <span className="settings-ai-row-name">{config.name || config.id}</span>
                 <span className="settings-ai-row-provider">{llmProviderInfo(config.provider)?.label ?? config.provider}</span>
                 {invalid ? (
-                  <span className="settings-ai-row-warning" title="This configuration has errors">
+                  <span className="settings-ai-row-warning" title={t('settings.ai.invalidTitle')}>
                     <Mark icon={CircleAlert} size={14} />
                   </span>
                 ) : null}
                 {config.isDefault ? (
-                  <span className="settings-ai-row-default" title="Default">
+                  <span className="settings-ai-row-default" title={t('settings.ai.defaultTitle')}>
                     <Mark icon={Star} size={14} />
-                    Default
+                    {t('settings.ai.defaultTitle')}
                   </span>
                 ) : null}
               </button>
@@ -108,7 +116,7 @@ export const AiSection = observer(function AiSection() {
           icon={<Mark icon={Plus} size={14} />}
           onClick={() => settings.addLlmConfig()}
         >
-          Add provider
+          {t('settings.ai.add')}
         </Button>
         <Button
           tone="danger"
@@ -118,7 +126,7 @@ export const AiSection = observer(function AiSection() {
           icon={<Mark icon={Trash2} size={14} />}
           onClick={() => selected && settings.removeLlmConfig(selected.id)}
         >
-          Delete
+          {t('common.delete')}
         </Button>
         <Button
           tone="quiet"
@@ -128,14 +136,14 @@ export const AiSection = observer(function AiSection() {
           icon={<Mark icon={Star} size={14} />}
           onClick={() => selected && settings.setDefaultLlmConfig(selected.id)}
         >
-          Set as default
+          {t('settings.ai.makeDefault')}
         </Button>
       </div>
       {selected ? (
         <div className="settings-ai-form">
           <div className="settings-ai-field">
             <Input
-              label="Name"
+              label={t('settings.ai.name')}
               className="settings-ai-input"
               data-testid="llm-name"
               value={selected.name}
@@ -147,7 +155,7 @@ export const AiSection = observer(function AiSection() {
           </div>
           <div className="settings-ai-field">
             <Select
-              label="Provider"
+              label={t('settings.ai.provider')}
               className="settings-ai-input"
               data-testid="llm-provider"
               value={selected.provider}
@@ -160,7 +168,7 @@ export const AiSection = observer(function AiSection() {
           </div>
           <div className="settings-ai-field">
             <Input
-              label="Model"
+              label={t('settings.ai.model')}
               className="settings-ai-input"
               data-testid="llm-model"
               value={selected.model}
@@ -178,7 +186,7 @@ export const AiSection = observer(function AiSection() {
           </div>
           <div className="settings-ai-field">
             <Input
-              label="Base URL"
+              label={t('settings.ai.baseUrl')}
               className="settings-ai-input"
               data-testid="llm-base-url"
               value={selected.baseUrl}
@@ -191,12 +199,12 @@ export const AiSection = observer(function AiSection() {
           </div>
           <div className="settings-ai-field settings-ai-field-wide">
             <Input
-              label="API key"
+              label={t('settings.ai.apiKey')}
               className="settings-ai-input"
               data-testid="llm-key"
               type="password"
               value={settings.llmKeyDrafts[selected.id] ?? ''}
-              placeholder={selected.keyMask || 'API key'}
+              placeholder={selected.keyMask || t('settings.ai.apiKey')}
               aria-describedby="llm-key-meta"
               onChange={(event) => {
                 settings.llmKeyDrafts = { ...settings.llmKeyDrafts, [selected.id]: event.target.value }
@@ -204,8 +212,8 @@ export const AiSection = observer(function AiSection() {
             />
             <span className="settings-ai-meta" id="llm-key-meta">
               {selected.keyMask
-                ? `Stored key ${selected.keyMask} — kept while the field stays untouched; enter a new key to replace it.`
-                : 'Keys are sealed before they are stored and never written in plaintext.'}
+                ? t('settings.ai.keyKept', { mask: selected.keyMask })
+                : t('settings.ai.keySealed')}
             </span>
           </div>
           <div className="settings-ai-actions settings-ai-field-wide">
@@ -220,7 +228,7 @@ export const AiSection = observer(function AiSection() {
                 void settings.testSelectedLlm()
               }}
             >
-              {testing ? 'Testing…' : 'Test connection'}
+              {testing ? t('common.testing') : t('common.testConnection')}
             </Button>
             {settings.llmTestResult ? (
               <p
@@ -229,7 +237,7 @@ export const AiSection = observer(function AiSection() {
                 role="status"
               >
                 <Mark icon={testOk ? CircleCheck : CircleAlert} size={14} />
-                <span>{testOk ? 'Connection successful.' : settings.llmTestResult}</span>
+                <span>{testText}</span>
               </p>
             ) : null}
           </div>
@@ -246,11 +254,15 @@ export const AiSection = observer(function AiSection() {
             void settings.save()
           }}
         >
-          {saving ? 'Saving…' : 'Save'}
+          {saving ? t('common.saving') : t('common.save')}
         </Button>
         {invalidCount > 0 ? (
           <p className="settings-ai-error" data-testid="settings-ai-invalid-summary" role="alert">
-            Fix the highlighted fields before saving ({invalidCount} of {configs.length} {configs.length === 1 ? 'configuration' : 'configurations'} invalid).
+            {t('settings.ai.invalidSummary', {
+              invalid: invalidCount,
+              total: configs.length,
+              noun: configs.length === 1 ? t('settings.ai.configuration') : t('settings.ai.configurations'),
+            })}
           </p>
         ) : null}
         {settings.notice ? <p className="settings-ai-error" data-testid="settings-ai-notice" role="alert">{settings.notice}</p> : null}

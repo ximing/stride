@@ -30,7 +30,7 @@ export const highlightInputExtension = Extension.create({
 
 export const calloutSlashCommand = {
   id: 'callout',
-  title: '提示块',
+  title: 'Callout',
   keywords: 'callout 提示 警告',
   run(editor: Editor) {
     editor.commands.insertContent({

@@ -196,7 +196,7 @@ describe('panel empty/error states', () => {
       await act(async () => {
         window.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', metaKey: true, bubbles: true, cancelable: true }))
       })
-      expect(element.querySelector('[data-testid="quick-open-empty"]')?.textContent).toContain('还没有笔记')
+      expect(element.querySelector('[data-testid="quick-open-empty"]')?.textContent).toContain('No notes yet')
     } finally {
       vault.cancelPending()
       await unmount(element, root)

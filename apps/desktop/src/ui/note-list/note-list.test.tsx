@@ -208,7 +208,7 @@ describe('NoteList', () => {
     })
     expect(host!.querySelector('[data-testid="list-filter-clear"]')).toBeNull()
     const input = host!.querySelector<HTMLInputElement>('[data-testid="list-filter"]')!
-    expect(input.placeholder).toBe('过滤标题或属性')
+    expect(input.placeholder).toBe('Filter title or properties')
     await act(async () => {
       setInputValue(input, '纪要')
     })

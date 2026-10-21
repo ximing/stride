@@ -1,6 +1,7 @@
 import { Check, FileText, Folder, Pencil, Trash2 } from 'lucide-react'
 import { observer, useService } from '@rabjs/react'
 import { useEffect, useMemo, useState, type DragEvent } from 'react'
+import { useTranslation } from 'react-i18next'
 import type { StrideNote } from '@stride/core/note'
 import {
   buildFolderMenu,
@@ -102,6 +103,7 @@ function FolderNotes({
   onSelect: (id: string) => void
   onMenu: (id: string, x: number, y: number) => void
 }) {
+  const { t } = useTranslation()
   const inFolder = notesIn(notes, parent)
   const shown = inFolder.length > FOLDER_NOTE_RENDER_CAP ? inFolder.slice(0, FOLDER_NOTE_RENDER_CAP) : inFolder
   return (
@@ -117,7 +119,7 @@ function FolderNotes({
       ))}
       {inFolder.length > shown.length && (
         <p className="folder-overflow" data-testid="folder-overflow">
-          … {inFolder.length - shown.length} more notes here
+          {t('folders.more', { count: inFolder.length - shown.length })}
         </p>
       )}
     </>
@@ -165,7 +167,10 @@ function FolderBlock({
   onCreateDraft,
   onCreateIn,
 }: FolderBlockProps) {
+  const { t } = useTranslation()
   const label = path.split('/').pop() ?? path
+  const renameLabel = `${t('folders.rename')} ${label}`
+  const insideLabel = t('folders.newInside', { name: label })
   return (
     <div
       className="folder-row"
@@ -182,10 +187,10 @@ function FolderBlock({
       <div className="folder-row-main">
         {renaming === path ? (
           <Input
-            label={`Rename ${label}`}
+            label={renameLabel}
             className="folder-rename-input"
             value={draft}
-            aria-label={`Rename ${label}`}
+            aria-label={renameLabel}
             onChange={(event) => onDraft(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === 'Enter') {
@@ -204,14 +209,14 @@ function FolderBlock({
           <IconButton
             data-testid="rename-folder"
             icon={renaming === path ? Check : Pencil}
-            label={renaming === path ? `Save name for ${label}` : `Rename ${label}`}
+            label={renaming === path ? t('folders.saveName', { name: label }) : renameLabel}
             size="sm"
             onClick={() => (renaming === path ? onRename(path) : onStartRename(path))}
           />
           <IconButton
             data-testid="delete-folder"
             icon={Trash2}
-            label={`Delete ${label}`}
+            label={`${t('common.delete')} ${label}`}
             size="sm"
             onClick={() => onDelete(path)}
           />
@@ -221,10 +226,10 @@ function FolderBlock({
         {creatingIn === path && (
           <div className="folder-create">
             <Input
-              label={`New folder inside ${label}`}
+              label={insideLabel}
               data-testid="folder-child-name"
               value={createDraft}
-              aria-label={`New folder inside ${label}`}
+              aria-label={insideLabel}
               onChange={(event) => onCreateDraft(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter') {
@@ -234,7 +239,7 @@ function FolderBlock({
               }}
             />
             <Button size="sm" tone="secondary" data-testid="create-folder-child" onClick={() => onCreateIn(path)}>
-              Create
+              {t('folders.create')}
             </Button>
           </div>
         )}
@@ -268,6 +273,7 @@ function FolderBlock({
 }
 
 export const FolderTree = observer(function FolderTree() {
+  const { t } = useTranslation()
   const vault = useService(VaultService)
   const folderService = useService(FolderService)
   const listFilter = useService(ListFilterService)
@@ -390,20 +396,20 @@ export const FolderTree = observer(function FolderTree() {
     >
       <div className="folder-tree-actions">
         <Button size="sm" tone="secondary" data-testid="new-folder" onClick={() => setCreating(true)}>
-          New folder
+          {t('folders.newFolder')}
         </Button>
       </div>
       {treeEmpty && (
         <EmptyState
           compact
-          title={listFilter.query.trim() !== '' || vault.searchQuery.trim() !== '' ? 'No notes match the current filter.' : 'No notes yet.'}
+          title={listFilter.query.trim() !== '' || vault.searchQuery.trim() !== '' ? t('folders.emptyFilter') : t('folders.empty')}
           testId="folder-tree-empty"
         />
       )}
       {creating && (
         <div className="folder-create">
           <Input
-            label="Folder name"
+            label={t('folders.name')}
             data-testid="folder-name"
             value={name}
             onChange={(event) => setName(event.target.value)}
@@ -415,7 +421,7 @@ export const FolderTree = observer(function FolderTree() {
             }}
           />
           <Button size="sm" tone="secondary" data-testid="create-folder" onClick={() => void submitCreate()}>
-            Create
+            {t('folders.create')}
           </Button>
         </div>
       )}
@@ -445,12 +451,12 @@ export const FolderTree = observer(function FolderTree() {
       <FolderNotes notes={notes} parent="" activeId={vault.activeId} onSelect={(id) => tabs.openNote(id)} onMenu={openNoteMenu} />
       <Modal open={deleting !== ''} onOpenChange={(open) => { if (!open) setDeleting('') }}>
         <ModalContent
-          title="Delete folder"
-          description={`Delete folder “${deletingLabel}”? The folder must be empty of notes.`}
+          title={t('folders.deleteTitle')}
+          description={t('folders.deleteBody', { name: deletingLabel })}
         >
           <div className="sd-modal-actions">
             <ModalClose asChild>
-              <Button tone="secondary" data-testid="cancel-delete-folder">Cancel</Button>
+              <Button tone="secondary" data-testid="cancel-delete-folder">{t('common.cancel')}</Button>
             </ModalClose>
             <Button
               tone="danger"
@@ -460,7 +466,7 @@ export const FolderTree = observer(function FolderTree() {
                 setDeleting('')
               }}
             >
-              Delete
+              {t('common.delete')}
             </Button>
           </div>
         </ModalContent>

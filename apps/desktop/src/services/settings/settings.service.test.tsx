@@ -104,10 +104,10 @@ describe('settings service', () => {
     settings.setEmbeddingDim('4')
     settings.embeddingKey = 'sk-stride-embed-test-key'
     await settings.testEmbedding()
-    expect(settings.embeddingTestResult).toBe('连接成功')
+    expect(settings.embeddingTestResult).toBe('ok')
     expect(localStorage.getItem(SETTINGS_STORAGE_KEY)).toBeNull()
     const init = fetchMock.mock.calls[0]?.[1]
-    expect(JSON.parse(String(init?.body)).input).toEqual(['连接测试'])
+    expect(JSON.parse(String(init?.body)).input).toEqual(['connection test'])
 
     fetchMock.mockResolvedValueOnce(new Response('no', { status: 401 }))
     await settings.testEmbedding()
@@ -124,12 +124,12 @@ describe('settings service', () => {
       data: [{ index: 0, embedding: [1, 0] }],
     }), { status: 200, headers: { 'content-type': 'application/json' } }))
     await settings.testEmbedding()
-    expect(settings.embeddingTestResult).toContain('维度不符')
+    expect(settings.embeddingTestResult).toContain('dim:')
 
     const calls = fetchMock.mock.calls.length
     settings.setEmbeddingDim('')
     await settings.testEmbedding()
-    expect(settings.embeddingTestResult).toBe('维度不符')
+    expect(settings.embeddingTestResult).toBe('dim')
     expect(fetchMock.mock.calls.length).toBe(calls)
   })
 
@@ -201,7 +201,7 @@ describe('settings service', () => {
     settings.addLlmConfig()
     settings.llmKeyDrafts = { [settings.selectedLlmId]: 'sk-stride-llm-test-key' }
     await settings.testSelectedLlm()
-    expect(settings.llmTestResult).toBe('连接成功')
+    expect(settings.llmTestResult).toBe('ok')
     expect(fetchMock).toHaveBeenCalled()
   })
 })

@@ -1,22 +1,22 @@
 import type { Editor } from '@tiptap/core'
 
 export const TEXT_COLORS = [
-  { label: '赤', value: '#b3402a' },
-  { label: '赭', value: '#9a6232' },
-  { label: '绿', value: '#2f7d4a' },
-  { label: '蓝', value: '#2a5f9e' },
-  { label: '紫', value: '#6a4c93' },
-  { label: '墨', value: '#221d16' },
-  { label: '灰', value: '#6f675c' },
+  { id: 'vermilion', value: '#b3402a' },
+  { id: 'ochre', value: '#9a6232' },
+  { id: 'green', value: '#2f7d4a' },
+  { id: 'blue', value: '#2a5f9e' },
+  { id: 'purple', value: '#6a4c93' },
+  { id: 'ink', value: '#221d16' },
+  { id: 'gray', value: '#6f675c' },
 ] as const
 
 export const BACKGROUND_COLORS = [
-  { label: '黄', value: '#f6e7a8' },
-  { label: '绿', value: '#d7efd4' },
-  { label: '蓝', value: '#d6e6f7' },
-  { label: '粉', value: '#f8d6d0' },
-  { label: '紫', value: '#e7dff6' },
-  { label: '灰', value: '#ece7df' },
+  { id: 'yellow', value: '#f6e7a8' },
+  { id: 'green', value: '#d7efd4' },
+  { id: 'blue', value: '#d6e6f7' },
+  { id: 'pink', value: '#f8d6d0' },
+  { id: 'purple', value: '#e7dff6' },
+  { id: 'gray', value: '#ece7df' },
 ] as const
 
 export type BarState = {

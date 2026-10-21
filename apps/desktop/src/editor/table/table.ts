@@ -21,7 +21,7 @@ export function tableExtensions() {
 
 export const tableSlashCommand = {
   id: 'table',
-  title: '表格',
+  title: 'Table',
   keywords: 'table 表格',
   run(editor: Editor) {
     editor.commands.insertTable({ rows: 3, cols: 3, withHeaderRow: true })

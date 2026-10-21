@@ -1,6 +1,7 @@
 import { Extension, type Editor } from '@tiptap/core'
 import { PluginKey } from '@tiptap/pm/state'
 import { Suggestion } from '@tiptap/suggestion'
+import { t } from '../../i18n'
 import { renderSlashMenu } from './slash-menu'
 
 export type SlashCommand = {
@@ -20,7 +21,11 @@ export function registerSlashCommand(command: SlashCommand) {
 
 export function filterSlashCommands(query: string): SlashCommand[] {
   const needle = query.toLowerCase()
-  return slashCommands.filter((item) => `${item.title} ${item.keywords}`.toLowerCase().includes(needle))
+  return slashCommands.filter((item) => {
+    const en = t(`editor.slash.${item.id}`, { lng: 'en' })
+    const zh = t(`editor.slash.${item.id}`, { lng: 'zh' })
+    return `${item.title} ${item.keywords} ${en} ${zh}`.toLowerCase().includes(needle)
+  })
 }
 
 export function moveSlashSelection(index: number, direction: 'up' | 'down', length: number): number {
@@ -31,7 +36,7 @@ export function moveSlashSelection(index: number, direction: 'up' | 'down', leng
 
 registerSlashCommand({
   id: 'h2',
-  title: '标题 H2',
+  title: 'Heading 2',
   keywords: 'h2 heading 标题',
   run: (editor) => {
     editor.commands.toggleHeading({ level: 2 })
@@ -40,7 +45,7 @@ registerSlashCommand({
 
 registerSlashCommand({
   id: 'h3',
-  title: '标题 H3',
+  title: 'Heading 3',
   keywords: 'h3 heading 标题',
   run: (editor) => {
     editor.commands.toggleHeading({ level: 3 })
@@ -49,7 +54,7 @@ registerSlashCommand({
 
 registerSlashCommand({
   id: 'bullet',
-  title: '无序列表',
+  title: 'Bulleted list',
   keywords: 'bullet list ul 无序 列表',
   run: (editor) => {
     editor.commands.toggleBulletList()
@@ -58,7 +63,7 @@ registerSlashCommand({
 
 registerSlashCommand({
   id: 'ordered',
-  title: '有序列表',
+  title: 'Numbered list',
   keywords: 'ordered list ol 有序 列表',
   run: (editor) => {
     editor.commands.toggleOrderedList()
@@ -67,7 +72,7 @@ registerSlashCommand({
 
 registerSlashCommand({
   id: 'quote',
-  title: '引用',
+  title: 'Quote',
   keywords: 'quote blockquote 引用',
   run: (editor) => {
     editor.commands.toggleBlockquote()
@@ -76,7 +81,7 @@ registerSlashCommand({
 
 registerSlashCommand({
   id: 'code',
-  title: '代码块',
+  title: 'Code block',
   keywords: 'code block 代码 代码块',
   run: (editor) => {
     editor.commands.toggleCodeBlock()
@@ -85,7 +90,7 @@ registerSlashCommand({
 
 registerSlashCommand({
   id: 'hr',
-  title: '分隔线',
+  title: 'Divider',
   keywords: 'hr horizontal rule divider 分隔线 分隔',
   run: (editor) => {
     editor.commands.setHorizontalRule()

@@ -1,6 +1,7 @@
 import { ListTree } from 'lucide-react'
 import type { Editor } from '@tiptap/core'
 import { observer, useService } from '@rabjs/react'
+import { useTranslation } from 'react-i18next'
 import { VaultService } from '../../services/vault/vault.service'
 import { EmptyState } from '../primitives/empty-state'
 import { tocItems, type TocItem } from './toc'
@@ -32,6 +33,7 @@ function openItem(item: TocItem) {
 }
 
 export const TocPanel = observer(function TocPanel() {
+  const { t } = useTranslation()
   const vault = useService(VaultService)
   const note = vault.active
   if (!note) {
@@ -40,8 +42,8 @@ export const TocPanel = observer(function TocPanel() {
         <EmptyState
           compact
           icon={ListTree}
-          title="Select a note"
-          body="The outline of the open note shows here."
+          title={t('panels.tocEmptyTitle')}
+          body={t('panels.tocEmptyBody')}
           testId="toc-empty"
         />
       </div>
@@ -55,8 +57,8 @@ export const TocPanel = observer(function TocPanel() {
         <EmptyState
           compact
           icon={ListTree}
-          title="No headings in this note."
-          body="Add headings to build an outline."
+          title={t('panels.tocNoneTitle')}
+          body={t('panels.tocNoneBody')}
           testId="toc-empty-headings"
         />
       </div>
@@ -64,7 +66,7 @@ export const TocPanel = observer(function TocPanel() {
   }
   return (
     <div className="toc-panel" data-testid="toc-panel">
-      <h2 className="panel-heading">Outline</h2>
+      <h2 className="panel-heading">{t('panels.outline')}</h2>
       <div className="toc-list">
         {items.map((item, index) => (
           <button

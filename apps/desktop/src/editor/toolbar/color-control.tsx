@@ -1,5 +1,6 @@
 import type { LucideIcon } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { createPortal } from 'react-dom'
 
 export function EditorIcon({ icon: Glyph }: { icon: LucideIcon }) {
@@ -27,12 +28,13 @@ export function ColorControl({
   icon: LucideIcon
   value: string
   fallback: string
-  colors: readonly { label: string; value: string }[]
+  colors: readonly { id: string; value: string }[]
   open: boolean
   pressed?: boolean
   onOpenChange: (open: boolean) => void
   onPick: (value: string | null) => void
 }) {
+  const { t } = useTranslation()
   const buttonRef = useRef<HTMLButtonElement>(null)
   const popRef = useRef<HTMLDivElement>(null)
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
@@ -125,7 +127,7 @@ export function ColorControl({
                     type="button"
                     className={`editor-color-swatch${value.toLowerCase() === color.value ? ' is-on' : ''}`}
                     style={{ background: color.value }}
-                    aria-label={color.label}
+                    aria-label={t(`editor.color.${color.id}`)}
                     aria-pressed={value.toLowerCase() === color.value}
                     onClick={() => {
                       onPick(color.value)
@@ -135,10 +137,10 @@ export function ColorControl({
                 ))}
               </div>
               <label className="editor-color-custom">
-                自定义
+                {t('editor.custom')}
                 <input
                   type="color"
-                  aria-label={`${label}自定义`}
+                  aria-label={t('editor.customOf', { label })}
                   value={shown}
                   onChange={(event) => onPick(event.target.value)}
                 />

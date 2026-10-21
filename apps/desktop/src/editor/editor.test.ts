@@ -123,7 +123,7 @@ describe('editor formats', () => {
     expect(JSON.stringify(editor.getJSON())).toContain('horizontalRule')
     expect(runFormat(editor, 'h1' as FormatName)).toBe(false)
     expect(editor.isActive('heading', { level: 1 })).toBe(false)
-    expect(editorTools.some((tool) => tool.id === 'h1' || String(tool.format) === 'h1' || tool.label.includes('H1'))).toBe(false)
+    expect(editorTools.some((tool) => tool.id === 'h1' || String(tool.format) === 'h1')).toBe(false)
   })
 
   it('leaves Mod-k unbound because the command palette owns it app-wide', () => {
@@ -282,7 +282,7 @@ describe('editor formats', () => {
       expect(button, id).not.toBeNull()
       expect(button?.getAttribute('type')).toBe('button')
     }
-    expect(document.querySelector('[data-testid="toolbar-heading"]')?.textContent).toContain('正文')
+    expect(document.querySelector('[data-testid="toolbar-heading"]')?.textContent).toContain('Text')
     expect(document.querySelector('[data-testid="toolbar-h1"]')).toBeNull()
     expect(document.querySelector('[data-testid="toolbar-h2"]')).toBeNull()
     expect(document.querySelector('[data-testid="editor-bubble"]')).not.toBeNull()
@@ -292,10 +292,10 @@ describe('editor formats', () => {
     for (const id of ['bubble-h2', 'bubble-h3', 'bubble-bullet', 'bubble-ordered', 'bubble-quote', 'bubble-highlight', 'bubble-code', 'bubble-code-block', 'bubble-hr', 'bubble-wikilink']) {
       expect(document.querySelector(`[data-testid="${id}"]`), id).toBeNull()
     }
-    expect(document.querySelector('[data-testid="toolbar-bold"]')?.getAttribute('aria-label')).toBe(`粗体 ${formatShortcut('Mod+B')}`)
-    expect(document.querySelector('[data-testid="toolbar-highlight"]')?.getAttribute('aria-label')).toBe(`高亮 ${formatShortcut('Mod+Shift+H')}`)
+    expect(document.querySelector('[data-testid="toolbar-bold"]')?.getAttribute('aria-label')).toBe(`Bold ${formatShortcut('Mod+B')}`)
+    expect(document.querySelector('[data-testid="toolbar-highlight"]')?.getAttribute('aria-label')).toBe(`Highlight ${formatShortcut('Mod+Shift+H')}`)
     // Mod+K is the command palette app-wide (T6.2); the link bubble keeps no shortcut hint.
-    expect(document.querySelector('[data-testid="toolbar-link"]')?.getAttribute('aria-label')).toBe('链接')
+    expect(document.querySelector('[data-testid="toolbar-link"]')?.getAttribute('aria-label')).toBe('Link')
 
     const before = editor.getJSON()
     await act(async () => {
@@ -303,10 +303,10 @@ describe('editor formats', () => {
     })
     const href = document.querySelector('[data-testid="link-href"]') as HTMLInputElement | null
     expect(href).not.toBeNull()
-    expect(href?.getAttribute('aria-label')).toBe('链接地址')
+    expect(href?.getAttribute('aria-label')).toBe('Link URL')
     expect(editor.getJSON()).toEqual(before)
 
-    const cancel = [...document.querySelectorAll('button')].find((button) => button.textContent === '取消')
+    const cancel = [...document.querySelectorAll('button')].find((button) => button.textContent === 'Cancel')
     await act(async () => {
       cancel?.click()
     })

@@ -10,6 +10,8 @@
 import { observer, useService } from '@rabjs/react'
 import { CircleAlert, CircleCheck, LoaderCircle, TriangleAlert } from 'lucide-react'
 import { useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
+import { t } from '../../../i18n'
 import { SettingsService, type EmbeddingRuntime } from '../../../services/settings/settings.service'
 import { VaultService } from '../../../services/vault/vault.service'
 import { Button } from '../../primitives/button'
@@ -38,21 +40,28 @@ export function parseEmbeddingDim(value: string): number | null {
 export function embeddingEndpointError(endpoint: string): string {
   const trimmed = endpoint.trim()
   if (!trimmed) return ''
-  return isHttpUrl(trimmed) ? '' : 'Endpoint must be a valid http:// or https:// URL'
+  return isHttpUrl(trimmed) ? '' : t('settings.embedding.badEndpoint')
 }
 
 /** Why vector search is off, for the degraded banner. */
 export function degradedReason(runtime: EmbeddingRuntime): string {
-  if (!runtime.intended) {
-    return 'Vector search is not configured — set the endpoint, model, and a positive dim. Search falls back to text (BM25).'
+  if (!runtime.intended) return t('settings.embedding.notConfigured')
+  if (!runtime.active) return t('settings.embedding.keyMissing')
+  return t('settings.embedding.unavailable')
+}
+
+function embeddingTestText(testResult: string): string {
+  if (testResult === 'ok') return t('common.connectionOk')
+  if (testResult === 'dim') return t('settings.embedding.dim')
+  if (testResult.startsWith('dim:')) {
+    const [, expected = '', actual = ''] = testResult.split(':')
+    return t('settings.embedding.dimDetail', { expected, actual })
   }
-  if (!runtime.active) {
-    return 'Vector search is inactive because the API key is missing. Search falls back to text (BM25).'
-  }
-  return 'Vector search is temporarily unavailable — the dim changed and the index needs a rebuild, or embedding requests are failing. Search falls back to text (BM25).'
+  return testResult
 }
 
 export const EmbeddingSection = observer(function EmbeddingSection() {
+  const { t } = useTranslation()
   const settings = useService(SettingsService)
   const vault = useService(VaultService)
   const embedding = settings.form.embedding
@@ -63,8 +72,8 @@ export const EmbeddingSection = observer(function EmbeddingSection() {
   const testing = settings.$model.testEmbedding.loading
   const saving = settings.$model.save.loading
   const testResult = settings.embeddingTestResult
-  const testOk = testResult === '连接成功'
-  const testDimMismatch = !testOk && testResult.startsWith('维度不符')
+  const testOk = testResult === 'ok'
+  const testDimMismatch = testResult === 'dim' || testResult.startsWith('dim:')
 
   // Echo the stored mask into the draft so an untouched save keeps the key
   // (an empty draft would clear it). Refires only when the mask itself changes
@@ -84,7 +93,7 @@ export const EmbeddingSection = observer(function EmbeddingSection() {
       ) : null}
       <div className="settings-embedding-field">
         <Input
-          label="Endpoint"
+          label={t('settings.embedding.endpoint')}
           className="settings-embedding-input"
           data-testid="embedding-endpoint"
           value={embedding.endpoint}
@@ -100,7 +109,7 @@ export const EmbeddingSection = observer(function EmbeddingSection() {
       </div>
       <div className="settings-embedding-field">
         <Input
-          label="Model"
+          label={t('settings.embedding.model')}
           className="settings-embedding-input"
           data-testid="embedding-model"
           value={embedding.model}
@@ -113,12 +122,12 @@ export const EmbeddingSection = observer(function EmbeddingSection() {
       </div>
       <div className="settings-embedding-field">
         <Input
-          label="API key"
+          label={t('settings.embedding.apiKey')}
           className="settings-embedding-input"
           data-testid="embedding-key"
           type="password"
           value={settings.embeddingKey}
-          placeholder={embedding.keyMask || 'API key'}
+          placeholder={embedding.keyMask || t('settings.embedding.apiKeyPlaceholder')}
           aria-describedby="embedding-key-meta"
           onChange={(event) => {
             settings.embeddingTestResult = ''
@@ -127,13 +136,13 @@ export const EmbeddingSection = observer(function EmbeddingSection() {
         />
         <span className="settings-embedding-meta" id="embedding-key-meta">
           {embedding.keyMask
-            ? `Stored key ${embedding.keyMask} — kept while the mask stays in the field; clear the field to remove the key.`
-            : 'Keys are sealed before they are stored and never written in plaintext.'}
+            ? t('settings.embedding.keyKept', { mask: embedding.keyMask })
+            : t('settings.embedding.keySealed')}
         </span>
       </div>
       <div className="settings-embedding-field">
         <Input
-          label="Dimensions"
+          label={t('settings.embedding.dimensions')}
           className="settings-embedding-input"
           data-testid="embedding-dim"
           inputMode="numeric"
@@ -148,7 +157,7 @@ export const EmbeddingSection = observer(function EmbeddingSection() {
         />
         {dimOff ? (
           <span className="settings-embedding-note" id="embedding-dim-note" data-testid="embedding-dim-note">
-            Dim is empty or not a positive integer, so the vector index stays off (dim = 0) and search uses text only.
+            {t('settings.embedding.dimOff')}
           </span>
         ) : null}
       </div>
@@ -163,7 +172,7 @@ export const EmbeddingSection = observer(function EmbeddingSection() {
             void settings.testEmbedding()
           }}
         >
-          {testing ? 'Testing…' : 'Test connection'}
+          {testing ? t('common.testing') : t('common.testConnection')}
         </Button>
         {testResult ? (
           <p
@@ -172,7 +181,7 @@ export const EmbeddingSection = observer(function EmbeddingSection() {
             role="status"
           >
             <Mark icon={testOk ? CircleCheck : testDimMismatch ? TriangleAlert : CircleAlert} size={14} />
-            <span>{testOk ? 'Connection successful.' : testDimMismatch ? `Dimension mismatch: ${testResult.replace(/^维度不符:?\s*/, '')}` : testResult}</span>
+            <span>{embeddingTestText(testResult)}</span>
           </p>
         ) : null}
       </div>
@@ -187,7 +196,7 @@ export const EmbeddingSection = observer(function EmbeddingSection() {
             void settings.save()
           }}
         >
-          {saving ? 'Saving…' : 'Save'}
+          {saving ? t('common.saving') : t('common.save')}
         </Button>
         {settings.notice ? <p className="settings-embedding-error" data-testid="settings-embedding-notice" role="alert">{settings.notice}</p> : null}
       </div>

@@ -31,6 +31,8 @@ import {
 import { BubbleMenu } from '@tiptap/react/menus'
 import { useEditorState } from '@tiptap/react'
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import { t } from '../../i18n'
 import { formatShortcut } from '../../services/commands/commands'
 import { applyLink, clearFormatting, runFormat, unsetLink, type FormatName } from '../extensions'
 import { findSeedFromSelection } from '../find/find-hits'
@@ -46,7 +48,6 @@ import { OverflowToolbar, type OverflowSlot } from './toolbar-overflow'
 
 type ToolSpec = {
   id: string
-  label: string
   keys?: string
   icon: LucideIcon
   bubble: boolean
@@ -55,57 +56,30 @@ type ToolSpec = {
 }
 
 export const editorTools: ToolSpec[] = [
-  { id: 'bold', label: '粗体', keys: 'Mod+B', icon: Bold, bubble: true, active: 'bold', format: 'bold' },
-  { id: 'italic', label: '斜体', keys: 'Mod+I', icon: Italic, bubble: true, active: 'italic', format: 'italic' },
-  { id: 'h2', label: 'H2', keys: 'Mod+Alt+2', icon: Heading2, bubble: false, active: 'h2', format: 'h2' },
-  { id: 'h3', label: 'H3', keys: 'Mod+Alt+3', icon: Heading3, bubble: false, active: 'h3', format: 'h3' },
-  { id: 'bullet', label: '无序列表', keys: 'Mod+Shift+8', icon: List, bubble: false, active: 'bullet', format: 'bullet' },
-  { id: 'ordered', label: '有序列表', keys: 'Mod+Shift+7', icon: ListOrdered, bubble: false, active: 'ordered', format: 'ordered' },
-  { id: 'task', label: '任务列表', icon: ListTodo, bubble: false, active: 'task', format: 'task' },
-  { id: 'quote', label: '引用', keys: 'Mod+Shift+B', icon: Quote, bubble: false, active: 'quote', format: 'quote' },
-  { id: 'link', label: '链接', icon: LinkIcon, bubble: true, active: 'link' },
-  { id: 'highlight', label: '高亮', keys: 'Mod+Shift+H', icon: Highlighter, bubble: false, active: 'highlight', format: 'highlight' },
-  { id: 'strike', label: '删除线', keys: 'Mod+Shift+S', icon: Strikethrough, bubble: true, active: 'strike', format: 'strike' },
-  { id: 'code', label: '行内代码', keys: 'Mod+E', icon: Code, bubble: false, active: 'code', format: 'code' },
-  { id: 'code-block', label: '代码块', icon: SquareCode, bubble: false, active: 'codeBlock', format: 'codeBlock' },
-  { id: 'hr', label: '分隔线', icon: Minus, bubble: false, active: 'hr', format: 'hr' },
+  { id: 'bold', keys: 'Mod+B', icon: Bold, bubble: true, active: 'bold', format: 'bold' },
+  { id: 'italic', keys: 'Mod+I', icon: Italic, bubble: true, active: 'italic', format: 'italic' },
+  { id: 'h2', keys: 'Mod+Alt+2', icon: Heading2, bubble: false, active: 'h2', format: 'h2' },
+  { id: 'h3', keys: 'Mod+Alt+3', icon: Heading3, bubble: false, active: 'h3', format: 'h3' },
+  { id: 'bullet', keys: 'Mod+Shift+8', icon: List, bubble: false, active: 'bullet', format: 'bullet' },
+  { id: 'ordered', keys: 'Mod+Shift+7', icon: ListOrdered, bubble: false, active: 'ordered', format: 'ordered' },
+  { id: 'task', icon: ListTodo, bubble: false, active: 'task', format: 'task' },
+  { id: 'quote', keys: 'Mod+Shift+B', icon: Quote, bubble: false, active: 'quote', format: 'quote' },
+  { id: 'link', icon: LinkIcon, bubble: true, active: 'link' },
+  { id: 'highlight', keys: 'Mod+Shift+H', icon: Highlighter, bubble: false, active: 'highlight', format: 'highlight' },
+  { id: 'strike', keys: 'Mod+Shift+S', icon: Strikethrough, bubble: true, active: 'strike', format: 'strike' },
+  { id: 'code', keys: 'Mod+E', icon: Code, bubble: false, active: 'code', format: 'code' },
+  { id: 'code-block', icon: SquareCode, bubble: false, active: 'codeBlock', format: 'codeBlock' },
+  { id: 'hr', icon: Minus, bubble: false, active: 'hr', format: 'hr' },
 ]
 
-export function toolLabel(tool: ToolSpec): string {
-  return tool.keys ? `${tool.label} ${formatShortcut(tool.keys)}` : tool.label
+export function toolLabel(tool: ToolSpec, translate: (key: string) => string = t): string {
+  const label = translate(`editor.tool.${tool.id}`)
+  return tool.keys ? `${label} ${formatShortcut(tool.keys)}` : label
 }
 
-const HEADING_OPTIONS = [
-  { value: 'p', label: '正文' },
-  { value: '1', label: 'H1' },
-  { value: '2', label: 'H2' },
-  { value: '3', label: 'H3' },
-  { value: '4', label: 'H4' },
-  { value: '5', label: 'H5' },
-  { value: '6', label: 'H6' },
-]
+const HEADING_LEVELS = ['1', '2', '3', '4', '5', '6'] as const
 
-const ALIGN_OPTIONS = [
-  { value: 'left', label: '居左' },
-  { value: 'center', label: '居中' },
-  { value: 'right', label: '居右' },
-]
-
-const FONT_SIZE_OPTIONS = [
-  { value: '', label: '默认' },
-  { value: '12px', label: '12' },
-  { value: '13px', label: '13' },
-  { value: '14px', label: '14' },
-  { value: '15px', label: '15' },
-  { value: '16px', label: '16' },
-  { value: '18px', label: '18' },
-  { value: '20px', label: '20' },
-  { value: '22px', label: '22' },
-  { value: '24px', label: '24' },
-  { value: '28px', label: '28' },
-  { value: '32px', label: '32' },
-  { value: '36px', label: '36' },
-]
+const FONT_SIZE_VALUES = ['12px', '13px', '14px', '15px', '16px', '18px', '20px', '22px', '24px', '28px', '32px', '36px'] as const
 
 function applyHeading(editor: Editor, value: string) {
   const chain = editor.chain().focus()
@@ -172,6 +146,7 @@ export function EditorToolbar({
   openLinkRef: { current: () => boolean }
   getFs?: () => FileSystemBackend | null
 }) {
+  const { t: translate } = useTranslation()
   const active = useEditorState({
     editor,
     selector: ({ editor: current }) => (current ? barStateOf(current) : IDLE),
@@ -245,31 +220,45 @@ export function EditorToolbar({
       : spec.active === 'h3'
         ? active.heading === '3'
         : Boolean(active[spec.active as keyof BarState])
-    return tool(spec.id, toolLabel(spec), spec.icon, () => runTool(spec), { pressed })
+    return tool(spec.id, toolLabel(spec, translate), spec.icon, () => runTool(spec), { pressed })
   }
 
+  const fontSizeOptions = [
+    { value: '', label: translate('editor.defaultSize') },
+    ...FONT_SIZE_VALUES.map((value) => ({ value, label: value.replace(/px$/, '') })),
+  ]
+  if (active.fontSize && !fontSizeOptions.some((item) => item.value === active.fontSize)) {
+    fontSizeOptions.unshift({ value: active.fontSize, label: active.fontSize.replace(/px$/, '') })
+  }
+  const alignOptions = [
+    { value: 'left', label: translate('editor.alignLeft') },
+    { value: 'center', label: translate('editor.alignCenter') },
+    { value: 'right', label: translate('editor.alignRight') },
+  ]
+  const headingOptions = [
+    { value: 'p', label: translate('editor.text') },
+    ...HEADING_LEVELS.map((level) => ({ value: level, label: `H${level}` })),
+  ]
+  const wikilinkLabel = translate('editor.wikilink')
+
   const slots: OverflowSlot[] = [
-    tool('undo', '撤销', Undo2, () => editor.chain().focus().undo().run(), { disabled: !active.canUndo }),
-    tool('redo', '重做', Redo2, () => editor.chain().focus().redo().run(), { disabled: !active.canRedo }),
+    tool('undo', translate('editor.tool.undo'), Undo2, () => editor.chain().focus().undo().run(), { disabled: !active.canUndo }),
+    tool('redo', translate('editor.tool.redo'), Redo2, () => editor.chain().focus().redo().run(), { disabled: !active.canRedo }),
     sepSlot('sep-history'),
     known('bold')!,
     known('italic')!,
     known('strike')!,
-    tool('subscript', '下标', Subscript, () => editor.chain().focus().toggleSubscript().run(), { pressed: active.subscript }),
-    tool('superscript', '上标', Superscript, () => editor.chain().focus().toggleSuperscript().run(), { pressed: active.superscript }),
+    tool('subscript', translate('editor.tool.subscript'), Subscript, () => editor.chain().focus().toggleSubscript().run(), { pressed: active.subscript }),
+    tool('superscript', translate('editor.tool.superscript'), Superscript, () => editor.chain().focus().toggleSuperscript().run(), { pressed: active.superscript }),
     {
       id: 'font-size',
       measure: 'select',
       node: (
         <ToolSelect
           testId="toolbar-font-size"
-          label="字号"
+          label={translate('editor.fontSize')}
           value={active.fontSize}
-          options={
-            active.fontSize && !FONT_SIZE_OPTIONS.some((item) => item.value === active.fontSize)
-              ? [{ value: active.fontSize, label: active.fontSize.replace(/px$/, '') }, ...FONT_SIZE_OPTIONS]
-              : FONT_SIZE_OPTIONS
-          }
+          options={fontSizeOptions}
           onChange={(value) => applyFontSize(editor, value)}
         />
       ),
@@ -277,8 +266,8 @@ export function EditorToolbar({
     iconSlot('color', (
       <ColorControl
         testId="toolbar-color"
-        label="字体颜色"
-        clearLabel="默认"
+        label={translate('editor.fontColor')}
+        clearLabel={translate('editor.clear')}
         icon={Palette}
         value={active.color}
         fallback="#221d16"
@@ -295,8 +284,8 @@ export function EditorToolbar({
     iconSlot('background', (
       <ColorControl
         testId="toolbar-background"
-        label="字体背景色"
-        clearLabel="无"
+        label={translate('editor.fontBackground')}
+        clearLabel={translate('editor.none')}
         icon={Highlighter}
         value={active.background}
         fallback="#f6e7a8"
@@ -310,7 +299,7 @@ export function EditorToolbar({
         }}
       />
     ), active.background !== ''),
-    tool('clear', '清除格式', Eraser, () => clearFormatting(editor)),
+    tool('clear', translate('editor.tool.clear'), Eraser, () => clearFormatting(editor)),
     sepSlot('sep-style'),
     {
       id: 'align',
@@ -318,9 +307,9 @@ export function EditorToolbar({
       node: (
         <ToolSelect
           testId="toolbar-align"
-          label="对齐"
+          label={translate('editor.align')}
           value={active.align}
-          options={ALIGN_OPTIONS}
+          options={alignOptions}
           onChange={(value) => applyAlign(editor, value)}
         />
       ),
@@ -331,9 +320,9 @@ export function EditorToolbar({
       node: (
         <ToolSelect
           testId="toolbar-heading"
-          label="标题"
+          label={translate('editor.heading')}
           value={active.heading}
-          options={HEADING_OPTIONS}
+          options={headingOptions}
           onChange={(value) => applyHeading(editor, value)}
         />
       ),
@@ -346,35 +335,35 @@ export function EditorToolbar({
     known('code-block')!,
     sepSlot('sep-insert'),
     known('link')!,
-    tool('image', '图片', ImageIcon, () => imageInputRef.current?.click()),
-    tool('table', '表格', TableIcon, () => {
+    tool('image', translate('editor.tool.image'), ImageIcon, () => imageInputRef.current?.click()),
+    tool('table', translate('editor.tool.table'), TableIcon, () => {
       if (active.table) return
       editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run()
     }, { pressed: active.table }),
     known('hr')!,
-    tool('math', '公式', Sigma, () => setMathOpen(true)),
-    tool('mermaid', 'Mermaid', Workflow, () => insertMermaid(editor)),
+    tool('math', translate('editor.tool.math'), Sigma, () => setMathOpen(true)),
+    tool('mermaid', translate('editor.slash.mermaid'), Workflow, () => insertMermaid(editor)),
     sepSlot('sep-find'),
-    tool('find', '查找', Search, openFind, { pressed: findOpen }),
+    tool('find', translate('editor.tool.find'), Search, openFind, { pressed: findOpen }),
     sepSlot('sep-stride'),
     known('highlight')!,
     known('code')!,
     {
       id: 'wikilink',
-      measure: { className: 'editor-tool editor-tool-text', text: 'Wikilink' },
+      measure: { className: 'editor-tool editor-tool-text', text: wikilinkLabel },
       node: (
         <button
           type="button"
           className="editor-tool editor-tool-text"
           data-testid="toolbar-wikilink"
-          aria-label="Wikilink"
+          aria-label={wikilinkLabel}
           onMouseDown={keepSelection}
           onClick={() => {
             setLinkForm(null)
             editor.chain().focus().insertContent('[[').run()
           }}
         >
-          Wikilink
+          {wikilinkLabel}
         </button>
       ),
     },
@@ -385,7 +374,7 @@ export function EditorToolbar({
   return (
     <>
       <div data-testid="editor-toolbar" className="editor-toolbar">
-        <OverflowToolbar label="编辑器工具栏" onClose={() => setStyleMenu((current) => (current === 'cell' ? current : null))} slots={slots} />
+        <OverflowToolbar label={translate('editor.toolbar')} onClose={() => setStyleMenu((current) => (current === 'cell' ? current : null))} slots={slots} />
         {active.table ? <TableActionBar editor={editor} /> : null}
       </div>
       <input
@@ -407,12 +396,12 @@ export function EditorToolbar({
       {linkForm ? (
         <EditorPrompt
           key={linkSession}
-          title="链接"
-          description="输入链接地址。选区为空时，地址会作为链接文字插入。"
-          label="链接地址"
+          title={translate('editor.linkTitle')}
+          description={translate('editor.linkBody')}
+          label={translate('editor.linkLabel')}
           initialValue={linkForm.href}
-          placeholder="https://"
-          extraLabel={linkForm.hasLink ? '取消链接' : undefined}
+          placeholder={translate('editor.linkPlaceholder')}
+          extraLabel={linkForm.hasLink ? translate('editor.unlink') : undefined}
           onSubmit={(value) => {
             editor.commands.setTextSelection({ from: linkForm.from, to: linkForm.to })
             if (!value.trim()) {
@@ -432,12 +421,12 @@ export function EditorToolbar({
       ) : null}
       {mathOpen ? (
         <EditorPrompt
-          title="公式"
-          description="行内公式用 $...$，独立公式用 $$...$$。"
-          label="LaTeX"
+          title={translate('editor.mathTitle')}
+          description={translate('editor.mathBody')}
+          label={translate('editor.mathLabel')}
           inputTestId="math-latex"
           initialValue=""
-          placeholder="$E=mc^2$"
+          placeholder={translate('editor.mathPlaceholder')}
           onSubmit={(value) => {
             if (value.trim()) insertMathLatex(editor, value)
             setMathOpen(false)
@@ -474,7 +463,7 @@ export function EditorToolbar({
           <ToolButton
             key={item.id}
             testId={`bubble-${item.id}`}
-            label={toolLabel(item)}
+            label={toolLabel(item, translate)}
             pressed={item.active === 'strike' ? active.strike : item.active === 'bold' ? active.bold : item.active === 'italic' ? active.italic : active.link}
             icon={item.icon}
             onClick={() => runTool(item)}

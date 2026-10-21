@@ -1,4 +1,5 @@
 import type { MermaidConfig } from 'mermaid';
+import { t, watchLocale } from '../../i18n';
 import { mermaidSvgLooksUnsafe } from './mermaid-svg';
 
 export type MermaidPaintState = 'off' | 'empty' | 'loading' | 'drawn' | 'error';
@@ -229,11 +230,18 @@ export function createMermaidFrame(onChange: () => void): MermaidFrame {
     lastKey = '';
   };
 
+  const applyStatus = (): void => {
+    if (paintState === 'loading') status.textContent = t('editor.mermaid.drawing');
+    else if (paintState === 'error') status.textContent = t('editor.mermaid.failed');
+  };
+  applyStatus();
+  const unwatch = watchLocale(applyStatus);
+
   const showLoading = (): void => {
     if (stage.childElementCount > 0) return;
     setState('loading');
     status.hidden = false;
-    status.textContent = '正在绘制…';
+    applyStatus();
     status.removeAttribute('title');
     figure.hidden = false;
   };
@@ -241,11 +249,11 @@ export function createMermaidFrame(onChange: () => void): MermaidFrame {
   const showError = (detail: string): void => {
     stage.replaceChildren();
     status.hidden = false;
-    status.textContent = '这张图没有画出来';
+    setState('error');
+    applyStatus();
     if (detail) status.title = detail;
     else status.removeAttribute('title');
     figure.hidden = false;
-    setState('error');
   };
 
   const showSvg = (svg: Element): void => {
@@ -326,6 +334,7 @@ export function createMermaidFrame(onChange: () => void): MermaidFrame {
     state: () => paintState,
     sync,
     destroy: () => {
+      unwatch();
       cancel();
       themeObserver.disconnect();
     },

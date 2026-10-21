@@ -136,7 +136,7 @@ describe('UpdateBanner', () => {
       const banner = element.querySelector('[data-testid="update-banner"]')!
       expect(banner.getAttribute('data-phase')).toBe('available')
       expect(banner.textContent).toContain('v0.2.0')
-      expect(banner.textContent).toContain('当前 v0.1.0')
+      expect(banner.textContent).toContain('Current v0.1.0')
       expect(banner.textContent).toContain('2026-10-16')
       const notes = element.querySelector('[data-testid="update-notes"]')!
       expect(notes.textContent).toContain('fix one')
@@ -221,7 +221,7 @@ describe('UpdateBanner', () => {
       expect(updates.phase).toBe('downloading')
       const banner = element.querySelector('[data-testid="update-banner"]')!
       expect(banner.getAttribute('data-phase')).toBe('downloading')
-      expect(banner.textContent).toContain('后台下载中')
+      expect(banner.textContent).toContain('Downloading in the background')
       const progress = element.querySelector('[data-testid="update-progress"]')!
       expect(progress.getAttribute('aria-valuenow')).toBe('40')
       expect(element.querySelector('[data-testid="update-progress-percent"]')!.textContent).toBe('40%')
@@ -233,7 +233,7 @@ describe('UpdateBanner', () => {
       })
       expect(updates.phase).toBe('ready')
       const restart = element.querySelector<HTMLButtonElement>('[data-testid="update-restart"]')!
-      expect(restart.textContent).toBe('重启以更新到 v0.2.0')
+      expect(restart.textContent).toBe('Restart to update to v0.2.0')
       await act(async () => {
         restart.click()
       })

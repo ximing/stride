@@ -2,14 +2,16 @@
 // in this version; the switch only persists the preference.
 
 import { has, observer, useService } from '@rabjs/react'
+import { useTranslation } from 'react-i18next'
 import { SettingsService } from '../../../services/settings/settings.service'
 import './privacy.css'
 
 const TelemetryToggle = observer(function TelemetryToggle() {
+  const { t } = useTranslation()
   const settings = useService(SettingsService)
   return (
     <div className="privacy-group">
-      <h3 className="privacy-heading">Telemetry</h3>
+      <h3 className="privacy-heading">{t('settings.privacy.telemetry')}</h3>
       <label className="privacy-toggle settings-choice">
         <input
           className="settings-choice-control"
@@ -24,12 +26,9 @@ const TelemetryToggle = observer(function TelemetryToggle() {
             void settings.save()
           }}
         />
-        <span>Allow telemetry</span>
+        <span>{t('settings.privacy.allow')}</span>
       </label>
-      <p className="privacy-hint">
-        Stride does not collect any telemetry in this version. This switch only saves your preference for
-        when telemetry becomes available — nothing is sent either way.
-      </p>
+      <p className="privacy-hint">{t('settings.privacy.hint')}</p>
       {settings.notice && (
         <p className="error" role="alert" data-testid="privacy-notice">
           {settings.notice}
@@ -40,8 +39,9 @@ const TelemetryToggle = observer(function TelemetryToggle() {
 })
 
 export function PrivacySection() {
+  const { t } = useTranslation()
   return (
-    <section className="privacy-section" data-testid="settings-section-privacy" aria-label="Privacy settings">
+    <section className="privacy-section" data-testid="settings-section-privacy" aria-label={t('settings.privacy.region')}>
       {has(SettingsService) ? <TelemetryToggle /> : null}
     </section>
   )

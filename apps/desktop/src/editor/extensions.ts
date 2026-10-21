@@ -9,6 +9,7 @@ import TextAlign from '@tiptap/extension-text-align'
 import { TextStyleKit } from '@tiptap/extension-text-style'
 import StarterKit from '@tiptap/starter-kit'
 import 'katex/dist/katex.min.css'
+import { t } from '../i18n'
 import { codeBlockExtension } from './code/codeblock'
 import { calloutNode, calloutSlashCommand, highlightInputExtension } from './callout/callout'
 import { externalLinkOpen } from './link/external-link-plugin'
@@ -30,7 +31,7 @@ registerSlashCommand(calloutSlashCommand)
 registerSlashCommand(imageSlashCommand)
 registerSlashCommand({
   id: 'math',
-  title: '公式',
+  title: 'Math',
   keywords: 'math latex katex 公式 数学',
   run: () => {
     window.dispatchEvent(new CustomEvent('stride-editor-math'))
@@ -127,7 +128,7 @@ export function createEditorExtensions(options: {
     DocSubscript,
     DocSuperscript,
     Highlight.configure({ multicolor: false }),
-    Placeholder.configure({ placeholder: 'Write in the vault…' }),
+    Placeholder.configure({ placeholder: () => t('editor.placeholder') }),
     createWikilinkNode({ getNotes, onOpen }),
     createWikilinkSuggestionExtension(getNotes),
     ...createTaskExtensions(),

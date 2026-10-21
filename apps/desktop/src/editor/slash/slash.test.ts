@@ -126,7 +126,7 @@ describe('slash menu', () => {
     const registered = slashCommands.find((item) => item.id === 'task')
     expect(registered).toMatchObject({
       id: 'task',
-      title: '任务列表',
+      title: 'Task list',
       keywords: 'task todo 任务 待办',
     })
 

@@ -2,7 +2,9 @@ import type { TipTapNode } from '@stride/core/note'
 import { isArchived, plainText, stripLeadingH1 } from '@stride/core/note'
 import { EditorContent, useEditor } from '@tiptap/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { observer, useService } from '@rabjs/react'
+import { watchLocale } from '../i18n'
 import { TabsService } from '../services/notes/tabs.service'
 import { VaultService } from '../services/vault/vault.service'
 import { createEditorExtensions } from './extensions'
@@ -19,6 +21,7 @@ import { resolveWikilinkClick } from './wikilink/wikilink'
 const emptyDoc = { type: 'doc', content: [{ type: 'paragraph' }] }
 
 export const NoteEditor = observer(function NoteEditor() {
+  const { t } = useTranslation()
   const vault = useService(VaultService)
   const tabs = useService(TabsService)
   const note = vault.active
@@ -89,6 +92,15 @@ export const NoteEditor = observer(function NoteEditor() {
 
   const [mathPrompt, setMathPrompt] = useState<{ pos: number; kind: 'inline' | 'block'; latex: string } | null>(null)
   useEffect(() => {
+    if (!editor) return
+    const refresh = () => {
+      if (editor.isDestroyed) return
+      editor.view.dispatch(editor.view.state.tr)
+    }
+    refresh()
+    return watchLocale(refresh)
+  }, [editor])
+  useEffect(() => {
     installImeEnterGuard()
   }, [])
   useEffect(() => {
@@ -117,9 +129,9 @@ export const NoteEditor = observer(function NoteEditor() {
       {mathPrompt ? (
         <EditorPrompt
           key={`${mathPrompt.kind}:${mathPrompt.pos}:${mathPrompt.latex}`}
-          title="公式"
-          description="留空则删除这个公式。"
-          label="LaTeX"
+          title={t('editor.mathTitle')}
+          description={t('editor.mathEditBody')}
+          label={t('editor.mathLabel')}
           inputTestId="math-latex"
           initialValue={mathPrompt.latex}
           onSubmit={(value) => {

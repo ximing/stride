@@ -3,6 +3,7 @@
 
 import { has, observer, useService } from '@rabjs/react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { SettingsService } from '../../../services/settings/settings.service'
 import { VaultService } from '../../../services/vault/vault.service'
 import { Input } from '../../primitives/input'
@@ -12,19 +13,23 @@ const AUTOSAVE_DEBOUNCE_MIN = 100
 const AUTOSAVE_DEBOUNCE_MAX = 5000
 
 const AutosaveField = observer(function AutosaveField() {
+  const { t } = useTranslation()
   const settings = useService(SettingsService)
   const vault = useService(VaultService)
   const [draft, setDraft] = useState<string | null>(null)
-  const [error, setError] = useState('')
+  const [invalid, setInvalid] = useState(false)
+  const error = invalid
+    ? t('settings.editor.debounceError', { min: AUTOSAVE_DEBOUNCE_MIN, max: AUTOSAVE_DEBOUNCE_MAX })
+    : ''
 
   const onChange = (text: string) => {
     setDraft(text)
     const parsed = Number(text)
     if (text.trim() === '' || !Number.isInteger(parsed) || parsed < AUTOSAVE_DEBOUNCE_MIN || parsed > AUTOSAVE_DEBOUNCE_MAX) {
-      setError(`Debounce must be a whole number between ${AUTOSAVE_DEBOUNCE_MIN} and ${AUTOSAVE_DEBOUNCE_MAX} ms.`)
+      setInvalid(true)
       return
     }
-    setError('')
+    setInvalid(false)
     settings.form = { ...settings.form, editor: { ...settings.form.editor, autosaveDebounceMs: parsed } }
     // Push straight into VaultService so the next edit's timer uses it.
     vault.setAutosaveDebounceMs(parsed)
@@ -33,10 +38,10 @@ const AutosaveField = observer(function AutosaveField() {
 
   return (
     <div className="editor-group">
-      <h3 className="editor-heading">Autosave</h3>
+      <h3 className="editor-heading">{t('settings.editor.autosave')}</h3>
       <div className="editor-field">
         <Input
-          label="Debounce (ms)"
+          label={t('settings.editor.debounce')}
           className="editor-input"
           data-testid="autosave-debounce"
           type="number"
@@ -52,7 +57,7 @@ const AutosaveField = observer(function AutosaveField() {
         />
       </div>
       <p className="editor-hint" id="autosave-debounce-hint">
-        Pause before an edit is written to disk, {AUTOSAVE_DEBOUNCE_MIN}–{AUTOSAVE_DEBOUNCE_MAX} ms. Applies to new edits.
+        {t('settings.editor.debounceHint', { min: AUTOSAVE_DEBOUNCE_MIN, max: AUTOSAVE_DEBOUNCE_MAX })}
       </p>
       {error && (
         <p className="error" id="autosave-debounce-error" role="alert" data-testid="autosave-debounce-error">
@@ -69,11 +74,12 @@ const AutosaveField = observer(function AutosaveField() {
 })
 
 const RenameFromHeadingField = observer(function RenameFromHeadingField() {
+  const { t } = useTranslation()
   const vault = useService(VaultService)
   const vaultOpen = vault.phase === 'ready'
   return (
     <div className="editor-group">
-      <h3 className="editor-heading">Rename from heading</h3>
+      <h3 className="editor-heading">{t('settings.editor.rename')}</h3>
       <label className="editor-toggle settings-choice">
         <input
           className="settings-choice-control"
@@ -85,19 +91,19 @@ const RenameFromHeadingField = observer(function RenameFromHeadingField() {
             void vault.setRenameFromHeading(event.target.checked)
           }}
         />
-        <span>Rename the note file from its first heading (H1)</span>
+        <span>{t('settings.editor.renameLabel')}</span>
       </label>
       <p className="editor-hint">
-        Stored per vault in .stride/vault.json.
-        {vaultOpen ? '' : ' Open a vault to change this setting.'}
+        {`${t('settings.editor.renameHint')}${vaultOpen ? '' : t('settings.editor.renameClosed')}`}
       </p>
     </div>
   )
 })
 
 export function EditorSection() {
+  const { t } = useTranslation()
   return (
-    <section className="editor-section" data-testid="settings-section-editor" aria-label="Editor settings">
+    <section className="editor-section" data-testid="settings-section-editor" aria-label={t('settings.editor.region')}>
       {has(SettingsService) && has(VaultService) ? <AutosaveField /> : null}
       {has(VaultService) ? <RenameFromHeadingField /> : null}
     </section>

@@ -9,6 +9,7 @@ import { observer, useService } from '@rabjs/react'
 import type { UpdateChannel } from '@stride/core'
 import { CircleAlert, CircleCheck } from 'lucide-react'
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { SettingsService } from '../../../services/settings/settings.service'
 import { Button } from '../../primitives/button'
 import { Mark } from '../../primitives/icon'
@@ -17,31 +18,34 @@ import './updates.css'
 
 // Empty means the channel default feed. Anything else must be a real http(s)
 // URL: either a tauri static latest.json or a GitHub release API URL.
-function validateReleasesUrl(text: string): string {
+function releasesUrlInvalid(text: string): boolean {
   const trimmed = text.trim()
-  if (trimmed === '') return ''
+  if (trimmed === '') return false
   try {
     const url = new URL(trimmed)
-    if (url.protocol === 'http:' || url.protocol === 'https:') return ''
+    if (url.protocol === 'http:' || url.protocol === 'https:') return false
   } catch {
     // fall through to the error
   }
-  return 'Enter a valid http(s) URL, or leave empty for the default.'
+  return true
 }
 
+type SaveStatus = '' | 'saved' | 'invalid'
+
 export const UpdatesSection = observer(function UpdatesSection() {
+  const { t } = useTranslation()
   const settings = useService(SettingsService)
   const [channel, setChannel] = useState<UpdateChannel>(settings.form.updates.channel)
   const [autoCheck, setAutoCheck] = useState(settings.form.updates.autoCheck)
   const [releasesUrl, setReleasesUrl] = useState(settings.form.releasesUrl)
-  const [urlError, setUrlError] = useState('')
-  const [status, setStatus] = useState('')
+  const [urlError, setUrlError] = useState(false)
+  const [status, setStatus] = useState<SaveStatus>('')
 
   const save = async () => {
-    const error = validateReleasesUrl(releasesUrl)
-    setUrlError(error)
-    if (error) {
-      setStatus('Fix the highlighted field before saving.')
+    const invalid = releasesUrlInvalid(releasesUrl)
+    setUrlError(invalid)
+    if (invalid) {
+      setStatus('invalid')
       return
     }
     setStatus('')
@@ -49,14 +53,16 @@ export const UpdatesSection = observer(function UpdatesSection() {
     settings.form = { ...settings.form, updates: { channel, autoCheck } }
     await settings.save()
     if (settings.notice) setStatus('')
-    else setStatus('Saved.')
+    else setStatus('saved')
   }
+
+  const statusText = status === 'saved' ? t('common.saved') : status === 'invalid' ? t('common.fixField') : ''
 
   return (
     <div className="supd" data-testid="settings-section-updates">
       <div className="supd-field">
         <span className="supd-label" id="settings-updates-channel-label">
-          Update channel
+          {t('settings.updates.channel')}
         </span>
         <div className="supd-radios" role="radiogroup" aria-labelledby="settings-updates-channel-label">
           <label className="supd-radio settings-choice">
@@ -72,8 +78,8 @@ export const UpdatesSection = observer(function UpdatesSection() {
               }}
             />
             <span>
-              <span className="supd-radio-label">Stable</span>
-              <span className="supd-hint">Recommended. Fully tested releases.</span>
+              <span className="supd-radio-label">{t('settings.updates.stable')}</span>
+              <span className="supd-hint">{t('settings.updates.stableHint')}</span>
             </span>
           </label>
           <label className="supd-radio settings-choice">
@@ -89,8 +95,8 @@ export const UpdatesSection = observer(function UpdatesSection() {
               }}
             />
             <span>
-              <span className="supd-radio-label">Beta</span>
-              <span className="supd-hint">Early builds with the latest features; may be less stable.</span>
+              <span className="supd-radio-label">{t('settings.updates.beta')}</span>
+              <span className="supd-hint">{t('settings.updates.betaHint')}</span>
             </span>
           </label>
         </div>
@@ -107,17 +113,14 @@ export const UpdatesSection = observer(function UpdatesSection() {
               setStatus('')
             }}
           />
-          <span className="supd-check-label">Check for updates automatically</span>
+          <span className="supd-check-label">{t('settings.updates.auto')}</span>
         </label>
-        <p className="supd-hint">
-          When on, Stride silently checks the selected channel a few seconds after launch. Applies the moment you
-          save; the next launch obeys the saved value.
-        </p>
+        <p className="supd-hint">{t('settings.updates.autoHint')}</p>
       </div>
       <div className="supd-field">
         <Input
           id="settings-updates-releases-url-input"
-          label="Releases URL"
+          label={t('settings.updates.releasesUrl')}
           className="supd-input"
           type="text"
           autoComplete="off"
@@ -129,34 +132,31 @@ export const UpdatesSection = observer(function UpdatesSection() {
           aria-errormessage={urlError ? 'settings-updates-releases-url-error' : undefined}
           onChange={(event) => {
             setReleasesUrl(event.target.value)
-            if (urlError && !validateReleasesUrl(event.target.value)) setUrlError('')
+            if (urlError && !releasesUrlInvalid(event.target.value)) setUrlError(false)
             setStatus('')
           }}
         />
         {urlError ? (
           <p className="supd-error" id="settings-updates-releases-url-error" role="alert" data-testid="settings-updates-releases-url-error">
-            {urlError}
+            {t('settings.updates.releasesError')}
           </p>
         ) : (
           <p className="supd-hint" id="settings-updates-releases-url-hint">
-            Custom endpoint override (a latest.json or GitHub release API URL). Takes priority over the channel;
-            leave empty to use the channel feed.
+            {t('settings.updates.releasesHint')}
           </p>
         )}
       </div>
       <p className="supd-note" data-testid="settings-updates-note">
-        Stable polls the built-in release feed with in-app download and install. Beta polls the beta-latest release
-        tag, and a custom URL overrides both; those checks compare versions in-app and hand the download to your
-        browser. Saved changes apply to the next update check.
+        {t('settings.updates.note')}
       </p>
       <div className="supd-actions">
         <Button tone="primary" size="lg" data-testid="settings-updates-save" onClick={() => void save()}>
-          Save
+          {t('common.save')}
         </Button>
-        {status && (
-          <p className="supd-status" data-tone={status === 'Saved.' ? 'success' : 'error'} data-testid="settings-updates-status" role="status">
-            <Mark icon={status === 'Saved.' ? CircleCheck : CircleAlert} size={14} />
-            <span>{status}</span>
+        {statusText && (
+          <p className="supd-status" data-tone={status === 'saved' ? 'success' : 'error'} data-testid="settings-updates-status" role="status">
+            <Mark icon={status === 'saved' ? CircleCheck : CircleAlert} size={14} />
+            <span>{statusText}</span>
           </p>
         )}
         {settings.notice && (

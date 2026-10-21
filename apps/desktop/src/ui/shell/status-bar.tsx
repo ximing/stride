@@ -2,6 +2,8 @@ import { observer, useService } from '@rabjs/react'
 import { syncState } from '@stride/core'
 import type { GitSurface, SyncState } from '@stride/core'
 import { GitBranch, Home, RefreshCw, Search, Settings, Sparkles } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { t } from '../../i18n'
 import { LayoutService } from '../../services/layout/layout.service'
 import { GitService } from '../../services/git/git.service'
 import { SettingsPageService } from '../../services/settings/settings-page.service'
@@ -20,15 +22,20 @@ function gitSyncFailed(surface: GitSurface, output: string): boolean {
 }
 
 function gitBadge(surface: GitSurface, state: SyncState): string {
-  if (surface === 'unavailable') return 'Git unavailable'
-  if (surface === 'disabled') return 'Git off'
-  if (surface === 'blocked') return 'Git blocked'
-  if (surface === 'needs-init') return 'Not a repo'
-  if (state === 'pull_required') return 'pull required'
+  if (surface === 'unavailable') return t('git.badge.unavailable')
+  if (surface === 'disabled') return t('git.badge.disabled')
+  if (surface === 'blocked') return t('git.badge.blocked')
+  if (surface === 'needs-init') return t('git.badge.needsInit')
+  if (state === 'pull_required') return t('git.badge.pullRequired')
+  if (state === 'idle') return t('git.badge.idle')
+  if (state === 'syncing') return t('git.badge.syncing')
+  if (state === 'conflict') return t('git.badge.conflict')
+  if (state === 'error') return t('git.badge.error')
   return state
 }
 
 export const GitStatusBadge = observer(function GitStatusBadge() {
+  const { t: translate } = useTranslation()
   const git = useService(GitService)
   const state = syncState({
     busy: git.busy,
@@ -45,8 +52,8 @@ export const GitStatusBadge = observer(function GitStatusBadge() {
       </PopoverTrigger>
       <PopoverContent className="git-sync-popover" side="top" data-testid="git-sync-popover">
         <p>{git.branch}</p>
-        <p>ahead {git.ahead}</p>
-        <p>behind {git.behind}</p>
+        <p>{translate('git.ahead', { count: git.ahead })}</p>
+        <p>{translate('git.behind', { count: git.behind })}</p>
         {state === 'error' ? <p>{git.output}</p> : null}
       </PopoverContent>
     </Popover>
@@ -54,13 +61,14 @@ export const GitStatusBadge = observer(function GitStatusBadge() {
 })
 
 function indexStatusLabel(phase: VaultService['indexPhase'], done: number, total: number): string {
-  if (phase === 'rebuilding') return `索引 ${done}/${total}`
-  if (phase === 'ready') return '索引就绪'
-  if (phase === 'error') return '索引失败'
+  if (phase === 'rebuilding') return t('shell.indexProgress', { done, total })
+  if (phase === 'ready') return t('shell.indexReady')
+  if (phase === 'error') return t('shell.indexFailed')
   return ''
 }
 
 export const StatusBar = observer(function StatusBar() {
+  const { t: translate } = useTranslation()
   const vault = useService(VaultService)
   const git = useService(GitService)
   const layout = useService(LayoutService)
@@ -85,12 +93,12 @@ export const StatusBar = observer(function StatusBar() {
           size="sm"
           className="statusbar-item statusbar-action statusbar-index-error"
           data-testid="index-status"
-          title="索引失败,点击重建"
+          title={translate('shell.indexFailedTitle')}
           icon={<Mark icon={Search} size={14} />}
           onClick={() => vault.retryIndex()}
         >
           {indexStatusLabel(vault.indexPhase, vault.indexDone, vault.indexTotal)}
-          <span data-testid="index-retry">重试</span>
+          <span data-testid="index-retry">{translate('common.retry')}</span>
         </Button>
       ) : (
         <span className="statusbar-item" data-testid="index-status">
@@ -106,11 +114,11 @@ export const StatusBar = observer(function StatusBar() {
           className="statusbar-item statusbar-action"
           data-testid="statusbar-update-check"
           disabled={updateCheck.feedback === 'checking'}
-          title="Check for updates"
+          title={translate('shell.checkUpdates')}
           icon={<Mark icon={RefreshCw} size={14} />}
           onClick={() => void updateCheck.manualCheck()}
         >
-          {updateCheck.feedback === 'checking' ? '检查中…' : '检查更新'}
+          {updateCheck.feedback === 'checking' ? translate('shell.checking') : translate('shell.checkUpdates')}
         </Button>
       ) : null}
       {updateCheck.feedbackText ? (
@@ -126,19 +134,19 @@ export const StatusBar = observer(function StatusBar() {
         icon={<Mark icon={Sparkles} size={14} />}
         onClick={() => layout.setRightPanelTab('chat')}
       >
-        Ask AI
+        {translate('shell.askAi')}
       </Button>
       <Button
         tone="quiet"
         size="sm"
         className="statusbar-item statusbar-action"
         data-testid="statusbar-settings"
-        aria-label="Settings"
-        title="Settings"
+        aria-label={translate('shell.settings')}
+        title={translate('shell.settings')}
         icon={<Mark icon={Settings} size={14} />}
         onClick={() => settingsPage.show()}
       >
-        Settings
+        {translate('shell.settings')}
       </Button>
       <span className="statusbar-item statusbar-version" data-testid="statusbar-version">v{APP_VERSION}</span>
     </footer>

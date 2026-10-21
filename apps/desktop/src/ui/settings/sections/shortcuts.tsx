@@ -1,4 +1,6 @@
+import { useTranslation } from 'react-i18next'
 import manifest from '../../../appCommandManifest.json'
+import { commandTitle } from '../../../i18n'
 import { formatShortcut, parseAppCommandManifest, type AppCommand } from '../../../services/commands/commands'
 
 interface ShortcutGroup {
@@ -28,19 +30,20 @@ function groupBySection(commands: readonly AppCommand[]): ShortcutGroup[] {
 const SHORTCUT_GROUPS = groupBySection(parseAppCommandManifest(manifest))
 
 export function ShortcutsSection() {
+  const { t } = useTranslation()
   return (
     <div className="settings-shortcuts" data-testid="settings-section-shortcuts">
       {SHORTCUT_GROUPS.map((group) => (
         <section key={group.section} className="settings-shortcut-group" data-section={group.section}>
-          <h3 className="settings-shortcut-heading">{group.section}</h3>
+          <h3 className="settings-shortcut-heading">{t('commands.section.' + group.section, { defaultValue: group.section })}</h3>
           <ul className="settings-shortcut-list">
             {group.commands.map((command) => (
               <li key={command.id} className="settings-shortcut-row" data-command-id={command.id}>
-                <span className="settings-shortcut-title">{command.title}</span>
+                <span className="settings-shortcut-title">{commandTitle(command.id, command.title)}</span>
                 {command.shortcut ? (
                   <kbd className="settings-shortcut-kbd">{formatShortcut(command.shortcut)}</kbd>
                 ) : (
-                  <span className="settings-shortcut-none">—</span>
+                  <span className="settings-shortcut-none">{t('settings.shortcuts.none')}</span>
                 )}
               </li>
             ))}

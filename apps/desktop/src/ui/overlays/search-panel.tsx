@@ -1,6 +1,7 @@
 import { observer, useService } from '@rabjs/react'
 import { Search } from 'lucide-react'
 import { useEffect, useRef, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import { CommandService } from '../../services/commands/command.service'
 import { SearchPanelService } from '../../services/search/search-panel.service'
 import { VaultService } from '../../services/vault/vault.service'
@@ -30,6 +31,7 @@ function markQuery(snippet: string, query: string) {
 }
 
 export const SearchPanel = observer(function SearchPanel() {
+  const { t } = useTranslation()
   const vault = useService(VaultService)
   const service = useService(SearchPanelService)
   const commands = useService(CommandService)
@@ -94,15 +96,15 @@ export const SearchPanel = observer(function SearchPanel() {
         aria-labelledby="search-panel-title"
         onClick={(event) => event.stopPropagation()}
       >
-        <h2 id="search-panel-title" className="search-panel-title sd-command-title">搜索</h2>
+        <h2 id="search-panel-title" className="search-panel-title sd-command-title">{t('search.title')}</h2>
         <div className="sd-command-search">
           <Search aria-hidden="true" size={16} strokeWidth={1.75} />
           <input
             ref={inputRef}
             className="search-panel-input sd-command-input"
             data-testid="search-panel-input"
-            placeholder="搜索笔记"
-            aria-label="搜索笔记"
+            placeholder={t('search.placeholder')}
+            aria-label={t('search.placeholder')}
             autoFocus
             autoComplete="off"
             spellCheck={false}
@@ -110,15 +112,15 @@ export const SearchPanel = observer(function SearchPanel() {
             onChange={(event) => { void service.setQuery(event.target.value) }}
           />
         </div>
-        {vault.searchDegraded ? <p className="sd-command-notice" data-testid="search-degraded">已降级为 BM25</p> : null}
-        <div ref={listRef} className="search-panel-list sd-command-list" role="listbox" aria-label="搜索结果">
+        {vault.searchDegraded ? <p className="sd-command-notice" data-testid="search-degraded">{t('search.degraded')}</p> : null}
+        <div ref={listRef} className="search-panel-list sd-command-list" role="listbox" aria-label={t('search.list')}>
           {results.length === 0 ? (
             service.query.trim() === '' ? (
               <EmptyState
                 compact
                 icon={Search}
-                title="输入关键词开始搜索"
-                body="支持标题与全文;索引状态见底部状态栏。"
+                title={t('search.startTitle')}
+                body={t('search.startBody')}
                 testId="search-panel-hint"
               />
             ) : service.pending ? (
@@ -127,13 +129,13 @@ export const SearchPanel = observer(function SearchPanel() {
               <EmptyState
                 compact
                 icon={Search}
-                title="没有匹配的笔记"
+                title={t('search.noMatch')}
                 testId="search-panel-empty"
               />
             )
           ) : (
             <>
-              <p className="search-panel-section sd-command-section">搜索结果</p>
+              <p className="search-panel-section sd-command-section">{t('search.results')}</p>
               {results.map((hit, index) => (
                 <button
                   key={hit.id}

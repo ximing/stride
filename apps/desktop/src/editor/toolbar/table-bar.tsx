@@ -2,8 +2,10 @@ import type { Editor } from '@tiptap/core'
 import { useEditorState } from '@tiptap/react'
 import { PaintBucket } from 'lucide-react'
 import { useState, type ReactNode } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   TABLE_CELL_COLORS,
+  TABLE_COMMAND_KEY,
   applyCellBackground,
   runTableCommand,
   tableActionState,
@@ -29,8 +31,10 @@ export function TableActionBar({ editor }: { editor: Editor }) {
     selector: ({ editor: instance }) => (instance ? tableActionState(instance) : null),
   })
   const [cellColorOpen, setCellColorOpen] = useState(false)
+  const { t } = useTranslation()
   if (!state) return null
-  const action = (label: string, command: TableCommand, extra?: { disabled?: boolean; pressed?: boolean }) => {
+  const action = (command: TableCommand, extra?: { disabled?: boolean; pressed?: boolean }) => {
+    const label = t(TABLE_COMMAND_KEY[command])
     const shortcut: TableShortcut | null =
       command === 'addRowBefore' ||
       command === 'addRowAfter' ||
@@ -64,28 +68,28 @@ export function TableActionBar({ editor }: { editor: Editor }) {
   }
   return (
     <OverflowToolbar
-      label="表格操作"
+      label={t('editor.table.actions')}
       className="editor-table-bar"
       slots={[
-        { id: 'label', measure: { className: 'editor-table-label', text: '表格' }, node: <span className="editor-table-label">表格</span> },
-        action('上方加行', 'addRowBefore'),
-        action('下方加行', 'addRowAfter'),
-        action('删除行', 'deleteRow', { disabled: !state.canDeleteRow }),
+        { id: 'label', measure: { className: 'editor-table-label', text: t('editor.table.label') }, node: <span className="editor-table-label">{t('editor.table.label')}</span> },
+        action('addRowBefore'),
+        action('addRowAfter'),
+        action('deleteRow', { disabled: !state.canDeleteRow }),
         sepSlot('sep-row'),
-        action('左侧加列', 'addColumnBefore'),
-        action('右侧加列', 'addColumnAfter'),
-        action('删除列', 'deleteColumn', { disabled: !state.canDeleteColumn }),
+        action('addColumnBefore'),
+        action('addColumnAfter'),
+        action('deleteColumn', { disabled: !state.canDeleteColumn }),
         sepSlot('sep-col'),
-        action('合并单元格', 'mergeCells', { disabled: !state.canMerge }),
-        action('拆分单元格', 'splitCell', { disabled: !state.canSplit }),
+        action('mergeCells', { disabled: !state.canMerge }),
+        action('splitCell', { disabled: !state.canSplit }),
         sepSlot('sep-cell'),
-        action('表头行', 'toggleHeaderRow', { pressed: state.headerRow }),
-        action('表头列', 'toggleHeaderColumn', { pressed: state.headerColumn }),
+        action('toggleHeaderRow', { pressed: state.headerRow }),
+        action('toggleHeaderColumn', { pressed: state.headerColumn }),
         iconSlot('cell-color', (
           <ColorControl
             testId="table-cell-color"
-            label="单元格背景"
-            clearLabel="无"
+            label={t('editor.table.background')}
+            clearLabel={t('common.none')}
             icon={PaintBucket}
             value={state.background}
             fallback="#ece7df"
@@ -97,7 +101,7 @@ export function TableActionBar({ editor }: { editor: Editor }) {
           />
         ), state.background !== ''),
         sepSlot('sep-delete'),
-        action('删除表格', 'deleteTable'),
+        action('deleteTable'),
       ]}
     />
   )

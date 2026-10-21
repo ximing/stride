@@ -402,7 +402,7 @@ export class SettingsService extends Service {
   async testEmbedding() {
     const dim = parsePositiveInt(this.embeddingDimText)
     if (dim === null) {
-      this.embeddingTestResult = '维度不符'
+      this.embeddingTestResult = 'dim'
       return
     }
     const settings: AppSettings['embedding'] = {
@@ -412,12 +412,12 @@ export class SettingsService extends Service {
       dim,
     }
     try {
-      const [vector] = await new EmbeddingClient((input, init) => globalThis.fetch(input, init)).embed(['连接测试'], settings)
+      const [vector] = await new EmbeddingClient((input, init) => globalThis.fetch(input, init)).embed(['connection test'], settings)
       if (!vector || vector.length !== dim) {
-        this.embeddingTestResult = `维度不符: expected ${dim}, got ${vector?.length ?? 0}`
+        this.embeddingTestResult = `dim:${dim}:${vector?.length ?? 0}`
         return
       }
-      this.embeddingTestResult = '连接成功'
+      this.embeddingTestResult = 'ok'
     } catch (error) {
       this.embeddingTestResult = errorText(error)
     }
@@ -426,7 +426,7 @@ export class SettingsService extends Service {
   async testSelectedLlm() {
     const current = this.form.llmConfigs.find((config) => config.id === this.selectedLlmId)
     if (!current) {
-      this.llmTestResult = 'Missing model'
+      this.llmTestResult = 'missing'
       return
     }
     const config: LlmConfig = {
@@ -451,7 +451,7 @@ export class SettingsService extends Service {
       }
     }
     const result = await testLlmConnection(config, { fetch: globalThis.fetch.bind(globalThis), baseUrl })
-    this.llmTestResult = result.ok ? '连接成功' : result.error
+    this.llmTestResult = result.ok ? 'ok' : result.error
   }
 
   private async loadBody() {

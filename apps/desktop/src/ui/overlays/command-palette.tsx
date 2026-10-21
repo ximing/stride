@@ -1,6 +1,7 @@
 import { observer, useService } from '@rabjs/react'
 import { Search } from 'lucide-react'
 import { Fragment, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { paletteItemSection, paletteItemTitle, type PaletteItem } from '../../services/commands/command-palette'
 import { CommandPaletteService } from '../../services/commands/command-palette.service'
 import { CommandService } from '../../services/commands/command.service'
@@ -20,6 +21,7 @@ function itemCommandId(item: PaletteItem): string | null {
 }
 
 export const CommandPalette = observer(function CommandPalette() {
+  const { t } = useTranslation()
   const service = useService(CommandPaletteService)
   const commands = useService(CommandService)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -87,15 +89,15 @@ export const CommandPalette = observer(function CommandPalette() {
         aria-labelledby="command-palette-title"
         onClick={(event) => event.stopPropagation()}
       >
-        <h2 id="command-palette-title" className="command-palette-title sd-command-title">命令面板</h2>
+        <h2 id="command-palette-title" className="command-palette-title sd-command-title">{t('palette.title')}</h2>
         <div className="sd-command-search">
           <Search aria-hidden="true" size={16} strokeWidth={1.75} />
           <input
             ref={inputRef}
             className="command-palette-input sd-command-input"
             data-testid="command-palette-input"
-            placeholder="命令、笔记，或向 AI 提问"
-            aria-label="命令、笔记，或向 AI 提问"
+            placeholder={t('palette.placeholder')}
+            aria-label={t('palette.placeholder')}
             autoFocus
             autoComplete="off"
             spellCheck={false}
@@ -103,13 +105,13 @@ export const CommandPalette = observer(function CommandPalette() {
             onChange={(event) => service.setQuery(event.target.value)}
           />
         </div>
-        <div ref={listRef} className="command-palette-list sd-command-list" role="listbox" aria-label="命令与笔记">
+        <div ref={listRef} className="command-palette-list sd-command-list" role="listbox" aria-label={t('palette.list')}>
           {items.length === 0 && (
             <EmptyState
               compact
               icon={Search}
-              title="没有匹配的命令或笔记"
-              body="换个关键词试试;输入问题可向 AI 提问。"
+              title={t('palette.emptyTitle')}
+              body={t('palette.emptyBody')}
               testId="command-palette-empty"
             />
           )}

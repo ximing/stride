@@ -1,5 +1,6 @@
 import { Node, mergeAttributes, type Editor } from '@tiptap/core'
 import type { FileSystemBackend } from '@stride/platform'
+import { t, watchLocale } from '../../i18n'
 import { MIN_IMAGE_WIDTH_PX, imageLengthPx, nextImageSize, type ImageResizeCorner } from './image-resize'
 
 const mimeExtensions: Record<string, string> = {
@@ -60,7 +61,7 @@ export async function localizeRemoteImage(fs: FileSystemBackend, url: string): P
 
 export const imageSlashCommand = {
   id: 'image',
-  title: '图片',
+  title: 'Image',
   keywords: 'image img 图片',
   run(editor: Editor) {
     editor.commands.insertContent({ type: 'image', attrs: { src: '' } })
@@ -239,7 +240,11 @@ export function createImageExtension(options: {
         button.type = 'button'
         button.className = 'editor-image-pick'
         button.dataset.testid = 'image-pick'
-        button.textContent = '选择图片'
+        const applyPick = () => {
+          button.textContent = t('editor.pickImage')
+        }
+        applyPick()
+        const unwatchPick = watchLocale(applyPick)
 
         const input = document.createElement('input')
         input.type = 'file'
@@ -416,6 +421,7 @@ export function createImageExtension(options: {
             dom.classList.remove('is-selected')
           },
           destroy: () => {
+            unwatchPick()
             generation += 1
             revokeUrl(objectUrl)
             objectUrl = null

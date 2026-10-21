@@ -21,6 +21,8 @@
 //   - Overlay-local keys (arrows, Enter, Escape) are handled by each overlay's
 //     own listener after dispatchKeydown passes, and only while it is open.
 
+import { commandTitle, t } from '../../i18n'
+
 export interface AppCommand {
   id: string
   title: string
@@ -182,14 +184,17 @@ export function parseAppCommandManifest(
   return commands.map((entry, index) => validateCommand(entry, index, ids, knownConditions))
 }
 
-/** Case-insensitive substring match over title, id, section, and keywords. Empty query lists everything. */
+/** Case-insensitive substring match over title, id, section, keywords, and the active locale. Empty query lists everything. */
 export function filterCommands(commands: readonly AppCommand[], query: string): AppCommand[] {
   const needle = query.trim().toLowerCase()
   if (!needle) return [...commands]
   return commands.filter((command) => {
     if (command.title.toLowerCase().includes(needle)) return true
+    if (commandTitle(command.id, command.title).toLowerCase().includes(needle)) return true
     if (command.id.toLowerCase().includes(needle)) return true
     if (command.section.toLowerCase().includes(needle)) return true
+    const section = t(`commands.section.${command.section}`, { defaultValue: command.section })
+    if (section.toLowerCase().includes(needle)) return true
     return (command.keywords ?? []).some((keyword) => keyword.toLowerCase().includes(needle))
   })
 }
