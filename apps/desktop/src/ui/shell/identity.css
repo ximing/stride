@@ -1,172 +1,7 @@
-/* Surviving rules moved from src/styles so each class has one source. */
-.topbar {
-  display: flex;
-  align-items: center;
-  border-bottom: 1px solid var(--sd-border);
-}
-
-.update-banner {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  padding: 0.45rem 0.8rem;
-  border-bottom: 1px solid var(--sd-border);
-}
-
-.topbar-icon {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: var(--sd-radius);
-  color: var(--sd-muted);
-}
-
-.topbar-icon:hover:not(:disabled) {
-  border-color: transparent;
-  background: var(--sd-bg-elevated);
-  color: var(--sd-fg);
-}
-
-.topbar-icon[aria-pressed="true"] {
-  color: var(--sd-fg);
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-}
+/* Vault switcher. The status bar hosts it, in the path slot. */
 
 .vault-switcher {
   position: relative;
-}
-
-.vault-switcher > button {
-  border-color: transparent;
-  color: var(--sd-muted);
-  padding: 0.3rem 0.55rem;
-}
-
-.vault-switcher > button:hover {
-  border-color: transparent;
-  background: var(--sd-bg-elevated);
-  color: var(--sd-fg);
-}
-
-.vault-switcher-list {
-  position: absolute;
-  left: 0;
-  z-index: 30;
-  display: flex;
-  flex-direction: column;
-  border: 1px solid var(--sd-border);
-}
-
-.vault-switcher-list button {
-  border-color: transparent;
-  text-align: left;
-  border-radius: var(--sd-radius);
-}
-
-.vault-switcher-list button:hover {
-  background: var(--sd-bg);
-  border-color: transparent;
-}
-
-.vault-switcher-list button.active {
-  background: var(--sd-bg);
-  border-color: transparent;
-}
-
-.search {
-  display: flex;
-  align-items: center;
-}
-
-.search input {
-  border: 1px solid var(--sd-border);
-  border-radius: var(--sd-radius);
-  background: var(--sd-bg-elevated);
-  padding: 0.32rem 0.6rem;
-  width: 15rem;
-}
-
-.search input:focus {
-  border-color: var(--sd-accent);
-}
-
-.search button {
-  padding: 0.3rem 0.65rem;
-}
-
-.search-mode {
-  white-space: nowrap;
-}
-
-.search-degraded {
-  white-space: nowrap;
-}
-
-.search-mode {
-  color: var(--sd-muted);
-}
-
-.search-mode:empty {
-  display: none;
-}
-
-.search-degraded {
-  color: var(--sd-danger);
-}
-
-/* ---------- identity, vault switcher and global search ---------- */
-
-.topbar {
-  height: 48px;
-  min-height: 48px;
-  gap: 8px;
-  padding: 0 12px;
-  background: var(--sd-bg);
-}
-
-.topbar-icon.sd-icon-button {
-  width: 32px;
-  height: 32px;
-  min-height: 32px;
-  flex: none;
-  padding: 0;
-  border: 1px solid transparent;
-  color: var(--sd-muted);
-}
-
-.topbar-icon.sd-icon-button:hover:not(:disabled),
-.topbar-icon.sd-icon-button[aria-pressed="true"] {
-  border-color: transparent;
-  background: color-mix(in srgb, var(--sd-fg) 5%, transparent);
-  color: var(--sd-fg);
-}
-
-.brand {
-  flex: none;
-  min-width: 0;
-  max-width: 38%;
-  gap: 8px;
-  margin-right: 0;
-}
-
-.wordmark {
-  color: var(--sd-fg);
-  font-family: var(--sd-font-serif);
-  font-size: 18px;
-  font-weight: 600;
-  line-height: 1;
-  letter-spacing: -0.01em;
-}
-
-.vault-switcher {
   min-width: 0;
 }
 
@@ -208,20 +43,41 @@
   transform: rotate(180deg);
 }
 
-.vault-switcher-list {
+.vault-switcher-menu {
+  position: absolute;
   top: calc(100% + 4px);
+  left: 0;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
   gap: 2px;
   min-width: 208px;
   max-width: 280px;
-  max-height: 320px;
   padding: 4px;
-  overflow-y: auto;
+  border: 1px solid var(--sd-border);
   border-radius: 8px;
   background: var(--sd-bg-elevated);
   box-shadow: var(--sd-shadow);
 }
 
-.vault-switcher-list .sd-btn {
+.vault-switcher-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.vault-switcher-add {
+  border-top: 1px solid var(--sd-border);
+  padding-top: 2px;
+}
+
+.vault-switcher-add .sd-btn {
+  justify-content: flex-start;
+}
+
+.vault-switcher-menu .sd-btn {
   display: flex;
   width: 100%;
   min-height: 32px;
@@ -230,12 +86,13 @@
   gap: 8px;
   padding: 0 8px;
   border: 1px solid transparent;
+  border-radius: var(--sd-radius);
   color: var(--sd-fg);
   font-size: 13px;
   text-align: left;
 }
 
-.vault-switcher-list .sd-btn:hover:not(:disabled) {
+.vault-switcher-menu .sd-btn:hover:not(:disabled) {
   border-color: transparent;
   background: color-mix(in srgb, var(--sd-fg) 5%, transparent);
 }
@@ -253,91 +110,3 @@
   flex: none;
   color: var(--sd-accent);
 }
-
-.search {
-  flex: 1;
-  min-width: 0;
-  max-width: 640px;
-  justify-content: flex-end;
-  gap: 8px;
-  margin-left: auto;
-}
-
-.search-field {
-  position: relative;
-  display: flex;
-  flex: 1;
-  align-items: center;
-  width: 100%;
-  min-width: 96px;
-  max-width: 320px;
-  height: 32px;
-}
-
-.search .search-field input {
-  width: 100%;
-  height: 32px;
-  min-width: 0;
-  padding: 0 34px 0 32px;
-  border: 1px solid transparent;
-  border-radius: var(--sd-radius);
-  background: var(--sd-inset);
-  color: var(--sd-fg);
-  font-size: 13px;
-  line-height: 30px;
-}
-
-.search .search-field input:hover:not(:focus) {
-  background: var(--sd-inset-hover);
-}
-
-.search .search-field input:focus {
-  border-color: var(--sd-accent);
-  background: var(--sd-surface);
-}
-
-.search .search-field input:focus-visible {
-  outline: 2px solid var(--sd-accent);
-  outline-offset: 2px;
-}
-
-.search-icon {
-  position: absolute;
-  left: 10px;
-  z-index: 1;
-  display: inline-flex;
-  color: var(--sd-muted);
-  pointer-events: none;
-}
-
-.search-clear.sd-icon-button {
-  position: absolute;
-  right: 3px;
-  width: 26px;
-  height: 26px;
-  min-height: 26px;
-  padding: 0;
-  border: 1px solid transparent;
-  color: var(--sd-muted);
-}
-
-.search-clear.sd-icon-button:hover:not(:disabled) {
-  border-color: transparent;
-  background: color-mix(in srgb, var(--sd-fg) 6%, transparent);
-  color: var(--sd-fg);
-}
-
-.search-submit.sd-btn {
-  flex: none;
-  min-height: 32px;
-  height: 32px;
-}
-
-.search-mode,
-.search-degraded {
-  flex: none;
-  font-size: 12px;
-  letter-spacing: 0;
-  text-transform: none;
-}
-

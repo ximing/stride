@@ -326,8 +326,8 @@ importers:
         specifier: 2026.8.0
         version: 2026.8.0
       '@vane-rs/web':
-        specifier: file:./vendor/vane-rs-web-0.4.4.tgz
-        version: file:packages/search-web/vendor/vane-rs-web-0.4.4.tgz
+        specifier: file:./vendor/vane-rs-web-0.4.5.tgz
+        version: file:packages/search-web/vendor/vane-rs-web-0.4.5.tgz
     devDependencies:
       typescript:
         specifier: ^5.8.2
@@ -2046,9 +2046,9 @@ packages:
   '@vane-rs/dict-zh@2026.8.0':
     resolution: {integrity: sha512-H3KALD+Po4EAKSGWK/GvQOWkERy+wag8qtZAQzufO1EfpS30Rn7sM9WgXj7kIcn6kcB435mdzquSstjRjsC89A==}
 
-  '@vane-rs/web@file:packages/search-web/vendor/vane-rs-web-0.4.4.tgz':
-    resolution: {integrity: sha512-orA4hPC3rX65TNDYDNQQ34TBBqx23WT7FEhJbyfVNhR9KgiDW9T0+GKTk0ECtw7lTP9ammcnFDYPRGyq601b/Q==, tarball: file:packages/search-web/vendor/vane-rs-web-0.4.4.tgz}
-    version: 0.4.4
+  '@vane-rs/web@file:packages/search-web/vendor/vane-rs-web-0.4.5.tgz':
+    resolution: {integrity: sha512-Ww5ET5WTjbB/iHX/ZMqjm7/dt+cipBVm75p45ZSDKn1I9nAUloSUv72ikMCxn5vF/PS/R7CsL5dvJ1MZiLz4uw==, tarball: file:packages/search-web/vendor/vane-rs-web-0.4.5.tgz}
+    version: 0.4.5
     engines: {node: '>=16'}
 
   '@vitejs/plugin-react@4.7.0':
@@ -5010,7 +5010,7 @@ snapshots:
 
   '@vane-rs/dict-zh@2026.8.0': {}
 
-  '@vane-rs/web@file:packages/search-web/vendor/vane-rs-web-0.4.4.tgz':
+  '@vane-rs/web@file:packages/search-web/vendor/vane-rs-web-0.4.5.tgz':
     optionalDependencies:
       '@vane-rs/dict-zh': 2026.8.0
 

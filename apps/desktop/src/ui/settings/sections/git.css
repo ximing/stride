@@ -65,7 +65,6 @@
   flex-wrap: wrap;
   gap: 12px;
   padding-top: 16px;
-  border-top: 1px solid var(--sd-border);
 }
 
 .sgit-status {

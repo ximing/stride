@@ -2,6 +2,7 @@ import type { LucideIcon } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { createPortal } from 'react-dom'
+import { colorLabel, type EditorColor } from '../colors'
 
 export function EditorIcon({ icon: Glyph }: { icon: LucideIcon }) {
   return <Glyph aria-hidden="true" size={16} strokeWidth={1.75} />
@@ -17,6 +18,7 @@ export function ColorControl({
   value,
   fallback,
   colors,
+  clearSwatch,
   open,
   pressed,
   onOpenChange,
@@ -28,7 +30,8 @@ export function ColorControl({
   icon: LucideIcon
   value: string
   fallback: string
-  colors: readonly { id: string; value: string }[]
+  colors: readonly EditorColor[]
+  clearSwatch?: string
   open: boolean
   pressed?: boolean
   onOpenChange: (open: boolean) => void
@@ -104,8 +107,10 @@ export function ColorControl({
           onOpenChange(!open)
         }}
       >
-        <EditorIcon icon={icon} />
-        <span className={value ? 'editor-color-bar' : 'editor-color-bar is-empty'} style={value ? { background: value } : undefined} />
+        <span className="editor-color-mark">
+          <EditorIcon icon={icon} />
+          <span className={value ? 'editor-color-bar' : 'editor-color-bar is-empty'} style={value ? { background: value } : undefined} />
+        </span>
       </button>
       {open
         ? createPortal(
@@ -121,40 +126,55 @@ export function ColorControl({
               }}
             >
               <div className="editor-color-swatches">
-                {colors.map((color) => (
-                  <button
-                    key={color.value}
-                    type="button"
-                    className={`editor-color-swatch${value.toLowerCase() === color.value ? ' is-on' : ''}`}
-                    style={{ background: color.value }}
-                    aria-label={t(`editor.color.${color.id}`)}
-                    aria-pressed={value.toLowerCase() === color.value}
-                    onClick={() => {
-                      onPick(color.value)
-                      onOpenChange(false)
-                    }}
-                  />
-                ))}
+                {colors.map((color) => {
+                  const selected = value.toLowerCase() === color.value
+                  return (
+                    <button
+                      key={color.id}
+                      type="button"
+                      className={`editor-color-swatch${selected ? ' is-on' : ''}`}
+                      style={{ background: color.value }}
+                      aria-label={colorLabel(t, color)}
+                      aria-pressed={selected}
+                      onClick={() => {
+                        onPick(color.value)
+                        onOpenChange(false)
+                      }}
+                    />
+                  )
+                })}
               </div>
-              <label className="editor-color-custom">
-                {t('editor.custom')}
-                <input
-                  type="color"
-                  aria-label={t('editor.customOf', { label })}
-                  value={shown}
-                  onChange={(event) => onPick(event.target.value)}
-                />
-              </label>
-              <button
-                type="button"
-                className={value ? 'editor-color-clear' : 'editor-color-clear is-on'}
-                onClick={() => {
-                  onPick(null)
-                  onOpenChange(false)
-                }}
-              >
-                {clearLabel}
-              </button>
+              <div className="editor-color-actions">
+                <button
+                  type="button"
+                  className={value ? 'editor-color-clear' : 'editor-color-clear is-on'}
+                  onClick={() => {
+                    onPick(null)
+                    onOpenChange(false)
+                  }}
+                >
+                  <span className="editor-color-none" style={clearSwatch ? { background: clearSwatch } : undefined} aria-hidden="true" />
+                  {clearLabel}
+                </button>
+                <label className="editor-color-custom">
+                  <span
+                    className="editor-color-custom-chip"
+                    style={
+                      value
+                        ? { background: shown }
+                        : { background: 'conic-gradient(#d24b4b, #e0a03a, #d6c25a, #4e9a62, #3d78b4, #7a5aa0, #d24b4b)' }
+                    }
+                    aria-hidden="true"
+                  />
+                  {t('editor.custom')}
+                  <input
+                    type="color"
+                    aria-label={t('editor.customOf', { label })}
+                    value={shown}
+                    onChange={(event) => onPick(event.target.value)}
+                  />
+                </label>
+              </div>
             </div>,
             document.body,
           )

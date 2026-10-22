@@ -1,5 +1,14 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+#[cfg(desktop)]
+mod menu;
+mod recent;
+#[cfg(desktop)]
+mod windows;
+
+#[cfg(desktop)]
+use tauri::Manager;
+
 fn main() {
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_process::init())
@@ -8,6 +17,7 @@ fn main() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_keyring::init())
+        .enable_macos_default_menu(false)
         .setup(|app| {
             // Dev builds have no Info.plist, so register `stride://` with the
             // OS at runtime for `open 'stride://...'` testing. Bundled apps
@@ -19,15 +29,53 @@ fn main() {
                     eprintln!("deep-link dev registration failed: {error:?}");
                 }
             }
-            #[cfg(not(all(desktop, debug_assertions)))]
+            #[cfg(desktop)]
+            {
+                windows::install(app.handle())?;
+                menu::install(app.handle())?;
+            }
+            #[cfg(not(desktop))]
             {
                 let _ = app;
             }
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            #[cfg(desktop)]
+            if matches!(event, tauri::WindowEvent::Destroyed) {
+                windows::forget_window(window.app_handle(), window.label());
+            }
+            #[cfg(not(desktop))]
+            {
+                let _ = (window, event);
+            }
         });
     #[cfg(desktop)]
-    let builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+    let builder = builder
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .invoke_handler(tauri::generate_handler![
+            windows::window_intent,
+            windows::window_set_project,
+            windows::menu_new_window,
+            windows::menu_new_project,
+            windows::menu_open_project,
+            menu::sync_recent_projects,
+        ]);
     builder
-        .run(tauri::generate_context!())
-        .expect("error while running Stride");
+        .build(tauri::generate_context!())
+        .expect("error while building Stride")
+        .run(|app, event| {
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen {
+                has_visible_windows,
+                ..
+            } = event
+            {
+                windows::reopen_or_fresh(app.clone(), has_visible_windows);
+            }
+            #[cfg(not(target_os = "macos"))]
+            {
+                let _ = (app, event);
+            }
+        });
 }

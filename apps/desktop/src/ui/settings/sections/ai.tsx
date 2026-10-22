@@ -14,6 +14,7 @@ import { Button } from '../../primitives/button'
 import { Mark } from '../../primitives/icon'
 import { Input } from '../../primitives/input'
 import { Select } from '../../primitives/select'
+import { TokenUsagePanel } from './token-usage-panel'
 import './ai.css'
 
 export interface LlmFieldErrors {
@@ -267,6 +268,7 @@ export const AiSection = observer(function AiSection() {
         ) : null}
         {settings.notice ? <p className="settings-ai-error" data-testid="settings-ai-notice" role="alert">{settings.notice}</p> : null}
       </div>
+      <TokenUsagePanel />
     </div>
   )
 })

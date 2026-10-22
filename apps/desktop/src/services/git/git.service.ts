@@ -22,7 +22,6 @@ import {
   parsePorcelain,
   resolveLlm,
   suggestCommitMessage,
-  unmergedFiles,
   type GitChange,
   type GitCommitInfo,
   type GitSurface,
@@ -30,8 +29,11 @@ import {
 } from '@stride/core'
 import { browserGitBackend } from '@stride/git-web'
 import { PlatformError, type FileSystemBackend, type GitBackend } from '@stride/platform'
+import { isDesktopRuntime } from '../platform/runtime'
 import { SettingsService } from '../settings/settings.service'
 import { pickVaultBackend, VaultService } from '../vault/vault.service'
+import * as gitAuto from './git-auto'
+import type { GitAutoDeps } from './git-auto'
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
@@ -77,13 +79,9 @@ export function setCommitMessageSuggestForTests(next: CommitMessageSuggest | nul
   commitMessageSuggestForTests = next
 }
 
-function tauriRuntime(): boolean {
-  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
-}
-
 async function resolveGitBackend(): Promise<GitBackend> {
   if (testGitBackendSet && testGitBackend) return testGitBackend
-  if (tauriRuntime()) {
+  if (isDesktopRuntime()) {
     if (!shellGitBackend) {
       const { ShellGitBackend } = await import('@stride/git-tauri')
       shellGitBackend = new ShellGitBackend()
@@ -118,20 +116,18 @@ export class GitService extends Service {
   private historyPath = ''
   suggesting = false
   busy = false
-  private busyCount = 0
-  private autoSyncTimer: ReturnType<typeof setInterval> | null = null
+  busyCount = 0
   lastActivityAt = 0
   lastBlurAt = 0
-  private idleCheckpointAt = 0
-  private blurCheckpointAt = 0
-  private autoGitTimer: ReturnType<typeof setInterval> | null = null
+  idleCheckpointAt = 0
+  blurCheckpointAt = 0
   private diffPath = ''
   private suggestController: AbortController | null = null
   private suggestGeneration = 0
 
   constructor() {
     super()
-    if (tauriRuntime()) return
+    if (isDesktopRuntime()) return
     const preset = testGitBackendSet ? testGitBackend : browserGitBackend()
     if (preset && !preset.available) {
       this.output = GIT_BROWSER
@@ -200,7 +196,7 @@ export class GitService extends Service {
   }
 
   private async homeDirectory(): Promise<string> {
-    if (!tauriRuntime()) return BROWSER_HOME
+    if (!isDesktopRuntime()) return BROWSER_HOME
     try {
       const { homeDir } = await import('@tauri-apps/api/path')
       const home = await homeDir()
@@ -491,7 +487,7 @@ export class GitService extends Service {
       isDefault: true,
     }
     const resolved = resolveLlm(config)
-    return suggestCommitMessage({
+    const suggested = await suggestCommitMessage({
       diff,
       model: resolved.model,
       apiKey: resolved.apiKey,
@@ -501,6 +497,17 @@ export class GitService extends Service {
         apiKey: resolved.apiKey,
       }),
     })
+    if (suggested.usage) {
+      this.settings.recordTokenUsage({
+        model: runtime.model,
+        input: suggested.usage.input,
+        output: suggested.usage.output,
+        cacheRead: suggested.usage.cacheRead,
+        cacheWrite: suggested.usage.cacheWrite,
+        total: suggested.usage.totalTokens,
+      })
+    }
+    return { message: suggested.message, aborted: suggested.aborted }
   }
 
   async cloneRemote() {
@@ -523,12 +530,12 @@ export class GitService extends Service {
       }
       if (cloneDestForTests) {
         await assertCloneDestEmpty(cloneDestForTests)
-      } else if (tauriRuntime()) {
+      } else if (isDesktopRuntime()) {
         await this.assertTauriCloneDestEmpty(dest)
       }
       await gitClone(backend, url, dest, home)
       this.vault.openedClonePath = dest
-      if (!tauriRuntime()) return
+      if (!isDesktopRuntime()) return
       const { TauriFileSystem } = await import('@stride/fs-tauri')
       await this.vault.openClonedVault(new TauriFileSystem(dest))
     } catch (error) {
@@ -536,148 +543,46 @@ export class GitService extends Service {
     }
   }
 
+  private autoGitDeps(): GitAutoDeps {
+    return {
+      vault: this.vault,
+      settings: this.settings,
+      gitEnabled: () => this.gitEnabled(),
+      resolveGitBackend,
+      checkpointMessage: (diff) => this.checkpointMessage(diff),
+    }
+  }
+
   ensureAutoSync() {
-    this.stopAutoSync()
-    const minutes = this.settings.form.autoSyncMinutes
-    if (!(minutes > 0)) return
-    this.autoSyncTimer = setInterval(() => {
-      void this.autoSyncTick()
-    }, minutes * 60_000)
+    gitAuto.ensureAutoSync(this, this.autoGitDeps())
   }
 
   stopAutoSync() {
-    if (this.autoSyncTimer === null) return
-    clearInterval(this.autoSyncTimer)
-    this.autoSyncTimer = null
+    gitAuto.stopAutoSync(this)
   }
 
   noteActivity() {
-    this.lastActivityAt = Date.now()
+    gitAuto.noteActivity(this)
   }
 
   noteBlur() {
-    this.lastBlurAt = Date.now()
+    gitAuto.noteBlur(this)
   }
 
   ensureAutoGit() {
-    this.stopAutoGit()
-    if (this.settings.form.autoGitEnabled !== true) return
-    this.autoGitTimer = setInterval(() => {
-      void this.autoGitTick(Date.now())
-    }, 1000)
+    gitAuto.ensureAutoGit(this, this.autoGitDeps())
   }
 
   stopAutoGit() {
-    if (this.autoGitTimer === null) return
-    clearInterval(this.autoGitTimer)
-    this.autoGitTimer = null
+    gitAuto.stopAutoGit(this)
   }
 
   async autoSyncTick() {
-    const minutes = this.settings.form.autoSyncMinutes
-    if (!(minutes > 0)) return
-    if (this.busy) return
-    if (this.vault.phase !== 'ready') return
-    if (!this.gitEnabled()) return
-    if (this.surface !== 'ready') return
-    const backend = await resolveGitBackend()
-    if (!backend.available) return
-    const fs = this.vault.fs
-    if (!fs) return
-    this.busyCount += 1
-    this.busy = true
-    try {
-      try {
-        await this.vault.flush()
-      } catch (error) {
-        this.output = error instanceof Error ? error.message : String(error)
-        return
-      }
-      let result: Awaited<ReturnType<typeof gitPull>>
-      try {
-        result = await gitPull(fs, backend)
-      } catch (error) {
-        this.output = error instanceof Error ? error.message : String(error)
-        return
-      }
-      if (result.conflict) {
-        this.conflicts = [...result.files]
-        this.output = result.output
-        await this.refresh()
-        return
-      }
-      this.conflicts = []
-      this.output = ''
-      if (!/already up to date/i.test(result.output)) await this.vault.reopenForSettings()
-      await this.refresh()
-    } finally {
-      this.busyCount -= 1
-      if (this.busyCount <= 0) {
-        this.busyCount = 0
-        this.busy = false
-      }
-    }
+    return gitAuto.autoSyncTick(this, this.autoGitDeps())
   }
 
   async autoGitTick(now: number) {
-    if (this.settings.form.autoGitEnabled !== true) return
-    const idleSeconds = this.settings.form.autoGitIdleSeconds
-    const blurSeconds = this.settings.form.autoGitBlurSeconds
-    const idleDue = idleSeconds > 0
-      && this.lastActivityAt > 0
-      && this.lastActivityAt !== this.idleCheckpointAt
-      && now - this.lastActivityAt >= idleSeconds * 1000
-    const blurDue = blurSeconds > 0
-      && this.lastBlurAt > 0
-      && this.lastBlurAt !== this.blurCheckpointAt
-      && now - this.lastBlurAt >= blurSeconds * 1000
-    if (!idleDue && !blurDue) return
-    if (this.busy) return
-    if (this.vault.phase !== 'ready') return
-    if (!this.gitEnabled()) return
-    if (this.surface !== 'ready') return
-    const backend = await resolveGitBackend()
-    if (!backend.available) return
-    const fs = this.vault.fs
-    if (!fs) return
-    const unmerged = await unmergedFiles(fs, backend)
-    if (unmerged.length > 0) return
-    this.busyCount += 1
-    this.busy = true
-    try {
-      try {
-        await this.vault.flush()
-      } catch (error) {
-        this.output = errorText(error)
-        return
-      }
-      let diff = ''
-      try {
-        diff = await gitDiff(fs, backend)
-      } catch (error) {
-        this.output = errorText(error)
-        return
-      }
-      const message = await this.checkpointMessage(diff)
-      try {
-        await gitCommit(fs, backend, message)
-      } catch (error) {
-        const output = error instanceof GitError ? error.output || error.message : errorText(error)
-        if (!isNothingToCommit(output)) {
-          this.output = output
-          return
-        }
-      }
-      if (idleDue) this.idleCheckpointAt = this.lastActivityAt
-      if (blurDue) this.blurCheckpointAt = this.lastBlurAt
-      await this.refresh()
-    } finally {
-      this.busyCount -= 1
-      if (this.busyCount <= 0) {
-        this.busyCount = 0
-        this.busy = false
-      }
-    }
+    return gitAuto.autoGitTick(this, this.autoGitDeps(), now)
   }
 
   private async checkpointMessage(diff: string): Promise<string> {

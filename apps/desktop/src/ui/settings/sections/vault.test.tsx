@@ -46,6 +46,7 @@ describe('T7.3 This Vault settings section', () => {
     void vault.setZoom(1)
     void vault.setViewMode('comfortable')
     void vault.setGitSetupPreference('undecided')
+    void vault.setRenameFromHeading(true)
   })
 
   async function mount(component: ReactElement) {
@@ -79,6 +80,7 @@ describe('T7.3 This Vault settings section', () => {
     expect(mounted.querySelector('[data-testid="vault-settings-empty"]')).not.toBeNull()
     expect(mounted.textContent).toContain('Open a vault to configure these settings.')
     expect(mounted.querySelector('[data-testid="vault-zoom"]')).toBeNull()
+    expect(mounted.querySelector('[data-testid="settings-rename-from-heading"]')).toBeNull()
   })
 
   it('zoom applies to the stage immediately and persists to vault.json', async () => {
@@ -169,6 +171,22 @@ describe('T7.3 This Vault settings section', () => {
     expect(vault.gitSetupPreference).toBe('disabled')
     const marker = await vault.fs!.readText('.stride/vault.json')
     expect(marker).toContain('"gitSetupPreference": "disabled"')
+    expect(marker).toContain('"kind": "stride-vault"')
+  })
+
+  it('rename-from-heading writes .stride/vault.json', async () => {
+    const vault = await openVault()
+    const mounted = await mount(<VaultSection />)
+    const toggle = mounted.querySelector<HTMLInputElement>('[data-testid="settings-rename-from-heading"]')!
+    expect(toggle.checked).toBe(true)
+    expect(mounted.textContent).toContain('Rename the note file from its first heading (H1)')
+
+    await act(async () => {
+      toggle.click()
+    })
+    expect(vault.renameFromHeading).toBe(false)
+    const marker = await vault.fs!.readText('.stride/vault.json')
+    expect(marker).toContain('"renameFromHeading": false')
     expect(marker).toContain('"kind": "stride-vault"')
   })
 })

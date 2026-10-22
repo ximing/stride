@@ -1,6 +1,6 @@
 import type { AgentTool, StreamFn } from '@earendil-works/pi-agent-core'
 import type { Api, Model } from '@earendil-works/pi-ai'
-import { runAgentLoop } from '@stride/core'
+import { runAgentLoop, type AgentUsage } from '@stride/core'
 
 export interface ChatToolCall {
   id: string
@@ -111,7 +111,8 @@ export async function playChatTurn(input: {
   onThinking: (delta: string) => void
   onToolStart?: (call: { id: string; name: string; args: unknown }) => void
   onToolEnd?: (call: { id: string; name: string; isError: boolean; durationMs: number; resultSummary: string }) => void
-}): Promise<{ text: string; aborted: boolean }> {
+  onUsage?: (usage: AgentUsage) => void
+}): Promise<{ text: string; usage: AgentUsage; aborted: boolean }> {
   return runAgentLoop({
     model: input.model,
     apiKey: input.apiKey,
@@ -133,7 +134,7 @@ export async function playChatTurn(input: {
           durationMs: event.durationMs,
           resultSummary: event.resultSummary,
         })
-      }
+      } else if (event.type === 'usage') input.onUsage?.(event.usage)
     },
   })
 }

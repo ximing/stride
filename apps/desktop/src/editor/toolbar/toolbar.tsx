@@ -267,11 +267,12 @@ export function EditorToolbar({
       <ColorControl
         testId="toolbar-color"
         label={translate('editor.fontColor')}
-        clearLabel={translate('editor.clear')}
+        clearLabel={translate('editor.restoreDefault')}
         icon={Palette}
         value={active.color}
         fallback="#221d16"
         colors={TEXT_COLORS}
+        clearSwatch="#221d16"
         open={styleMenu === 'color'}
         pressed={active.color !== ''}
         onOpenChange={(open) => setStyleMenu(open ? 'color' : null)}

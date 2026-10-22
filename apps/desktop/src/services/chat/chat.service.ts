@@ -15,6 +15,8 @@ export class ChatService extends Service {
   draft = ''
   error = ''
   running = false
+  /** Saved LLM config used for the next turn. Empty follows the settings default. */
+  modelId = ''
   sessions: ChatSession[] = [{ id: 'session-1', title: 'New', messages: [] }]
   activeId = 'session-1'
   private controller: AbortController | null = null
@@ -26,6 +28,18 @@ export class ChatService extends Service {
 
   setDraft(value: string) {
     this.draft = value
+  }
+
+  setModel(id: string) {
+    if (!this.settings.form.llmConfigs.some((config) => config.id === id)) return
+    this.modelId = id
+  }
+
+  /** Config for the composer. An unknown id falls back to the default, then the first saved config. */
+  get activeModelId(): string {
+    const configs = this.settings.form.llmConfigs
+    if (this.modelId && configs.some((config) => config.id === this.modelId)) return this.modelId
+    return configs.find((config) => config.isDefault)?.id ?? configs[0]?.id ?? ''
   }
 
   select(id: string) {
@@ -54,7 +68,7 @@ export class ChatService extends Service {
   async send() {
     const text = this.draft.trim()
     if (!text || this.running) return
-    const runtime = this.settings.llmRuntime()
+    const runtime = this.settings.llmRuntime(this.activeModelId || undefined)
     if (!runtime?.apiKey || !runtime.model || !runtime.baseUrl) {
       this.error = 'Add a model provider, base URL, model, and key in Settings'
       return
@@ -96,6 +110,14 @@ export class ChatService extends Service {
         onThinking: (delta) => appendAssistantDelta(this.sessions, sessionId, 'thinking', delta),
         onToolStart: (call) => appendToolStart(this.sessions, sessionId, call),
         onToolEnd: (call) => appendToolEnd(this.sessions, sessionId, call),
+        onUsage: (usage) => this.settings.recordTokenUsage({
+          model: runtime.model,
+          input: usage.input,
+          output: usage.output,
+          cacheRead: usage.cacheRead,
+          cacheWrite: usage.cacheWrite,
+          total: usage.totalTokens,
+        }),
       })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Agent failed'

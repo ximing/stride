@@ -3,7 +3,9 @@
   flex: none;
   min-width: 0;
   overflow: hidden;
-  background: var(--sd-bg);
+  /* Half step up from the rail's desk tone: separates the two nav columns
+     by luminance instead of a hairline. */
+  background: var(--sd-bg-nav);
   display: flex;
   flex-direction: column;
 }
@@ -18,7 +20,6 @@
 .note-list-head {
   display: flex;
   height: 44px;
-  border-bottom: 1px solid var(--sd-border);
 }
 
 .note-list-title {
@@ -104,14 +105,16 @@
   color: var(--sd-fg);
 }
 
-.note-list-sort {
+.note-list-sort,
+.note-list-filter-toggle {
   border-color: transparent;
   color: var(--sd-muted);
   border-radius: var(--sd-radius);
   display: inline-flex;
 }
 
-.note-list-sort:hover:not(:disabled) {
+.note-list-sort:hover:not(:disabled),
+.note-list-filter-toggle:hover:not(:disabled) {
   background: var(--sd-bg-elevated);
   border-color: transparent;
   color: var(--sd-fg);
@@ -172,8 +175,10 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
-  min-height: 40px;
-  padding: 12px 12px 8px;
+  height: 44px;
+  min-height: 44px;
+  padding: 0 8px 0 12px;
+  user-select: none;
 }
 
 .note-list-title {
@@ -191,12 +196,29 @@
   line-height: 20px;
 }
 
-.note-list-sort {
+.note-list-head .note-list-new {
   flex: none;
   width: 28px;
   height: 28px;
   min-height: 28px;
   margin-left: auto;
+  padding: 0;
+}
+
+.note-list-head .note-list-filter-toggle {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+}
+
+.note-list-sort {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  margin-left: 0;
   padding: 0;
 }
 
@@ -248,7 +270,10 @@
   border: 0;
 }
 
-.list-filter .list-filter-input {
+.list-filter .list-filter-input,
+.list-filter .list-filter-input:hover:not(:disabled),
+.list-filter .list-filter-input:focus,
+.list-filter .list-filter-input:focus-visible {
   width: 100%;
   height: 30px;
   min-height: 30px;
@@ -256,25 +281,31 @@
   color: var(--sd-fg);
   font-size: 13px;
   line-height: 20px;
+  /* The pill paints hover and focus. A second background here stacks on the
+     translucent inset and darkens only the text column. */
   background: transparent;
   border: 0;
-  box-shadow: none;
-}
-
-.list-filter .list-filter-input:focus,
-.list-filter .list-filter-input:focus-visible {
-  border: 0;
+  border-radius: 0;
   outline: none;
   box-shadow: none;
 }
 
-.list-filter .list-filter-clear {
+.list-filter .list-filter-clear,
+.list-filter .list-filter-clear:hover:not(:disabled),
+.list-filter .list-filter-clear:active:not(:disabled) {
   flex: none;
   width: 24px;
   height: 24px;
   min-height: 24px;
   padding: 0;
   border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+
+.list-filter .list-filter-clear:hover:not(:disabled),
+.list-filter .list-filter-clear:active:not(:disabled) {
+  color: var(--sd-fg);
 }
 
 .note-list-batch {

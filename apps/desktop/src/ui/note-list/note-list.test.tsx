@@ -9,6 +9,7 @@ import { createVaultNote } from '../../../../../packages/core/src/vault'
 import { ListFilterService } from '../../services/search/list-filter.service'
 import { DEFAULT_LIST_SORT, LIST_STORAGE_KEY, NOTE_ROW_HEIGHT } from '../../services/notes/note-list'
 import { NoteListService } from '../../services/notes/note-list.service'
+import { FolderService } from '../../services/vault/folder.service'
 import { VaultService } from '../../services/vault/vault.service'
 import { NoteList, noteListTitle, noteSnippet, relativeDay } from './note-list'
 
@@ -171,6 +172,33 @@ describe('NoteList', () => {
     }
   })
 
+  it('scopes the list to a folder filter and the header + creates inside it', async () => {
+    if (!has(FolderService)) register(FolderService)
+    const { vault } = await mountNoteList()
+    await act(async () => {
+      await vault.openFromDraft()
+      await vault.createNote()
+    })
+    const rootId = vault.activeId
+    await act(async () => {
+      await resolve(FolderService).createFolder('box')
+      vault.setFilter('folder:box')
+    })
+    // The root note is out of scope; the header shows the folder name.
+    expect(renderedItems().length).toBe(0)
+    expect(host!.querySelector('[data-testid="note-list-title"]')?.textContent).toBe('box')
+
+    await act(async () => {
+      host!.querySelector<HTMLButtonElement>('[data-testid="note-list-new"]')!.click()
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, 0))
+    })
+    expect(vault.activeId.startsWith('box/')).toBe(true)
+    // The folder scope survives createNote()'s reset-to-all.
+    expect(vault.listFilter).toBe('folder:box')
+    expect(vault.visibleNotes.map((note) => note.id)).not.toContain(rootId)
+    expect(itemTitles()).toEqual([vault.active?.title ?? ''])
+  })
+
   it('lists visible notes with title, snippet, and relative date; click selects', async () => {
     const { vault } = await mountNoteList()
     const moss = noteWithBody('moss', 'Moss notes', 'The bricks stay damp until noon.')
@@ -198,7 +226,7 @@ describe('NoteList', () => {
     expect(host!.querySelector('[data-note-id="moss"]')?.getAttribute('aria-current')).toBeNull()
   })
 
-  it('shows the inbox view name and filters inline via the header input', async () => {
+  it('opens a list filter from the header icon and filters the notes', async () => {
     const { vault } = await mountNoteList()
     await act(async () => {
       vault.listFilter = 'all'
@@ -206,18 +234,37 @@ describe('NoteList', () => {
       vault.searchHits = []
       vault.notes = [noteWithBody('a', '会议纪要', '正文'), noteWithBody('b', 'Shopping', 'milk')]
     })
+    const toggle = host!.querySelector<HTMLButtonElement>('[data-testid="list-filter-toggle"]')!
+    expect(toggle.getAttribute('aria-label')).toBe('Filter list')
+    expect(toggle.getAttribute('aria-expanded')).toBe('false')
+    expect(host!.querySelector('[data-testid="list-filter"]')).toBeNull()
     expect(host!.querySelector('[data-testid="list-filter-clear"]')).toBeNull()
+
+    await act(async () => {
+      toggle.click()
+    })
     const input = host!.querySelector<HTMLInputElement>('[data-testid="list-filter"]')!
     expect(input.placeholder).toBe('Filter title or properties')
+    expect(host!.querySelector('[data-testid="list-filter-toggle"]')?.getAttribute('aria-expanded')).toBe('true')
     await act(async () => {
       setInputValue(input, '纪要')
     })
     expect(itemTitles()).toEqual(['会议纪要'])
     expect(host!.querySelector('[data-testid="list-filter-clear"]')).not.toBeNull()
+    // A typed query stays visible; the icon focuses the field instead of hiding it.
+    await act(async () => {
+      host!.querySelector<HTMLButtonElement>('[data-testid="list-filter-toggle"]')!.click()
+    })
+    expect(host!.querySelector('[data-testid="list-filter"]')).not.toBeNull()
     await act(async () => {
       host!.querySelector<HTMLButtonElement>('[data-testid="list-filter-clear"]')!.click()
     })
     expect(itemTitles()).toEqual(['会议纪要', 'Shopping'])
+    expect(host!.querySelector('[data-testid="list-filter"]')).not.toBeNull()
+    await act(async () => {
+      host!.querySelector<HTMLButtonElement>('[data-testid="list-filter-toggle"]')!.click()
+    })
+    expect(host!.querySelector('[data-testid="list-filter"]')).toBeNull()
 
     await act(async () => {
       vault.listFilter = 'inbox'
@@ -246,11 +293,19 @@ describe('NoteList', () => {
       vault.searchHits = []
       vault.notes = [noteWithBody('a', 'Alpha', 'body')]
     })
+    await act(async () => {
+      host!.querySelector<HTMLButtonElement>('[data-testid="list-filter-toggle"]')!.click()
+    })
     const input = host!.querySelector<HTMLInputElement>('[data-testid="list-filter"]')!
     await act(async () => {
       setInputValue(input, 'zzz')
     })
     expect(host!.querySelector('[data-testid="note-list-empty-filter"]')?.textContent).toContain('No notes match “zzz”.')
+    await act(async () => {
+      input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    })
+    expect(host!.querySelector('[data-testid="list-filter"]')).toBeNull()
+    expect(itemTitles()).toEqual(['Alpha'])
   })
 
   it('renders type and status chips; plain notes get no type chip', async () => {

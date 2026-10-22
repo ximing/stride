@@ -1,47 +1,59 @@
 import { MessageCircle, Plus, Send, Square } from 'lucide-react'
+import type { PublicLlmConfig } from '@stride/core'
 import { observer, useService } from '@rabjs/react'
 import { useTranslation } from 'react-i18next'
 import { ChatService } from '../../services/chat/chat.service'
+import { SettingsService } from '../../services/settings/settings.service'
 import { VaultService } from '../../services/vault/vault.service'
 import { ChatMarkdown } from './chat-markdown'
-import { Button } from '../primitives/button'
+import { Button, IconButton } from '../primitives/button'
 import { EmptyState } from '../primitives/empty-state'
 import { Mark } from '../primitives/icon'
+import { Select } from '../primitives/select'
 import { Tabs, TabsList, TabsTrigger } from '../primitives/tabs'
+
+function modelOptionLabel(config: PublicLlmConfig): string {
+  const name = config.name.trim()
+  const model = config.model.trim()
+  if (name && model && name !== model) return `${name} · ${model}`
+  return model || name || config.provider || config.id
+}
 
 export const ChatPanel = observer(function ChatPanel() {
   const { t } = useTranslation()
   const chat = useService(ChatService)
+  const settings = useService(SettingsService)
   const vault = useService(VaultService)
   const session = chat.sessions.find((item) => item.id === chat.activeId) ?? chat.sessions[0]
+  const models = settings.form.llmConfigs
+  const modelId = chat.activeModelId
   return (
     <div className="chat-panel" data-testid="chat-panel">
-      <div className="chat-head">
-        <h2 className="panel-heading">{t('chat.heading')}</h2>
-        <Button
+      <div className="chat-sessions">
+        <Tabs className="chat-session-tabs" value={chat.activeId} onValueChange={(id) => chat.select(id)}>
+          <TabsList className="chat-tabs" data-testid="chat-tabs" aria-label={t('chat.sessions')}>
+            {chat.sessions.map((item) => (
+              <TabsTrigger
+                key={item.id}
+                className="chat-tab"
+                value={item.id}
+                aria-pressed={item.id === chat.activeId}
+              >
+                {item.title}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </Tabs>
+        <IconButton
+          icon={Plus}
+          label={t('chat.new')}
           size="sm"
-          tone="quiet"
-          icon={<Mark icon={Plus} size={14} />}
+          iconSize={14}
+          className="chat-new"
           data-testid="chat-new"
           onClick={() => chat.newSession()}
-        >
-          {t('chat.new')}
-        </Button>
+        />
       </div>
-      <Tabs className="chat-session-tabs" value={chat.activeId} onValueChange={(id) => chat.select(id)}>
-        <TabsList className="chat-tabs" data-testid="chat-tabs" aria-label={t('chat.sessions')}>
-          {chat.sessions.map((item) => (
-            <TabsTrigger
-              key={item.id}
-              className="chat-tab"
-              value={item.id}
-              aria-pressed={item.id === chat.activeId}
-            >
-              {item.title}
-            </TabsTrigger>
-          ))}
-        </TabsList>
-      </Tabs>
       <div className="chat-messages" data-testid="chat-messages">
         {session && session.messages.length === 0 ? (
           <EmptyState
@@ -79,32 +91,6 @@ export const ChatPanel = observer(function ChatPanel() {
         </p>
       )}
       <div className="chat-compose">
-        <Tabs
-          className="chat-mode-tabs"
-          value={vault.agentMode}
-          onValueChange={(mode) => {
-            if (mode === 'safe' || mode === 'power') void vault.setAgentMode(mode)
-          }}
-        >
-          <TabsList className="chat-mode" aria-label={t('chat.mode')}>
-            <TabsTrigger
-              className="chat-mode-trigger"
-              value="safe"
-              data-testid="chat-mode-safe"
-              aria-pressed={vault.agentMode === 'safe'}
-            >
-              {t('chat.safe')}
-            </TabsTrigger>
-            <TabsTrigger
-              className="chat-mode-trigger"
-              value="power"
-              data-testid="chat-mode-power"
-              aria-pressed={vault.agentMode === 'power'}
-            >
-              {t('chat.power')}
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
         <textarea
           className="chat-draft"
           data-testid="chat-draft"
@@ -112,7 +98,57 @@ export const ChatPanel = observer(function ChatPanel() {
           onChange={(event) => chat.setDraft(event.target.value)}
           placeholder={t('chat.placeholder')}
         />
-        <div className="chat-compose-actions">
+        <div className="chat-compose-bar">
+          {models.length > 0 && modelId ? (
+            <Select
+              className="chat-model"
+              aria-label={t('chat.model')}
+              data-testid="chat-model"
+              value={modelId}
+              options={models.map((config) => ({ value: config.id, label: modelOptionLabel(config) }))}
+              onValueChange={(id) => chat.setModel(id)}
+            />
+          ) : (
+            <p className="chat-model-empty" data-testid="chat-model-empty">{t('chat.noModel')}</p>
+          )}
+          <Tabs
+            className="chat-mode-tabs"
+            value={vault.agentMode}
+            onValueChange={(mode) => {
+              if (mode === 'safe' || mode === 'power') void vault.setAgentMode(mode)
+            }}
+          >
+            <TabsList className="chat-mode" aria-label={t('chat.mode')}>
+              <TabsTrigger
+                className="chat-mode-trigger"
+                value="safe"
+                data-testid="chat-mode-safe"
+                aria-pressed={vault.agentMode === 'safe'}
+              >
+                {t('chat.safe')}
+              </TabsTrigger>
+              <TabsTrigger
+                className="chat-mode-trigger"
+                value="power"
+                data-testid="chat-mode-power"
+                aria-pressed={vault.agentMode === 'power'}
+              >
+                {t('chat.power')}
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <span className="chat-compose-spacer" />
+          {chat.running ? (
+            <Button
+              size="sm"
+              tone="quiet"
+              icon={<Mark icon={Square} size={14} />}
+              data-testid="chat-abort"
+              onClick={() => chat.abort()}
+            >
+              {t('chat.stop')}
+            </Button>
+          ) : null}
           <Button
             size="sm"
             tone="primary"
@@ -122,16 +158,6 @@ export const ChatPanel = observer(function ChatPanel() {
             onClick={() => { void chat.send() }}
           >
             {t('chat.send')}
-          </Button>
-          <Button
-            size="sm"
-            tone="quiet"
-            icon={<Mark icon={Square} size={14} />}
-            data-testid="chat-abort"
-            disabled={!chat.running}
-            onClick={() => chat.abort()}
-          >
-            {t('chat.stop')}
           </Button>
         </div>
       </div>

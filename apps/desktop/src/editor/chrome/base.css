@@ -497,13 +497,28 @@
   position: relative;
 }
 
+.editor-color-mark {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  line-height: 0;
+}
+
+.editor-color-mark svg {
+  display: block;
+}
+
 .editor-color-bar {
   position: absolute;
-  left: 7px;
-  right: 7px;
-  bottom: 5px;
-  height: 3px;
-  border-radius: 2px;
+  left: 0;
+  bottom: -6px;
+  width: 16px;
+  height: 2px;
+  border-radius: 1px;
   background: var(--sd-accent);
 }
 
@@ -516,13 +531,26 @@
   z-index: 46;
   display: flex;
   flex-direction: column;
-  width: 11.5rem;
+  width: max-content;
 }
 
 .editor-color-swatches {
+  display: grid;
+  grid-template-columns: repeat(10, 22px);
+}
+
+.editor-color-actions {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.editor-color-none,
+.editor-color-custom-chip {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  border-radius: var(--sd-radius);
 }
 
 .editor-table-menu-colors {
@@ -532,19 +560,37 @@
 }
 
 .editor-color-custom {
+  position: relative;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 0.4rem;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  min-height: 28px;
+  padding: 2px 6px;
+  cursor: pointer;
 }
 
 .editor-color-custom input[type='color'] {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  margin: 0;
   padding: 0;
+  border: 0;
+  opacity: 0;
+  cursor: pointer;
 }
 
 .editor-color-clear {
-  width: auto;
-  align-self: flex-start;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+  align-self: stretch;
+  text-align: left;
 }
 
 .editor-table-menu-clear {
@@ -762,10 +808,9 @@
 
 .editor-toolbar {
   gap: 4px;
-  margin-bottom: 8px;
-  padding: 0 0 4px;
+  margin-bottom: 10px;
+  padding: 0;
   border: 0;
-  border-bottom: 1px solid var(--sd-border);
   border-radius: 0;
   background: transparent;
 }

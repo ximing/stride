@@ -55,7 +55,6 @@
   gap: 12px;
   min-height: 52px;
   padding: 10px 12px 10px 20px;
-  border-bottom: 1px solid var(--sd-border);
 }
 
 .settings-title {
@@ -84,7 +83,6 @@
   display: flex;
   flex-direction: column;
   padding: 12px;
-  border-right: 1px solid var(--sd-border);
   background: var(--sd-bg);
 }
 
@@ -157,8 +155,6 @@
 
 .settings-section-title {
   margin: 0 0 20px;
-  padding-bottom: 12px;
-  border-bottom: 1px solid var(--sd-border);
   font-size: 16px;
   font-weight: 600;
   line-height: 24px;
@@ -269,10 +265,6 @@
   font-size: 13px;
 }
 
-.settings-shortcut-row + .settings-shortcut-row {
-  border-top: 1px solid var(--sd-border);
-}
-
 .settings-shortcut-kbd {
   font-family: var(--sd-font-mono);
   font-size: 12px;
@@ -297,8 +289,6 @@
 
   .settings-sidebar {
     padding: 8px 12px;
-    border-right: 0;
-    border-bottom: 1px solid var(--sd-border);
   }
 
   .settings-nav {

@@ -1,9 +1,10 @@
-// This Vault settings section (T7.3, FEATURES 9.8): editor zoom, note-list
-// density, and the git setup preference. All three live in .stride/vault.json
-// via the read-modify-write helpers in core vault-config, so they differ
-// between vaults and travel with the vault folder in git. VaultService owns
-// the live values; zoom reaches the stage instantly through stage-zoom.ts and
-// viewMode reaches NoteList through the `is-compact` class.
+// This Vault settings section: editor zoom, note-list density, the git setup
+// preference, and whether a title change renames the note file. All of them
+// live in .stride/vault.json via the read-modify-write helpers in core
+// vault-config, so they differ between vaults and travel with the vault
+// folder in git. VaultService owns the live values; zoom reaches the stage
+// instantly through stage-zoom.ts and viewMode reaches NoteList through the
+// `is-compact` class.
 
 import { has, observer, useService } from '@rabjs/react'
 import { FolderOpen } from 'lucide-react'
@@ -132,6 +133,31 @@ const GitSetupField = observer(function GitSetupField() {
   )
 })
 
+const RenameFromHeadingField = observer(function RenameFromHeadingField() {
+  const { t } = useTranslation()
+  const vault = useService(VaultService)
+  return (
+    <div className="svault-group">
+      <h3 className="svault-heading">{t('settings.vault.rename')}</h3>
+      <label className="svault-check settings-choice">
+        <input
+          className="settings-choice-control"
+          type="checkbox"
+          data-testid="settings-rename-from-heading"
+          checked={vault.renameFromHeading}
+          onChange={(event) => {
+            void vault.setRenameFromHeading(event.target.checked)
+          }}
+        />
+        <span>{t('settings.vault.renameLabel')}</span>
+      </label>
+      <p className="svault-hint">
+        {t('settings.vault.renameHint', { perVault: t('settings.vault.perVault') })}
+      </p>
+    </div>
+  )
+})
+
 const VaultFields = observer(function VaultFields() {
   const { t } = useTranslation()
   const vault = useService(VaultService)
@@ -151,6 +177,7 @@ const VaultFields = observer(function VaultFields() {
       <ZoomField />
       <ViewModeField />
       <GitSetupField />
+      <RenameFromHeadingField />
     </>
   )
 })

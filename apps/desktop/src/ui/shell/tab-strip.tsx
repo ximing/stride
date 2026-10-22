@@ -10,21 +10,22 @@ import { IconButton } from '../primitives/button'
 
 /**
  * Editor tab strip: one tab per open note (title derived live from vault.notes,
- * so renames follow automatically). Hidden while no vault is open or no tabs
- * exist. Close via the hover-revealed close button or middle click.
+ * so renames follow automatically). Hidden while no vault is open. With no tabs
+ * the band stays so the column headers share one line.
+ * Close via the hover-revealed close button or middle click.
  */
 export const TabStrip = observer(function TabStrip() {
   const { t } = useTranslation()
   const tabs = useService(TabsService)
   const vault = useService(VaultService)
   const commands = useService(CommandService)
-  if (vault.phase !== 'ready' || tabs.tabs.length === 0) return null
+  if (vault.phase !== 'ready') return null
   // Tooltip shortcut text comes from the manifest, never a hard-coded chord.
   const closeKeys = commandShortcut(commands.commands, 'tab.close')
   const closeName = commandTitle('tab.close', 'Close tab')
   const closeLabel = closeKeys ? `${closeName} (${closeKeys})` : closeName
   return (
-    <div className="tab-strip" data-testid="tab-strip" role="tablist" aria-label={t('shell.openNotes')}>
+    <div className="tab-strip" data-testid="tab-strip" role="tablist" aria-label={t('shell.openNotes')} data-tauri-drag-region="deep">
       {tabs.tabs.map((tab) => {
         const note = vault.notes.find((item) => item.id === tab.noteId)
         const title = note?.title || t('notes.untitled')
@@ -62,6 +63,7 @@ export const TabStrip = observer(function TabStrip() {
           </div>
         )
       })}
+      <div className="rail-drag" />
     </div>
   )
 })

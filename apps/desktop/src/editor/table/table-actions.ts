@@ -3,17 +3,11 @@ import type { EditorState, Selection } from '@tiptap/pm/state';
 import { TextSelection } from '@tiptap/pm/state';
 import type { EditorView } from '@tiptap/pm/view';
 import { CellSelection, cellAround, columnIsHeader, isInTable, rowIsHeader, selectedRect } from '@tiptap/pm/tables';
+import { BACKGROUND_COLORS } from '../colors';
 
 const CELL_HEX = /^#[0-9a-fA-F]{6}$/;
 
-export const TABLE_CELL_COLORS = [
-  { id: 'yellow', value: '#f6e7a8' },
-  { id: 'green', value: '#d7efd4' },
-  { id: 'blue', value: '#d6e6f7' },
-  { id: 'pink', value: '#f8d6d0' },
-  { id: 'purple', value: '#e7dff6' },
-  { id: 'gray', value: '#ece7df' },
-] as const;
+export const TABLE_CELL_COLORS = BACKGROUND_COLORS;
 
 /** Catalog keys for table commands. Translated at render, not stored as copy. */
 export const TABLE_COMMAND_KEY: Record<TableCommand, string> = {

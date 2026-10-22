@@ -60,6 +60,12 @@
   --sd-z-modal: 41;
   --sd-z-tooltip: 50;
   --sd-z-toast: 60;
+
+  /* macOS traffic-light hues. They stay the same in light and dark. */
+  --sd-window-close: #ff5f57;
+  --sd-window-minimize: #febc2e;
+  --sd-window-zoom: #28c840;
+  --sd-window-glyph: #1c1c1c;
 }
 
 :root,
@@ -68,13 +74,20 @@
 .sd-preview[data-theme="light"],
 .sd-preview[data-theme="system"] {
   color-scheme: light;
-  --sd-bg: #f3f4f1;
-  --sd-surface: #fcfdfb;
+  /* Paper-desk ladder: the desk (--sd-bg) is a quiet green-gray, the document
+     (--sd-surface) one calmer step up — never pure white — and floating
+     layers (--sd-bg-elevated) the brightest. Structure comes from these
+     tonal steps, not hairlines. */
+  --sd-bg: #ebede6;
+  /* Half step between desk and paper: the note list sits on it so the
+     primary rail and the list column read as two planes without a hairline. */
+  --sd-bg-nav: #f0f1ea;
+  --sd-surface: #f4f5ef;
   --sd-bg-surface: var(--sd-surface);
-  --sd-bg-elevated: #ffffff;
+  --sd-bg-elevated: #fafbf7;
   --sd-fg: #252a26;
   --sd-muted: #697169;
-  --sd-border: #dde1da;
+  --sd-border: #d9ddd3;
   --sd-border-strong: color-mix(in srgb, var(--sd-fg) 24%, var(--sd-border));
   --sd-accent: #356854;
   --sd-accent-fg: #ffffff;
@@ -94,6 +107,7 @@
   --sd-danger-fg: #ffffff;
   --sd-danger-hover: color-mix(in srgb, var(--sd-danger) 88%, var(--sd-fg));
   --sd-danger-soft: color-mix(in srgb, var(--sd-danger) 10%, var(--sd-surface));
+  --sd-warning: #8a6510;
   --sd-overlay: rgba(23, 26, 24, 0.38);
   --sd-tooltip-bg: var(--sd-fg);
   --sd-tooltip-fg: var(--sd-surface);
@@ -126,6 +140,7 @@
 .sd-preview[data-theme="dark"] {
   color-scheme: dark;
   --sd-bg: #171a18;
+  --sd-bg-nav: #1c201d;
   --sd-surface: #202421;
   --sd-bg-surface: var(--sd-surface);
   --sd-bg-elevated: #272c28;
@@ -151,6 +166,7 @@
   --sd-danger-fg: #171a18;
   --sd-danger-hover: color-mix(in srgb, var(--sd-danger) 88%, var(--sd-fg));
   --sd-danger-soft: color-mix(in srgb, var(--sd-danger) 14%, var(--sd-surface));
+  --sd-warning: #dbb268;
   --sd-overlay: rgba(0, 0, 0, 0.58);
   --sd-tooltip-bg: var(--sd-fg);
   --sd-tooltip-fg: var(--sd-bg);
@@ -184,6 +200,7 @@
   .sd-preview[data-theme="system"] {
     color-scheme: dark;
     --sd-bg: #171a18;
+    --sd-bg-nav: #1c201d;
     --sd-surface: #202421;
     --sd-bg-surface: var(--sd-surface);
     --sd-bg-elevated: #272c28;
@@ -209,6 +226,7 @@
     --sd-danger-fg: #171a18;
     --sd-danger-hover: color-mix(in srgb, var(--sd-danger) 88%, var(--sd-fg));
     --sd-danger-soft: color-mix(in srgb, var(--sd-danger) 14%, var(--sd-surface));
+    --sd-warning: #dbb268;
     --sd-overlay: rgba(0, 0, 0, 0.58);
     --sd-tooltip-bg: var(--sd-fg);
     --sd-tooltip-fg: var(--sd-bg);

@@ -73,7 +73,6 @@
 .settings-embedding-save {
   gap: 12px;
   padding-top: 16px;
-  border-top: 1px solid var(--sd-border);
 }
 
 .settings-embedding-test-ok,

@@ -104,6 +104,7 @@
 .editor-select-menu button[role='option']:focus-visible,
 .editor-color-swatch:focus-visible,
 .editor-color-clear:focus-visible,
+.editor-color-custom:focus-within,
 .editor-table-menu-item:focus-visible,
 .editor-table-menu-clear:focus-visible,
 .wikilink-menu button:focus-visible,

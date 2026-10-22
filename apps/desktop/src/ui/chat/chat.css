@@ -1,7 +1,10 @@
 /* Surviving rules moved from src/styles so each class has one source. */
 .chat-messages {
   display: flex;
+  flex: 1 1 auto;
   flex-direction: column;
+  min-height: 0;
+  overflow: auto;
 }
 
 .chat-thinking {
@@ -14,8 +17,9 @@
 }
 
 .chat-compose textarea {
-  min-height: 5rem;
+  min-height: 72px;
   width: 100%;
+  resize: none;
 }
 
 .chat-tool {
@@ -32,40 +36,53 @@
 
 /* ---------- agent chat ---------- */
 
-.chat-panel {
+.panel-body:has(> .chat-panel) {
   display: flex;
   flex-direction: column;
-  min-height: 100%;
+  overflow: hidden;
+  padding-bottom: 12px;
 }
 
-.chat-head {
+.chat-panel {
   display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
+  flex: 1 1 auto;
+  flex-direction: column;
   min-width: 0;
-  margin-bottom: 12px;
+  min-height: 0;
+  overflow: hidden;
 }
 
-.chat-head .panel-heading {
-  margin: 0;
+.chat-sessions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  margin-bottom: 8px;
 }
 
 .chat-session-tabs {
+  flex: 1 1 auto;
   min-width: 0;
-  margin-bottom: 12px;
+  margin-bottom: 0;
 }
 
-.chat-tabs {
+.chat-sessions .chat-new {
+  flex: none;
+}
+
+.chat-tabs.sd-tabs-list {
   display: flex;
   flex-wrap: nowrap;
   gap: 2px;
   min-width: 0;
+  min-height: 0;
   margin: 0;
   padding: 2px;
   overflow-x: auto;
   background: var(--sd-inset);
   border: 1px solid transparent;
+  border-bottom: 0;
   border-radius: 8px;
 }
 
@@ -102,17 +119,14 @@
   gap: 12px;
 }
 
-.chat-message {
-  min-width: 0;
-  padding: 0 0 12px;
-  overflow-wrap: anywhere;
-  white-space: normal;
-  border-bottom: 1px solid color-mix(in srgb, var(--sd-border) 72%, transparent);
+.chat-messages:not(:has(.chat-message)) {
+  justify-content: center;
 }
 
-.chat-message:last-child {
-  padding-bottom: 0;
-  border-bottom: 0;
+.chat-message {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .chat-message-role {
@@ -216,26 +230,90 @@
   border-color: color-mix(in srgb, var(--sd-danger) 45%, var(--sd-border));
 }
 
-.chat-compose {
-  gap: 8px;
-  min-width: 0;
-  margin-top: 16px;
-  padding-top: 12px;
-  border-top: 1px solid var(--sd-border);
+.chat-panel > .error {
+  flex: none;
+  margin: 8px 0 0;
 }
 
-.chat-mode-tabs {
-  align-self: flex-start;
+.chat-compose {
+  flex: none;
+  gap: 4px;
+  min-width: 0;
+  margin-top: 12px;
+  /* One rounded composer card instead of a hairline + stacked inset boxes. */
+  padding: 6px;
+  background: var(--sd-inset);
+  border: 1px solid transparent;
+  border-radius: var(--sd-radius-lg);
+}
+
+.chat-compose:focus-within {
+  border-color: var(--sd-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sd-accent) 18%, transparent);
+}
+
+.chat-compose-bar {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.chat-compose .sd-select-field.sd-field {
+  /* Size to content, shrink (with truncation) when the panel is narrow; the
+     spacer — not this field — absorbs leftover width. */
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 4.5rem;
   max-width: 100%;
 }
 
-.chat-mode {
+.chat-compose .chat-model.sd-select-trigger {
+  min-height: 28px;
+  height: 28px;
+  padding: 0 8px;
+  font-size: 12px;
+  background: transparent;
+}
+
+.chat-compose .chat-model.sd-select-trigger:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sd-fg) 5%, transparent);
+}
+
+/* The segmented track sits inside the composer card, so it stays quiet. */
+.chat-compose .chat-mode.sd-tabs-list {
+  padding: 0;
+  background: transparent;
+}
+
+.chat-model-empty {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  overflow: hidden;
+  color: var(--sd-muted);
+  font-size: 12px;
+  line-height: 28px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-mode-tabs {
+  flex: none;
+  align-self: center;
+  max-width: 100%;
+}
+
+.chat-mode.sd-tabs-list {
   display: flex;
   gap: 2px;
+  min-height: 0;
   max-width: 100%;
   padding: 2px;
   background: var(--sd-inset);
   border: 1px solid transparent;
+  border-bottom: 0;
   border-radius: 8px;
 }
 
@@ -262,36 +340,31 @@
   box-shadow: 0 1px 2px color-mix(in srgb, var(--sd-fg) 18%, transparent);
 }
 
-.chat-compose .chat-draft {
+/* The draft is chromeless inside the composer card; the card's
+   focus-within ring is the visible focus indicator. */
+.chat-compose .chat-draft,
+.chat-compose .chat-draft:hover:not(:focus),
+.chat-compose .chat-draft:focus {
   width: 100%;
-  min-height: 96px;
-  max-height: 240px;
-  padding: 8px 10px;
+  min-height: 56px;
+  max-height: 160px;
+  padding: 4px 6px;
   color: var(--sd-fg);
   font-size: 13px;
   line-height: 1.5;
-  background: var(--sd-inset);
-  border: 1px solid transparent;
-  border-radius: var(--sd-radius);
-  resize: vertical;
+  background: transparent;
+  border: 0;
+  border-radius: 0;
+  box-shadow: none;
+  resize: none;
 }
 
-.chat-compose .chat-draft:hover:not(:focus) {
-  background: var(--sd-inset-hover);
+.chat-compose .chat-draft:focus-visible {
+  outline: none;
 }
 
-.chat-compose .chat-draft:focus {
-  background: var(--sd-surface);
-  border-color: var(--sd-accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--sd-accent) 18%, transparent);
-}
-
-.chat-compose-actions {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 8px;
-  min-width: 0;
+.chat-compose-spacer {
+  flex: 1 1 auto;
 }
 
 @media (prefers-reduced-motion: reduce) {

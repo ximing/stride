@@ -1,10 +1,7 @@
 import { has, Service } from '@rabjs/react'
 import { compareVersions, type UpdateChannel } from '@stride/core'
+import { isDesktopRuntime } from '../platform/runtime'
 import { SettingsService } from '../settings/settings.service'
-
-function tauriRuntime(): boolean {
-  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
-}
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
@@ -175,7 +172,7 @@ async function checkStaticEndpoint(url: string): Promise<UpdaterUpdateInfo | nul
 
 async function loadUpdaterDriver(): Promise<UpdaterDriver | null> {
   if (updaterDriverForTests) return updaterDriverForTests
-  if (!tauriRuntime()) return null
+  if (!isDesktopRuntime()) return null
   const [updater, process] = await Promise.all([
     import('@tauri-apps/plugin-updater'),
     import('@tauri-apps/plugin-process'),
@@ -237,7 +234,7 @@ export class UpdateService extends Service {
   // Whether any updater can run here at all (Tauri runtime or an injected
   // test driver). UI hides check-for-updates affordances when false.
   get updaterSupported(): boolean {
-    return updaterDriverForTests !== null || tauriRuntime()
+    return updaterDriverForTests !== null || isDesktopRuntime()
   }
 
   // Read the persisted preference at check time so settings edits apply to

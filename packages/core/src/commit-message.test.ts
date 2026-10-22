@@ -69,7 +69,11 @@ describe('suggestCommitMessage', () => {
       apiKey: 'sk-passed',
       streamFn: textStream(['fix: rename the note']),
     })
-    expect(result).toEqual({ message: 'fix: rename the note', aborted: false })
+    expect(result).toEqual({
+      message: 'fix: rename the note',
+      aborted: false,
+      usage: { input: 3, output: 2, cacheRead: 0, cacheWrite: 0, totalTokens: 5, costTotal: 0 },
+    })
   })
 
   it('does not call streamFn for an empty diff', async () => {

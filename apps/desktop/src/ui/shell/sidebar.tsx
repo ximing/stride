@@ -12,7 +12,6 @@ import {
   Inbox,
   Pencil,
   Plus,
-  SquarePen,
   Star,
   Tag,
   User,
@@ -21,12 +20,14 @@ import {
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { typeSidebarLabel } from '../../../../../packages/core/src/types'
+import type { ContextMenuEntry } from '../../services/commands/context-menu'
 import { TabsService } from '../../services/notes/tabs.service'
 import { VaultService } from '../../services/vault/vault.service'
 import { ViewsService } from '../../services/views/views.service'
+import { FolderTree } from '../folders/folder-tree'
+import { ContextMenu } from '../overlays/context-menu'
 import { Button, IconButton } from '../primitives/button'
 import { EmptyState } from '../primitives/empty-state'
-import { FolderTree } from '../folders/folder-tree'
 import { Mark } from '../primitives/icon'
 import { ViewEditorModal } from '../views/view-editor'
 
@@ -142,23 +143,23 @@ export const Rail = observer(function Rail() {
   const { t } = useTranslation()
   const vault = useService(VaultService)
   const tabs = useService(TabsService)
+  const [inboxMenu, setInboxMenu] = useState<{ x: number; y: number } | null>(null)
   const typeDocs = vault.sidebarTypes
   const fallbackTypes = vault.typeDocuments.length === 0 ? [...vault.graph.byType.keys()] : []
   const showInstances = vault.active?.type === 'Type'
+  const inboxMenuItems: ContextMenuEntry[] = [
+    {
+      kind: 'item',
+      id: 'advance-inbox',
+      label: t('sidebar.advance'),
+      checked: vault.advanceInbox,
+      onSelect: () => {
+        void vault.setAdvanceInbox(!vault.advanceInbox)
+      },
+    },
+  ]
   return (
     <div className="rail-inner">
-      <div className="rail-head">
-        <Button
-          tone="primary"
-          size="lg"
-          className="rail-new-note"
-          data-testid="new-note"
-          icon={<Mark icon={SquarePen} size={16} />}
-          onClick={() => vault.createNote()}
-        >
-          {t('shell.newNote')}
-        </Button>
-      </div>
       <div className="group-label">{t('sidebar.views')}</div>
       <button
         type="button"
@@ -172,22 +173,24 @@ export const Rail = observer(function Rail() {
       <button
         type="button"
         className={vault.listFilter === 'inbox' ? 'rail-nav-item active' : 'rail-nav-item'}
+        data-testid="rail-inbox"
         aria-current={vault.listFilter === 'inbox' ? 'page' : undefined}
         onClick={() => vault.setFilter('inbox')}
+        onContextMenu={(event) => {
+          event.preventDefault()
+          setInboxMenu({ x: event.clientX, y: event.clientY })
+        }}
       >
         <span className="rail-nav-icon"><Mark icon={Inbox} size={16} /></span>
         <span className="type-label">{t('sidebar.inboxCount', { n: vault.inboxCount })}</span>
       </button>
-      {vault.listFilter === 'inbox' && (
-        <label className="advance-inbox">
-          <input
-            type="checkbox"
-            data-testid="advance-inbox"
-            checked={vault.advanceInbox}
-            onChange={(event) => { void vault.setAdvanceInbox(event.target.checked) }}
-          />
-          {t('sidebar.advance')}
-        </label>
+      {inboxMenu && (
+        <ContextMenu
+          x={inboxMenu.x}
+          y={inboxMenu.y}
+          items={inboxMenuItems}
+          onClose={() => setInboxMenu(null)}
+        />
       )}
       <SavedViews />
       <div className="group-label">{t('sidebar.types')}</div>
@@ -280,7 +283,6 @@ export const Rail = observer(function Rail() {
           <span className="type-label">{type}</span>
         </button>
       ))}
-      <div className="group-label">{t('shell.notes')}</div>
       <FolderTree />
     </div>
   )

@@ -1,29 +1,32 @@
 import { observer, useService } from '@rabjs/react'
-import { BookOpen, FolderOpen, FolderPlus, GitBranch, Notebook } from 'lucide-react'
-import { useEffect } from 'react'
+import { Book, BookOpen, FolderOpen, FolderPlus, GitBranch, Notebook } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { NoteEditor } from './editor'
 import { LayoutService } from './services/layout/layout.service'
+import { isTauriRuntime } from './services/platform/deep-link'
 import { GitService } from './services/git/git.service'
 import { SettingsService } from './services/settings/settings.service'
 import { VaultService } from './services/vault/vault.service'
+import { folderTitle } from './services/vault/vault-registry'
 import { Button } from './ui/primitives/button'
 import { CommandPalette } from './ui/overlays/command-palette'
 import { EmptyState } from './ui/primitives/empty-state'
 import { Mark } from './ui/primitives/icon'
 import { Input } from './ui/primitives/input'
-import { NoteList } from './ui/note-list/note-list'
+import { NoteList, relativeDay } from './ui/note-list/note-list'
 import { QuickOpen } from './ui/overlays/quick-open'
 import { ResizeHandle } from './ui/shell/resize-handle'
 import { PanelRail, RightPanel } from './ui/panels/right-panel'
 import { SearchPanel } from './ui/overlays/search-panel'
 import { SettingsPage } from './ui/settings/settings-page'
 import { Rail } from './ui/shell/sidebar'
+import { CollapsedChrome, RailChrome } from './ui/shell/rail-chrome'
 import { StatusBar } from './ui/shell/status-bar'
 import { TabStrip } from './ui/shell/tab-strip'
 import { TooltipProvider } from './ui/primitives/tooltip'
-import { TopBar } from './ui/shell/topbar'
 import { UpdateBanner } from './ui/shell/update-banner'
+import { WindowControls } from './ui/shell/window-controls'
 
 // Re-exports keep existing test imports (`from '../app'`) stable.
 export { Rail } from './ui/shell/sidebar'
@@ -34,8 +37,15 @@ const Chooser = observer(function Chooser() {
   const { t } = useTranslation()
   const vault = useService(VaultService)
   const git = useService(GitService)
+  const desktop = isTauriRuntime()
   return (
     <section className="chooser" data-testid="vault-surface">
+      {desktop ? (
+        <div className="chooser-window" data-tauri-drag-region="deep">
+          <WindowControls />
+          <div className="rail-drag" />
+        </div>
+      ) : null}
       <div className="chooser-panel">
         <div className="chooser-copy">
           <div className="chooser-brand">
@@ -53,6 +63,38 @@ const Chooser = observer(function Chooser() {
             event.preventDefault()
           }}
         >
+          {vault.recentVaults.length > 0 && (
+            <div className="chooser-recent" data-testid="recent-vaults">
+              <div className="chooser-section-label">{t('chooser.recent')}</div>
+              <div className="chooser-recent-list" role="list">
+                {vault.recentVaults.map((entry) => {
+                  const title = folderTitle(entry.label)
+                  const path = title === entry.label ? '' : entry.label
+                  const opened = relativeDay(Date.parse(entry.lastOpened), Date.now())
+                  return (
+                    <div key={entry.id} role="listitem">
+                      <Button
+                        tone="quiet"
+                        size="md"
+                        className="chooser-recent-item"
+                        data-testid="recent-vault"
+                        data-vault-id={entry.id}
+                        title={entry.label}
+                        icon={<Mark icon={Book} size={16} />}
+                        onClick={() => void vault.switchVault(entry.id)}
+                      >
+                        <span className="chooser-recent-copy">
+                          <span className="chooser-recent-label">{title}</span>
+                          {path ? <span className="chooser-recent-path">{path}</span> : null}
+                        </span>
+                        {opened ? <span className="chooser-recent-time">{opened}</span> : null}
+                      </Button>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
           <div className="chooser-start">
             <div className="chooser-section-label">{t('chooser.start')}</div>
             <div className="chooser-actions">
@@ -122,6 +164,49 @@ const Chooser = observer(function Chooser() {
   )
 })
 
+/** Save feedback beside the note title: "saved" confirms briefly then folds
+   away (the element collapses via `.save-status:empty`); pending/saving and
+   error states stay visible until they resolve. */
+const SaveStatus = observer(function SaveStatus() {
+  const { t } = useTranslation()
+  const vault = useService(VaultService)
+  const [showSaved, setShowSaved] = useState(false)
+  useEffect(() => {
+    if (vault.saveStatus !== 'saved') {
+      setShowSaved(false)
+      return
+    }
+    setShowSaved(true)
+    const timer = setTimeout(() => setShowSaved(false), 2600)
+    return () => clearTimeout(timer)
+  }, [vault.saveStatus])
+  const status = vault.saveStatus
+  return (
+    <>
+      <span className={status === 'error' ? 'save-status is-error' : 'save-status'} data-testid="save-status">
+        {status === 'pending' || status === 'saving'
+          ? t('shell.saving')
+          : status === 'error'
+            ? t('shell.saveFailed')
+            : showSaved
+              ? t('shell.saved')
+              : ''}
+      </span>
+      {status === 'error' && (
+        <Button
+          tone="secondary"
+          size="sm"
+          className="save-retry"
+          data-testid="save-retry"
+          onClick={() => { void vault.flush() }}
+        >
+          {t('common.retry')}
+        </Button>
+      )}
+    </>
+  )
+})
+
 const Workspace = observer(function Workspace() {
   const { t } = useTranslation()
   const vault = useService(VaultService)
@@ -147,81 +232,54 @@ const Workspace = observer(function Workspace() {
   return (
     <div className="shell" data-testid="vault-surface">
       <UpdateBanner />
-      <TopBar />
       <div className="workspace">
         {!layout.sidebarCollapsed && (
           <>
             <aside className="rail" data-testid="sidebar" style={{ width: layout.sidebarWidth }}>
-              <Rail />
+              <RailChrome />
+              <div className="rail-scroll">
+                <Rail />
+              </div>
             </aside>
             <ResizeHandle column="sidebar" label={t('shell.resizeSidebar')} onDoubleToggle={() => layout.toggleSidebar()} />
           </>
         )}
         <section className="note-list-col" style={{ width: layout.noteListWidth }} aria-label={t('shell.notes')}>
-          <NoteList />
+          <NoteList leading={layout.sidebarCollapsed ? <CollapsedChrome /> : undefined} />
         </section>
         <ResizeHandle column="noteList" label={t('shell.resizeNotes')} />
         <main className="stage">
           <TabStrip />
-          {note ? (
-            <>
-              <div className="stage-head">
-                <input
-                  className="note-title"
-                  data-testid="note-title"
-                  value={note.title}
-                  onChange={(event) => vault.updateTitle(event.target.value)}
-                  onBlur={() => { void vault.commitHeadingRename() }}
-                />
-                <span
-                  className={vault.saveStatus === 'error' ? 'save-status is-error' : 'save-status'}
-                  data-testid="save-status"
-                >
-                  {vault.saveStatus === 'pending' || vault.saveStatus === 'saving'
-                    ? t('shell.saving')
-                    : vault.saveStatus === 'saved'
-                      ? t('shell.saved')
-                      : vault.saveStatus === 'error'
-                        ? t('shell.saveFailed')
-                        : ''}
-                </span>
-                {vault.saveStatus === 'error' && (
-                  <Button
-                    tone="secondary"
-                    size="sm"
-                    className="save-retry"
-                    data-testid="save-retry"
-                    onClick={() => { void vault.flush() }}
-                  >
-                    {t('common.retry')}
-                  </Button>
-                )}
-                <label className="rename-toggle">
+          <div className="stage-scroll">
+            {note ? (
+              <>
+                <div className="stage-head">
                   <input
-                    type="checkbox"
-                    data-testid="rename-from-heading"
-                    checked={vault.renameFromHeading}
-                    onChange={(event) => { void vault.setRenameFromHeading(event.target.checked) }}
+                    className="note-title"
+                    data-testid="note-title"
+                    value={note.title}
+                    onChange={(event) => vault.updateTitle(event.target.value)}
+                    onBlur={() => { void vault.commitHeadingRename() }}
                   />
-                  {t('shell.renameFromHeading')}
-                </label>
-              </div>
-              <NoteEditor key={note.id} />
-            </>
-          ) : (
-            <EmptyState
-              icon={Notebook}
-              title={t('shell.noNoteTitle')}
-              body={t('shell.noNoteBody')}
-              actionLabel={t('shell.newNote')}
-              actionTestId="stage-new-note"
-              onAction={() => vault.createNote()}
-              className="sd-empty-state-stage"
-              testId="stage-empty"
-            />
-          )}
-          {vault.error && <p className="error" data-testid="vault-error" role="alert">{vault.error}</p>}
-          {vault.broad && <p className="meta">{t('chooser.broadRoot')}</p>}
+                  <SaveStatus />
+                </div>
+                <NoteEditor key={note.id} />
+              </>
+            ) : (
+              <EmptyState
+                icon={Notebook}
+                title={t('shell.noNoteTitle')}
+                body={t('shell.noNoteBody')}
+                actionLabel={t('shell.newNote')}
+                actionTestId="stage-new-note"
+                onAction={() => vault.createNote()}
+                className="sd-empty-state-stage"
+                testId="stage-empty"
+              />
+            )}
+            {vault.error && <p className="error" data-testid="vault-error" role="alert">{vault.error}</p>}
+            {vault.broad && <p className="meta">{t('chooser.broadRoot')}</p>}
+          </div>
         </main>
         {layout.rightPanelCollapsed ? (
           <PanelRail />

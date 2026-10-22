@@ -41,6 +41,8 @@ export interface ContextMenuItem {
   shortcut?: string | null
   disabled?: boolean
   danger?: boolean
+  /** When set, the row is a checkbox item and shows a check mark while true. */
+  checked?: boolean
   onSelect?: () => void
 }
 
@@ -382,6 +384,7 @@ export interface FolderNoteMenuInput {
 
 export interface FolderNoteMenuActions {
   open(noteId: string): void
+  rename(noteId: string): void
   copyWikilink(noteId: string): void
   archive(noteId: string): void
   deleteNote(noteId: string): void
@@ -400,6 +403,14 @@ export function buildFolderNoteMenu(
       icon: ExternalLink,
       onSelect: () => actions.open(noteId),
     },
+    {
+      kind: 'item',
+      id: 'rename',
+      label: t('folders.rename'),
+      icon: Pencil,
+      onSelect: () => actions.rename(noteId),
+    },
+    separator('note-actions'),
     {
       kind: 'item',
       id: 'copy-wikilink',

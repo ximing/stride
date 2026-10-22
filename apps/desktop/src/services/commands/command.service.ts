@@ -14,6 +14,8 @@ import { SearchPanelService } from '../search/search-panel.service'
 import { SettingsPageService } from '../settings/settings-page.service'
 import { TabsService } from '../notes/tabs.service'
 import { UpdateCheckService } from '../update/update-check'
+import { isDesktopRuntime } from '../platform/runtime'
+import { requestNewProject, requestNewWindow, requestOpenProject } from '../platform/windows'
 import { VaultService } from '../vault/vault.service'
 import { ViewsService } from '../views/views.service'
 
@@ -28,15 +30,11 @@ function focusOverlayInput(selector: string) {
   document.querySelector<HTMLInputElement>(selector)?.focus()
 }
 
-function isDesktopRuntime(): boolean {
-  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
-}
-
-// Mod+W is the macOS window-close accelerator and Tauri's default menu claims it
-// before the webview can act, so the tab.close *shortcut* is disabled on desktop.
-// The command itself stays runnable (palette) and tabs still close via the strip's
-// × button or middle click. Dispatcher-layer gate, per T6.4.
-const DESKTOP_DISABLED_SHORTCUTS = new Set(['tab.close'])
+// On desktop the native File menu owns New Window and Open Project, so the
+// webview must not handle those chords as well. tab.close stays disabled
+// because the desktop app does not bind Cmd+W; the command stays runnable from
+// the palette, and tabs still close from the strip.
+export const DESKTOP_DISABLED_SHORTCUTS = new Set(['tab.close', 'file.newWindow', 'file.openProject'])
 
 /**
  * Single runtime registry for the app command manifest. Handlers only forward
@@ -118,6 +116,26 @@ export class CommandService extends Service {
   }
 
   private registerBuiltinHandlers() {
+    this.registerHandler('file.newWindow', {
+      available: () => has(VaultService),
+      run: () => {
+        requestNewWindow()
+      },
+    })
+    this.registerHandler('file.newProject', {
+      available: () => has(VaultService),
+      run: () => {
+        if (isDesktopRuntime()) requestNewProject()
+        else void this.resolve(VaultService).createNewVault()
+      },
+    })
+    this.registerHandler('file.openProject', {
+      available: () => has(VaultService),
+      run: () => {
+        if (isDesktopRuntime()) requestOpenProject()
+        else void this.resolve(VaultService).openFromDraft()
+      },
+    })
     this.registerHandler('file.newNote', {
       available: () => has(VaultService),
       run: () => {

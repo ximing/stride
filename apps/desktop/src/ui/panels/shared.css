@@ -23,7 +23,6 @@
 .panel-head {
   display: flex;
   align-items: center;
-  border-bottom: 1px solid var(--sd-border);
 }
 
 .panel-tabs {
@@ -64,7 +63,6 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  border-left: 1px solid var(--sd-border);
   background: var(--sd-bg);
 }
 

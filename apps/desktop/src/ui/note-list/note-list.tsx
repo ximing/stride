@@ -1,13 +1,15 @@
-import { ArrowUpDown, Bookmark, Check, FileText, Inbox, Search, X } from 'lucide-react'
-import { observer, raw, useService } from '@rabjs/react'
+import { ArrowUpDown, Bookmark, Check, FileText, Inbox, Plus, Search, X } from 'lucide-react'
+import { has, observer, raw, resolve, useService } from '@rabjs/react'
 import { plainText, type StrideNote } from '@stride/core/note'
-import { memo, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
+import { memo, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
 import { i18n, t } from '../../i18n'
 import { typeSidebarLabel } from '../../../../../packages/core/src/types'
 import { CommandService } from '../../services/commands/command.service'
 import { buildNoteListMenu, type ContextMenuEntry } from '../../services/commands/context-menu'
 import { ListFilterService } from '../../services/search/list-filter.service'
+import { FolderService } from '../../services/vault/folder.service'
+import { FOLDER_FILTER_PREFIX } from '../../services/vault/vault.service'
 import { NOTE_ROW_HEIGHT, NOTE_ROW_HEIGHT_COMPACT, NOTE_ROW_OVERSCAN, sortNotes, virtualWindow, type ListSort, type ListSortKey } from '../../services/notes/note-list'
 import { NoteListService } from '../../services/notes/note-list.service'
 import { TabsService } from '../../services/notes/tabs.service'
@@ -56,6 +58,10 @@ export function noteListTitle(vault: VaultService): string {
   if (vault.searchQuery.trim() && vault.searchHits.length > 0) return t('search.results')
   if (vault.listFilter === 'all') return t('notes.all')
   if (vault.listFilter === 'inbox') return t('notes.inbox')
+  if (vault.listFilter.startsWith(FOLDER_FILTER_PREFIX)) {
+    const path = vault.listFilter.slice(FOLDER_FILTER_PREFIX.length)
+    return path.split('/').pop() ?? path
+  }
   const typeDoc = vault.typeDocuments.find((note) => note.title === vault.listFilter)
   if (typeDoc) return typeSidebarLabel(typeDoc)
   return vault.listFilter
@@ -92,19 +98,32 @@ function buildTypeInfo(vault: VaultService): Map<string, TypeChipInfo> {
   return map
 }
 
-export const ListFilterInput = observer(function ListFilterInput() {
+export const ListFilterInput = observer(function ListFilterInput({
+  inputRef,
+  onDismiss,
+}: {
+  inputRef: RefObject<HTMLInputElement | null>
+  onDismiss: () => void
+}) {
   const { t: translate } = useTranslation()
   const listFilter = useService(ListFilterService)
   return (
-    <div className="list-filter">
+    <div className="list-filter" id="note-list-filter" data-tauri-drag-region="false">
       <Mark icon={Search} size={14} />
       <Input
+        ref={inputRef}
         label={translate('notes.filter')}
         className="list-filter-input"
         data-testid="list-filter"
         placeholder={translate('notes.filter')}
         value={listFilter.query}
         onChange={(event) => listFilter.setQuery(event.target.value)}
+        onKeyDown={(event) => {
+          if (event.key !== 'Escape') return
+          event.preventDefault()
+          event.stopPropagation()
+          onDismiss()
+        }}
       />
       {listFilter.query.trim() !== '' && (
         <IconButton
@@ -113,7 +132,10 @@ export const ListFilterInput = observer(function ListFilterInput() {
           icon={X}
           label={translate('notes.clearFilter')}
           size="sm"
-          onClick={() => listFilter.clear()}
+          onClick={() => {
+            listFilter.clear()
+            inputRef.current?.focus()
+          }}
         />
       )}
     </div>
@@ -327,7 +349,7 @@ function chipTypeOf(note: StrideNote): string {
 }
 
 /** Right-click rename: open the note, then focus/select the stage title input. */
-function focusNoteTitle() {
+export function focusNoteTitle() {
   window.setTimeout(() => {
     const input = document.querySelector<HTMLInputElement>('[data-testid="note-title"]')
     input?.focus()
@@ -345,7 +367,7 @@ interface RowMenuState {
   items: ContextMenuEntry[]
 }
 
-export const NoteList = observer(function NoteList() {
+export const NoteList = observer(function NoteList({ leading }: { leading?: ReactNode }) {
   const { t: translate, i18n } = useTranslation()
   const vault = useService(VaultService)
   const listFilter = useService(ListFilterService)
@@ -354,6 +376,8 @@ export const NoteList = observer(function NoteList() {
   const tabs = useService(TabsService)
   const commands = useService(CommandService)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const filterInputRef = useRef<HTMLInputElement>(null)
+  const [filterOpen, setFilterOpen] = useState(false)
   const [scrollTop, setScrollTop] = useState(0)
   const [viewport, setViewport] = useState(0)
   const [rowMenu, setRowMenu] = useState<RowMenuState | null>(null)
@@ -403,8 +427,43 @@ export const NoteList = observer(function NoteList() {
   const win = virtualWindow(notes.length, scrollTop, viewport, NOTE_ROW_OVERSCAN, rowHeight)
   const rows = notes.slice(win.start, win.end)
 
-  // One empty state per way the list can be empty; the most specific wins.
+  // The header icon opens the field. A non-empty query keeps it visible so a
+  // filter cannot hide while it is still applied.
   const filterQuery = listFilter.query.trim()
+  const filterShown = filterOpen || filterQuery !== ''
+
+  useEffect(() => {
+    if (!filterOpen) return
+    filterInputRef.current?.focus()
+  }, [filterOpen])
+
+  function toggleListFilter() {
+    if (filterShown && filterQuery === '') {
+      setFilterOpen(false)
+      return
+    }
+    if (filterOpen) {
+      filterInputRef.current?.focus()
+      return
+    }
+    setFilterOpen(true)
+  }
+
+  function dismissListFilter() {
+    listFilter.clear()
+    setFilterOpen(false)
+  }
+
+  // The header "+": inside a folder scope the note lands in that folder
+  // (FolderService restores the scope after createNote resets it).
+  function createNoteFromList(): Promise<void> {
+    if (vault.listFilter.startsWith(FOLDER_FILTER_PREFIX) && has(FolderService)) {
+      return resolve(FolderService).createNoteInFolder(vault.listFilter.slice(FOLDER_FILTER_PREFIX.length))
+    }
+    return vault.createNote()
+  }
+
+  // One empty state per way the list can be empty; the most specific wins.
   let emptyState: ReactNode = null
   if (notes.length === 0) {
     if (filterQuery !== '') {
@@ -496,12 +555,34 @@ export const NoteList = observer(function NoteList() {
         }
       }}
     >
-      <header className="note-list-head">
+      <header className="note-list-head" data-tauri-drag-region="deep">
+        {leading}
         <h2 className="note-list-title" data-testid="note-list-title">{title}</h2>
         <span className="note-list-count" data-testid="note-list-count">{notes.length}</span>
+        <IconButton
+          className="note-list-new"
+          data-testid="note-list-new"
+          icon={Plus}
+          label={translate('shell.newNote')}
+          size="sm"
+          onClick={() => void createNoteFromList()}
+        />
+        <IconButton
+          className="note-list-filter-toggle"
+          data-testid="list-filter-toggle"
+          icon={Search}
+          label={translate('notes.showFilter')}
+          size="sm"
+          active={filterShown}
+          aria-expanded={filterShown}
+          aria-controls="note-list-filter"
+          onClick={toggleListFilter}
+        />
         <SortMenu />
       </header>
-      <ListFilterInput />
+      {filterShown && (
+        <ListFilterInput inputRef={filterInputRef} onDismiss={dismissListFilter} />
+      )}
       {list.hasMultiSelection && <BatchBar />}
       <div
         className="note-list-items"

@@ -58,23 +58,34 @@ async function queryVector(client: EmbeddingClient, embedding: EmbeddingSettings
   }
 }
 
+export async function searchIndex(
+  index: Pick<NoteIndex, 'search'>,
+  query: string,
+  topK: number,
+  embedding: EmbeddingSettings | null,
+  client: EmbeddingClient,
+  vectorGap: number,
+): Promise<RankedNotes> {
+  if (vectorGap > 0 || !embedding?.apiKey) {
+    const hits = await index.search({ text: query, topK, mode: 'text' })
+    return { mode: 'text', hits, degraded: vectorGap > 0 ? true : false }
+  }
+  const vector = await queryVector(client, embedding, query)
+  if (!vector) {
+    const hits = await index.search({ text: query, topK, mode: 'text' })
+    return { mode: 'text', hits, degraded: true }
+  }
+  const hits = await index.search({ text: query, topK, mode: 'hybrid', vector })
+  return { mode: 'hybrid', hits, degraded: false }
+}
+
 export async function searchNotes(
   index: Pick<NoteIndex, 'search'>,
   query: string,
   embedding: EmbeddingSettings | null,
   client: EmbeddingClient,
 ): Promise<RankedNotes> {
-  if (!embedding?.apiKey) {
-    const hits = await index.search({ text: query, topK: 8, mode: 'text' })
-    return { mode: 'text', hits, degraded: false }
-  }
-  const vector = await queryVector(client, embedding, query)
-  if (!vector) {
-    const hits = await index.search({ text: query, topK: 8, mode: 'text' })
-    return { mode: 'text', hits, degraded: true }
-  }
-  const hits = await index.search({ text: query, topK: 8, mode: 'hybrid', vector })
-  return { mode: 'hybrid', hits, degraded: false }
+  return searchIndex(index, query, 8, embedding, client, 0)
 }
 
 export interface NoteRebuildOptions {
@@ -84,6 +95,8 @@ export interface NoteRebuildOptions {
 }
 
 export interface NoteRebuilder {
+  begin(): void
+  cancel(): void
   upsert(docs: SearchDocument[]): Promise<void>
   remove(ids: string[]): Promise<void>
   rebuild(docs: readonly SearchDocument[], options?: NoteRebuildOptions): Promise<{ aborted: boolean }>
@@ -140,6 +153,15 @@ export function noteRebuilder(sink: IndexSink): NoteRebuilder {
   const live = new Map<string, SearchDocument | null>()
 
   return {
+    begin() {
+      if (rebuilding) return
+      rebuilding = true
+      live.clear()
+    },
+    cancel() {
+      rebuilding = false
+      live.clear()
+    },
     async upsert(docs) {
       if (docs.length === 0) return
       await sink.upsert(docs)
@@ -156,8 +178,9 @@ export function noteRebuilder(sink: IndexSink): NoteRebuilder {
       const shouldContinue = () => options.shouldContinue?.() ?? true
       const batchSize = Math.max(1, Math.floor(options.batchSize ?? REBUILD_BATCH))
       const total = docs.length
+      const already = rebuilding
       rebuilding = true
-      live.clear()
+      if (!already) live.clear()
       try {
         if (!shouldContinue()) return { aborted: true }
         await options.onProgress?.(0, total)

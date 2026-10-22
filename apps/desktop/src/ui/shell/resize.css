@@ -5,7 +5,8 @@
   margin: 0 -1px;
   z-index: 5;
   cursor: col-resize;
-  border-left: 1px solid var(--sd-border);
+  /* No hairline: columns are separated by their tonal step. The accent fill
+     on hover/active/focus is the drag affordance. */
   background: transparent;
   transition: background-color 120ms ease;
 }

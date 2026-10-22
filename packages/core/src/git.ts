@@ -71,6 +71,7 @@ Thumbs.db
 .stride/rename-tx/
 .stride/vane/
 .stride/vane-dim
+.stride/search/
 `
 
 export { gitSurface } from './git-surface.ts'

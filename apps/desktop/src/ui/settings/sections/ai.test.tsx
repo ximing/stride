@@ -1,11 +1,12 @@
 import { has, register, resolve } from '@rabjs/react'
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
+import { emptyTokenHistory, tokenUsageMonth, tokenUsageWeek } from '@stride/core'
 import { MemorySecretsStore } from '@stride/platform'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { resetSecretsStore, setSecretsStore, SETTINGS_STORAGE_KEY, SettingsService } from '../../../services/settings/settings.service'
+import { resetSecretsStore, setSecretsStore, SETTINGS_STORAGE_KEY, SettingsService, TOKEN_USAGE_STORAGE_KEY } from '../../../services/settings/settings.service'
 import { AiSection, hasLlmErrors, llmConfigErrors } from './ai'
 
 const originalScrollIntoView = window.HTMLElement.prototype.scrollIntoView
@@ -37,12 +38,18 @@ function resetSettings() {
   settings.embeddingTestResult = ''
   settings.llmTestResult = ''
   settings.notice = ''
+  settings.tokenHistory = emptyTokenHistory()
+  settings.usageVaultOpen = false
   Object.assign(settings, {
     memoryEmbeddingKey: '',
     memoryLlmKeys: {},
     loaded: false,
     loadTask: null,
+    usageFs: null,
+    usageChain: Promise.resolve(),
+    pendingUsage: [],
   })
+  localStorage.removeItem(TOKEN_USAGE_STORAGE_KEY)
 }
 
 function setInputValue(input: HTMLInputElement, value: string) {
@@ -106,6 +113,7 @@ describe('ai settings section', () => {
     if (originalScrollIntoView) window.HTMLElement.prototype.scrollIntoView = originalScrollIntoView
     else Reflect.deleteProperty(window.HTMLElement.prototype, 'scrollIntoView')
     localStorage.removeItem(SETTINGS_STORAGE_KEY)
+    localStorage.removeItem(TOKEN_USAGE_STORAGE_KEY)
     resetSettings()
     resetSecretsStore()
   })
@@ -331,5 +339,62 @@ describe('ai settings section', () => {
     expect(llmConfigErrors({ ...base, baseUrl: 'notaurl' }).baseUrl).toBeTruthy()
     expect(llmConfigErrors({ ...base, provider: 'custom' }).baseUrl).toBeTruthy()
     expect(hasLlmErrors(llmConfigErrors({ ...base, provider: 'custom', baseUrl: 'https://x.dev' }))).toBe(false)
+  })
+
+  it('asks for a vault before usage can be stored', async () => {
+    await mount()
+    expect(document.querySelector('[data-testid="token-usage"] .settings-ai-meta')?.textContent).toBe('Open a vault to record usage in the repository.')
+    expect(document.querySelector('[data-testid="token-usage-empty"]')).toBeNull()
+  })
+
+  it('shows an empty token usage state before any calls', async () => {
+    resolve(SettingsService).usageVaultOpen = true
+    await mount()
+    expect(document.querySelector('[data-testid="token-usage-empty"]')?.textContent).toBe('No token usage yet.')
+  })
+
+  it('lists token usage by model, week, and month', async () => {
+    const settings = resolve(SettingsService)
+    settings.usageVaultOpen = true
+    settings.tokenHistory = {
+      days: [
+        { date: '2026-09-15', model: 'deepseek-chat', input: 10, output: 5, cacheRead: 0, cacheWrite: 0, total: 15, requests: 1 },
+        { date: '2026-10-22', model: 'gpt-4o-mini', input: 1200, output: 300, cacheRead: 0, cacheWrite: 0, total: 1500, requests: 2 },
+      ],
+    }
+    await mount()
+    const rows = [...document.querySelectorAll('[data-testid="token-usage-row"]')]
+    expect(rows.map((row) => row.getAttribute('data-model'))).toEqual(['gpt-4o-mini', 'deepseek-chat'])
+    expect(document.querySelector('[data-testid="token-usage-summary"]')?.textContent?.replace(/,/g, '')).toContain('1515')
+
+    const weekTab = document.querySelector('[data-testid="token-usage-grain-week"]') as HTMLButtonElement
+    await act(async () => {
+      weekTab.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }))
+      weekTab.click()
+    })
+    const laterWeek = tokenUsageWeek('2026-10-22')
+    const earlierWeek = tokenUsageWeek('2026-09-15')
+    const trend = [...document.querySelectorAll('[data-testid="token-usage-trend"]')]
+    expect(trend.map((row) => row.getAttribute('data-period'))).toEqual([earlierWeek, laterWeek])
+    expect(trend[1]?.getAttribute('aria-pressed')).toBe('true')
+    expect(document.querySelector('[data-testid="token-usage-period"]')?.textContent).toBe(laterWeek)
+    expect([...document.querySelectorAll('[data-testid="token-usage-row"]')].map((row) => row.getAttribute('data-model'))).toEqual(['gpt-4o-mini'])
+
+    await act(async () => {
+      ;(trend[0] as HTMLButtonElement).click()
+    })
+    expect(document.querySelector('[data-testid="token-usage-period"]')?.textContent).toBe(earlierWeek)
+    expect([...document.querySelectorAll('[data-testid="token-usage-row"]')].map((row) => row.getAttribute('data-model'))).toEqual(['deepseek-chat'])
+
+    const monthTab = document.querySelector('[data-testid="token-usage-grain-month"]') as HTMLButtonElement
+    await act(async () => {
+      monthTab.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, button: 0 }))
+      monthTab.click()
+    })
+    expect([...document.querySelectorAll('[data-testid="token-usage-trend"]')].map((row) => row.getAttribute('data-period'))).toEqual([
+      tokenUsageMonth('2026-09-15'),
+      tokenUsageMonth('2026-10-22'),
+    ])
+    expect(document.querySelector('[data-testid="token-usage-period"]')?.textContent).toBe('2026-10')
   })
 })

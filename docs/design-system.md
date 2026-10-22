@@ -8,6 +8,7 @@ The working metaphor is the writing desk (案头纸墨): the note page is the pr
 
 - **Content before chrome.** Use spacing, alignment, and subtle surface changes to create hierarchy. Do not wrap every region in a card.
 - **Three planes, no boxes.** Plane 0 is the workbench (`--sd-bg`: rails, strips, tool rows); plane 1 is paper (`--sd-surface`: reading/writing surfaces); plane 2 is floating (`--sd-bg-elevated`: transient overlays and raised thumbs only). Controls never get their own white boxes — inputs are carved into the workbench with `--sd-inset` (a 4–6% foreground tint), a transparent border, and on focus they rise to paper with an accent ring.
+- **Tonal steps, not hairlines.** Neighboring planes are separated by their luminance step alone. No 1px rules between columns, under header bands, atop the status bar, or beneath the editor toolbar — whitespace and plane changes do the work. Borders are reserved for floating layers (menus, dialogs, toasts), in-document structure (tables, callouts, code blocks), and control outlines.
 - **One accent, used semantically.** Moss green is ink: it marks the single primary action per view, focus rings, wikilinks, and active icon marks. It is never decorative, never large fills, never green text on a green tint.
 - **Two voices.** Avenir Next/system sans for UI; Iowan Old Style/system serif for note titles, note body, and the Stride wordmark — the brand reads as a publication name.
 - **Predictable interaction.** Every control has default, hover, active/selected, focus-visible, disabled, and (where relevant) destructive states.
@@ -18,12 +19,13 @@ The working metaphor is the writing desk (案头纸墨): the note page is the pr
 
 | Token role | Light | Dark | Use |
 | --- | --- | --- | --- |
-| Canvas | `#F3F4F1` | `#171A18` | App background and navigation (plane 0) |
-| Surface | `#FCFDFB` | `#202421` | Editor, paper, focused inputs (plane 1) |
-| Elevated | `#FFFFFF` | `#272C28` | Menus, dialogs, segmented thumbs (plane 2) |
+| Canvas | `#EBEDE6` | `#171A18` | App background and navigation rail (plane 0) |
+| Nav list | `#F0F1EA` | `#1C201D` | Note-list column: half step up from canvas so the two nav columns separate without a hairline |
+| Surface | `#F4F5EF` | `#202421` | Editor, paper, focused inputs (plane 1) |
+| Elevated | `#FAFBF7` | `#272C28` | Menus, dialogs, segmented thumbs (plane 2) |
 | Text | `#252A26` | `#EDF0EB` | Primary copy |
 | Muted | `#697169` | `#9CA59C` | Secondary copy and inactive icons |
-| Border | `#DDE1DA` | `#353C36` | Separators and hairlines |
+| Border | `#D9DDD3` | `#353C36` | Floating-layer edges and in-document structure |
 | Accent | `#356854` | `#94BFA7` | Primary action, focus, selection |
 
 Use semantic tokens (`--sd-bg`, `--sd-bg-elevated`, `--sd-fg`, `--sd-muted`, `--sd-border`, `--sd-accent`) rather than literal values. `--sd-inset` / `--sd-inset-hover` are the resting/hover fills for embedded controls (inputs, segmented tracks). Keep syntax, diff, mark, and note-type colors theme-aware.
@@ -72,10 +74,10 @@ Unknown trigger props such as `data-testid`, `aria-label`, `id`, and `className`
 
 Use the Radix-backed wrappers from `src/ui/primitives/tabs.tsx`: `Tabs`, `TabsList`, `TabsTrigger`, and `TabsContent`. Two idioms, chosen by metaphor:
 
-- **Panel-switch tabs** (the default `sd-tabs*` styling): a quiet text row over a hairline, the active item marked by a crisp 2px accent underline and primary text. No pills, no inset shadow edges.
+- **Panel-switch tabs** (the default `sd-tabs*` styling): a quiet text row, the active item marked by a crisp 2px accent underline and primary text. No pills, no inset shadow edges, no hairline under the row.
 - **Value pickers** (chat session tabs, agent mode): the track-and-thumb segmented idiom — an `--sd-inset` track with 2px padding, the selected thumb raised to `--sd-bg-elevated` with a crisp 1px ambient shadow and primary text. Inactive items are muted text only.
 
-Note editor tabs keep their specialized connected-to-page shape (active tab shares the editor paper surface and overlaps the strip hairline) but use the same size, hover, selected, and focus tokens.
+Note editor tabs are quiet pills centered in the strip: the active pill takes the editor paper surface, so it reads as the page's label without corner notches or a strip hairline. Same size, hover, selected, and focus tokens as other tabs.
 
 ### Dialog, Menu, Toast, Tooltip
 

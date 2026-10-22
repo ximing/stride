@@ -8,8 +8,7 @@
   display: flex;
   overflow-x: auto;
   flex: none;
-  margin: -1.4rem -1.8rem 1rem;
-  border-bottom: 1px solid var(--sd-border);
+  margin: 0;
   scrollbar-width: thin;
 }
 
@@ -18,33 +17,24 @@
   gap: 0.75rem;
   flex-wrap: wrap;
   max-width: var(--sd-note-max-width);
+  margin-bottom: 1.15rem;
 }
 
 .note-title {
+  /* The title is document text, not a form field: no inner padding, and the
+     global naked-input hover/focus fills must never paint behind it. */
+  padding: 0;
   border: none;
   background: transparent;
   font-size: var(--sd-text-note-title);
-  line-height: 1.15;
+  line-height: 1.2;
   letter-spacing: -0.015em;
 }
 
+.note-title:hover:not(:disabled),
 .note-title:focus {
-  border-bottom-color: transparent;
-}
-
-.rename-toggle {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  color: var(--sd-muted);
-  font-size: 0.78rem;
-  white-space: nowrap;
-}
-
-.rename-toggle input {
-  width: auto;
-  margin: 0;
-  accent-color: var(--sd-accent);
+  border-color: transparent;
+  background: transparent;
 }
 
 .editor {
@@ -171,38 +161,37 @@
 }
 
 .wikilink.is-unresolved {
-  color: var(--sd-danger);
-  border-bottom: 1px dashed var(--sd-danger);
+  color: var(--sd-warning);
+  border-bottom: 1px dashed var(--sd-warning);
 }
 
 /* ---------- editor and inspector tabs ---------- */
 
-/* Column header band contract: the tab strip, note-list head, rail head and
-   panel head all render a 44px band with a bottom hairline, so the four
-   columns share one horizontal line under the topbar. */
+/* Column header band: sidebar, note list, tab strip, and panel head share
+   one 44px line across the top of the workspace. */
 .tab-strip {
-  align-items: flex-end;
+  align-items: center;
   gap: 2px;
   height: 44px;
   min-height: 44px;
+  margin: 0;
   padding: 0 8px;
   background: var(--sd-bg);
+  user-select: none;
 }
 
 .tab {
   display: flex;
   align-items: center;
-  height: 35px;
+  height: 32px;
   min-width: 96px;
   max-width: 192px;
   flex: 0 1 192px;
   overflow: hidden;
-  /* Overlap the strip's bottom hairline; the active tab covers it with its
-     own background so it reads as part of the editor page below. */
-  margin-bottom: -1px;
+  /* Quiet pill, centered in the strip: no connected-slab corners, so no
+     notch artifacts where the strip meets neighboring columns. */
   border: 1px solid transparent;
-  border-bottom: none;
-  border-radius: var(--sd-radius) var(--sd-radius) 0 0;
+  border-radius: var(--sd-radius);
   box-shadow: none;
   color: var(--sd-muted);
   font-size: 13px;
@@ -215,7 +204,9 @@
 
 .tab[aria-selected="true"],
 .tab[aria-selected="true"]:hover {
-  border-color: var(--sd-border);
+  /* No outline: the surface background alone merges the tab into the
+     document below, like a folder tab. */
+  border-color: transparent;
   background: var(--sd-surface);
   box-shadow: none;
   color: var(--sd-fg);
@@ -235,8 +226,13 @@
   font-size: 13px;
 }
 
-.tab-main:hover:not(:disabled) {
+.tab-main:hover:not(:disabled),
+.tab-main:active:not(:disabled) {
   border-color: transparent;
+  /* The tab paints the hover. This button must stay clear, or only the title
+     column shifts and the close column keeps the tab color. */
+  background: transparent;
+  box-shadow: none;
 }
 
 .tab-title {
@@ -256,6 +252,8 @@
   margin-right: 3px;
   padding: 0;
   border: 1px solid transparent;
+  background: transparent;
+  box-shadow: none;
   color: var(--sd-muted);
   opacity: 0;
 }
@@ -272,9 +270,11 @@
   opacity: 1;
 }
 
-.tab-close.sd-icon-button:hover:not(:disabled) {
+.tab-close.sd-icon-button:hover:not(:disabled),
+.tab-close.sd-icon-button:active:not(:disabled) {
   border-color: transparent;
-  background: color-mix(in srgb, var(--sd-danger) 10%, transparent);
+  background: transparent;
+  box-shadow: none;
   color: var(--sd-danger);
 }
 
@@ -283,6 +283,7 @@
   min-height: 44px;
   gap: 4px;
   padding: 6px 8px;
+  user-select: none;
 }
 
 .panel-tabs {

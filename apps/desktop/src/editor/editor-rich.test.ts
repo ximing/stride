@@ -198,10 +198,11 @@ describe('rich text aligned with inwit', () => {
         new MouseEvent('mousedown', { bubbles: true, cancelable: true }),
       )
     })
+    expect(document.querySelectorAll('.editor-color-pop .editor-color-swatch')).toHaveLength(70)
     await act(async () => {
-      ;(document.querySelector('[aria-label="Vermilion"]') as HTMLButtonElement).click()
+      ;(document.querySelector('[aria-label="Red 1"]') as HTMLButtonElement).click()
     })
-    expect(editor.getAttributes('textStyle').color).toBe('#b3402a')
+    expect(editor.getAttributes('textStyle').color).toBe('#ff4d4f')
 
     await act(async () => {
       window.dispatchEvent(new CustomEvent('stride-editor-find-open', { detail: { open: true } }))

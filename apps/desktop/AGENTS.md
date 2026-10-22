@@ -20,25 +20,25 @@
 
 | 目录 | 职责 |
 | --- | --- |
-| `vault/` | `VaultService`、`FolderService`。Vault 的打开、笔记正文、属性与索引是同一份响应式状态，`VaultService` 保持一个类。 |
+| `vault/` | `VaultService`、`FolderService`。Vault 的打开、笔记正文、属性与索引是同一份响应式状态，`VaultService` 保持一个类。搜索会话、开库管线、属性草稿、id 重映射是同目录 collaborator 文件，写回同一个实例。 |
 | `notes/` | 笔记列表与编辑器标签页。 |
 | `layout/` | 栏宽、折叠、舞台缩放。 |
 | `views/` | 保存的视图。 |
 | `search/` | 列表筛选、快速打开、搜索面板。 |
 | `commands/` | 命令绑定、命令面板状态、右键菜单模型。 |
-| `git/` | `GitService`。 |
+| `git/` | `GitService`。`git-auto.ts` 是 autoSync / autoGit 的 collaborator，不是第二个 Service。 |
 | `chat/` | 对话回合、vault 宿主、`ChatService`。 |
 | `settings/` | 设置读写与设置页状态。 |
 | `update/` | 更新检查与安装。 |
 | `appearance/` | 主题与笔记外观。 |
-| `platform/` | 深链、浮层互斥这类宿主杂项。 |
+| `platform/` | 深链、浮层互斥、多窗口与最近项目菜单、`runtime.ts` 宿主探测。 |
 
 ## `src/ui/`
 
 | 目录 | 职责 |
 | --- | --- |
 | `primitives/` | Button、Input、Select、Tabs、Modal、Menu、Toast、Tooltip、EmptyState 等设计系统原语。不引用具体业务面板，不引用 Service。 |
-| `shell/` | 顶栏、侧栏、状态栏、标签条、缩放手柄、更新条。 |
+| `shell/` | 侧栏、窗口按钮、状态栏、标签条、缩放手柄、更新条。 |
 | `note-list/`、`folders/` | 中间列表与文件夹树。 |
 | `panels/` | 右栏宿主、属性、大纲。 |
 | `git/`、`chat/` | 右栏里的 Git 与对话面板。 |

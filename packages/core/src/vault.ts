@@ -37,17 +37,29 @@ export async function isDedicatedVault(fs: FileSystemBackend): Promise<boolean> 
   }
 }
 
+export const VAULT_GITIGNORE_ENTRIES = [
+  '.stride/rename-tx/',
+  '.stride/vane/',
+  '.stride/vane-dim',
+  '.stride/search/',
+] as const
+
+export async function ensureGitignoreEntries(fs: FileSystemBackend, entries: readonly string[]): Promise<void> {
+  const ignore = await fs.stat('.gitignore')
+  const current = ignore ? await fs.readText('.gitignore') : ''
+  const lines = current.split('\n')
+  const missing = entries.filter((entry) => !lines.includes(entry))
+  if (missing.length === 0) return
+  const base = current.replace(/\n$/, '')
+  await fs.writeText('.gitignore', `${base ? `${base}\n` : ''}${missing.join('\n')}\n`)
+}
+
 export async function markDedicatedVault(fs: FileSystemBackend): Promise<void> {
   await fs.writeText(
     VAULT_MARKER,
     `${JSON.stringify({ kind: 'stride-vault', version: 1 }, null, 2)}\n`,
   )
-  const entry = '.stride/vane/'
-  const ignore = await fs.stat('.gitignore')
-  const current = ignore ? await fs.readText('.gitignore') : ''
-  if (!current.split('\n').includes(entry)) {
-    await fs.writeText('.gitignore', `${current.trim() ? `${current.replace(/\n$/, '')}\n` : ''}${entry}\n`)
-  }
+  await ensureGitignoreEntries(fs, VAULT_GITIGNORE_ENTRIES)
 }
 
 export async function listNoteFiles(fs: FileSystemBackend): Promise<string[]> {
@@ -124,10 +136,12 @@ export async function openVault(fs: FileSystemBackend, homeDir: string): Promise
   }
   const broad = isBroadPersonalRoot(fs.rootLabel, homeDir)
   if (!broad && !(await isDedicatedVault(fs))) await markDedicatedVault(fs)
+  const dedicated = await isDedicatedVault(fs)
+  if (dedicated) await ensureGitignoreEntries(fs, VAULT_GITIGNORE_ENTRIES)
   return {
     path: fs.rootLabel,
     broad,
-    dedicated: await isDedicatedVault(fs),
+    dedicated,
     notes: await loadNotes(fs),
   }
 }

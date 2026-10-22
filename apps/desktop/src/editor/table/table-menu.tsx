@@ -5,6 +5,7 @@ import { Check } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
+import { colorLabel } from '../colors';
 import {
   TABLE_CELL_COLORS,
   TABLE_COMMAND_KEY,
@@ -204,9 +205,9 @@ export function TableContextMenu({ editor }: { editor: Editor }) {
           <button
             key={color.value}
             type="button"
-            className={`editor-color-swatch${state.background === color.value ? ' is-on' : ''}`}
+            className={`editor-color-swatch is-square${state.background === color.value ? ' is-on' : ''}`}
             style={{ background: color.value }}
-            aria-label={t(`editor.color.${color.id}`)}
+            aria-label={colorLabel(t, color)}
             aria-pressed={state.background === color.value}
             onMouseDown={(event) => event.preventDefault()}
             onClick={() => {

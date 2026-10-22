@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { MemoryFileSystem, MemorySearchBackend, MemorySecretsStore } from '@stride/platform'
 import { EmbeddingClient } from './embeddings.ts'
-import { noteIndex, noteRebuilder, searchNotes } from './search.ts'
+import { noteIndex, noteRebuilder, searchIndex, searchNotes } from './search.ts'
 import {
   defaultLlmConfig,
   defaultSettings,
@@ -241,5 +241,62 @@ describe('search notes', () => {
     const removed = await backend.search({ text: 'oldtoken2', topK: 12, mode: 'text' })
     expect(removed.some((hit) => hit.id === 'n2')).toBe(false)
     await backend.close()
+  })
+
+  it('keeps an upsert that landed after begin and before rebuild', async () => {
+    const backend = new MemorySearchBackend()
+    const session = noteRebuilder(backend)
+    session.begin()
+    await session.upsert([{ id: 'n1', text: 'live-before freshtoken' }])
+    const result = await session.rebuild([
+      { id: 'n1', text: 'snapshot-old oldtoken' },
+      { id: 'n2', text: 'snapshot-kept kepttoken' },
+    ], { batchSize: 1 })
+    expect(result.aborted).toBe(false)
+    const fresh = await backend.search({ text: 'freshtoken', topK: 5, mode: 'text' })
+    expect(fresh.map((hit) => hit.id)).toEqual(['n1'])
+    const stale = await backend.search({ text: 'oldtoken', topK: 5, mode: 'text' })
+    expect(stale.some((hit) => hit.id === 'n1')).toBe(false)
+    const kept = await backend.search({ text: 'kepttoken', topK: 5, mode: 'text' })
+    expect(kept.map((hit) => hit.id)).toEqual(['n2'])
+    await backend.close()
+  })
+
+  it('cancel drops the live window opened by begin', async () => {
+    const backend = new MemorySearchBackend()
+    const session = noteRebuilder(backend)
+    session.begin()
+    await session.upsert([{ id: 'n1', text: 'during-prepare' }])
+    session.cancel()
+    const result = await session.rebuild([{ id: 'n1', text: 'snapshot-body' }], { batchSize: 1 })
+    expect(result.aborted).toBe(false)
+    const snap = await backend.search({ text: 'snapshot-body', topK: 5, mode: 'text' })
+    expect(snap.map((hit) => hit.id)).toEqual(['n1'])
+    await backend.close()
+  })
+
+  it('skips the query embedding when the document vector gap is open', async () => {
+    const backend = new MemorySearchBackend()
+    const index = noteIndex(backend, 4)
+    await index.upsert([{ id: 'alpha', text: 'alpha xylophonequartz' }])
+    const client = new EmbeddingClient(async () => {
+      throw new Error('gap search must not embed')
+    })
+    const embedding = { endpoint: 'http://127.0.0.1/v1', model: 'fixture-embed', apiKey: 'sk-test', dim: 4 }
+    const ranked = await searchIndex(index, 'xylophonequartz', 30, embedding, client, 2)
+    expect(client.calls).toBe(0)
+    expect(ranked.mode).toBe('text')
+    expect(ranked.degraded).toBe(true)
+    expect(index.lastQuery?.mode).toBe('text')
+    expect(index.lastQuery?.topK).toBe(30)
+    const hybridClient = new EmbeddingClient(async () => new Response(JSON.stringify({
+      data: [{ index: 0, embedding: [1, 0, 0, 0] }],
+    }), { status: 200 }))
+    const wrapped = await searchNotes(index, 'xylophonequartz', embedding, hybridClient)
+    expect(hybridClient.calls).toBe(1)
+    expect(wrapped.mode).toBe('hybrid')
+    expect(wrapped.degraded).toBe(false)
+    expect(index.lastQuery?.topK).toBe(8)
+    await index.close()
   })
 })

@@ -314,14 +314,15 @@ describe('buildFolderNoteMenu', () => {
     const calls: string[] = []
     const actions: FolderNoteMenuActions = {
       open: (id) => calls.push(`open:${id}`),
+      rename: (id) => calls.push(`rename:${id}`),
       copyWikilink: (id) => calls.push(`copy:${id}`),
       archive: (id) => calls.push(`archive:${id}`),
       deleteNote: (id) => calls.push(`delete:${id}`),
     }
     const entries = buildFolderNoteMenu({ noteId: 'n1', clipboard: true }, actions)
-    expect(itemIds(entries)).toEqual(['open', 'copy-wikilink', '|', 'archive', 'delete'])
-    for (const id of ['open', 'copy-wikilink', 'archive', 'delete']) item(entries, id).onSelect?.()
-    expect(calls).toEqual(['open:n1', 'copy:n1', 'archive:n1', 'delete:n1'])
+    expect(itemIds(entries)).toEqual(['open', 'rename', '|', 'copy-wikilink', '|', 'archive', 'delete'])
+    for (const id of ['open', 'rename', 'copy-wikilink', 'archive', 'delete']) item(entries, id).onSelect?.()
+    expect(calls).toEqual(['open:n1', 'rename:n1', 'copy:n1', 'archive:n1', 'delete:n1'])
 
     const noClipboard = buildFolderNoteMenu({ noteId: 'n1', clipboard: false }, actions)
     expect(item(noClipboard, 'copy-wikilink').disabled).toBe(true)

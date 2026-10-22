@@ -43,9 +43,9 @@ export interface DeepLinkApi {
   onOpenUrl(handler: (urls: string[]) => void): Promise<() => void>
 }
 
-export function isTauriRuntime(): boolean {
-  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
-}
+import { isTauriRuntime } from './runtime'
+
+export { isTauriRuntime }
 
 export interface DeepLinkListenerOptions {
   /** Injectable for tests. Returning null disables the listener. */

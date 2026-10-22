@@ -1,18 +1,28 @@
 import { has, Service } from '@rabjs/react'
 import {
   EmbeddingClient,
+  canonicalEmbeddingEndpoint,
   catalogDefaultModel,
   effectiveBaseUrl,
   llmProxyBaseUrl,
+  addTokenUsageDay,
+  emptyTokenHistory,
+  emptyTokenUsage,
+  localDateKey,
   maskSecret,
+  parseTokenUsage,
   readSettings,
+  readTokenUsageHistory,
   testLlmConnection,
   writeSettings,
+  writeTokenUsageHistory,
+  type TokenUsageHistory,
+  type TokenUsageSample,
   type AppSettings,
   type LlmConfig,
   type PublicLlmConfig,
 } from '@stride/core'
-import { MemoryFileSystem, type SecretsStore } from '@stride/platform'
+import { MemoryFileSystem, type FileSystemBackend, type SecretsStore } from '@stride/platform'
 import { webSecretsStore } from '../../../../../packages/secrets-web/src/index.ts'
 import { VaultService } from '../vault/vault.service'
 
@@ -47,6 +57,7 @@ const emptySettings = (): PublicSettings => ({
 })
 
 export const SETTINGS_STORAGE_KEY = 'stride:settings'
+export const TOKEN_USAGE_STORAGE_KEY = 'stride:token-usage'
 
 const SETTINGS_FILE = 'settings.json'
 
@@ -151,6 +162,12 @@ export class SettingsService extends Service {
   embeddingTestResult = ''
   llmTestResult = ''
   notice = ''
+  tokenHistory: TokenUsageHistory = emptyTokenHistory()
+  usageVaultOpen = false
+  private usageFs: FileSystemBackend | null = null
+  private usageChain: Promise<void> = Promise.resolve()
+  private usageEpoch = 0
+  private pendingUsage: Array<{ sample: TokenUsageSample; date: string }> = []
   private memoryEmbeddingKey = ''
   private memoryLlmKeys: Record<string, string> = {}
   private loadTask: Promise<void> | null = null
@@ -263,7 +280,7 @@ export class SettingsService extends Service {
 
   embeddingRuntime(): EmbeddingRuntime {
     const dim = parsePositiveInt(this.embeddingDimText)
-    const endpoint = this.form.embedding.endpoint.trim()
+    const endpoint = canonicalEmbeddingEndpoint(this.form.embedding.endpoint)
     const model = this.form.embedding.model.trim()
     const apiKey = this.memoryEmbeddingKey
     const intended = endpoint !== '' && model !== '' && dim !== null
@@ -271,8 +288,78 @@ export class SettingsService extends Service {
     return { endpoint, model, apiKey, dim: dim ?? 0, intended, active }
   }
 
-  llmRuntime(): { provider: string; model: string; baseUrl: string; apiKey: string } | null {
-    const config = this.form.llmConfigs.find((item) => item.isDefault)
+  /** Add one model call on today's local date and write it into the open vault. */
+  recordTokenUsage(sample: TokenUsageSample | null) {
+    if (!sample) return
+    const date = localDateKey()
+    const next = addTokenUsageDay(this.tokenHistory, sample, date)
+    if (next === this.tokenHistory) return
+    this.tokenHistory = next
+    const fs = this.usageFs
+    if (!fs) {
+      this.pendingUsage.push({ sample, date })
+      return
+    }
+    const snapshot = next
+    this.usageChain = this.usageChain.then(async () => {
+      await writeTokenUsageHistory(fs, snapshot)
+    }).catch(() => undefined)
+  }
+
+  /** Load this vault's history. A null backend clears it when the chooser is showing. */
+  bindUsageVault(fs: FileSystemBackend | null): Promise<void> {
+    const epoch = ++this.usageEpoch
+    this.usageVaultOpen = fs !== null
+    this.usageChain = this.usageChain.then(async () => {
+      if (this.usageEpoch !== epoch) return
+      await this.activateUsageVault(fs)
+    }).catch(() => undefined)
+    return this.usageChain
+  }
+
+  whenTokenUsageSettled(): Promise<void> {
+    return this.usageChain
+  }
+
+  private async activateUsageVault(fs: FileSystemBackend | null) {
+    if (!fs) {
+      this.usageFs = null
+      this.usageVaultOpen = false
+      this.pendingUsage = []
+      this.tokenHistory = emptyTokenHistory()
+      return
+    }
+    const carried = this.pendingUsage.splice(0)
+    let history = await readTokenUsageHistory(fs)
+    for (const item of carried) history = addTokenUsageDay(history, item.sample, item.date)
+    const legacy = this.readLegacyUsage()
+    const today = localDateKey()
+    for (const row of legacy.models) history = addTokenUsageDay(history, row, today)
+    this.usageFs = fs
+    this.usageVaultOpen = true
+    this.tokenHistory = history
+    if (carried.length === 0 && legacy.models.length === 0) return
+    try {
+      await writeTokenUsageHistory(fs, history)
+      if (legacy.models.length > 0 && typeof localStorage !== 'undefined') {
+        localStorage.removeItem(TOKEN_USAGE_STORAGE_KEY)
+      }
+    } catch (error) {
+      this.pendingUsage = [...carried, ...this.pendingUsage]
+      throw error
+    }
+  }
+
+  private readLegacyUsage() {
+    if (typeof localStorage === 'undefined') return emptyTokenUsage()
+    return parseTokenUsage(localStorage.getItem(TOKEN_USAGE_STORAGE_KEY))
+  }
+
+  /** Runtime for one saved config. A missing id uses the default config. */
+  llmRuntime(configId?: string): { provider: string; model: string; baseUrl: string; apiKey: string } | null {
+    const configs = this.form.llmConfigs
+    const config = (configId ? configs.find((item) => item.id === configId) : undefined)
+      ?? configs.find((item) => item.isDefault)
     if (!config) return null
     return {
       provider: config.provider,

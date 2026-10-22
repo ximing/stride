@@ -166,6 +166,7 @@ describe('VaultService', () => {
     expect(await vault.fs!.stat(`${id}.stride.json`)).not.toBeNull()
     expect(await vault.fs!.stat('field-notes.stride.json')).toBeNull()
 
+    await (vault as unknown as { saveTask: Promise<void> }).saveTask
     vault.searchQuery = 'zephyrword'
     await vault.runSearch()
     expect(vault.error).toBe('')
@@ -208,6 +209,7 @@ describe('VaultService', () => {
       content: [{ type: 'paragraph', content: [{ type: 'text', text: 'keep-me' }] }],
     })
     await vi.advanceTimersByTimeAsync(350)
+    await (vault as unknown as { saveTask: Promise<void> }).saveTask
 
     expect(vault.saveStatus).toBe('error')
     expect(plainText(vault.active!.doc)).toContain('keep-me')
@@ -220,6 +222,7 @@ describe('VaultService', () => {
     expect(onDisk).not.toContain('keep-me')
 
     await vi.advanceTimersByTimeAsync(1000)
+    await (vault as unknown as { saveTask: Promise<void> }).saveTask
 
     expect(vault.saveStatus).toBe('saved')
     expect(vault.error).toBe('')
@@ -605,14 +608,15 @@ describe('VaultService', () => {
 
     await act(async () => {
       host.querySelector<HTMLButtonElement>('[data-testid="open-vault"]')!.click()
-      await new Promise((resolvePromise) => setTimeout(resolvePromise, 0))
+    })
+    await vi.waitFor(() => {
+      expect(vault.phase, vault.error).toBe('ready')
     })
     expect(picker).not.toHaveBeenCalled()
-    expect(vault.phase).toBe('ready')
     expect(host.querySelector('[data-testid="vault-search"]')).not.toBeNull()
-    expect(host.querySelector('[data-testid="run-search"]')).not.toBeNull()
-    expect(host.querySelector('[data-testid="new-note"]')).not.toBeNull()
-    expect(host.querySelector('[data-testid="search-mode"]')).not.toBeNull()
+    expect(host.querySelector('[data-testid="run-search"]')).toBeNull()
+    expect(host.querySelector('.topbar')).toBeNull()
+    expect(host.querySelector('[data-testid="new-note"]')).toBeNull()
     expect(host.querySelector('[data-testid="search-degraded"]')).toBeNull()
     await act(async () => {
       vault.searchDegraded = true
@@ -622,6 +626,10 @@ describe('VaultService', () => {
       vault.searchDegraded = false
     })
     expect(host.querySelector('[data-testid="search-degraded"]')).toBeNull()
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('[data-testid="vault-search"]')!.click()
+    })
+    expect(host.querySelector('[data-testid="search-panel"]')).not.toBeNull()
     expect(host.querySelector('[data-testid="index-status"]')?.textContent).toBe('Index ready')
     await act(async () => {
       vault.indexPhase = 'rebuilding'
@@ -666,6 +674,45 @@ describe('VaultService', () => {
       lastOpened: '2026-02-01T00:00:00.000Z',
     })
     expect(JSON.parse(localStorage.getItem(VAULT_REGISTRY_KEY) ?? 'null')).toEqual(vault.vaults)
+  })
+
+  it('merges a vault written by another window ahead of the local upsert', () => {
+    window.history.replaceState(null, '', '/')
+    localStorage.setItem(VAULT_REGISTRY_KEY, JSON.stringify([
+      { id: 'remote', label: '/Users/remote', color: '', icon: '', lastOpened: '2026-01-01T00:00:00.000Z' },
+    ]))
+    register(VaultService)
+    const vault = resolve(VaultService)
+    vault.upsertVault({ id: 'local', label: '/Users/local', color: '', icon: '', lastOpened: '2026-02-01T00:00:00.000Z' })
+    expect(vault.vaults.map((entry) => entry.id)).toEqual(['remote', 'local'])
+  })
+
+  it('keeps color and the open vault when the recent list is replaced', () => {
+    window.history.replaceState(null, '', '/')
+    localStorage.removeItem(VAULT_REGISTRY_KEY)
+    register(VaultService)
+    const vault = resolve(VaultService)
+    vault.upsertVault({
+      id: 'open',
+      label: '/Users/notes',
+      color: '#112233',
+      icon: 'book',
+      lastOpened: '2026-04-01T00:00:00.000Z',
+    })
+    vault.activeVaultId = 'open'
+    vault.replaceRecentProjects([
+      { id: 'other', path: '/Users/other', title: 'other', lastOpened: '2026-05-01T00:00:00.000Z' },
+      { id: 'open', path: '/Users/notes', title: 'notes', lastOpened: '2026-03-01T00:00:00.000Z' },
+    ])
+    expect(vault.vaults.find((entry) => entry.id === 'open')).toMatchObject({
+      color: '#112233',
+      icon: 'book',
+      lastOpened: '2026-04-01T00:00:00.000Z',
+    })
+    vault.replaceRecentProjects([
+      { id: 'other', path: '/Users/other', title: 'other', lastOpened: '2026-05-01T00:00:00.000Z' },
+    ])
+    expect(vault.vaults.map((entry) => entry.id)).toEqual(['other', 'open'])
   })
 
   it('records two memory vaults and updates one entry when the same root opens again', async () => {
@@ -787,7 +834,8 @@ describe('VaultService', () => {
     expect(vault.searchDegraded).toBe(false)
 
     fetchMock.mockImplementation(async () => new Response('no', { status: 503 }))
-    vault.searchQuery = 'zephyrword'
+    // The previous query vector is cached. A different query still matches the note and misses the cache.
+    vault.searchQuery = 'field'
     await vault.runSearch()
     expect(vault.error).toBe('')
     expect(vault.searchMode).toBe('text')
@@ -819,7 +867,8 @@ describe('VaultService', () => {
       await new Promise((resolvePromise) => setTimeout(resolvePromise, 0))
     }
     expect(vault.indexPhase).toBe('ready')
-    expect(vault.searchDegraded).toBe(true)
+    // The first successful embed is already in the disk cache, so this 500 does not open a document gap.
+    expect(vault.searchDegraded).toBe(false)
     expect((vault as unknown as { index: NoteIndex }).index.dim).toBe(4)
     vault.searchQuery = 'zephyrword'
     await vault.runSearch()
@@ -937,7 +986,7 @@ describe('VaultService', () => {
     expect(vault.vaults).toHaveLength(2)
   })
 
-  it('lists recorded memory vaults in the header switcher', async () => {
+  it('lists recorded memory vaults in the status bar switcher', async () => {
     useMemoryFixture()
     const picker = vi.fn()
     vi.stubGlobal('showDirectoryPicker', picker)
@@ -973,7 +1022,9 @@ describe('VaultService', () => {
     const firstId = vault.vaults[0]?.id ?? ''
     await act(async () => {
       host.querySelector<HTMLButtonElement>(`[data-vault-id="${firstId}"]`)!.click()
-      await new Promise((resolvePromise) => setTimeout(resolvePromise, 0))
+    })
+    await vi.waitFor(() => {
+      expect(vault.activeVaultId).toBe(firstId)
     })
     expect(picker).not.toHaveBeenCalled()
     expect(vault.activeVaultId).toBe(firstId)
@@ -982,6 +1033,119 @@ describe('VaultService', () => {
     expect(host.querySelector('[data-testid="vault-switcher"]')?.textContent).toBe('memory-vault')
     root.unmount()
     host.remove()
+    vault.cancelPending()
+  })
+
+  it('opens the chooser from the vault switcher add action', async () => {
+    useMemoryFixture()
+    vi.stubGlobal('showDirectoryPicker', vi.fn())
+    register(VaultService)
+    register(FolderService)
+    register(GitService)
+    register(SettingsService)
+    register(ChatService)
+    register(UpdateService)
+    const vault = resolve(VaultService)
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    await act(async () => {
+      root.render(<App />)
+    })
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('[data-testid="open-vault"]')!.click()
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, 0))
+    })
+    await act(async () => {
+      await vault.createNewVault()
+    })
+    expect(vault.phase).toBe('ready')
+
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('[data-testid="vault-switcher"]')!.click()
+    })
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>('[data-testid="vault-add"]')!.click()
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, 0))
+    })
+    expect(vault.phase).toBe('chooser')
+    expect(host.querySelector('.chooser')).not.toBeNull()
+    expect(host.querySelector('[data-testid="new-vault"]')).not.toBeNull()
+    expect(host.querySelector('[data-testid="vault-switcher"]')).toBeNull()
+    root.unmount()
+    host.remove()
+    vault.cancelPending()
+  })
+
+  it('lists previously opened vaults on the chooser, newest first', async () => {
+    useMemoryFixture()
+    register(VaultService)
+    register(FolderService)
+    register(GitService)
+    register(SettingsService)
+    register(ChatService)
+    register(UpdateService)
+    const vault = resolve(VaultService)
+    vault.phase = 'chooser'
+    vault.vaults = []
+    vault.upsertVault({ id: 'older', label: '/Users/ximing/older-notes', color: '', icon: '', lastOpened: '2026-01-01T00:00:00.000Z' })
+    vault.upsertVault({ id: 'newer', label: 'Field notes', color: '', icon: '', lastOpened: '2026-06-01T00:00:00.000Z' })
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    await act(async () => {
+      root.render(<App />)
+    })
+    const rows = [...host.querySelectorAll<HTMLButtonElement>('[data-testid="recent-vault"]')]
+    expect(rows.map((node) => node.dataset.vaultId)).toEqual(['newer', 'older'])
+    expect(rows[0]?.textContent).toContain('Field notes')
+    expect(rows[1]?.querySelector('.chooser-recent-label')?.textContent).toBe('older-notes')
+    expect(rows[1]?.querySelector('.chooser-recent-path')?.textContent).toBe('/Users/ximing/older-notes')
+    expect(host.querySelector('[data-testid="new-vault"]')).not.toBeNull()
+    root.unmount()
+    host.remove()
+    vault.vaults = []
+    vault.cancelPending()
+  })
+
+  it('reopens a recent vault from the chooser', async () => {
+    useMemoryFixture()
+    vi.stubGlobal('showDirectoryPicker', vi.fn())
+    register(VaultService)
+    register(FolderService)
+    register(GitService)
+    register(SettingsService)
+    register(ChatService)
+    register(UpdateService)
+    const vault = resolve(VaultService)
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    await act(async () => {
+      root.render(<App />)
+    })
+    await act(async () => {
+      await vault.createNewVault()
+    })
+    const openedId = vault.activeVaultId
+    expect(openedId).not.toBe('')
+    await act(async () => {
+      await vault.showChooser()
+    })
+    expect(host.querySelector('.chooser')).not.toBeNull()
+    await act(async () => {
+      host.querySelector<HTMLButtonElement>(`[data-testid="recent-vault"][data-vault-id="${openedId}"]`)!.click()
+    })
+    await vi.waitFor(() => {
+      expect(vault.phase).toBe('ready')
+    })
+    expect(vault.phase).toBe('ready')
+    expect(vault.activeVaultId).toBe(openedId)
+    expect(host.querySelector('.chooser')).toBeNull()
+    expect(host.querySelector('[data-testid="vault-switcher"]')).not.toBeNull()
+    root.unmount()
+    host.remove()
+    vault.vaults = []
     vault.cancelPending()
   })
 
@@ -1084,11 +1248,11 @@ describe('VaultService', () => {
     vault.setFilter('all')
   })
 
-  it('shows the advance checkbox only while the inbox filter is selected', async () => {
+  it('toggles advance after organizing from the inbox context menu', async () => {
     register(VaultService)
     register(FolderService)
     const vault = resolve(VaultService)
-    vault.setFilter('all')
+    vault.setFilter('inbox')
     vault.advanceInbox = true
     const host = document.createElement('div')
     document.body.appendChild(host)
@@ -1097,21 +1261,21 @@ describe('VaultService', () => {
       root.render(<Rail />)
     })
     expect(host.querySelector('[data-testid="advance-inbox"]')).toBeNull()
+    expect(host.textContent).not.toContain('Advance after organizing')
+    const inbox = host.querySelector<HTMLButtonElement>('[data-testid="rail-inbox"]')
+    expect(inbox).not.toBeNull()
     await act(async () => {
-      vault.setFilter('inbox')
+      inbox!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 16, clientY: 40 }))
     })
-    const box = host.querySelector<HTMLInputElement>('[data-testid="advance-inbox"]')
-    expect(box).not.toBeNull()
-    expect(box?.checked).toBe(true)
-    expect(host.textContent).toContain('Advance after organizing')
+    const item = document.querySelector<HTMLElement>('[data-testid="context-menu-item-advance-inbox"]')
+    expect(item).not.toBeNull()
+    expect(item?.getAttribute('aria-checked')).toBe('true')
+    expect(item?.textContent).toContain('Advance after organizing')
     await act(async () => {
-      box?.click()
+      item!.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true }))
     })
     expect(vault.advanceInbox).toBe(false)
-    await act(async () => {
-      vault.setFilter('all')
-    })
-    expect(host.querySelector('[data-testid="advance-inbox"]')).toBeNull()
+    expect(document.querySelector('[data-testid="context-menu"]')).toBeNull()
     root.unmount()
     host.remove()
     vault.advanceInbox = true

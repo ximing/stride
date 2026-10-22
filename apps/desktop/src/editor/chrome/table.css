@@ -62,8 +62,17 @@
 }
 
 .editor-table-menu-colors {
-  padding: 4px 6px 2px;
+  display: grid;
+  grid-template-columns: repeat(10, 22px);
+  gap: 6px;
+  align-items: center;
+  padding: 6px 8px 8px;
   color: var(--sd-muted);
   font-size: 12px;
+}
+
+.editor-table-menu-colors > span,
+.editor-table-menu-colors .editor-table-menu-clear {
+  grid-column: 1 / -1;
 }
 

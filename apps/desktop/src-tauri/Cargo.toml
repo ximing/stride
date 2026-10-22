@@ -18,6 +18,11 @@ tauri-plugin-keyring = "0.1.0"
 tauri-plugin-process = "2"
 tauri-plugin-shell = "2"
 
+# Dock menu injection uses AppKit. Linux builds must not pull GTK through muda.
+[target.'cfg(target_os = "macos")'.dependencies]
+muda = "0.20"
+objc2 = "0.6"
+
 # The updater is desktop-only (mobile has its own store-driven update flow).
 [target."cfg(not(any(target_os = \"android\", target_os = \"ios\")))".dependencies]
 # The "zip" feature covers the Linux AppImage updater format (.AppImage.tar.gz

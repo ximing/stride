@@ -1,4 +1,6 @@
 import { describe, expect, it } from 'vitest'
+import manifest from '../appCommandManifest.json'
+import { parseAppCommandManifest } from '../services/commands/commands'
 import { en } from './en'
 import { i18n } from './index'
 import { zh } from './zh'
@@ -12,6 +14,16 @@ function leaves(value: unknown, prefix = ''): string[] {
 describe('catalogs', () => {
   it('gives Chinese every English key', () => {
     expect(leaves(zh).sort()).toEqual(leaves(en).sort())
+  })
+
+  it('covers every command id in both catalogs', () => {
+    const keys = new Set(leaves(en))
+    const zhKeys = new Set(leaves(zh))
+    for (const command of parseAppCommandManifest(manifest)) {
+      const leaf = `commands.${command.id}`
+      expect(keys.has(leaf), `en missing ${leaf}`).toBe(true)
+      expect(zhKeys.has(leaf), `zh missing ${leaf}`).toBe(true)
+    }
   })
 
   it('defaults to English and switches to Chinese', async () => {

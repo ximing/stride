@@ -1,0 +1,115 @@
+.settings-usage {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding-top: 16px;
+}
+
+.settings-usage-title {
+  margin: 0;
+  color: var(--sd-fg);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.settings-usage-empty,
+.settings-usage-summary,
+.settings-usage-period {
+  margin: 0;
+  color: var(--sd-muted);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+.settings-usage-summary,
+.settings-usage-period {
+  color: var(--sd-fg);
+}
+
+.settings-usage-trend {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.settings-usage-trend-row {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: var(--sd-radius-sm);
+  background: transparent;
+  color: var(--sd-fg);
+  font: inherit;
+  font-size: 12px;
+  line-height: 1.4;
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-usage-trend-row[aria-pressed='true'] {
+  background: var(--sd-bg-elevated);
+}
+
+.settings-usage-trend-row:focus-visible {
+  outline: 2px solid var(--sd-focus-ring);
+  outline-offset: 2px;
+}
+
+.settings-usage-trend-bar {
+  height: 8px;
+  overflow: hidden;
+  border-radius: var(--sd-radius-pill);
+  background: var(--sd-border);
+}
+
+.settings-usage-trend-bar > span {
+  display: block;
+  height: 100%;
+  background: var(--sd-accent);
+}
+
+.settings-usage-trend-value {
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-usage-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.settings-usage-table th,
+.settings-usage-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--sd-border);
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.settings-usage-table th:first-child,
+.settings-usage-table td:first-child,
+.settings-usage-table th[scope='row'] {
+  text-align: left;
+}
+
+.settings-usage-table thead th {
+  color: var(--sd-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.settings-usage-table th[scope='row'] {
+  max-width: 180px;
+  overflow: hidden;
+  color: var(--sd-fg);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}

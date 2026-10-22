@@ -2,6 +2,26 @@
   "version": 1,
   "commands": [
     {
+      "id": "file.newWindow",
+      "title": "New Window",
+      "shortcut": "Mod+Shift+N",
+      "section": "File",
+      "keywords": ["window", "新建", "窗口"]
+    },
+    {
+      "id": "file.newProject",
+      "title": "New Project…",
+      "section": "File",
+      "keywords": ["create", "project", "新建", "项目"]
+    },
+    {
+      "id": "file.openProject",
+      "title": "Open Project…",
+      "shortcut": "Mod+O",
+      "section": "File",
+      "keywords": ["open", "project", "打开", "项目"]
+    },
+    {
       "id": "file.newNote",
       "title": "New Note",
       "shortcut": "Mod+N",

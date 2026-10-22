@@ -1,7 +1,7 @@
 import { observer, useService } from '@rabjs/react'
 import { syncState } from '@stride/core'
 import type { GitSurface, SyncState } from '@stride/core'
-import { GitBranch, Home, RefreshCw, Search, Settings, Sparkles } from 'lucide-react'
+import { GitBranch, RefreshCw, Search, Settings, Sparkles } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { t } from '../../i18n'
 import { LayoutService } from '../../services/layout/layout.service'
@@ -12,6 +12,7 @@ import { VaultService } from '../../services/vault/vault.service'
 import { APP_VERSION } from '../../version'
 import { Button } from '../primitives/button'
 import { Mark } from '../primitives/icon'
+import { VaultSwitcher } from './rail-chrome'
 import { Popover, PopoverContent, PopoverTrigger } from '../primitives/popover'
 
 function gitSyncFailed(surface: GitSurface, output: string): boolean {
@@ -43,10 +44,20 @@ export const GitStatusBadge = observer(function GitStatusBadge() {
     behind: git.behind,
     error: gitSyncFailed(git.surface, git.output),
   })
+  const tone =
+    git.surface === 'ready'
+      ? state === 'error' || state === 'conflict'
+        ? ' is-error'
+        : state === 'syncing'
+          ? ' is-syncing'
+          : state === 'pull_required'
+            ? ' is-warning'
+            : ''
+      : ''
   return (
     <Popover>
       <PopoverTrigger asChild>
-        <Button tone="quiet" size="sm" className="git-status-badge" data-testid="git-status-badge">
+        <Button tone="quiet" size="sm" className={`git-status-badge${tone}`} data-testid="git-status-badge">
           {gitBadge(git.surface, state)}
         </Button>
       </PopoverTrigger>
@@ -60,7 +71,15 @@ export const GitStatusBadge = observer(function GitStatusBadge() {
   )
 })
 
-function indexStatusLabel(phase: VaultService['indexPhase'], done: number, total: number): string {
+function indexStatusLabel(
+  phase: VaultService['indexPhase'],
+  work: VaultService['indexWork'],
+  done: number,
+  total: number,
+): string {
+  if (work === 'embedding' && (phase === 'rebuilding' || phase === 'ready')) {
+    return t('shell.indexEmbedding', { done, total })
+  }
   if (phase === 'rebuilding') return t('shell.indexProgress', { done, total })
   if (phase === 'ready') return t('shell.indexReady')
   if (phase === 'error') return t('shell.indexFailed')
@@ -75,38 +94,35 @@ export const StatusBar = observer(function StatusBar() {
   const settingsPage = useService(SettingsPageService)
   const updateCheck = useService(UpdateCheckService)
   return (
-    <footer className="statusbar" data-testid="statusbar">
-      <span className="statusbar-item">
-        <Mark icon={Home} size={14} />
-        {vault.currentVaultLabel}
-      </span>
+    <footer className="statusbar" data-testid="statusbar" data-tauri-drag-region="deep">
+      <VaultSwitcher />
       {git.branch ? (
         <span className="statusbar-item" data-testid="statusbar-branch">
-          <Mark icon={GitBranch} size={14} />
+          <span className="statusbar-icon statusbar-icon-git"><Mark icon={GitBranch} size={14} /></span>
           {git.branch}
         </span>
       ) : null}
       <GitStatusBadge />
-      {vault.indexPhase === 'error' ? (
+      {vault.indexPhase === 'error' || (vault.indexPhase === 'ready' && vault.indexWork === 'embedding') ? (
         <Button
           tone="quiet"
           size="sm"
           className="statusbar-item statusbar-action statusbar-index-error"
           data-testid="index-status"
-          title={translate('shell.indexFailedTitle')}
+          title={vault.indexPhase === 'error' ? translate('shell.indexFailedTitle') : translate('shell.indexEmbeddingTitle')}
           icon={<Mark icon={Search} size={14} />}
-          onClick={() => vault.retryIndex()}
+          onClick={() => (vault.indexPhase === 'error' ? vault.retryIndex() : vault.retryMisses())}
         >
-          {indexStatusLabel(vault.indexPhase, vault.indexDone, vault.indexTotal)}
+          {indexStatusLabel(vault.indexPhase, vault.indexWork, vault.indexDone, vault.indexTotal)}
           <span data-testid="index-retry">{translate('common.retry')}</span>
         </Button>
       ) : (
         <span className="statusbar-item" data-testid="index-status">
           <Mark icon={Search} size={14} />
-          {indexStatusLabel(vault.indexPhase, vault.indexDone, vault.indexTotal)}
+          {indexStatusLabel(vault.indexPhase, vault.indexWork, vault.indexDone, vault.indexTotal)}
         </span>
       )}
-      <span className="statusbar-spacer" />
+      <span className="statusbar-spacer" data-tauri-drag-region />
       {updateCheck.supported ? (
         <Button
           tone="quiet"
@@ -115,7 +131,7 @@ export const StatusBar = observer(function StatusBar() {
           data-testid="statusbar-update-check"
           disabled={updateCheck.feedback === 'checking'}
           title={translate('shell.checkUpdates')}
-          icon={<Mark icon={RefreshCw} size={14} />}
+          icon={<span className="statusbar-icon statusbar-icon-update"><Mark icon={RefreshCw} size={14} /></span>}
           onClick={() => void updateCheck.manualCheck()}
         >
           {updateCheck.feedback === 'checking' ? translate('shell.checking') : translate('shell.checkUpdates')}
@@ -131,7 +147,7 @@ export const StatusBar = observer(function StatusBar() {
         size="sm"
         className="statusbar-item statusbar-action"
         data-testid="statusbar-ai"
-        icon={<Mark icon={Sparkles} size={14} />}
+        icon={<span className="statusbar-icon statusbar-icon-ai"><Mark icon={Sparkles} size={14} /></span>}
         onClick={() => layout.setRightPanelTab('chat')}
       >
         {translate('shell.askAi')}

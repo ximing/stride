@@ -31,5 +31,5 @@
 1. **双模运行兼容**：任何新增功能必须考虑 Tauri 与纯浏览器双环境。调用 `@tauri-apps/*` API 前需确认环境可用或提供浏览器端回退（参考 `services/vault/vault.service.ts`、`services/platform/deep-link.ts`、`services/update/update-check.ts`）。
 2. **命令驱动交互**：新增全局可触发操作或快捷键时，先在 `src/appCommandManifest.json` 注册，再由 `services/commands/command.service.ts` 与 `services/commands/commands.ts` 绑定实现，并确保通过 `services/commands/command-matrix.test.ts`。
 3. **遵循设计系统**：UI 修改必须使用 `src/ui/tokens.css` 中的 `--sd-*` 语义变量和 `src/ui/primitives/` 下的封装组件，严禁硬编码色值或调用原生 `window.alert/confirm/prompt`。样式入口文件只保留 `@import`。
-4. **保持四栏布局契约**：右侧面板（属性、TOC、Git、Chat）互斥切换，当前面板记在 `VaultService.panel`。栏宽和折叠由 `services/layout/layout.service.ts` 的 `LayoutService` 管。Git、Chat、Settings、Update 各自一个 Service，不要再合成一个文件。
+4. **保持四栏布局契约**：右侧面板（属性、TOC、Git、Chat）互斥切换，当前面板记在 `LayoutService.rightPanelTab`。栏宽和折叠由 `services/layout/layout.service.ts` 的 `LayoutService` 管。Git、Chat、Settings、Update 各自一个 Service，不要再合成一个文件。
 5. **界面文案走目录**：新增用户可见文案时同时改 `src/i18n/en.ts` 和 `zh.ts`。语言存在本机 `localStorage`，不进 Vault。细则见 `.claude/rules/i18n.md`。

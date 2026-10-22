@@ -8,8 +8,6 @@
 .settings-ai-empty {
   margin: 0;
   padding: 12px 0;
-  border-top: 1px solid var(--sd-border);
-  border-bottom: 1px solid var(--sd-border);
   color: var(--sd-muted);
   font-size: 13px;
   line-height: 1.5;
@@ -84,7 +82,6 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
   padding-top: 20px;
-  border-top: 1px solid var(--sd-border);
 }
 
 .settings-ai-field {
@@ -141,7 +138,6 @@
 .settings-ai-save {
   gap: 12px;
   padding-top: 16px;
-  border-top: 1px solid var(--sd-border);
 }
 
 .settings-ai-save > .settings-ai-error {

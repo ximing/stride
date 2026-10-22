@@ -1,0 +1,122 @@
+/* Custom traffic lights. Colors live in tokens.css so the component file
+   stays free of color literals. Glyphs appear on hover, like the system set. */
+
+.window-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.window-control,
+.rail .window-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 12px;
+  height: 12px;
+  min-height: 12px;
+  flex: none;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 99px;
+  color: var(--sd-window-glyph);
+}
+
+.window-control svg {
+  opacity: 0;
+  transition: opacity var(--sd-motion-hover) var(--sd-ease-standard);
+}
+
+.window-controls:hover .window-control svg,
+.window-controls:focus-within .window-control svg {
+  opacity: 1;
+}
+
+.window-control-close,
+.window-control-close:hover:not(:disabled),
+.window-control-close:active:not(:disabled),
+.rail .window-control-close:hover:not(:disabled),
+.rail .window-control-close:active:not(:disabled) {
+  border-color: transparent;
+  background: var(--sd-window-close);
+}
+
+.window-control-minimize,
+.window-control-minimize:hover:not(:disabled),
+.window-control-minimize:active:not(:disabled),
+.rail .window-control-minimize:hover:not(:disabled),
+.rail .window-control-minimize:active:not(:disabled) {
+  border-color: transparent;
+  background: var(--sd-window-minimize);
+}
+
+.window-control-zoom,
+.window-control-zoom:hover:not(:disabled),
+.window-control-zoom:active:not(:disabled),
+.rail .window-control-zoom:hover:not(:disabled),
+.rail .window-control-zoom:active:not(:disabled) {
+  border-color: transparent;
+  background: var(--sd-window-zoom);
+}
+
+.collapsed-chrome {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+
+.collapsed-chrome .rail-drag {
+  width: 16px;
+  flex: none;
+  align-self: stretch;
+}
+
+.chooser-window {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 40px;
+  padding: 0 12px;
+}
+
+.chooser-window .rail-drag,
+.rail-drag {
+  flex: 1;
+  align-self: stretch;
+  min-width: 12px;
+  min-height: 12px;
+}
+
+/* Undecorated Tauri windows are square. The webview is transparent, and the
+   shell paints the rounded rect. A filled window goes edge to edge. */
+html[data-desktop='tauri'],
+html[data-desktop='tauri'] body,
+html[data-desktop='tauri'] #root {
+  background: transparent;
+}
+
+html[data-desktop='tauri'] .shell,
+html[data-desktop='tauri'] .chooser {
+  height: 100%;
+  min-height: 0;
+  border-radius: var(--sd-radius-lg);
+  overflow: hidden;
+}
+
+html[data-desktop='tauri'][data-window-fill] .shell,
+html[data-desktop='tauri'][data-window-fill] .chooser {
+  border-radius: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .window-control svg {
+    transition: none;
+  }
+}

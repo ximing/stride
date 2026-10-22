@@ -90,8 +90,8 @@
 }
 
 .editor-color-pop {
-  gap: 8px;
-  padding: 8px;
+  gap: 10px;
+  padding: 12px;
 }
 
 .editor-color-swatches,
@@ -100,12 +100,12 @@
 }
 
 .editor-color-swatch {
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   padding: 0;
-  border: 1px solid var(--sd-border);
+  border: 1px solid color-mix(in srgb, var(--sd-fg) 18%, transparent);
   border-radius: var(--sd-radius);
-  transition: outline-color 120ms ease, transform 120ms ease;
+  transition: outline-color 120ms ease, border-color 120ms ease;
 }
 
 .editor-color-swatch:hover:not(:disabled) {
@@ -113,21 +113,32 @@
 }
 
 .editor-color-swatch.is-on {
-  outline: 2px solid var(--sd-accent);
+  outline: 2px solid var(--sd-fg);
   outline-offset: 1px;
 }
 
-.editor-color-custom {
-  color: var(--sd-muted);
-  font-size: 12px;
+.editor-color-actions {
+  border-top: 1px solid var(--sd-border);
+  padding-top: 8px;
 }
 
-.editor-color-custom input[type='color'] {
-  width: 32px;
-  height: 24px;
-  border: 1px solid var(--sd-border);
-  border-radius: var(--sd-radius);
+.editor-color-none {
+  border: 1px solid color-mix(in srgb, var(--sd-fg) 18%, transparent);
   background: var(--sd-bg-elevated);
+}
+
+.editor-color-custom {
+  border-radius: var(--sd-radius);
+  color: var(--sd-fg);
+  font-size: 13px;
+}
+
+.editor-color-custom:hover {
+  background: color-mix(in srgb, var(--sd-fg) 6%, transparent);
+}
+
+.editor-color-custom-chip {
+  border: 1px solid color-mix(in srgb, var(--sd-fg) 18%, transparent);
 }
 
 .editor-color-clear,
@@ -148,8 +159,16 @@
   color: var(--sd-fg);
 }
 
+.editor-color-clear {
+  padding: 2px 6px;
+}
+
 .editor-color-clear.is-on,
 .editor-table-menu-clear.is-on {
   color: var(--sd-accent);
+}
+
+.editor-color-clear.is-on .editor-color-none {
+  border-color: var(--sd-accent);
 }
 

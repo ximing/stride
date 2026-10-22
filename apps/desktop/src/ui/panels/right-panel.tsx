@@ -9,19 +9,21 @@ import {
   type LucideIcon,
 } from 'lucide-react'
 import { LayoutService } from '../../services/layout/layout.service'
-import type { RightPanelTab } from '../../services/layout/layout'
+import { RIGHT_PANEL_TABS, type RightPanelTab } from '../../services/layout/layout'
 import { IconButton } from '../primitives/button'
 import { ChatPanel } from '../chat/chat-panel'
 import { GitPanel } from '../git/git-panel-host'
 import { PropertiesPanel } from './properties-panel'
 import { TocPanel } from './toc-panel'
 
-const PANEL_TABS: { id: RightPanelTab; labelKey: string; icon: LucideIcon }[] = [
-  { id: 'properties', labelKey: 'panels.properties', icon: SlidersHorizontal },
-  { id: 'toc', labelKey: 'panels.outline', icon: List },
-  { id: 'git', labelKey: 'panels.git', icon: GitBranch },
-  { id: 'chat', labelKey: 'panels.agent', icon: MessageCircle },
-]
+export const TAB_CHROME: Record<RightPanelTab, { labelKey: string; icon: LucideIcon }> = {
+  properties: { labelKey: 'panels.properties', icon: SlidersHorizontal },
+  toc: { labelKey: 'panels.outline', icon: List },
+  git: { labelKey: 'panels.git', icon: GitBranch },
+  chat: { labelKey: 'panels.agent', icon: MessageCircle },
+}
+
+const PANEL_TABS = RIGHT_PANEL_TABS.map((id) => ({ id, ...TAB_CHROME[id] }))
 
 const TabButton = observer(function TabButton({ tab, collapsed }: { tab: (typeof PANEL_TABS)[number]; collapsed: boolean }) {
   const { t } = useTranslation()
@@ -73,7 +75,7 @@ export const RightPanel = observer(function RightPanel() {
   const layout = useService(LayoutService)
   return (
     <div className="panel-wrap" data-testid="right-panel">
-      <div className="panel-head">
+      <div className="panel-head" data-tauri-drag-region="deep">
         <PanelTabs collapsed={false} />
         <IconButton
           icon={PanelRightClose}

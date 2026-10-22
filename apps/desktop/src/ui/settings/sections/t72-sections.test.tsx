@@ -176,31 +176,6 @@ describe('T7.2 settings sections', () => {
     vault.cancelPending()
   })
 
-  it('editor: rename-from-heading is disabled without a vault and writes .stride/vault.json when open', async () => {
-    const mounted = await mount(<EditorSection />)
-    const disabledToggle = mounted.querySelector<HTMLInputElement>('[data-testid="settings-rename-from-heading"]')!
-    expect(disabledToggle.disabled).toBe(true)
-
-    useMemoryFixture()
-    const vault = resolve(VaultService)
-    await vault.restoreOpened()
-    await act(async () => {
-      await vault.openFromDraft()
-    })
-    expect(vault.phase).toBe('ready')
-    const toggle = mounted.querySelector<HTMLInputElement>('[data-testid="settings-rename-from-heading"]')!
-    expect(toggle.disabled).toBe(false)
-    expect(toggle.checked).toBe(true)
-
-    await act(async () => {
-      toggle.click()
-    })
-    expect(vault.renameFromHeading).toBe(false)
-    const marker = await vault.fs!.readText('.stride/vault.json')
-    expect(marker).toContain('"renameFromHeading": false')
-    vault.cancelPending()
-  })
-
   it('privacy: telemetry toggle persists the preference only', async () => {
     const mounted = await mount(<PrivacySection />)
     expect(mounted.textContent).toContain('does not collect any telemetry')

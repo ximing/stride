@@ -12,9 +12,9 @@ import type {
 import {
   PlatformError,
   type SearchBackend,
-  type SearchBackendOpener,
   type SearchDocument,
   type SearchHit,
+  type SearchOpenOptions,
   type SearchQuery,
 } from '@stride/platform'
 import { loadPackagedJiebaDict, type JiebaDict } from './dict.ts'
@@ -30,7 +30,22 @@ export interface VaneSession {
   search(col: number, query: VaneSearchQuery): Promise<Hit[]>
   delete(col: number, ids: string[]): Promise<number>
   close(): Promise<void>
+  export?(path: string): Promise<void>
+  readFile?(path: string): Promise<Uint8Array>
 }
+
+export interface VaneSearchSession {
+  backend: SearchBackend
+  capture: (() => Promise<Uint8Array>) | null
+  restored: boolean
+}
+
+export interface VaneCapableOpener {
+  open(options: SearchOpenOptions, snapshot?: Uint8Array | null): Promise<VaneSearchSession>
+}
+
+// Memory VFS unpacks `open({ snapshot })` before Db::open. OPFS and IDB stay unused.
+export const VANE_SNAPSHOT_RESTORE = true
 
 export type VaneFactory = (opts?: VaneWorkerOpts) => Promise<VaneSession>
 
@@ -172,51 +187,101 @@ class VaneSearchBackend implements SearchBackend {
   }
 }
 
+function captureOf(vane: VaneSession, restore: boolean): (() => Promise<Uint8Array>) | null {
+  if (!restore || !vane.export || !vane.readFile) return null
+  const write = vane.export.bind(vane)
+  const read = vane.readFile.bind(vane)
+  return async () => {
+    await write('stride-export.vane')
+    return read('stride-export.vane')
+  }
+}
+
+async function openWorker(
+  vane: VaneSession,
+  dbPath: string,
+  dim: number,
+  snapshot: Uint8Array | null,
+): Promise<VaneSearchBackend> {
+  const options: OpenOptions = {
+    autoCommit: 'off',
+    persistence: 'persistent',
+  }
+  if (snapshot && snapshot.byteLength > 0) options.snapshot = snapshot
+  await vane.open(dbPath, options)
+  const col = await vane.collection(COLLECTION, schemaFor(dim), {
+    tokenizer: 'jieba',
+    autoCommit: 'off',
+  })
+  return new VaneSearchBackend(vane, col, dim)
+}
+
 export function createVaneSearchOpener(
   factory: VaneFactory,
   vfs: VfsKind,
   loadDict: JiebaDictLoader = loadPackagedJiebaDict,
-): SearchBackendOpener {
+  restore = VANE_SNAPSHOT_RESTORE,
+): VaneCapableOpener {
   return {
-    async open(options): Promise<SearchBackend> {
-      const dbPath = dbPathForVault(options.vaultKey)
-      let loaded: JiebaDict
-      try {
-        loaded = await loadDict()
-      } catch (error) {
-        if (error instanceof PlatformError) throw error
-        const detail = error instanceof Error ? error.message : String(error)
-        throw new PlatformError('io', `Failed to load jieba dictionary: ${detail}`)
-      }
-      if (loaded.dictData.byteLength === 0 || !/^[0-9a-f]{16}$/.test(loaded.dictSha256)) {
-        throw new PlatformError('io', 'Jieba dictionary is empty or its sha256 prefix is invalid')
-      }
-      // createVane transfers the buffer. slice keeps a shared copy usable and sends only these bytes.
-      const dictData = loaded.dictData.slice()
-      if (vfs === 'opfs' && navigator.storage?.getDirectory) {
-        const root = await navigator.storage.getDirectory()
-        await root.removeEntry(dbPath).catch(() => undefined)
-      }
-      const vane = await factory({ vfs, dbPath, dictData, dictSha256: loaded.dictSha256 })
-      try {
-        await vane.open(dbPath, { autoCommit: 'off', persistence: 'persistent' })
-        const col = await vane.collection(COLLECTION, schemaFor(options.dim), {
-          tokenizer: 'jieba',
-          autoCommit: 'off',
-        })
-        return new VaneSearchBackend(vane, col, options.dim)
-      } catch (error) {
-        await vane.close().catch(() => undefined)
-        throw error
-      }
+    open(options, snapshot) {
+      return openVaneSearchSession(factory, vfs, loadDict, options, snapshot ?? null, restore)
     },
   }
 }
 
-// Memory, not OPFS. vane 0.4.4 awaits an IDBOpenDBRequest when OPFS init fails,
-// which throws `arg0.then is not a function` and aborts vault open. A leftover
-// SyncAccessHandle makes that miss happen on the next open. The index is
-// rebuilt from the notes every time a vault opens.
-export function vaneWebSearchOpener(factory: VaneFactory = createVane): SearchBackendOpener {
-  return createVaneSearchOpener(factory, 'memory')
+export async function openVaneSearchSession(
+  factory: VaneFactory,
+  vfs: VfsKind,
+  loadDict: JiebaDictLoader,
+  options: SearchOpenOptions,
+  snapshot: Uint8Array | null,
+  restore: boolean,
+): Promise<VaneSearchSession> {
+  const dbPath = dbPathForVault(options.vaultKey)
+  let loaded: JiebaDict
+  try {
+    loaded = await loadDict()
+  } catch (error) {
+    if (error instanceof PlatformError) throw error
+    const detail = error instanceof Error ? error.message : String(error)
+    throw new PlatformError('io', `Failed to load jieba dictionary: ${detail}`)
+  }
+  if (loaded.dictData.byteLength === 0 || !/^[0-9a-f]{16}$/.test(loaded.dictSha256)) {
+    throw new PlatformError('io', 'Jieba dictionary is empty or its sha256 prefix is invalid')
+  }
+  if (vfs === 'opfs' && navigator.storage?.getDirectory) {
+    const root = await navigator.storage.getDirectory()
+    await root.removeEntry(dbPath).catch(() => undefined)
+  }
+  const useSnapshot = restore && snapshot && snapshot.byteLength > 0 ? snapshot : null
+  const spawn = () => factory({
+    vfs,
+    dbPath,
+    dictData: loaded.dictData.slice(),
+    dictSha256: loaded.dictSha256,
+  })
+  const vane = await spawn()
+  try {
+    const backend = await openWorker(vane, dbPath, options.dim, useSnapshot)
+    return { backend, capture: captureOf(vane, restore), restored: useSnapshot !== null }
+  } catch (error) {
+    await vane.close().catch(() => undefined)
+    if (!useSnapshot) throw error
+    const retry = await spawn()
+    try {
+      const backend = await openWorker(retry, dbPath, options.dim, null)
+      return { backend, capture: captureOf(retry, restore), restored: false }
+    } catch (retryError) {
+      await retry.close().catch(() => undefined)
+      throw retryError
+    }
+  }
+}
+
+// Memory, not OPFS or IDB. The memory VFS unpacks a snapshot into the db path
+// before Db::open. OPFS init still awaits an IDBOpenDBRequest on failure
+// (`arg0.then is not a function`) and aborts vault open; a leftover
+// SyncAccessHandle makes that miss happen on the next open.
+export function vaneWebSearchOpener(factory: VaneFactory = createVane): VaneCapableOpener {
+  return createVaneSearchOpener(factory, 'memory', loadPackagedJiebaDict, VANE_SNAPSHOT_RESTORE)
 }

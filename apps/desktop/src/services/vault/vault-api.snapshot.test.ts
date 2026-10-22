@@ -1,0 +1,185 @@
+import { describe, expect, it } from 'vitest'
+import { VaultService } from './vault.service'
+
+const PUBLIC_FIELDS = [
+  'phase',
+  'vaultPath',
+  'openedClonePath',
+  'pathDraft',
+  'broad',
+  'notes',
+  'activeId',
+  'listFilter',
+  'error',
+  'saveStatus',
+  'searchQuery',
+  'searchHits',
+  'searchMode',
+  'searchDegraded',
+  'indexPhase',
+  'indexWork',
+  'indexDone',
+  'indexTotal',
+  'docEpoch',
+  'renameFromHeading',
+  'agentMode',
+  'advanceInbox',
+  'zoom',
+  'viewMode',
+  'gitSetupPreference',
+  'propertyName',
+  'propertyType',
+  'propertyValue',
+  'propertyChecked',
+  'collapsedTypes',
+  'fs',
+  'vaults',
+  'activeVaultId',
+  'noteMtimes',
+  'indexSignature',
+] as const
+
+const PUBLIC_METHODS = [
+  'active',
+  'graph',
+  'typeDocuments',
+  'sidebarTypes',
+  'typeInstances',
+  'inboxCount',
+  'listedNotes',
+  'currentVaultLabel',
+  'recentVaults',
+  'visibleNotes',
+  'listFilterService',
+  'setPathDraft',
+  'setFilter',
+  'select',
+  'toggleTypeCollapsed',
+  'openVaultPath',
+  'restoreOpened',
+  'openFromDraft',
+  'createNewVault',
+  'cloneSampleVault',
+  'upsertVault',
+  'switchVault',
+  'showChooser',
+  'createNote',
+  'createLinkedNote',
+  'createType',
+  'createInstance',
+  'updateDoc',
+  'updateTitle',
+  'setRenameFromHeading',
+  'setAutosaveDebounceMs',
+  'setAdvanceInbox',
+  'setAgentMode',
+  'setZoom',
+  'setViewMode',
+  'setGitSetupPreference',
+  'retargetTitleBaseline',
+  'syncMovedIds',
+  'commitHeadingRename',
+  'updateType',
+  'setPropertyName',
+  'setPropertyType',
+  'setPropertyValue',
+  'setPropertyChecked',
+  'addProperty',
+  'updateProperty',
+  'updateListProperty',
+  'updateNumberProperty',
+  'updateBooleanProperty',
+  'removeProperty',
+  'commitListProperty',
+  'commitNumberProperty',
+  'blurProperty',
+  'numberText',
+  'listText',
+  'propertyText',
+  'runSearch',
+  'queryRanked',
+  'clearSearch',
+  'adopt',
+  'cancelPending',
+  'restoreActiveNote',
+  'flush',
+  'openClonedVault',
+  'reopenForSettings',
+  'refreshMtimes',
+  'retryIndex',
+  'retryMisses',
+  'replaceRecentProjects',
+  'rememberVault',
+  'currentEmbedding',
+  'replace',
+  'schedule',
+  'deleteActiveNote',
+  'archiveNotes',
+  'retypeNotes',
+  'deleteNotes',
+] as const
+
+const PRIVATE_METHODS = [
+  'viewsService',
+  'enqueueWrite',
+  'openBackend',
+  'openBackendBody',
+  'startRebuild',
+  'memoryFixtureRoot',
+  'seedMemoryFixture',
+  'ensureRegistry',
+  'ensureRegistryListener',
+  'persistRegistry',
+  'writeRegistry',
+  'latestRecord',
+  'openedStamp',
+  'idFor',
+  'openSearchSession',
+  'upsertIndexed',
+  'rankedHits',
+  'prepareIndexed',
+  'embedMisses',
+  'retainNotes',
+  'embedGroups',
+  'embeddingSettings',
+  'vectorGapFor',
+  'publishGap',
+  'queryEmbeddingClient',
+  'bindPagehide',
+  'scheduleFlush',
+  'flushDiskNow',
+  'flushDisk',
+  'removeIndexed',
+  'writeProperty',
+  'maybeAdvanceInbox',
+  'clearFieldDraft',
+  'resetPropertyEditor',
+  'mutateNotes',
+] as const
+
+describe('VaultService API snapshot', () => {
+  it('keeps the known public fields on the instance', () => {
+    const vault = new VaultService()
+    const keys = Object.keys(vault)
+    for (const field of PUBLIC_FIELDS) {
+      expect(keys, field).toContain(field)
+    }
+    expect(keys).not.toContain('panel')
+    for (const name of ['slot', 'disk', 'session', 'queries']) {
+      expect(keys).not.toContain(name)
+    }
+  })
+
+  it('keeps the prototype method set stable', () => {
+    const names = Object.getOwnPropertyNames(VaultService.prototype)
+      .filter((name) => name !== 'constructor')
+      .sort()
+    const expected = [...PUBLIC_METHODS, ...PRIVATE_METHODS].sort()
+    expect(names).toEqual(expected)
+  })
+
+  it('does not expose setPanel or panel', () => {
+    expect(Object.getOwnPropertyNames(VaultService.prototype)).not.toContain('setPanel')
+    expect(new VaultService()).not.toHaveProperty('panel')
+  })
+})

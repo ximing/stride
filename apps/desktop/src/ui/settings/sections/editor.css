@@ -27,13 +27,6 @@
   width: 100%;
 }
 
-.editor-toggle {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 13px;
-}
-
 .editor-hint {
   max-width: 64ch;
   margin: 8px 0 0;

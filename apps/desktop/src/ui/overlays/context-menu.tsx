@@ -13,6 +13,7 @@
 //   from firing while it is open.
 // - Activating an item runs onSelect exactly once, then closes.
 
+import { Check } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import type { ContextMenuEntry } from '../../services/commands/context-menu'
@@ -142,12 +143,14 @@ export function ContextMenu({ x, y, items, onClose, testId = 'context-menu' }: C
           return <div key={entry.id} className="sd-menu-separator" role="separator" />
         }
         const Glyph = entry.icon
+        const checkable = entry.checked !== undefined
         return (
           <div
             key={entry.id}
             className="sd-menu-item"
             data-testid={`${testId}-item-${entry.id}`}
-            role="menuitem"
+            role={checkable ? 'menuitemcheckbox' : 'menuitem'}
+            aria-checked={checkable ? entry.checked : undefined}
             aria-disabled={entry.disabled || undefined}
             tabIndex={-1}
             {...(entry.disabled ? { 'data-disabled': '' } : {})}
@@ -161,6 +164,11 @@ export function ContextMenu({ x, y, items, onClose, testId = 'context-menu' }: C
               activate(index)
             }}
           >
+            {checkable && (
+              <span className="sd-menu-item-icon sd-menu-item-check">
+                {entry.checked ? <Check aria-hidden="true" size={14} strokeWidth={1.75} /> : null}
+              </span>
+            )}
             {Glyph && (
               <span className="sd-menu-item-icon">
                 <Glyph aria-hidden="true" size={14} strokeWidth={1.75} />

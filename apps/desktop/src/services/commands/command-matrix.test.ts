@@ -223,4 +223,21 @@ describe('shortcut dispatch matrix', () => {
       unstub()
     }
   })
+
+  it('registers a handler for every manifest id (presence, not runnability)', () => {
+    readyVault()
+    const service = resolve(CommandService)
+    const unstub = [
+      service.registerHandler('app.commandPalette', { run: () => {} }),
+      service.registerHandler('edit.find', { run: () => {} }),
+    ]
+    try {
+      const handlers = (service as unknown as { handlers: Map<string, unknown> }).handlers
+      for (const command of commands) {
+        expect(handlers.has(command.id), `${command.id} has no registered handler`).toBe(true)
+      }
+    } finally {
+      for (const unregister of unstub) unregister()
+    }
+  })
 })

@@ -1,5 +1,4 @@
-// Editor settings: autosave debounce (app-wide, settings file) and the
-// per-vault "rename from H1" toggle (`.stride/vault.json` via VaultService).
+// Editor settings: autosave debounce (app-wide, settings file).
 
 import { has, observer, useService } from '@rabjs/react'
 import { useState } from 'react'
@@ -73,39 +72,11 @@ const AutosaveField = observer(function AutosaveField() {
   )
 })
 
-const RenameFromHeadingField = observer(function RenameFromHeadingField() {
-  const { t } = useTranslation()
-  const vault = useService(VaultService)
-  const vaultOpen = vault.phase === 'ready'
-  return (
-    <div className="editor-group">
-      <h3 className="editor-heading">{t('settings.editor.rename')}</h3>
-      <label className="editor-toggle settings-choice">
-        <input
-          className="settings-choice-control"
-          type="checkbox"
-          data-testid="settings-rename-from-heading"
-          checked={vault.renameFromHeading}
-          disabled={!vaultOpen}
-          onChange={(event) => {
-            void vault.setRenameFromHeading(event.target.checked)
-          }}
-        />
-        <span>{t('settings.editor.renameLabel')}</span>
-      </label>
-      <p className="editor-hint">
-        {`${t('settings.editor.renameHint')}${vaultOpen ? '' : t('settings.editor.renameClosed')}`}
-      </p>
-    </div>
-  )
-})
-
 export function EditorSection() {
   const { t } = useTranslation()
   return (
     <section className="editor-section" data-testid="settings-section-editor" aria-label={t('settings.editor.region')}>
       {has(SettingsService) && has(VaultService) ? <AutosaveField /> : null}
-      {has(VaultService) ? <RenameFromHeadingField /> : null}
     </section>
   )
 }

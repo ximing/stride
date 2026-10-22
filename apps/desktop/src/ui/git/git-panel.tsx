@@ -16,6 +16,16 @@ function diffLineClass(line: string): string {
   return 'diff-line'
 }
 
+/** Porcelain code -> one-letter badge with a semantic tone. */
+function changeBadge(change: GitChange): { label: string; tone: string } {
+  if (change.unmerged) return { label: '!', tone: 'is-unmerged' }
+  if (change.untracked) return { label: '?', tone: 'is-untracked' }
+  if (change.code.includes('D')) return { label: 'D', tone: 'is-deleted' }
+  if (change.code.includes('A')) return { label: 'A', tone: 'is-added' }
+  if (change.code.includes('R')) return { label: 'R', tone: 'is-renamed' }
+  return { label: 'M', tone: 'is-modified' }
+}
+
 /** Renders a unified diff with add/del/hunk line colors. textContent is preserved verbatim. */
 function DiffLines({ diff }: { diff: string }) {
   const lines = diff.split('\n')
@@ -144,23 +154,27 @@ export function GitPanelView(props: {
               {props.changes.length === 0 ? (
                 <EmptyState compact icon={CircleCheck} title={t('git.clean')} testId="git-clean" />
               ) : (
-                props.changes.map((change) => (
-                  <div
-                    key={change.path}
-                    className={selected.includes(change.path) ? 'field git-change is-selected' : 'field git-change'}
-                    data-testid="git-change"
-                    data-path={change.path}
-                    onClick={() => props.onOpenFileDiff(change.path)}
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selected.includes(change.path)}
-                      onChange={() => props.onToggle(change.path)}
-                      onClick={(event) => event.stopPropagation()}
-                    />
-                    <span className="git-change-path">{change.path}</span>
-                  </div>
-                ))
+                props.changes.map((change) => {
+                  const badge = changeBadge(change)
+                  return (
+                    <div
+                      key={change.path}
+                      className={selected.includes(change.path) ? 'field git-change is-selected' : 'field git-change'}
+                      data-testid="git-change"
+                      data-path={change.path}
+                      onClick={() => props.onOpenFileDiff(change.path)}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(change.path)}
+                        onChange={() => props.onToggle(change.path)}
+                        onClick={(event) => event.stopPropagation()}
+                      />
+                      <span className={`git-change-badge ${badge.tone}`} aria-hidden="true">{badge.label}</span>
+                      <span className="git-change-path">{change.path}</span>
+                    </div>
+                  )
+                })
               )}
             </div>
           </section>

@@ -67,6 +67,10 @@
   color: var(--sd-muted);
 }
 
+.sd-menu-item-check {
+  color: var(--sd-accent);
+}
+
 .sd-menu-item-label {
   flex: 1;
   min-width: 0;

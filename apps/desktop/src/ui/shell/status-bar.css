@@ -2,7 +2,6 @@
 .statusbar {
   display: flex;
   align-items: center;
-  border-top: 1px solid var(--sd-border);
   background: var(--sd-bg);
   color: var(--sd-muted);
 }
@@ -76,8 +75,9 @@
   min-height: 28px;
   gap: 4px;
   padding: 0 12px;
-  overflow: hidden;
+  overflow: visible;
   font-size: 12px;
+  user-select: none;
   line-height: 1;
 }
 
@@ -133,6 +133,43 @@
   color: var(--sd-fg);
 }
 
+.statusbar .git-status-badge.sd-btn.is-error,
+.statusbar .git-status-badge.sd-btn.is-error:hover:not(:disabled) {
+  color: var(--sd-danger);
+}
+
+.statusbar .git-status-badge.sd-btn.is-warning,
+.statusbar .git-status-badge.sd-btn.is-warning:hover:not(:disabled) {
+  color: var(--sd-warning);
+}
+
+.statusbar .git-status-badge.sd-btn.is-syncing,
+.statusbar .git-status-badge.sd-btn.is-syncing:hover:not(:disabled) {
+  color: var(--sd-dot-blue);
+}
+
+/* Fixed semantic hues for status bar icons; they keep their color on hover. */
+.statusbar-icon {
+  display: inline-flex;
+  flex: none;
+}
+
+.statusbar-icon-vault {
+  color: var(--sd-dot-teal);
+}
+
+.statusbar-icon-git {
+  color: var(--sd-dot-orange);
+}
+
+.statusbar-icon-update {
+  color: var(--sd-dot-blue);
+}
+
+.statusbar-icon-ai {
+  color: var(--sd-dot-purple);
+}
+
 .statusbar-update-feedback {
   max-width: 180px;
   overflow: hidden;
@@ -141,5 +178,20 @@
 
 .statusbar-version {
   padding: 0 4px;
+}
+
+.statusbar .vault-switcher .vault-switcher-trigger.sd-btn {
+  width: auto;
+  max-width: 180px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0 4px;
+  color: var(--sd-muted);
+  font-size: 12px;
+}
+
+.statusbar .vault-switcher-menu {
+  top: auto;
+  bottom: calc(100% + 4px);
 }
 

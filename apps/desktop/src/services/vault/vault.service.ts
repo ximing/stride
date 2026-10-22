@@ -1,17 +1,12 @@
 import { has, raw, Service } from '@rabjs/react'
-import { buildGraph, hasOutgoingRelationship, type VaultGraph } from '@stride/core/graph'
+import { buildGraph, type VaultGraph } from '@stride/core/graph'
 import {
   applyBody,
   applyTitle,
-  formatProperty,
   isArchived,
   isPlaceholderTitle,
   noteForSave,
-  parseFiniteNumber,
-  parseListInput,
   parseNote,
-  parsePropertyInput,
-  plainText,
   type NoteProperty,
   type PropertyKind,
   type StrideNote,
@@ -26,26 +21,29 @@ import {
 } from '@stride/fs-web'
 import {
   MemoryFileSystem,
-  memorySearchOpener,
   type FileSystemBackend,
-  type SearchBackendOpener,
 } from '@stride/platform'
-import { EmbeddingClient } from '../../../../../packages/core/src/embeddings'
-import { noteIndex, noteRebuilder, searchNotes, type NoteIndex, type NoteRebuilder, type SearchHit } from '../../../../../packages/core/src/search'
-import { rankSearch } from '../../../../../packages/core/src/search-rank'
+import type { EmbeddingClient } from '../../../../../packages/core/src/embeddings'
+import { type NoteIndex, type NoteRebuilder, type SearchHit } from '../../../../../packages/core/src/search'
+import { indexText, type CacheNote, type SearchDiskCache } from '../../../../../packages/core/src/search-cache'
 import type { EmbeddingRuntime, IndexSignature } from '../settings/settings.service'
 import { writeSampleNotes } from '../../../../../packages/core/src/sample'
 import { initializeVault } from '../../../../../packages/core/src/seed'
 import { compareTypeDocuments, isTypeVisible, nextTypeOrder, templateBody } from '../../../../../packages/core/src/types'
-import { recoverRename, rewriteVaultLinks } from '../../../../../packages/core/src/rename-tx'
+import { rewriteVaultLinks } from '../../../../../packages/core/src/rename-tx'
 import { applyViewFilter, VIEW_FILTER_PREFIX, type SavedView } from '../../../../../packages/core/src/views'
+import { isDesktopRuntime, isMemoryFixture } from '../platform/runtime'
+import { reportOpenProject, syncRecentProjects } from '../platform/windows'
 import {
-  readAdvanceInbox,
-  readAgentMode,
-  readGitSetupPreference,
-  readRenameFromHeading,
-  readViewMode,
-  readZoom,
+  mergeVaultRecords,
+  parseVaultRecords,
+  readStoredVaults,
+  reconcileRegistry,
+  recentProjectsFromRecords,
+  VAULT_REGISTRY_KEY,
+  type RecentProject,
+} from './vault-registry'
+import {
   sanitizeGitSetupPreference,
   sanitizeViewMode,
   sanitizeZoom,
@@ -64,18 +62,21 @@ import {
   nextSlugId,
   noteIdFromPath,
   notePath,
-  openVault,
   readNoteFile,
   saveNote,
 } from '../../../../../packages/core/src/vault'
 import { ListFilterService } from '../search/list-filter.service'
-import { NoteListService } from '../notes/note-list.service'
 import { applyStageZoom } from '../layout/stage-zoom'
-import { TabsService } from '../notes/tabs.service'
 import { ViewsService } from '../views/views.service'
+import { applyNoteIdChanges, FOLDER_FILTER_PREFIX } from './note-identity'
+import * as vaultOpen from './vault-open'
+import * as propertyEditor from './vault-properties'
+import * as searchSession from './vault-search-session'
+
+export { FOLDER_FILTER_PREFIX }
+export { embeddingClient, searchSlot } from './vault-search-session'
 
 const COLLAPSED_TYPES_KEY = 'stride:collapsed-types'
-const EMBED_BATCH = 16
 
 const UNCONFIGURED_EMBEDDING: EmbeddingRuntime = {
   endpoint: '',
@@ -89,7 +90,7 @@ const UNCONFIGURED_EMBEDDING: EmbeddingRuntime = {
 // The browser has no home directory. openVault only uses this to reject broad personal roots.
 const HOME_DIR = '/Users/stride'
 
-export const VAULT_REGISTRY_KEY = 'stride:vaults'
+export { VAULT_REGISTRY_KEY }
 
 export interface VaultRecord {
   id: string
@@ -97,13 +98,6 @@ export interface VaultRecord {
   color: string
   icon: string
   lastOpened: string
-}
-
-// Resolve fetch at call time so tests can stub globalThis.fetch after import.
-const embeddingClient = new EmbeddingClient((input, init) => globalThis.fetch(input, init))
-
-function isMemoryFixture(): boolean {
-  return new URLSearchParams(window.location.search).get('fixture') === 'memory'
 }
 
 // Dev-only: `?fixture=memory&seed=N` programmatically fills the in-memory vault
@@ -123,17 +117,6 @@ function memoryFixtureSeedCount(): number {
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
-}
-
-function nextMacrotask(): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, 0)
-  })
-}
-
-// Title plus body only. Properties (including archived) stay out of the full-text index.
-function indexText(note: StrideNote): string {
-  return `${note.title}\n${plainText(note.doc)}`
 }
 
 function isTypeDocument(note: StrideNote): boolean {
@@ -162,10 +145,6 @@ function writeCollapsedTypes(titles: string[]) {
   }
 }
 
-function hasTauriInternals(): boolean {
-  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
-}
-
 // Cross-render derivation caches, keyed by the raw notes array. VaultService
 // replaces `notes` immutably on every mutation, so array identity is a
 // complete change signal and WeakMap entries die with the array. Computing
@@ -174,6 +153,7 @@ function hasTauriInternals(): boolean {
 // dominated CPU profiles of vault open.
 const graphCache = new WeakMap<StrideNote[], VaultGraph>()
 const typeDocCache = new WeakMap<StrideNote[], StrideNote[]>()
+const listedCache = new WeakMap<StrideNote[], StrideNote[]>()
 const visibleCache = new WeakMap<
   StrideNote[],
   { hits: { id: string; score: number }[]; query: string; filter: string; view: SavedView | null; result: StrideNote[] }
@@ -185,16 +165,6 @@ function createVaultId(): string {
   return `vault-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
 }
 
-function isVaultRecord(value: unknown): value is VaultRecord {
-  if (!value || typeof value !== 'object') return false
-  const record = value as Partial<VaultRecord>
-  return typeof record.id === 'string' && record.id !== ''
-    && typeof record.label === 'string'
-    && typeof record.color === 'string'
-    && typeof record.icon === 'string'
-    && typeof record.lastOpened === 'string'
-}
-
 async function sameDirectory(left: FileSystemDirectoryHandle, right: FileSystemDirectoryHandle): Promise<boolean> {
   if (left === right) return true
   if (typeof left.isSameEntry !== 'function') return false
@@ -202,7 +172,7 @@ async function sameDirectory(left: FileSystemDirectoryHandle, right: FileSystemD
 }
 
 export async function pickVaultBackend(): Promise<FileSystemBackend> {
-  if (!hasTauriInternals()) return pickVaultDirectory()
+  if (!isDesktopRuntime()) return pickVaultDirectory()
   const dialog = await import('@tauri-apps/plugin-dialog')
   const selected = await dialog.open({ directory: true, multiple: false })
   if (typeof selected !== 'string' || selected === '') {
@@ -228,9 +198,9 @@ export class VaultService extends Service {
   searchMode = ''
   searchDegraded = false
   indexPhase: 'idle' | 'rebuilding' | 'ready' | 'error' = 'idle'
+  indexWork: 'idle' | 'indexing' | 'embedding' = 'idle'
   indexDone = 0
   indexTotal = 0
-  panel: 'properties' | 'toc' | 'git' | 'chat' | 'settings' = 'properties'
   docEpoch = 0
   renameFromHeading = true
   agentMode: 'safe' | 'power' = 'safe'
@@ -251,37 +221,36 @@ export class VaultService extends Service {
   noteMtimes: Record<string, number> = {}
   // Signature passed to the last successful opener.open. Save compares against this.
   indexSignature: IndexSignature = { endpoint: '', model: '', dim: 0, active: false }
-  private index: NoteIndex | null = null
-  private rebuilder: NoteRebuilder | null = null
-  private rebuildEpoch = 0
-  private rebuildDone: Promise<void> = Promise.resolve()
+  index: NoteIndex | null = null
+  rebuilder: NoteRebuilder | null = null
+  rebuildEpoch = 0
+  rebuildDone: Promise<void> = Promise.resolve()
   private openQueue: Promise<void> = Promise.resolve()
   private docTimer: ReturnType<typeof setTimeout> | null = null
+  /** In-flight autosave. Fake timers do not wait for the timer callback's promise. */
+  private saveTask: Promise<void> = Promise.resolve()
   // Autosave debounce (ms). Settings > Editor pushes the configured value via
   // setAutosaveDebounceMs; schedule() also re-syncs it lazily from
   // SettingsService so a value persisted in a previous session applies even
   // when the settings page was never opened.
   private autosaveDebounceMs = 350
-  private pendingId = ''
+  pendingId = ''
   private retryDelay = 1000
   private renaming = false
   private titleBaseline = new Map<string, string>()
   private leaveQueue: StrideNote[] = []
-  private numberDrafts: Record<string, string> = {}
-  private listDrafts: Record<string, string> = {}
+  numberDrafts: Record<string, string> = {}
+  listDrafts: Record<string, string> = {}
   private saveGeneration = 0
   private saveChain: Promise<void> = Promise.resolve()
   private registryReady = false
+  private registryListening = false
   private memoryRoot: MemoryFileSystem | null = null
   private readonly backends = new Map<string, FileSystemBackend>()
   private readonly idsByBackend = new Map<FileSystemBackend, string>()
 
   setPathDraft(value: string) {
     this.pathDraft = value
-  }
-
-  setPanel(panel: VaultService['panel']) {
-    this.panel = panel
   }
 
   setFilter(filter: string) {
@@ -344,9 +313,29 @@ export class VaultService extends Service {
     return this.graph.inbox.filter((note) => !isTypeDocument(note) && !isArchived(note)).length
   }
 
+  /**
+   * Every listable note (type docs and archived excluded), ignoring all filter
+   * dimensions. The folder tree renders from this while a folder scope is
+   * active — selecting a folder narrows the note-list column, never the tree.
+   */
+  get listedNotes(): StrideNote[] {
+    const key = raw(this.notes)
+    let result = listedCache.get(key)
+    if (!result) {
+      result = key.filter((note) => !isTypeDocument(note) && !isArchived(note))
+      listedCache.set(key, result)
+    }
+    return result
+  }
+
   get currentVaultLabel(): string {
     const entry = this.vaults.find((item) => item.id === this.activeVaultId)
     return entry?.label || this.fs?.rootLabel || ''
+  }
+
+  get recentVaults(): VaultRecord[] {
+    this.ensureRegistry()
+    return [...this.vaults].sort((left, right) => right.lastOpened.localeCompare(left.lastOpened))
   }
 
   get visibleNotes(): StrideNote[] {
@@ -378,6 +367,10 @@ export class VaultService extends Service {
       // Saved view: its own base (Type docs always out; archived only when the
       // view opts in), then the view's type/property conditions.
       result = applyViewFilter(key, view)
+    } else if (filter.startsWith(FOLDER_FILTER_PREFIX)) {
+      // Folder dimension: the folder's subtree — direct and nested notes alike.
+      const prefix = `${filter.slice(FOLDER_FILTER_PREFIX.length)}/`
+      result = listed(key.filter((note) => note.id.startsWith(prefix)))
     } else if (filter !== 'all' && !filter.startsWith(VIEW_FILTER_PREFIX)) {
       result = listed(this.graph.byType.get(filter) ?? [])
     } else {
@@ -387,13 +380,25 @@ export class VaultService extends Service {
     return result
   }
 
+  async openVaultPath(path: string) {
+    if (!isDesktopRuntime()) return
+    this.error = ''
+    try {
+      await this.commitHeadingRename()
+      const { TauriFileSystem } = await import('@stride/fs-tauri')
+      await this.openBackend(new TauriFileSystem(path))
+    } catch (error) {
+      this.error = errorText(error)
+    }
+  }
+
   async restoreOpened() {
     if (isMemoryFixture()) return
     this.ensureRegistry()
     const last = this.latestRecord()
     if (!last) return
     try {
-      if (hasTauriInternals()) {
+      if (isDesktopRuntime()) {
         const { TauriFileSystem } = await import('@stride/fs-tauri')
         await this.openBackend(new TauriFileSystem(last.label))
         return
@@ -481,7 +486,7 @@ export class VaultService extends Service {
       this.error = 'That vault is not available.'
       return
     }
-    if (hasTauriInternals()) {
+    if (isDesktopRuntime()) {
       try {
         const { TauriFileSystem } = await import('@stride/fs-tauri')
         await this.commitHeadingRename()
@@ -504,6 +509,16 @@ export class VaultService extends Service {
     } catch (error) {
       this.error = errorText(error)
     }
+  }
+
+  async showChooser() {
+    if (this.phase === 'chooser') return
+    this.error = ''
+    await this.commitHeadingRename()
+    this.phase = 'chooser'
+    reportOpenProject(null)
+    const { SettingsService } = await import('../settings/settings.service')
+    if (has(SettingsService)) await this.resolve(SettingsService).bindUsageVault(null)
   }
 
   async createNote() {
@@ -708,7 +723,7 @@ export class VaultService extends Service {
       if (note) docs.push({ id: note.id, text: indexText(note) })
     }
     if (!this.rebuilder || docs.length === 0) return
-    const prepared = await this.prepareIndexed(docs, () => true)
+    const prepared = await this.prepareIndexed(docs, () => true, 'upsert')
     if (!prepared) return
     await this.rebuilder.upsert(prepared)
   }
@@ -751,23 +766,7 @@ export class VaultService extends Service {
       if (nextId === undefined) nextId = await nextSlugId(fs, fresh.title, fresh.id)
       if (nextId !== fresh.id) {
         await fs.rename(notePath(fromId), notePath(nextId))
-        const latest = this.notes.find((note) => note.id === fromId) ?? fresh
-        const renamed: StrideNote = { ...latest, id: nextId }
-        this.notes = this.notes.map((note) => (note.id === fromId ? renamed : note))
-        if (this.activeId === fromId) this.activeId = nextId
-        // Tabs track note ids in their per-tab history; rewrite before any reaction
-        // flush could mistake the rename for a deletion. Same sync segment as the
-        // id remap above, so the TabsService convergence microtask sees final state.
-        if (has(TabsService)) this.resolve(TabsService).remapNoteId(fromId, nextId)
-        if (this.pendingId === fromId) this.pendingId = nextId
-        if (fromId in this.noteMtimes) {
-          const mtimes = { ...this.noteMtimes }
-          mtimes[nextId] = mtimes[fromId]!
-          delete mtimes[fromId]
-          this.noteMtimes = mtimes
-        }
-        await this.removeIndexed([fromId])
-        await this.upsertIndexed(renamed)
+        await applyNoteIdChanges(this, [{ fromId, toId: nextId }])
       }
       this.titleBaseline.delete(fromId)
       this.titleBaseline.delete(nextId)
@@ -788,175 +787,76 @@ export class VaultService extends Service {
   }
 
   setPropertyName(value: string) {
-    this.propertyName = value
+    return propertyEditor.setPropertyName(this, value)
   }
 
   setPropertyType(value: string) {
-    if (value === 'string' || value === 'number' || value === 'boolean' || value === 'list') {
-      this.propertyType = value
-    }
+    return propertyEditor.setPropertyType(this, value)
   }
 
   setPropertyValue(value: string) {
-    this.propertyValue = value
+    return propertyEditor.setPropertyValue(this, value)
   }
 
   setPropertyChecked(value: boolean) {
-    this.propertyChecked = value
+    return propertyEditor.setPropertyChecked(this, value)
   }
 
   addProperty() {
-    const field = this.propertyName.trim()
-    if (!field || !this.active) return
-    let next: NoteProperty | undefined
-    if (this.propertyType === 'boolean') next = this.propertyChecked
-    else if (this.propertyType === 'number') next = parseFiniteNumber(this.propertyValue)
-    else if (this.propertyType === 'list') {
-      const items = parseListInput(this.propertyValue)
-      if (items.length > 0) next = items
-    } else {
-      const parsed = parsePropertyInput(this.propertyValue)
-      if (parsed !== '' && !(Array.isArray(parsed) && parsed.length === 0)) next = parsed
-    }
-    if (next === undefined) return
-    this.clearFieldDraft(field)
-    this.writeProperty(field, next)
-    this.propertyName = ''
-    this.propertyValue = ''
-    this.propertyChecked = false
+    return propertyEditor.addProperty(this)
   }
 
   updateProperty(field: string, raw: string) {
-    const current = this.active
-    if (!current) return
-    const value: NoteProperty = parsePropertyInput(raw)
-    const properties = { ...current.properties }
-    if (value === '' || (Array.isArray(value) && value.length === 0)) delete properties[field]
-    else properties[field] = value
-    this.clearFieldDraft(field)
-    this.replace({ ...current, properties })
-    this.schedule(current.id)
-    this.maybeAdvanceInbox(current)
+    return propertyEditor.updateProperty(this, field, raw)
   }
 
   updateListProperty(field: string, raw: string) {
-    const items = parseListInput(raw)
-    if (items.length === 0) {
-      this.removeProperty(field)
-      return
-    }
-    this.listDrafts = { ...this.listDrafts, [field]: raw }
-    this.writeProperty(field, items)
+    return propertyEditor.updateListProperty(this, field, raw)
   }
 
   updateNumberProperty(field: string, raw: string) {
-    if (raw.trim() === '') {
-      this.removeProperty(field)
-      return
-    }
-    this.numberDrafts = { ...this.numberDrafts, [field]: raw }
-    const parsed = parseFiniteNumber(raw)
-    if (parsed === undefined) return
-    this.writeProperty(field, parsed)
+    return propertyEditor.updateNumberProperty(this, field, raw)
   }
 
   updateBooleanProperty(field: string, value: boolean) {
-    this.writeProperty(field, value)
+    return propertyEditor.updateBooleanProperty(this, field, value)
   }
 
   removeProperty(field: string) {
-    const current = this.active
-    this.clearFieldDraft(field)
-    if (!current || !Object.hasOwn(current.properties, field)) return
-    const properties = { ...current.properties }
-    delete properties[field]
-    this.replace({ ...current, properties })
-    this.schedule(current.id)
+    return propertyEditor.removeProperty(this, field)
   }
 
   commitListProperty(field: string) {
-    const raw = this.listDrafts[field]
-    if (raw !== undefined) {
-      this.clearFieldDraft(field)
-      const items = parseListInput(raw)
-      if (items.length === 0) this.removeProperty(field)
-      else this.writeProperty(field, items)
-    }
-    this.blurProperty()
+    return propertyEditor.commitListProperty(this, field)
   }
 
   commitNumberProperty(field: string) {
-    const raw = this.numberDrafts[field]
-    if (raw !== undefined) {
-      this.clearFieldDraft(field)
-      if (raw.trim() === '') this.removeProperty(field)
-      else {
-        const parsed = parseFiniteNumber(raw)
-        if (parsed !== undefined) this.writeProperty(field, parsed)
-      }
-    }
-    this.blurProperty()
+    return propertyEditor.commitNumberProperty(this, field)
   }
 
   blurProperty() {
-    void this.flush().catch((error: unknown) => {
-      this.error = errorText(error)
-    })
+    return propertyEditor.blurProperty(this)
   }
 
   numberText(field: string): string {
-    if (Object.hasOwn(this.numberDrafts, field)) return this.numberDrafts[field] ?? ''
-    const value = this.active?.properties[field]
-    return typeof value === 'number' ? String(value) : ''
+    return propertyEditor.numberText(this, field)
   }
 
   listText(field: string): string {
-    if (Object.hasOwn(this.listDrafts, field)) return this.listDrafts[field] ?? ''
-    return formatProperty(this.active?.properties[field])
+    return propertyEditor.listText(this, field)
   }
 
   propertyText(field: string): string {
-    return formatProperty(this.active?.properties[field])
+    return propertyEditor.propertyText(this, field)
   }
 
   async runSearch() {
-    this.error = ''
-    try {
-      if (!this.index) throw new Error('Open a vault first')
-      const runtime = await this.currentEmbedding()
-      if (!runtime.active || this.index.dim !== runtime.dim) {
-        const result = await searchNotes(this.index, this.searchQuery, null, embeddingClient)
-        this.searchMode = 'text'
-        this.searchHits = result.hits
-        this.searchDegraded = runtime.intended
-        return
-      }
-      const result = await searchNotes(this.index, this.searchQuery, {
-        endpoint: runtime.endpoint,
-        model: runtime.model,
-        apiKey: runtime.apiKey,
-        dim: runtime.dim,
-      }, embeddingClient)
-      this.searchMode = result.mode
-      this.searchHits = result.hits
-      this.searchDegraded = result.degraded
-    } catch (error) {
-      this.error = errorText(error)
-    }
+    return searchSession.runSearch(this)
   }
 
   // Title weighting stays in rankSearch. Hybrid is only the BM25/vector hit list.
   async queryRanked(text: string) {
-    const trimmed = text.trim()
-    if (!trimmed) return []
-    const notes = this.notes.filter((note) => !isArchived(note)).map((note) => ({
-      id: note.id,
-      title: note.title,
-      text: `${note.title}\n${plainText(note.doc)}`,
-    }))
-    const allowed = new Set(notes.map((note) => note.id))
-    const found = this.index ? await this.rankedHits(trimmed, 30) : []
-    return rankSearch(trimmed, notes, found.filter((hit) => allowed.has(hit.id)))
+    return searchSession.queryRanked(this, text)
   }
 
   clearSearch() {
@@ -1063,7 +963,7 @@ export class VaultService extends Service {
     })
   }
 
-  private get listFilterService() {
+  get listFilterService() {
     return this.resolve(ListFilterService)
   }
 
@@ -1090,75 +990,14 @@ export class VaultService extends Service {
     return this.openBackend(backend)
   }
 
-  private async openBackendBody(backend: FileSystemBackend) {
-    const runtime = await this.currentEmbedding()
-    const dim = runtime.active ? runtime.dim : 0
-    await recoverRename(backend)
-    const opened = await openVault(backend, HOME_DIR)
-    const renameFromHeading = await readRenameFromHeading(backend)
-    const advanceInbox = await readAdvanceInbox(backend)
-    const agentMode = await readAgentMode(backend)
-    const zoom = await readZoom(backend)
-    const viewMode = await readViewMode(backend)
-    const gitSetupPreference = await readGitSetupPreference(backend)
-    this.rebuildEpoch += 1
-    const epoch = this.rebuildEpoch
-    const retiring = this.index
-    const retiringRebuild = this.rebuildDone
-    this.index = null
-    this.rebuilder = null
-    await retiringRebuild.catch(() => undefined)
-    await retiring?.close().catch(() => undefined)
-    const opener = await this.searchOpener()
-    const search = await opener.open({ vaultKey: backend.rootLabel, dim })
-    this.indexSignature = { endpoint: runtime.endpoint, model: runtime.model, dim, active: runtime.active }
-    const index = noteIndex(search, dim)
-    this.index = index
-    this.rebuilder = noteRebuilder(index)
-    this.fs = backend
-    this.vaultPath = opened.path
-    this.broad = opened.broad
-    this.notes = opened.notes
-    this.docEpoch += 1
-    this.activeId = opened.notes.find((note) => !isTypeDocument(note))?.id ?? ''
-    this.listFilter = 'all'
-    this.searchHits = []
-    this.searchQuery = ''
-    this.searchMode = ''
-    this.searchDegraded = runtime.intended && !runtime.active
-    this.listFilterService.clear()
-    this.renameFromHeading = renameFromHeading
-    this.agentMode = agentMode
-    this.advanceInbox = advanceInbox
-    this.zoom = zoom
-    this.viewMode = viewMode
-    this.gitSetupPreference = gitSetupPreference
-    applyStageZoom(zoom)
-    this.resetPropertyEditor()
-    const snapshot = opened.notes.map((note) => ({ id: note.id, text: indexText(note) }))
-    this.indexDone = 0
-    this.indexTotal = snapshot.length
-    this.indexPhase = snapshot.length > 0 ? 'rebuilding' : 'ready'
-    this.phase = 'ready'
-    this.rebuildDone = snapshot.length > 0 ? this.startRebuild(epoch, snapshot) : Promise.resolve()
-    this.error = ''
-    void this.refreshMtimes(epoch, opened.notes)
-    await this.rememberVault(backend)
-    // Tabs restore the per-vault scene only now: activeVaultId became final in
-    // rememberVault, so earlier activeId reactions belong to the old vault.
-    if (has(TabsService)) this.resolve(TabsService).onVaultOpened()
-    // Same handover for the list: load this vault's persisted sort and drop any
-    // selection left over from the previous vault.
-    if (has(NoteListService)) this.resolve(NoteListService).onVaultOpened()
-    // Saved views scan `views/*.json` and subscribe to fs watch events (git pull
-    // refresh). Awaited so the sidebar is populated before open resolves.
-    if (has(ViewsService)) await this.resolve(ViewsService).onVaultOpened()
+  private openBackendBody(backend: FileSystemBackend) {
+    return vaultOpen.openBackendBody(this, backend)
   }
 
   // Best-effort mtime harvest for the note list. Never blocks or fails an open.
   // Guard on the open epoch only: `this.fs` reads back as a reactive proxy, so
   // comparing it against the raw backend reference would always mismatch.
-  private async refreshMtimes(epoch: number, notes: StrideNote[]) {
+  async refreshMtimes(epoch: number, notes: StrideNote[]) {
     const fs = this.fs
     if (!fs) return
     const entries = await Promise.all(
@@ -1180,42 +1019,17 @@ export class VaultService extends Service {
   }
 
   private startRebuild(epoch: number, docs: { id: string; text: string }[]): Promise<void> {
-    const rebuilder = this.rebuilder
-    if (!rebuilder) return Promise.resolve()
-    const shouldContinue = () => epoch === this.rebuildEpoch
-    return this.prepareIndexed(docs, shouldContinue).then((prepared) => {
-      if (!prepared || !shouldContinue()) return
-      return rebuilder.rebuild(prepared, {
-        shouldContinue,
-        onProgress: (done, total) => {
-          if (!shouldContinue()) return
-          this.indexDone = done
-          this.indexTotal = total
-          this.indexPhase = 'rebuilding'
-        },
-      }).then((result) => {
-        if (!shouldContinue() || result.aborted) return
-        this.indexDone = prepared.length
-        this.indexTotal = prepared.length
-        this.indexPhase = 'ready'
-      }, () => {
-        if (!shouldContinue()) return
-        this.indexPhase = 'error'
-      })
-    })
+    return searchSession.startRebuild(this, epoch, docs)
   }
 
   // Status bar retry entry after a failed index rebuild. Pure presentation
   // support: re-runs the same rebuild pipeline against the current notes.
   retryIndex() {
-    if (this.phase !== 'ready' || !this.rebuilder || this.indexPhase !== 'error') return
-    this.rebuildEpoch += 1
-    const epoch = this.rebuildEpoch
-    const snapshot = this.notes.map((note) => ({ id: note.id, text: indexText(note) }))
-    this.indexDone = 0
-    this.indexTotal = snapshot.length
-    this.indexPhase = snapshot.length > 0 ? 'rebuilding' : 'ready'
-    this.rebuildDone = snapshot.length > 0 ? this.startRebuild(epoch, snapshot) : Promise.resolve()
+    return searchSession.retryIndex(this)
+  }
+
+  retryMisses() {
+    return searchSession.retryMisses(this)
   }
 
   private memoryFixtureRoot(): MemoryFileSystem {
@@ -1240,25 +1054,61 @@ export class VaultService extends Service {
   }
 
   private ensureRegistry() {
-    if (this.registryReady) return
-    this.registryReady = true
-    if (isMemoryFixture()) return
-    if (typeof localStorage === 'undefined') return
-    const raw = localStorage.getItem(VAULT_REGISTRY_KEY)
-    if (!raw) return
-    try {
-      const parsed: unknown = JSON.parse(raw)
-      if (!Array.isArray(parsed)) return
-      this.vaults = parsed.filter(isVaultRecord)
-    } catch {
-      this.vaults = []
+    if (!this.registryReady) {
+      this.registryReady = true
+      if (!isMemoryFixture() && typeof localStorage !== 'undefined') {
+        this.vaults = parseVaultRecords(localStorage.getItem(VAULT_REGISTRY_KEY))
+      }
     }
+    this.ensureRegistryListener()
+  }
+
+  private ensureRegistryListener() {
+    if (this.registryListening || typeof window === 'undefined') return
+    this.registryListening = true
+    window.addEventListener('storage', this.onRegistryStorage)
+  }
+
+  private onRegistryStorage = (event: StorageEvent) => {
+    if (isMemoryFixture() || event.key !== VAULT_REGISTRY_KEY) return
+    const next = reconcileRegistry(this.vaults, parseVaultRecords(event.newValue))
+    const active = this.vaults.find((entry) => entry.id === this.activeVaultId)
+    if (active && !next.some((entry) => entry.id === active.id)) {
+      this.writeRegistry([...next, active], 'merge')
+      return
+    }
+    this.vaults = next
   }
 
   private persistRegistry() {
+    this.writeRegistry(this.vaults, 'merge')
+  }
+
+  private writeRegistry(records: readonly VaultRecord[], mode: 'merge' | 'replace') {
     if (isMemoryFixture()) return
     if (typeof localStorage === 'undefined') return
-    localStorage.setItem(VAULT_REGISTRY_KEY, JSON.stringify(this.vaults))
+    const next = mode === 'merge' ? mergeVaultRecords(records, readStoredVaults()) : [...records]
+    this.vaults = next
+    localStorage.setItem(VAULT_REGISTRY_KEY, JSON.stringify(next))
+    if (mode === 'merge') syncRecentProjects(recentProjectsFromRecords(next))
+  }
+
+  replaceRecentProjects(projects: readonly RecentProject[]) {
+    if (isMemoryFixture()) return
+    this.ensureRegistry()
+    const next = projects.map((project) => {
+      const previous = this.vaults.find((entry) => entry.id === project.id || entry.label === project.path)
+      return {
+        id: previous?.id ?? project.id,
+        label: project.path,
+        color: previous?.color ?? '',
+        icon: previous?.icon ?? '',
+        lastOpened: previous && previous.lastOpened > project.lastOpened ? previous.lastOpened : project.lastOpened,
+      }
+    })
+    const active = this.vaults.find((entry) => entry.id === this.activeVaultId)
+    if (active && !next.some((entry) => entry.id === active.id)) next.push(active)
+    this.writeRegistry(next, 'replace')
   }
 
   private latestRecord(): VaultRecord | null {
@@ -1279,7 +1129,7 @@ export class VaultService extends Service {
     return stamp
   }
 
-  private async rememberVault(backend: FileSystemBackend) {
+  async rememberVault(backend: FileSystemBackend) {
     this.ensureRegistry()
     const id = await this.idFor(backend)
     const previous = this.vaults.find((entry) => entry.id === id)
@@ -1293,6 +1143,7 @@ export class VaultService extends Service {
     this.backends.set(id, backend)
     this.idsByBackend.set(backend, id)
     this.activeVaultId = id
+    reportOpenProject(backend.rootLabel)
     if (isMemoryFixture() || !(backend instanceof BrowserFileSystem)) return
     await writeVaultHandleById(id, backend.directoryHandle)
   }
@@ -1311,7 +1162,7 @@ export class VaultService extends Service {
         const stored = await readVaultHandleById(entry.id)
         if (stored && await sameDirectory(stored, handle)) return entry.id
       }
-    } else if (hasTauriInternals()) {
+    } else if (isDesktopRuntime()) {
       const existing = this.vaults.find((entry) => {
         const cached = this.backends.get(entry.id)
         if (cached) return cached.rootLabel === backend.rootLabel
@@ -1322,20 +1173,15 @@ export class VaultService extends Service {
     return createVaultId()
   }
 
-  private async searchOpener(): Promise<SearchBackendOpener> {
-    if (isMemoryFixture()) return memorySearchOpener()
-    const { vaneWebSearchOpener } = await import('@stride/search-web')
-    return vaneWebSearchOpener()
+  private openSearchSession(vaultKey: string, dim: number) {
+    return searchSession.openSearchSession(this, vaultKey, dim)
   }
 
   private async upsertIndexed(note: StrideNote) {
-    if (!this.rebuilder) return
-    const prepared = await this.prepareIndexed([{ id: note.id, text: indexText(note) }], () => true)
-    if (!prepared) return
-    await this.rebuilder.upsert(prepared)
+    return searchSession.upsertIndexed(this, note)
   }
 
-  private async currentEmbedding(): Promise<EmbeddingRuntime> {
+  async currentEmbedding(): Promise<EmbeddingRuntime> {
     const { SettingsService } = await import('../settings/settings.service')
     if (!has(SettingsService)) return UNCONFIGURED_EMBEDDING
     const settings = this.resolve(SettingsService)
@@ -1344,95 +1190,83 @@ export class VaultService extends Service {
   }
 
   private async rankedHits(text: string, topK: number): Promise<SearchHit[]> {
-    const index = this.index
-    if (!index) return []
-    const runtime = await this.currentEmbedding()
-    if (!runtime.active || index.dim !== runtime.dim) {
-      if (runtime.intended) this.searchMode = 'text'
-      this.searchDegraded = runtime.intended
-      return index.search({ text, topK, mode: 'text' })
-    }
-    let vector: number[] | undefined
-    try {
-      const [row] = await embeddingClient.embed([text], {
-        endpoint: runtime.endpoint,
-        model: runtime.model,
-        apiKey: runtime.apiKey,
-        dim: runtime.dim,
-      })
-      vector = row
-    } catch {
-      vector = undefined
-    }
-    if (vector && vector.length === runtime.dim) {
-      this.searchMode = 'hybrid'
-      this.searchDegraded = false
-      return index.search({ text, topK, mode: 'hybrid', vector })
-    }
-    this.searchMode = 'text'
-    this.searchDegraded = true
-    return index.search({ text, topK, mode: 'text' })
+    return searchSession.rankedHits(this, text, topK)
   }
 
-  // Embed failures omit the vector so search-web stores zeros. The index error still rejects.
+  // Embed failures omit the vector so search-web stores zeros. Cache misses stay out of SEMB.
   private async prepareIndexed(
-    docs: { id: string; text: string; vector?: number[] }[],
+    docs: { id: string; text: string }[],
     shouldContinue: () => boolean,
+    mode: 'rebuild' | 'upsert',
   ): Promise<{ id: string; text: string; vector?: number[] }[] | null> {
-    const runtime = await this.currentEmbedding()
-    const openDim = this.index?.dim ?? 0
-    if (!runtime.active || openDim !== runtime.dim) {
-      if (runtime.intended && shouldContinue()) this.searchDegraded = true
-      return docs.map((doc) => ({ id: doc.id, text: doc.text }))
-    }
-    const prepared: { id: string; text: string; vector?: number[] }[] = []
-    for (let offset = 0; offset < docs.length; offset += EMBED_BATCH) {
-      if (offset > 0) await nextMacrotask()
-      if (!shouldContinue()) return null
-      const slice = docs.slice(offset, offset + EMBED_BATCH)
-      let vectors: number[][] | null = null
-      try {
-        vectors = await embeddingClient.embed(slice.map((doc) => doc.text), {
-          endpoint: runtime.endpoint,
-          model: runtime.model,
-          apiKey: runtime.apiKey,
-          dim: runtime.dim,
-        })
-      } catch {
-        vectors = null
-      }
-      if (!shouldContinue()) return null
-      const usable = vectors !== null && vectors.length === slice.length
-      if (!usable && shouldContinue()) this.searchDegraded = true
-      for (let index = 0; index < slice.length; index += 1) {
-        const doc = slice[index]!
-        const vector = usable ? vectors?.[index] : undefined
-        if (vector && vector.length === runtime.dim) prepared.push({ id: doc.id, text: doc.text, vector })
-        else {
-          if (shouldContinue()) this.searchDegraded = true
-          prepared.push({ id: doc.id, text: doc.text })
-        }
-      }
-    }
-    return prepared
+    return searchSession.prepareIndexed(this, docs, shouldContinue, mode)
+  }
+
+  private async embedMisses(epoch: number) {
+    return searchSession.embedMisses(this, epoch)
+  }
+
+  private retainNotes(disk: SearchDiskCache, notes: readonly CacheNote[]) {
+    return searchSession.retainNotes(this, disk, notes)
+  }
+
+  private async embedGroups(
+    embedNotes: readonly CacheNote[],
+    runtime: EmbeddingRuntime,
+    shouldContinue: () => boolean,
+    disk: SearchDiskCache | null,
+  ): Promise<Map<string, number[]> | null> {
+    return searchSession.embedGroups(this, embedNotes, runtime, shouldContinue, disk)
+  }
+
+  private embeddingSettings(runtime: EmbeddingRuntime) {
+    return searchSession.embeddingSettings(this, runtime)
+  }
+
+  private vectorGapFor(runtime: EmbeddingRuntime): number {
+    return searchSession.vectorGapFor(this, runtime)
+  }
+
+  private publishGap(runtime: EmbeddingRuntime, work: 'sync' | 'keep', queryDegraded = false) {
+    return searchSession.publishGap(this, runtime, work, queryDegraded)
+  }
+
+  private queryEmbeddingClient(): EmbeddingClient {
+    return searchSession.queryEmbeddingClient(this)
+  }
+
+  private bindPagehide() {
+    return searchSession.bindPagehide(this)
+  }
+
+  private scheduleFlush(immediate: boolean) {
+    return searchSession.scheduleFlush(this, immediate)
+  }
+
+  private async flushDiskNow(): Promise<void> {
+    return searchSession.flushDiskNow(this)
+  }
+
+  private async flushDisk(commit: boolean): Promise<void> {
+    return searchSession.flushDisk(this, commit)
   }
 
   private async removeIndexed(ids: string[]) {
-    if (!this.rebuilder || ids.length === 0) return
-    await this.rebuilder.remove(ids)
+    return searchSession.removeIndexed(this, ids)
   }
 
-  private replace(note: StrideNote) {
+  replace(note: StrideNote) {
     this.notes = this.notes.map((item) => (item.id === note.id ? note : item))
   }
 
-  private schedule(id: string) {
+  schedule(id: string) {
     this.pendingId = id
     this.saveGeneration += 1
     this.saveStatus = 'pending'
     if (this.docTimer) clearTimeout(this.docTimer)
+    // The callback's return value is not awaited by fake timers. Keep the promise.
     this.docTimer = setTimeout(() => {
-      void this.flush()
+      this.saveTask = this.flush()
     }, this.autosaveDebounceMs)
     void Promise.all([
       import('../git/git.service'),
@@ -1454,45 +1288,20 @@ export class VaultService extends Service {
   }
 
   private writeProperty(field: string, value: NoteProperty) {
-    const current = this.active
-    if (!current) return
-    this.replace({ ...current, properties: { ...current.properties, [field]: value } })
-    this.schedule(current.id)
-    this.maybeAdvanceInbox(current)
+    return propertyEditor.writeProperty(this, field, value)
   }
 
   // Property wikilinks are the only outgoing links that leave the inbox.
   private maybeAdvanceInbox(before: StrideNote) {
-    if (this.listFilter !== 'inbox' || !this.advanceInbox) return
-    if (this.activeId !== before.id || hasOutgoingRelationship(before)) return
-    const after = this.notes.find((note) => note.id === before.id)
-    if (!after || !hasOutgoingRelationship(after)) return
-    const index = this.notes.findIndex((note) => note.id === before.id)
-    const next = this.notes.slice(index + 1).find((note) => !isTypeDocument(note) && !hasOutgoingRelationship(note))
-    this.activeId = next?.id ?? ''
-    this.resetPropertyEditor()
+    return propertyEditor.maybeAdvanceInbox(this, before)
   }
 
   private clearFieldDraft(field: string) {
-    if (Object.hasOwn(this.numberDrafts, field)) {
-      const numberDrafts = { ...this.numberDrafts }
-      delete numberDrafts[field]
-      this.numberDrafts = numberDrafts
-    }
-    if (Object.hasOwn(this.listDrafts, field)) {
-      const listDrafts = { ...this.listDrafts }
-      delete listDrafts[field]
-      this.listDrafts = listDrafts
-    }
+    return propertyEditor.clearFieldDraft(this, field)
   }
 
   private resetPropertyEditor() {
-    this.propertyName = ''
-    this.propertyType = 'string'
-    this.propertyValue = ''
-    this.propertyChecked = false
-    this.numberDrafts = {}
-    this.listDrafts = {}
+    return propertyEditor.resetPropertyEditor(this)
   }
 
   async deleteActiveNote() {

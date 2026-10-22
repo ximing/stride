@@ -1,7 +1,8 @@
 import { has, register, resolve } from '@rabjs/react'
-import { MemorySecretsStore } from '@stride/platform'
+import { emptyTokenHistory, localDateKey, serializeTokenUsage } from '@stride/core'
+import { MemoryFileSystem, MemorySecretsStore } from '@stride/platform'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { resetSecretsStore, setSecretsStore, SETTINGS_STORAGE_KEY, SettingsService } from './settings.service'
+import { resetSecretsStore, setSecretsStore, SETTINGS_STORAGE_KEY, SettingsService, TOKEN_USAGE_STORAGE_KEY } from './settings.service'
 
 function resetSettingsMemory() {
   const settings = resolve(SettingsService)
@@ -26,18 +27,26 @@ function resetSettingsMemory() {
   settings.embeddingTestResult = ''
   settings.llmTestResult = ''
   settings.notice = ''
+  settings.tokenHistory = emptyTokenHistory()
+  settings.usageVaultOpen = false
   Object.assign(settings, {
     memoryEmbeddingKey: '',
     memoryLlmKeys: {},
     loaded: false,
     loadTask: null,
+    usageFs: null,
+    usageChain: Promise.resolve(),
+    usageEpoch: (settings as unknown as { usageEpoch: number }).usageEpoch + 1,
+    pendingUsage: [],
   })
+  localStorage.removeItem(TOKEN_USAGE_STORAGE_KEY)
 }
 
 describe('settings service', () => {
   afterEach(() => {
     vi.unstubAllGlobals()
     localStorage.removeItem(SETTINGS_STORAGE_KEY)
+    localStorage.removeItem(TOKEN_USAGE_STORAGE_KEY)
     if (has(SettingsService)) resetSettingsMemory()
     resetSecretsStore()
   })
@@ -173,6 +182,9 @@ describe('settings service', () => {
     expect(settings.llmRuntime()?.provider).toBe('deepseek')
     expect(settings.llmRuntime()?.apiKey).toBe('sk-stride-llm-beta-key')
     expect(settings.llmRuntime()?.model).toBe('deepseek-chat')
+    expect(settings.llmRuntime(first)?.provider).toBe('openai')
+    expect(settings.llmRuntime(first)?.apiKey).toBe('sk-stride-llm-alpha-key')
+    expect(settings.llmRuntime('missing')?.provider).toBe('deepseek')
 
     setSecretsStore({
       seal: async (value) => value,
@@ -203,5 +215,111 @@ describe('settings service', () => {
     await settings.testSelectedLlm()
     expect(settings.llmTestResult).toBe('ok')
     expect(fetchMock).toHaveBeenCalled()
+    expect(settings.tokenHistory.days).toEqual([])
+    expect(localStorage.getItem(TOKEN_USAGE_STORAGE_KEY)).toBeNull()
+  })
+
+  it('writes dated token usage into the vault and reloads it by week', async () => {
+    register(SettingsService)
+    const settings = resolve(SettingsService)
+    const fs = new MemoryFileSystem('vault')
+    const today = localDateKey()
+    await settings.bindUsageVault(fs)
+    settings.recordTokenUsage({
+      model: 'gpt-4o-mini',
+      input: 3,
+      output: 2,
+      cacheRead: 1,
+      cacheWrite: 0,
+      total: 4,
+    })
+    settings.recordTokenUsage({
+      model: ' gpt-4o-mini ',
+      input: 1,
+      output: 1,
+      cacheRead: 0,
+      cacheWrite: 4,
+      total: 0,
+    })
+    settings.recordTokenUsage({
+      model: 'deepseek-chat',
+      input: 8,
+      output: 2,
+      cacheRead: 0,
+      cacheWrite: 0,
+      total: 10,
+    })
+    settings.recordTokenUsage({
+      model: ' ',
+      input: 9,
+      output: 1,
+      cacheRead: 0,
+      cacheWrite: 0,
+      total: 10,
+    })
+    await settings.whenTokenUsageSettled()
+    const stored = await fs.readText('.stride/token-usage.json')
+    expect(stored).toContain('gpt-4o-mini')
+    expect(stored).toContain('deepseek-chat')
+    expect(stored).toContain(today)
+    expect(localStorage.getItem(SETTINGS_STORAGE_KEY)).toBeNull()
+    expect(localStorage.getItem(TOKEN_USAGE_STORAGE_KEY)).toBeNull()
+    settings.tokenHistory = emptyTokenHistory()
+    await settings.bindUsageVault(fs)
+    expect(settings.tokenHistory.days).toEqual([
+      {
+        date: today,
+        model: 'deepseek-chat',
+        input: 8,
+        output: 2,
+        cacheRead: 0,
+        cacheWrite: 0,
+        total: 10,
+        requests: 1,
+      },
+      {
+        date: today,
+        model: 'gpt-4o-mini',
+        input: 4,
+        output: 3,
+        cacheRead: 1,
+        cacheWrite: 4,
+        total: 12,
+        requests: 2,
+      },
+    ])
+  })
+
+  it('folds device usage into the open vault once', async () => {
+    register(SettingsService)
+    const settings = resolve(SettingsService)
+    localStorage.setItem(TOKEN_USAGE_STORAGE_KEY, serializeTokenUsage({
+      models: [{
+        model: 'gpt-4o-mini',
+        input: 3,
+        output: 1,
+        cacheRead: 0,
+        cacheWrite: 0,
+        total: 4,
+        requests: 2,
+      }],
+    }))
+    const first = new MemoryFileSystem('first')
+    await settings.bindUsageVault(first)
+    expect(localStorage.getItem(TOKEN_USAGE_STORAGE_KEY)).toBeNull()
+    expect(settings.tokenHistory.days).toEqual([{
+      date: localDateKey(),
+      model: 'gpt-4o-mini',
+      input: 3,
+      output: 1,
+      cacheRead: 0,
+      cacheWrite: 0,
+      total: 4,
+      requests: 2,
+    }])
+    const second = new MemoryFileSystem('second')
+    await settings.bindUsageVault(second)
+    expect(settings.tokenHistory.days).toEqual([])
+    await expect(second.stat('.stride/token-usage.json')).resolves.toBeNull()
   })
 })

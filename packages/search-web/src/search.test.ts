@@ -2,9 +2,9 @@ import { readFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { createVane } from '@vane-rs/web'
 import type { Doc, Hit, Schema, SearchQuery as VaneQuery, VaneWorkerOpts } from '@vane-rs/web'
-import { PlatformError, type SearchBackend, type SearchBackendOpener } from '@stride/platform'
+import { PlatformError, type SearchBackend } from '@stride/platform'
 import { afterAll, afterEach, describe, expect, it } from 'vitest'
-import { createVaneSearchOpener, type VaneFactory, type VaneSession, vaneWebSearchOpener } from './index.ts'
+import { createVaneSearchOpener, VANE_SNAPSHOT_RESTORE, vaneWebSearchOpener, type VaneCapableOpener, type VaneFactory, type VaneSession } from './index.ts'
 
 interface MemoryOptions {
   fields?: 'text' | 'none'
@@ -171,14 +171,14 @@ function createMemoryVane(options: MemoryOptions = {}): {
 
 const backends: SearchBackend[] = []
 
-function openerFor(memory = createMemoryVane()): SearchBackendOpener {
+function openerFor(memory = createMemoryVane()): VaneCapableOpener {
   return createVaneSearchOpener(memory.factory, 'memory')
 }
 
-async function openBackend(opener: SearchBackendOpener, vaultKey: string, dim = 0): Promise<SearchBackend> {
-  const backend = await opener.open({ vaultKey, dim })
-  backends.push(backend)
-  return backend
+async function openBackend(opener: VaneCapableOpener, vaultKey: string, dim = 0): Promise<SearchBackend> {
+  const session = await opener.open({ vaultKey, dim })
+  backends.push(session.backend)
+  return session.backend
 }
 
 afterEach(async () => {
@@ -408,8 +408,11 @@ describe('vane web search', () => {
 
   it('opens the browser index in memory so a stuck OPFS handle cannot abort vault open', async () => {
     const memory = createMemoryVane()
-    const backend = await vaneWebSearchOpener(memory.factory).open({ vaultKey: 'vault-web', dim: 0 })
-    backends.push(backend)
+    const session = await vaneWebSearchOpener(memory.factory).open({ vaultKey: 'vault-web', dim: 0 })
+    backends.push(session.backend)
+    expect(VANE_SNAPSHOT_RESTORE).toBe(true)
+    expect(session.capture).toBeNull()
+    expect(session.restored).toBe(false)
     expect(memory.workerOpts[0]?.vfs).toBe('memory')
     expect(memory.opened[0]?.vfs).toBe('memory')
   })
@@ -418,7 +421,7 @@ describe('vane web search', () => {
     const opener = createVaneSearchOpener(createVane, 'memory')
     let backend: SearchBackend
     try {
-      backend = await opener.open({ vaultKey: 'wasm-real', dim: 0 })
+      backend = (await opener.open({ vaultKey: 'wasm-real', dim: 0 })).backend
     } catch (error) {
       if (error instanceof PlatformError) throw error
       const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
@@ -446,4 +449,83 @@ describe('vane web search', () => {
     await backend.close()
     await expect(backend.search({ text: term, topK: 5, mode: 'text' })).rejects.toMatchObject({ code: 'io' })
   }, 20000)
+
+  it('restores a captured snapshot into a new memory session when the worker can start', async () => {
+    const opener = vaneWebSearchOpener()
+    let first
+    try {
+      first = await opener.open({ vaultKey: 'wasm-snap-src', dim: 0 })
+    } catch (error) {
+      if (error instanceof PlatformError) throw error
+      const message = error instanceof Error ? `${error.name}: ${error.message}` : String(error)
+      console.error(`REAL_WASM_UNAVAILABLE: ${message}`)
+      return
+    }
+    backends.push(first.backend)
+    const capture = first.capture
+    if (!capture) throw new Error('real vane session has no snapshot capture')
+    const term = 'xylophonequartz'
+    await first.backend.upsert([{ id: 'alpha', text: `${'p'.repeat(40)}${term}${'s'.repeat(40)}` }])
+    const snapshot = new Uint8Array(await capture())
+    expect(new TextDecoder().decode(snapshot.subarray(0, 9))).toBe('VANE_SNAP')
+    await first.backend.close()
+    const second = await opener.open({ vaultKey: 'wasm-snap-dst', dim: 0 }, snapshot)
+    backends.push(second.backend)
+    expect(second.restored).toBe(true)
+    const hits = await second.backend.search({ text: term, topK: 5, mode: 'text' })
+    expect(hits[0]?.id).toBe('alpha')
+    expect(hits[0]?.snippet).toContain(term)
+  }, 20000)
+
+  it('ignores a snapshot while restore is off and retries only when a snapshot was used', async () => {
+    const opened: Array<{ snapshot?: Uint8Array }> = []
+    const closed: string[] = []
+    let generation = 0
+    const factory: VaneFactory = async () => {
+      const id = `worker-${generation}`
+      generation += 1
+      let alive = true
+      const session: VaneSession = {
+        async open(_path, opts) {
+          opened.push(opts ?? {})
+          if (!alive) throw new Error('closed')
+        },
+        async collection() {
+          if (generation === 1) throw new Error('schema mismatch')
+          return 1
+        },
+        async add() { return 0 },
+        async flush() { return undefined },
+        async search() { return [] },
+        async delete() { return 0 },
+        async close() {
+          alive = false
+          closed.push(id)
+        },
+        async export() { return undefined },
+        async readFile() { return new Uint8Array([1, 2, 3]) },
+      }
+      return session
+    }
+    const off = createVaneSearchOpener(factory, 'memory', undefined, false)
+    const snap = new Uint8Array([9, 9, 9])
+    await expect(off.open({ vaultKey: 'vault-off', dim: 0 }, snap)).rejects.toThrow('schema mismatch')
+    expect(generation).toBe(1)
+    expect(opened).toEqual([{ autoCommit: 'off', persistence: 'persistent' }])
+    expect(closed).toEqual(['worker-0'])
+
+    opened.length = 0
+    closed.length = 0
+    generation = 0
+    const on = createVaneSearchOpener(factory, 'memory', undefined, true)
+    const session = await on.open({ vaultKey: 'vault-on', dim: 0 }, snap)
+    backends.push(session.backend)
+    expect(generation).toBe(2)
+    expect(opened[0]).toMatchObject({ autoCommit: 'off', persistence: 'persistent', snapshot: snap })
+    expect(opened[1]).toEqual({ autoCommit: 'off', persistence: 'persistent' })
+    expect(session.restored).toBe(false)
+    expect(closed).toEqual(['worker-0'])
+    expect(session.capture).not.toBeNull()
+    await expect(session.capture?.()).resolves.toEqual(new Uint8Array([1, 2, 3]))
+  })
 })

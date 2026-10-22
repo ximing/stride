@@ -1,6 +1,7 @@
 @import "./shell/chooser.css";
 @import "./shell/identity.css";
 @import "./shell/rail.css";
+@import "./shell/window-controls.css";
 @import "./shell/resize.css";
 @import "./shell/editor-tabs.css";
 @import "./shell/stage-fit.css";

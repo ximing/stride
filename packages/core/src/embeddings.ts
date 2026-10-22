@@ -1,3 +1,4 @@
+import { canonicalEmbeddingEndpoint } from './search-cache.ts'
 import type { EmbeddingSettings } from './settings.ts'
 
 export interface EmbeddingResponse {
@@ -10,7 +11,7 @@ export class EmbeddingClient {
 
   async embed(texts: string[], settings: EmbeddingSettings): Promise<number[][]> {
     if (!settings.apiKey) throw new Error('No embedding key')
-    const endpoint = settings.endpoint.replace(/\/$/, '')
+    const endpoint = canonicalEmbeddingEndpoint(settings.endpoint)
     if (!endpoint) throw new Error('No embedding endpoint')
     this.calls += 1
     const response = await this.fetchImpl(`${endpoint}/embeddings`, {

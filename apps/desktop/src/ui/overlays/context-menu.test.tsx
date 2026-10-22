@@ -40,6 +40,14 @@ afterEach(async () => {
 })
 
 describe('ContextMenu', () => {
+  it('renders a checked item as a checkbox row', async () => {
+    await mount([entry('advance', { label: 'Advance', checked: true })], () => {})
+    const item = menuItem('advance')
+    expect(item.getAttribute('role')).toBe('menuitemcheckbox')
+    expect(item.getAttribute('aria-checked')).toBe('true')
+    expect(item.querySelector('.sd-menu-item-check svg')).not.toBeNull()
+  })
+
   it('renders items at the pointer with role=menu', async () => {
     await mount([entry('one'), entry('two')], () => {})
     const menu = document.querySelector<HTMLElement>('[data-testid="context-menu"]')!

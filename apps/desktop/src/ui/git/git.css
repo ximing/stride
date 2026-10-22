@@ -52,9 +52,7 @@
 
 .git-section {
   min-width: 0;
-  margin: 0 0 16px;
-  padding-top: 12px;
-  border-top: 1px solid var(--sd-border);
+  margin: 0 0 20px;
 }
 
 .git-section .panel-subheading {
@@ -129,6 +127,34 @@
   font-family: var(--sd-font-mono);
   font-size: 12px;
   line-height: 18px;
+}
+
+.git-change-badge {
+  flex: none;
+  width: 16px;
+  text-align: center;
+  font-family: var(--sd-font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 18px;
+}
+
+.git-change-badge.is-added,
+.git-change-badge.is-untracked {
+  color: var(--sd-diff-add);
+}
+
+.git-change-badge.is-modified {
+  color: var(--sd-warning);
+}
+
+.git-change-badge.is-deleted,
+.git-change-badge.is-unmerged {
+  color: var(--sd-diff-del);
+}
+
+.git-change-badge.is-renamed {
+  color: var(--sd-dot-blue);
 }
 
 .git-diff,

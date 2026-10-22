@@ -1,6 +1,6 @@
 import type { StreamFn } from '@earendil-works/pi-agent-core'
 import type { Api, Model } from '@earendil-works/pi-ai'
-import { runAgentLoop } from './agent-loop.ts'
+import { runAgentLoop, type AgentUsage } from './agent-loop.ts'
 import { redactSecret } from './llm.ts'
 
 const DIFF_LIMIT = 8000
@@ -19,7 +19,7 @@ export async function suggestCommitMessage(input: {
   apiKey: string
   streamFn: StreamFn
   signal?: AbortSignal
-}): Promise<{ message: string; aborted: boolean }> {
+}): Promise<{ message: string; aborted: boolean; usage?: AgentUsage }> {
   if (!input.diff.trim()) return { message: '', aborted: false }
   const result = await runAgentLoop({
     model: input.model,
@@ -34,5 +34,6 @@ export async function suggestCommitMessage(input: {
   return {
     message: subjectLine(redactSecret(result.text, input.apiKey)),
     aborted: result.aborted,
+    usage: result.usage,
   }
 }

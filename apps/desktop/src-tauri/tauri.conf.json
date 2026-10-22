@@ -16,7 +16,11 @@
         "title": "Stride",
         "width": 1280,
         "height": 840,
-        "resizable": true
+        "resizable": true,
+        "decorations": false,
+        "transparent": true,
+        "shadow": true,
+        "acceptFirstMouse": true
       }
     ],
     "security": {

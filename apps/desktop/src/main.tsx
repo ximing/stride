@@ -10,6 +10,8 @@ import { UpdateService } from './services/update/update.service'
 import { CommandPaletteService } from './services/commands/command-palette.service'
 import { CommandService } from './services/commands/command.service'
 import { startDeepLinkListener } from './services/platform/deep-link'
+import { applyWindowIntent, installDesktopWindowBridge, publishDesktopMenusFromStorage, readStartupIntent } from './services/platform/windows'
+import { bindDesktopWindowFrame } from './ui/shell/window-controls'
 import { FolderService } from './services/vault/folder.service'
 import { LayoutService } from './services/layout/layout.service'
 import { ListFilterService } from './services/search/list-filter.service'
@@ -36,6 +38,7 @@ import './editor/chrome.css'
 // never flashes the wrong palette (system removes the attribute; light/dark
 // set an explicit override on <html>).
 applyStoredTheme()
+bindDesktopWindowFrame()
 
 const componentsPath = window.location.pathname
 const showComponents = componentsPath === '/dev/components' || componentsPath.startsWith('/dev/components/')
@@ -69,7 +72,13 @@ if (showComponents) {
   register(ThemeService)
   register(LocaleService)
 
-  void resolve(VaultService).restoreOpened()
+  const vault = resolve(VaultService)
+  installDesktopWindowBridge(vault)
+  void (async () => {
+    const intent = await readStartupIntent()
+    await applyWindowIntent(vault, intent)
+    publishDesktopMenusFromStorage()
+  })()
   void resolve(SettingsService).load()
 
   // T8.3: one silent update check a few seconds after launch; the
