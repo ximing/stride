@@ -986,6 +986,27 @@ describe('VaultService', () => {
     expect(vault.vaults).toHaveLength(2)
   })
 
+  it('shows an alias in the switcher and keeps the folder path', async () => {
+    register(VaultService)
+    const vault = resolve(VaultService)
+    vault.upsertVault({
+      id: 'notes',
+      label: '/Users/ximing/notes',
+      color: '',
+      icon: '',
+      lastOpened: '2026-01-01T00:00:00.000Z',
+    })
+    vault.activeVaultId = 'notes'
+    expect(vault.currentVaultLabel).toBe('notes')
+    vault.setVaultAlias('notes', '  我的笔记 ')
+    expect(vault.currentVaultLabel).toBe('我的笔记')
+    expect(vault.vaults.find((entry) => entry.id === 'notes')?.label).toBe('/Users/ximing/notes')
+    const stored = JSON.parse(localStorage.getItem(VAULT_REGISTRY_KEY) ?? '[]') as Array<{ alias?: string }>
+    expect(stored[0]?.alias).toBe('我的笔记')
+    vault.setVaultAlias('notes', '   ')
+    expect(vault.currentVaultLabel).toBe('notes')
+  })
+
   it('lists recorded memory vaults in the status bar switcher', async () => {
     useMemoryFixture()
     const picker = vi.fn()

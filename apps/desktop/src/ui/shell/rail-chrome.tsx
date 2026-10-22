@@ -7,7 +7,9 @@ import { commandShortcut } from '../../services/commands/commands'
 import { LayoutService } from '../../services/layout/layout.service'
 import { isTauriRuntime } from '../../services/platform/deep-link'
 import { VaultService } from '../../services/vault/vault.service'
+import { vaultDisplayName } from '../../services/vault/vault-registry'
 import { Button, IconButton } from '../primitives/button'
+import { Input } from '../primitives/input'
 import { Mark } from '../primitives/icon'
 import { WindowControls } from './window-controls'
 
@@ -15,8 +17,16 @@ export const VaultSwitcher = observer(function VaultSwitcher() {
   const { t } = useTranslation()
   const vault = useService(VaultService)
   const [open, setOpen] = useState(false)
+  const [aliasDraft, setAliasDraft] = useState('')
   const rootRef = useRef<HTMLDivElement>(null)
   const triggerRef = useRef<HTMLButtonElement>(null)
+  const active = vault.vaults.find((entry) => entry.id === vault.activeVaultId)
+  const activePath = active?.label ?? ''
+
+  const commitAlias = () => {
+    if (!active) return
+    vault.setVaultAlias(active.id, aliasDraft)
+  }
 
   useEffect(() => {
     if (!open) return
@@ -48,7 +58,14 @@ export const VaultSwitcher = observer(function VaultSwitcher() {
         aria-expanded={open}
         aria-haspopup="listbox"
         aria-controls="vault-switcher-options"
-        onClick={() => setOpen((value) => !value)}
+        title={activePath || undefined}
+        onClick={() => {
+          setOpen((value) => {
+            const next = !value
+            if (next) setAliasDraft(active?.alias ?? '')
+            return next
+          })
+        }}
       >
         <span className="statusbar-icon statusbar-icon-vault"><Mark icon={Book} size={14} /></span>
         <span className="vault-switcher-label">{vault.currentVaultLabel}</span>
@@ -69,17 +86,39 @@ export const VaultSwitcher = observer(function VaultSwitcher() {
                   data-vault-id={entry.id}
                   aria-selected={selected}
                   className={selected ? 'active' : ''}
+                  title={entry.label}
                   onClick={() => {
                     setOpen(false)
                     void vault.switchVault(entry.id)
                   }}
                 >
-                  <span className="vault-option-label">{entry.label}</span>
+                  <span className="vault-option-label">{vaultDisplayName(entry)}</span>
                   {selected ? <Mark icon={Check} size={14} /> : null}
                 </Button>
               )
             })}
           </div>
+          {active ? (
+            <div className="vault-switcher-alias" data-tauri-drag-region="false">
+              <Input
+                label={t('shell.vaultAlias')}
+                data-testid="vault-alias"
+                value={aliasDraft}
+                placeholder={vaultDisplayName({ label: activePath })}
+                spellCheck={false}
+                onChange={(event) => setAliasDraft(event.target.value)}
+                onBlur={commitAlias}
+                onKeyDown={(event) => {
+                  if (event.key !== 'Enter') return
+                  event.preventDefault()
+                  commitAlias()
+                }}
+              />
+              {activePath && activePath !== vaultDisplayName(active) ? (
+                <p className="vault-switcher-path">{activePath}</p>
+              ) : null}
+            </div>
+          ) : null}
           <div className="vault-switcher-add">
             <Button
               tone="quiet"

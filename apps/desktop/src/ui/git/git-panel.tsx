@@ -9,6 +9,38 @@ import { Mark } from '../primitives/icon'
 import { Input } from '../primitives/input'
 import { Modal, ModalClose, ModalContent } from '../primitives/modal'
 
+function RemoteFields(props: {
+  remote: string
+  onRemote: (value: string) => void
+  onAddRemote: () => void
+  onPull?: () => void
+  onPush?: () => void
+}) {
+  const { t } = useTranslation()
+  return (
+    <section className="git-section" aria-label={t('git.remoteSettings')}>
+      <Input
+        label={t('git.remote')}
+        type="text"
+        data-testid="git-remote"
+        placeholder="https://github.com/you/notes.git"
+        spellCheck={false}
+        value={props.remote}
+        onChange={(event) => props.onRemote(event.target.value)}
+      />
+      <div className="editor-tools git-actions">
+        <Button size="sm" tone="secondary" data-testid="git-remote-add" onClick={() => props.onAddRemote()}>{t('git.addRemote')}</Button>
+        {props.onPull ? (
+          <Button size="sm" tone="secondary" data-testid="git-pull" onClick={() => props.onPull?.()}>{t('git.pull')}</Button>
+        ) : null}
+        {props.onPush ? (
+          <Button size="sm" tone="secondary" data-testid="git-push" onClick={() => props.onPush?.()}>{t('git.push')}</Button>
+        ) : null}
+      </div>
+    </section>
+  )
+}
+
 function diffLineClass(line: string): string {
   if (line.startsWith('@@')) return 'diff-line diff-hunk'
   if (line.startsWith('+') && !line.startsWith('+++')) return 'diff-line diff-add'
@@ -117,15 +149,22 @@ export function GitPanelView(props: {
         <EmptyState compact tone="error" icon={CircleAlert} title={statusCopy(props.notice)} testId="git-blocked" />
       )}
       {props.surface === 'needs-init' && (
-        <EmptyState
-          compact
-          icon={GitBranch}
-          title={t('git.notRepo')}
-          actionLabel={t('git.init')}
-          actionTestId="git-init"
-          onAction={() => props.onInit()}
-          testId="git-needs-init-surface"
-        />
+        <>
+          <EmptyState
+            compact
+            icon={GitBranch}
+            title={t('git.notRepo')}
+            actionLabel={t('git.init')}
+            actionTestId="git-init"
+            onAction={() => props.onInit()}
+            testId="git-needs-init-surface"
+          />
+          <RemoteFields
+            remote={props.remote}
+            onRemote={props.onRemote}
+            onAddRemote={props.onAddRemote}
+          />
+        </>
       )}
       {props.surface === 'ready' && (
         <>
@@ -134,20 +173,13 @@ export function GitPanelView(props: {
             <p className="meta" data-testid="git-behind"><Mark icon={ArrowDown} size={13} />{t('git.behind', { count: props.behind })}</p>
           </div>
           {props.notice ? <p className="meta git-notice" data-testid="git-notice">{statusCopy(props.notice)}</p> : null}
-          <section className="git-section" aria-label={t('git.remoteSettings')}>
-            <Input
-              label={t('git.remote')}
-              type="text"
-              data-testid="git-remote"
-              value={props.remote}
-              onChange={(event) => props.onRemote(event.target.value)}
-            />
-            <div className="editor-tools git-actions">
-              <Button size="sm" tone="secondary" data-testid="git-remote-add" onClick={() => props.onAddRemote()}>{t('git.addRemote')}</Button>
-              <Button size="sm" tone="secondary" data-testid="git-pull" onClick={() => props.onPull()}>{t('git.pull')}</Button>
-              <Button size="sm" tone="secondary" data-testid="git-push" onClick={() => props.onPush()}>{t('git.push')}</Button>
-            </div>
-          </section>
+          <RemoteFields
+            remote={props.remote}
+            onRemote={props.onRemote}
+            onAddRemote={props.onAddRemote}
+            onPull={props.onPull}
+            onPush={props.onPush}
+          />
           <section className="git-section" aria-label={t('git.workingTree')}>
             <h3 className="panel-subheading">{t('git.changes')}</h3>
             <div className="git-changes">

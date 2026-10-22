@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest'
 import { MemoryFileSystem } from '@stride/platform'
-import { buildGraph, groupByType, relationsOf } from './graph.ts'
+import {
+  addRelationTarget,
+  buildGraph,
+  groupByType,
+  isManagedRelation,
+  relationStorageKey,
+  relationsOf,
+  removeRelationTarget,
+} from './graph.ts'
 import type { TipTapNode } from './note.ts'
 import { loadNotes, notePath, saveNote } from './vault.ts'
 
@@ -119,5 +127,21 @@ describe('relationships and inbox', () => {
     expect(relationsOf(graph, 'parent').shown).toEqual([])
     expect(relationsOf(graph, 'parent').backlinks).toEqual([{ sourceId: 'loose', via: 'body' }])
     expect(graph.inbox.map((note) => note.id).sort()).toEqual(['loose', 'parent'])
+  })
+
+  it('adds and removes belongs_to and related_to wikilinks without touching other text', () => {
+    expect(relationStorageKey({ 'belongs to': ['[[Parent]]'] }, 'belongs_to')).toBe('belongs to')
+    expect(relationStorageKey({}, 'related_to')).toBe('related_to')
+    expect(addRelationTarget(undefined, 'Parent')).toEqual(['[[Parent]]'])
+    expect(addRelationTarget(['[[Parent]]'], 'parent')).toEqual(['[[Parent]]'])
+    expect(addRelationTarget(['[[Parent]]'], 'Peer')).toEqual(['[[Parent]]', '[[Peer]]'])
+    expect(addRelationTarget('see [[Parent]]', 'Peer')).toBe('see [[Parent]] [[Peer]]')
+    expect(removeRelationTarget(['[[Parent]]', '[[Peer]]'], ['Parent'])).toEqual(['[[Peer]]'])
+    expect(removeRelationTarget('[[Parent]]', ['parent', 'parent-id'])).toBeUndefined()
+    expect(removeRelationTarget('[[parent-id]]', ['Parent', 'parent-id'])).toBeUndefined()
+    expect(isManagedRelation('belongs_to', ['[[Parent]]'])).toBe(true)
+    expect(isManagedRelation('belongs to', '[[Parent]]')).toBe(true)
+    expect(isManagedRelation('belongs_to', 'Parent')).toBe(false)
+    expect(isManagedRelation('supports', ['[[Peer]]'])).toBe(false)
   })
 })

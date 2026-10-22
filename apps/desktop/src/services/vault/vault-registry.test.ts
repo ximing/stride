@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   folderTitle,
+  vaultDisplayName,
   mergeVaultRecords,
   recentProjectsFromRecords,
   reconcileRegistry,
@@ -51,6 +52,14 @@ describe('reconcileRegistry', () => {
     const local = [vault('same', '/Users/local', stamp, '#local', 'a')]
     const incoming = [vault('same', '/Users/incoming', stamp, '#incoming', 'b')]
     expect(reconcileRegistry(local, incoming)).toEqual(incoming)
+  })
+})
+
+describe('vaultDisplayName', () => {
+  it('prefers a trimmed alias and otherwise uses the folder name', () => {
+    expect(vaultDisplayName({ label: '/Users/ximing/notes', alias: '  笔记  ' })).toBe('笔记')
+    expect(vaultDisplayName({ label: '/Users/ximing/notes' })).toBe('notes')
+    expect(vaultDisplayName({ label: '/Users/ximing/notes', alias: '   ' })).toBe('notes')
   })
 })
 

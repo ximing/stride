@@ -273,7 +273,8 @@ describe('GitPanelView', () => {
     expect(host?.textContent).toContain('This vault is not a Git repository.')
     expect(host?.querySelector('[data-testid="git-change"]')).toBeNull()
     expect(host?.querySelector('[data-testid="git-commit-open"]')).toBeNull()
-    expect(host?.querySelector('[data-testid="git-remote"]')).toBeNull()
+    expect(host?.querySelector('[data-testid="git-remote"]')).not.toBeNull()
+    expect(host?.querySelector('[data-testid="git-remote-add"]')).not.toBeNull()
     expect(host?.querySelector('[data-testid="git-pull"]')).toBeNull()
     expect(host?.querySelector('[data-testid="git-push"]')).toBeNull()
     await act(async () => {

@@ -20,6 +20,10 @@
   flex: none;
 }
 
+.sgit-field-wide > .sd-field {
+  width: min(100%, 520px);
+}
+
 .sgit-field .sd-field-label {
   color: var(--sd-fg);
   font-size: 13px;

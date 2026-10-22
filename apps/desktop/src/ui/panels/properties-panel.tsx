@@ -1,7 +1,14 @@
 import { Archive, SlidersHorizontal, Trash2, X } from 'lucide-react'
 import { observer, useService } from '@rabjs/react'
 import { useTranslation } from 'react-i18next'
-import { relationsOf, resolveNote, type NoteRelations } from '@stride/core/graph'
+import {
+  isManagedRelation,
+  relationsOf,
+  resolveNote,
+  structuralRelation,
+  type NoteRelations,
+  type StructuralRelation,
+} from '@stride/core/graph'
 import { bodyWikilinks, isArchived, isHiddenProperty, propertyKind, type StrideNote } from '@stride/core/note'
 import { useState } from 'react'
 import { TabsService } from '../../services/notes/tabs.service'
@@ -12,6 +19,126 @@ import { Mark } from '../primitives/icon'
 import { Input } from '../primitives/input'
 import { Modal, ModalClose, ModalContent } from '../primitives/modal'
 import { Select } from '../primitives/select'
+
+const RELATION_MATCH_LIMIT = 8
+
+function relationName(field: string, belongsTo: string, relatedTo: string): string {
+  const kind = structuralRelation(field)
+  if (kind === 'belongs_to') return belongsTo
+  if (kind === 'related_to') return relatedTo
+  return field
+}
+
+function RelationEditor({ noteId }: { noteId: string }) {
+  const { t } = useTranslation()
+  const vault = useService(VaultService)
+  const [kind, setKind] = useState<StructuralRelation>('belongs_to')
+  const [query, setQuery] = useState('')
+  const trimmed = query.trim().toLowerCase()
+  const matches = trimmed
+    ? vault.notes
+      .filter((item) => item.id !== noteId && !isArchived(item) && item.title.toLowerCase().includes(trimmed))
+      .slice(0, RELATION_MATCH_LIMIT)
+    : []
+  const add = (targetId: string) => {
+    vault.linkRelation(kind, targetId)
+    setQuery('')
+  }
+  return (
+    <form
+      className="relation-add-form"
+      onSubmit={(event) => {
+        event.preventDefault()
+        const first = matches[0]
+        if (first) add(first.id)
+      }}
+    >
+      <Select
+        label={t('panels.relationKind')}
+        data-testid="relation-kind"
+        value={kind}
+        onValueChange={(value) => {
+          if (value === 'belongs_to' || value === 'related_to') setKind(value)
+        }}
+        options={[
+          { value: 'belongs_to', label: t('panels.belongsTo') },
+          { value: 'related_to', label: t('panels.relatedTo') },
+        ]}
+      />
+      <Input
+        label={t('panels.relationNote')}
+        data-testid="relation-query"
+        value={query}
+        placeholder={t('panels.relationSearch')}
+        spellCheck={false}
+        onChange={(event) => setQuery(event.target.value)}
+      />
+      {matches.length > 0 ? (
+        <div className="relation-matches">
+          {matches.map((item) => (
+            <button
+              key={item.id}
+              type="button"
+              className="relation-match"
+              data-testid="relation-match"
+              data-target={item.id}
+              onClick={() => add(item.id)}
+            >
+              {item.title}
+            </button>
+          ))}
+        </div>
+      ) : null}
+    </form>
+  )
+}
+
+function RelationLine({
+  label,
+  field,
+  names,
+  targetId,
+  removable,
+  onOpen,
+}: {
+  label: string
+  field: string
+  names: string[]
+  targetId?: string
+  removable: boolean
+  onOpen?: () => void
+}) {
+  const { t } = useTranslation()
+  const vault = useService(VaultService)
+  return (
+    <div className="relation-line">
+      {targetId ? (
+        <button
+          type="button"
+          className="meta relation-row"
+          data-testid="relation-link"
+          data-target={targetId}
+          onClick={onOpen}
+        >
+          {label}
+        </button>
+      ) : (
+        <p className="meta">{label}</p>
+      )}
+      {removable ? (
+        <IconButton
+          className="property-remove"
+          data-testid="relation-remove"
+          data-field={field}
+          icon={X}
+          label={t('panels.remove', { name: names[0] || field })}
+          size="sm"
+          onClick={() => vault.unlinkRelation(field, names)}
+        />
+      ) : null}
+    </div>
+  )
+}
 
 function unresolvedRelations(
   note: StrideNote,
@@ -61,7 +188,9 @@ export const PropertiesPanel = observer(function PropertiesPanel() {
   const graph = vault.graph
   const relations = relationsOf(graph, note.id)
   const unresolved = unresolvedRelations(note, graph.notes, relations.outgoing)
-  const fields = Object.keys(note.properties).filter((field) => !isHiddenProperty(field))
+  const fields = Object.keys(note.properties).filter((field) => (
+    !isHiddenProperty(field) && !isManagedRelation(field, note.properties[field])
+  ))
   return (
     <div className="properties-panel">
       <div className="properties-panel-head">
@@ -206,37 +335,38 @@ export const PropertiesPanel = observer(function PropertiesPanel() {
         </Button>
       </form>
       <h2 className="panel-heading">{t('panels.relationships')}</h2>
+      <RelationEditor key={note.id} noteId={note.id} />
       {relations.shown.length === 0 && unresolved.length === 0 && (
         <EmptyState compact title={t('panels.noRelations')} testId="relationships-empty" />
       )}
       {relations.shown.map((link) => {
-        const fieldLabel = link.derived ? t('panels.derived', { field: link.field }) : link.field
-        const label = `${fieldLabel}: ${link.label}`
-        if (!link.targetId) {
-          return (
-            <p key={`${link.field}-${link.label}-${link.derived}`} className="meta">
-              {label}
-            </p>
-          )
-        }
+        const name = relationName(link.field, t('panels.belongsTo'), t('panels.relatedTo'))
+        const fieldLabel = link.derived ? t('panels.derived', { field: name }) : name
+        const removable = !link.derived && structuralRelation(link.field) !== null
         return (
-          <button
+          <RelationLine
             key={`${link.field}-${link.targetId}-${link.derived}`}
-            type="button"
-            className="meta relation-row"
-            data-testid="relation-link"
-            data-target={link.targetId}
-            onClick={() => tabs.openNote(link.targetId)}
-          >
-            {label}
-          </button>
+            label={`${fieldLabel}: ${link.label}`}
+            field={link.field}
+            names={[link.label, link.targetId].filter(Boolean)}
+            targetId={link.targetId || undefined}
+            removable={removable}
+            onOpen={link.targetId ? () => tabs.openNote(link.targetId) : undefined}
+          />
         )
       })}
-      {unresolved.map((link) => (
-        <p key={link.key} className="meta">
-          {link.field}: {link.label}
-        </p>
-      ))}
+      {unresolved.map((link) => {
+        const name = relationName(link.field, t('panels.belongsTo'), t('panels.relatedTo'))
+        return (
+          <RelationLine
+            key={link.key}
+            label={`${name}: ${link.label}`}
+            field={link.field}
+            names={[link.label]}
+            removable={structuralRelation(link.field) !== null}
+          />
+        )
+      })}
       <h2 className="panel-heading">{t('panels.backlinks')}</h2>
       {relations.backlinks.length === 0 && <EmptyState compact title={t('panels.noBacklinks')} testId="backlinks-empty" />}
       {relations.backlinks.map((link) => (

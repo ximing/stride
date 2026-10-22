@@ -76,6 +76,13 @@ export function folderTitle(label: string): string {
   return name || label
 }
 
+/** Switcher and chooser name: a saved alias, otherwise the folder name, never the full path. */
+export function vaultDisplayName(entry: { label: string; alias?: string }): string {
+  const alias = typeof entry.alias === 'string' ? entry.alias.trim() : ''
+  if (alias) return alias
+  return folderTitle(entry.label)
+}
+
 const ABSOLUTE_PATH = /^(?:\/|[A-Za-z]:[\\/])/
 
 export function recentProjectsFromRecords(records: readonly VaultRecord[]): RecentProject[] {
@@ -84,7 +91,7 @@ export function recentProjectsFromRecords(records: readonly VaultRecord[]): Rece
     .map((entry) => ({
       id: entry.id,
       path: entry.label,
-      title: folderTitle(entry.label),
+      title: vaultDisplayName(entry),
       lastOpened: entry.lastOpened,
     }))
     .sort((left, right) => right.lastOpened.localeCompare(left.lastOpened) || left.path.localeCompare(right.path))

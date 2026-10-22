@@ -37,6 +37,7 @@ import { reportOpenProject, syncRecentProjects } from '../platform/windows'
 import {
   mergeVaultRecords,
   parseVaultRecords,
+  vaultDisplayName,
   readStoredVaults,
   reconcileRegistry,
   recentProjectsFromRecords,
@@ -94,10 +95,13 @@ export { VAULT_REGISTRY_KEY }
 
 export interface VaultRecord {
   id: string
+  /** Filesystem path or backend root. Reopen uses this; it is not the display name. */
   label: string
   color: string
   icon: string
   lastOpened: string
+  /** Local display name for the switcher. Empty means the folder name. */
+  alias?: string
 }
 
 // Dev-only: `?fixture=memory&seed=N` programmatically fills the in-memory vault
@@ -330,7 +334,18 @@ export class VaultService extends Service {
 
   get currentVaultLabel(): string {
     const entry = this.vaults.find((item) => item.id === this.activeVaultId)
-    return entry?.label || this.fs?.rootLabel || ''
+    if (entry) return vaultDisplayName(entry)
+    return this.fs?.rootLabel ? vaultDisplayName({ label: this.fs.rootLabel }) : ''
+  }
+
+  /** Saves a local display name. The stored path in `label` stays the reopen key. */
+  setVaultAlias(id: string, alias: string) {
+    this.ensureRegistry()
+    const entry = this.vaults.find((item) => item.id === id)
+    if (!entry) return
+    const trimmed = alias.trim()
+    if ((entry.alias ?? '') === trimmed) return
+    this.upsertVault({ ...entry, alias: trimmed })
   }
 
   get recentVaults(): VaultRecord[] {
@@ -806,6 +821,14 @@ export class VaultService extends Service {
     return propertyEditor.addProperty(this)
   }
 
+  linkRelation(kind: 'belongs_to' | 'related_to', targetId: string) {
+    return propertyEditor.linkRelation(this, kind, targetId)
+  }
+
+  unlinkRelation(field: string, names: readonly string[]) {
+    return propertyEditor.unlinkRelation(this, field, names)
+  }
+
   updateProperty(field: string, raw: string) {
     return propertyEditor.updateProperty(this, field, raw)
   }
@@ -1103,6 +1126,7 @@ export class VaultService extends Service {
         label: project.path,
         color: previous?.color ?? '',
         icon: previous?.icon ?? '',
+        alias: previous?.alias ?? '',
         lastOpened: previous && previous.lastOpened > project.lastOpened ? previous.lastOpened : project.lastOpened,
       }
     })
@@ -1138,6 +1162,7 @@ export class VaultService extends Service {
       label: backend.rootLabel,
       color: previous?.color ?? '',
       icon: previous?.icon ?? '',
+      alias: previous?.alias ?? '',
       lastOpened: this.openedStamp(),
     })
     this.backends.set(id, backend)

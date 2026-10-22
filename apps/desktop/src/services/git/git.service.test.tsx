@@ -62,6 +62,8 @@ describe('browser panels', () => {
       git.abortSuggest()
       git.cloneUrl = ''
       git.cloneError = ''
+      git.remote = ''
+      Object.assign(git, { remoteRoot: '', remoteNeedsLoad: true })
       git.output = 'Git is not available in the browser'
       git.surface = 'unavailable'
       git.notice = ''
@@ -127,6 +129,64 @@ describe('browser panels', () => {
     await git.init()
     expect(calls).toEqual(['init /tmp/vault', 'commit Initial commit'])
     expect(await files.readText('.gitignore')).toBe(VAULT_GITIGNORE)
+  })
+
+  it('loads the origin URL and keeps a typed value across refresh', async () => {
+    let stored = 'https://example.test/notes.git'
+    setGitBackendForTests({
+      ...recordingGit([]),
+      remoteUrl: () => Promise.resolve(stored),
+    })
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const files = new MemoryFileSystem('/tmp/vault-remote-load')
+    await files.mkdir('.git')
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.broad = false
+    resolve(SettingsService).setGitEnabled(true)
+    const git = resolve(GitService)
+    await git.refresh()
+    expect(git.remote).toBe('https://example.test/notes.git')
+    git.setRemote('https://example.test/typed.git')
+    stored = 'https://example.test/notes.git'
+    await git.refresh()
+    expect(git.remote).toBe('https://example.test/typed.git')
+  })
+
+  it('initializes a vault that is not a repository before saving the remote URL', async () => {
+    const calls: string[] = []
+    const files = new MemoryFileSystem('/tmp/vault-connect')
+    setGitBackendForTests({
+      ...recordingGit(calls),
+      init: (repo) => {
+        calls.push(`init ${repo}`)
+        return files.mkdir('.git').then(() => undefined)
+      },
+      addRemote: (_repo, url) => {
+        calls.push(`add ${url}`)
+        return Promise.resolve()
+      },
+    })
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.broad = false
+    resolve(SettingsService).setGitEnabled(true)
+    const git = resolve(GitService)
+    git.setRemote('https://example.test/notes.git')
+    await git.addRemote()
+    expect(calls).toEqual([
+      'init /tmp/vault-connect',
+      'commit Initial commit',
+      'add https://example.test/notes.git',
+    ])
+    expect(git.output).toBe('')
+    expect(git.remote).toBe('https://example.test/notes.git')
+    expect(await files.stat('.git')).not.toBeNull()
   })
 
   it('refuses to initialize a broad Desktop root', async () => {

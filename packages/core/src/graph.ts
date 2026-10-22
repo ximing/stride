@@ -1,6 +1,7 @@
 import {
   bodyWikilinks,
   wikilinkTargets,
+  type NoteProperty,
   type StrideNote,
 } from './note.ts'
 
@@ -32,9 +33,96 @@ export interface VaultGraph {
 
 const BELONGS = new Set(['belongs_to', 'belongs to'])
 const RELATED = new Set(['related_to', 'related to'])
+const WIKILINK_TOKEN = /\[\[[^\]]+\]\]/g
+
+export type StructuralRelation = 'belongs_to' | 'related_to'
 
 export function normalizeField(field: string): string {
   return field.trim().toLowerCase().replace(/\s+/g, ' ')
+}
+
+export function structuralRelation(field: string): StructuralRelation | null {
+  const canonical = normalizeField(field)
+  if (BELONGS.has(canonical)) return 'belongs_to'
+  if (RELATED.has(canonical)) return 'related_to'
+  return null
+}
+
+/** Keep an existing `belongs to` / `related to` key; otherwise use the canonical name. */
+export function relationStorageKey(
+  properties: Record<string, NoteProperty>,
+  kind: StructuralRelation,
+): string {
+  return Object.keys(properties).find((field) => structuralRelation(field) === kind) ?? kind
+}
+
+function sameTitle(left: string, right: string): boolean {
+  return left.trim().toLowerCase() === right.trim().toLowerCase()
+}
+
+function withoutTokens(raw: string, names: readonly string[]): string {
+  return raw
+    .replace(WIKILINK_TOKEN, (token) => {
+      const inner = token.slice(2, -2).trim()
+      return names.some((name) => sameTitle(inner, name)) ? '' : token
+    })
+    .replace(/[\s,]+/g, ' ')
+    .trim()
+}
+
+function linkOnly(value: NoteProperty): boolean {
+  if (typeof value === 'string') {
+    return wikilinkTargets(value).length > 0 && value.replace(WIKILINK_TOKEN, '').replace(/[\s,]+/g, '') === ''
+  }
+  if (!Array.isArray(value) || value.length === 0) return false
+  return value.every((item) => (
+    typeof item === 'string'
+    && wikilinkTargets(item).length > 0
+    && item.replace(WIKILINK_TOKEN, '').replace(/[\s,]+/g, '') === ''
+  ))
+}
+
+/** True when this property is only `belongs_to` / `related_to` wikilinks, so the relationship editor owns it. */
+export function isManagedRelation(field: string, value: NoteProperty | undefined): boolean {
+  return value !== undefined && structuralRelation(field) !== null && linkOnly(value)
+}
+
+export function addRelationTarget(value: NoteProperty | undefined, title: string): NoteProperty {
+  const name = title.trim()
+  const token = `[[${name}]]`
+  if (!name) return value ?? ''
+  if (wikilinkTargets(value).some((item) => sameTitle(item, name))) return value ?? [token]
+  if (value === undefined || value === '') return [token]
+  if (Array.isArray(value)) return [...value, token]
+  if (typeof value === 'string') {
+    if (linkOnly(value)) return [...wikilinkTargets(value).map((item) => `[[${item}]]`), token]
+    return `${value} ${token}`.trim()
+  }
+  return [token]
+}
+
+/** Drop wikilinks whose text matches any name. `undefined` means the property should be removed. */
+export function removeRelationTarget(
+  value: NoteProperty | undefined,
+  names: readonly string[],
+): NoteProperty | undefined {
+  const wanted = names.map((name) => name.trim()).filter(Boolean)
+  if (wanted.length === 0) return value
+  if (Array.isArray(value)) {
+    const next = value.flatMap((item) => {
+      if (typeof item !== 'string') return []
+      if (wikilinkTargets(item).length === 0) return wanted.some((name) => sameTitle(item, name)) ? [] : [item]
+      const kept = withoutTokens(item, wanted)
+      return kept ? [kept] : []
+    })
+    return next.length > 0 ? next : undefined
+  }
+  if (typeof value === 'string') {
+    if (wikilinkTargets(value).length === 0) return wanted.some((name) => sameTitle(value, name)) ? undefined : value
+    const next = withoutTokens(value, wanted)
+    return next ? next : undefined
+  }
+  return value
 }
 
 export function relationshipFields(note: StrideNote): { field: string; targets: string[] }[] {

@@ -231,7 +231,7 @@ describe('PropertiesPanel', () => {
       const toA = host.querySelector<HTMLButtonElement>('[data-testid="relation-link"][data-target="note-a"]')
       const backToA = host.querySelector<HTMLButtonElement>('[data-testid="backlink"][data-source="note-a"]')
       expect(toA).not.toBeNull()
-      expect(toA?.textContent).toContain('related_to')
+      expect(toA?.textContent).toContain('Related to')
       expect(backToA).not.toBeNull()
       await act(async () => {
         backToA!.click()
@@ -246,6 +246,64 @@ describe('PropertiesPanel', () => {
         host.querySelector<HTMLButtonElement>('[data-testid="relation-link"][data-target="note-a"]')!.click()
       })
       expect(vault.activeId).toBe('note-a')
+    } finally {
+      vault.cancelPending()
+      await act(async () => {
+        root.unmount()
+      })
+      host.remove()
+    }
+  })
+
+  it('links belongs_to and related_to by picking a note', async () => {
+    register(VaultService)
+    const vault = resolve(VaultService)
+    vault.fs = null
+    vault.notes = [
+      linkedNote('note-a', 'Note A', {}, []),
+      linkedNote('note-b', 'Note B', {}, []),
+    ]
+    vault.activeId = 'note-a'
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    try {
+      await act(async () => {
+        root.render(<PropertiesPanel />)
+      })
+      await act(async () => {
+        setControlValue(host.querySelector<HTMLInputElement>('[data-testid="relation-query"]')!, 'note b')
+      })
+      await act(async () => {
+        host.querySelector<HTMLButtonElement>('[data-testid="relation-match"][data-target="note-b"]')!.click()
+      })
+      expect(vault.notes.find((note) => note.id === 'note-a')?.properties.belongs_to).toEqual(['[[Note B]]'])
+      expect(host.querySelector('[data-testid="property-field"][data-name="belongs_to"]')).toBeNull()
+      expect(host.textContent).toContain('Belongs to')
+      expect(vault.notes.find((note) => note.id === 'note-b')?.properties.has).toBeUndefined()
+
+      const kind = host.querySelector<HTMLButtonElement>('[data-testid="relation-kind"]')!
+      await act(async () => {
+        kind.click()
+      })
+      const related = [...document.querySelectorAll('[role="option"]')].find((item) => item.textContent === 'Related to')
+      expect(related).not.toBeNull()
+      await act(async () => {
+        ;(related as HTMLElement).click()
+      })
+      await act(async () => {
+        setControlValue(host.querySelector<HTMLInputElement>('[data-testid="relation-query"]')!, 'note b')
+      })
+      await act(async () => {
+        host.querySelector<HTMLButtonElement>('[data-testid="relation-match"][data-target="note-b"]')!.click()
+      })
+      expect(vault.notes.find((note) => note.id === 'note-a')?.properties.related_to).toEqual(['[[Note B]]'])
+
+      await act(async () => {
+        host.querySelector<HTMLButtonElement>('[data-testid="relation-remove"][data-field="belongs_to"]')!.click()
+      })
+      expect(vault.notes.find((note) => note.id === 'note-a')?.properties.belongs_to).toBeUndefined()
+      expect(vault.notes.find((note) => note.id === 'note-a')?.properties.related_to).toEqual(['[[Note B]]'])
     } finally {
       vault.cancelPending()
       await act(async () => {

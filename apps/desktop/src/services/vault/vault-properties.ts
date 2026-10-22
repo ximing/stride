@@ -1,4 +1,11 @@
-import { hasOutgoingRelationship } from '@stride/core/graph'
+import {
+  addRelationTarget,
+  hasOutgoingRelationship,
+  relationStorageKey,
+  removeRelationTarget,
+  structuralRelation,
+  type StructuralRelation,
+} from '@stride/core/graph'
 import {
   formatProperty,
   parseFiniteNumber,
@@ -33,6 +40,26 @@ export function setPropertyValue(vault: VaultService, value: string) {
 
 export function setPropertyChecked(vault: VaultService, value: boolean) {
   vault.propertyChecked = value
+}
+
+export function linkRelation(vault: VaultService, kind: StructuralRelation, targetId: string) {
+  const current = vault.active
+  if (!current || current.id === targetId) return
+  const target = vault.notes.find((note) => note.id === targetId)
+  const title = target?.title.trim() ?? ''
+  if (!title) return
+  const field = relationStorageKey(current.properties, kind)
+  clearFieldDraft(vault, field)
+  writeProperty(vault, field, addRelationTarget(current.properties[field], title))
+}
+
+export function unlinkRelation(vault: VaultService, field: string, names: readonly string[]) {
+  const current = vault.active
+  if (!current || !structuralRelation(field) || !Object.hasOwn(current.properties, field)) return
+  const next = removeRelationTarget(current.properties[field], names)
+  clearFieldDraft(vault, field)
+  if (next === undefined) removeProperty(vault, field)
+  else writeProperty(vault, field, next)
 }
 
 export function addProperty(vault: VaultService) {

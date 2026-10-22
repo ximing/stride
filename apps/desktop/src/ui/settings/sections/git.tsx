@@ -4,11 +4,13 @@
 // numeric drafts, writes the setters, then persists via SettingsService.save()
 // — the existing load/save round-trip migrates stored values unchanged.
 
-import { observer, useService } from '@rabjs/react'
+import { has, observer, resolve, useService } from '@rabjs/react'
 import { CircleAlert, CircleCheck } from 'lucide-react'
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
+import { GitService, isGitRemoteUrl } from '../../../services/git/git.service'
 import { SettingsService } from '../../../services/settings/settings.service'
+import { VaultService } from '../../../services/vault/vault.service'
 import { Button } from '../../primitives/button'
 import { Mark } from '../../primitives/icon'
 import { Input } from '../../primitives/input'
@@ -93,10 +95,48 @@ function ToggleRow(props: {
   )
 }
 
+const RemoteUrlField = observer(function RemoteUrlField(props: {
+  draft: string | null
+  error: string
+  onChange: (value: string) => void
+  onReset: () => void
+}) {
+  const { t } = useTranslation()
+  const git = useService(GitService)
+  const vault = useService(VaultService)
+  const vaultId = vault.activeVaultId
+  const onReset = props.onReset
+  useEffect(() => {
+    onReset()
+  }, [vaultId, onReset])
+  if (vault.phase !== 'ready' || !vault.fs) return null
+  return (
+    <div className="sgit-field sgit-field-wide">
+      <Input
+        label={t('settings.git.remote')}
+        className="sgit-input"
+        type="text"
+        autoComplete="off"
+        spellCheck={false}
+        placeholder="https://github.com/you/notes.git"
+        data-testid="settings-git-remote"
+        value={props.draft ?? git.remote}
+        aria-invalid={props.error ? true : undefined}
+        hint={props.error ? undefined : t('settings.git.remoteHint')}
+        error={props.error || undefined}
+        onChange={(event) => props.onChange(event.target.value)}
+      />
+    </div>
+  )
+})
+
 export const GitSection = observer(function GitSection() {
   const { t } = useTranslation()
   const settings = useService(SettingsService)
   const [gitEnabled, setGitEnabled] = useState(settings.form.gitEnabled)
+  const [remoteDraft, setRemoteDraft] = useState<string | null>(null)
+  const [remoteError, setRemoteError] = useState('')
+  const resetRemoteDraft = useCallback(() => setRemoteDraft(null), [])
   const [autoPull, setAutoPull] = useState(String(settings.form.autoSyncMinutes))
   const [autoGitEnabled, setAutoGitEnabled] = useState(settings.form.autoGitEnabled)
   const [idle, setIdle] = useState(String(settings.form.autoGitIdleSeconds))
@@ -129,10 +169,15 @@ export const GitSection = observer(function GitSection() {
       idle: idleParsed.ok ? '' : idleParsed.error,
       blur: blurParsed.ok ? '' : blurParsed.error,
     })
-    if (!autoPullParsed.ok || !idleParsed.ok || !blurParsed.ok) {
+    const liveRemote = has(GitService) ? resolve(GitService).remote.trim() : ''
+    const remoteNext = (remoteDraft ?? liveRemote).trim()
+    const remoteInvalid = remoteNext !== '' && !isGitRemoteUrl(remoteNext)
+    if (!autoPullParsed.ok || !idleParsed.ok || !blurParsed.ok || remoteInvalid) {
+      setRemoteError(remoteInvalid ? t('settings.git.remoteInvalid') : '')
       setStatus('invalid')
       return
     }
+    setRemoteError('')
     setStatus('')
     settings.setGitEnabled(gitEnabled)
     settings.setAutoSyncMinutes(autoPullParsed.value)
@@ -140,8 +185,22 @@ export const GitSection = observer(function GitSection() {
     settings.setAutoGitIdleSeconds(idleParsed.value)
     settings.setAutoGitBlurSeconds(blurParsed.value)
     await settings.save()
-    if (settings.notice) setStatus('')
-    else setStatus('saved')
+    if (settings.notice) {
+      setStatus('')
+      return
+    }
+    if (gitEnabled && remoteNext && remoteNext !== liveRemote && has(GitService) && has(VaultService)) {
+      const git = resolve(GitService)
+      git.setRemote(remoteNext)
+      await git.addRemote()
+      if (git.output) {
+        setRemoteError(git.output)
+        setStatus('invalid')
+        return
+      }
+      setRemoteDraft(null)
+    }
+    setStatus('saved')
   }
 
   const statusText = status === 'saved' ? t('common.saved') : status === 'invalid' ? t('common.fixFields') : ''
@@ -158,6 +217,18 @@ export const GitSection = observer(function GitSection() {
           setStatus('')
         }}
       />
+      {has(GitService) && has(VaultService) ? (
+        <RemoteUrlField
+          draft={remoteDraft}
+          error={remoteError}
+          onChange={(value) => {
+            setRemoteDraft(value)
+            setRemoteError('')
+            setStatus('')
+          }}
+          onReset={resetRemoteDraft}
+        />
+      ) : null}
       <NumberRow
         label={t('settings.git.autoPull')}
         hint={t('settings.git.autoPullHint', { max: MAX_AUTO_PULL_MINUTES })}

@@ -8,7 +8,7 @@ import { isTauriRuntime } from './services/platform/deep-link'
 import { GitService } from './services/git/git.service'
 import { SettingsService } from './services/settings/settings.service'
 import { VaultService } from './services/vault/vault.service'
-import { folderTitle } from './services/vault/vault-registry'
+import { vaultDisplayName } from './services/vault/vault-registry'
 import { Button } from './ui/primitives/button'
 import { CommandPalette } from './ui/overlays/command-palette'
 import { EmptyState } from './ui/primitives/empty-state'
@@ -68,7 +68,7 @@ const Chooser = observer(function Chooser() {
               <div className="chooser-section-label">{t('chooser.recent')}</div>
               <div className="chooser-recent-list" role="list">
                 {vault.recentVaults.map((entry) => {
-                  const title = folderTitle(entry.label)
+                  const title = vaultDisplayName(entry)
                   const path = title === entry.label ? '' : entry.label
                   const opened = relativeDay(Date.parse(entry.lastOpened), Date.now())
                   return (

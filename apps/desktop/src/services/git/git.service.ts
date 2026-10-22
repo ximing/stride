@@ -41,6 +41,23 @@ function errorText(error: unknown): string {
 
 const GIT_BROWSER = 'Git is not available in the browser'
 const GIT_OFF = 'Git is turned off.'
+const GIT_REMOTE_EMPTY = 'Enter a git repository URL'
+
+/** Empty is allowed (leave the remote unchanged). Anything else must be a git remote URL. */
+export function isGitRemoteUrl(value: string): boolean {
+  const url = value.trim()
+  if (url.length === 0) return true
+  if (/^git@[^:\s]+:\S+$/.test(url)) return true
+  try {
+    const parsed = new URL(url)
+    return parsed.protocol === 'https:'
+      || parsed.protocol === 'http:'
+      || parsed.protocol === 'ssh:'
+      || parsed.protocol === 'git:'
+  } catch {
+    return false
+  }
+}
 const GIT_KEY_NOTICE = 'Add a model provider, base URL, model, and key in Settings'
 const BROWSER_HOME = '/Users/stride'
 
@@ -97,6 +114,8 @@ export class GitService extends Service {
   history = ''
   message = ''
   remote = ''
+  private remoteRoot = ''
+  private remoteNeedsLoad = true
   cloneUrl = ''
   cloneError = ''
   output = ''
@@ -275,9 +294,27 @@ export class GitService extends Service {
           broadBlocked,
         })
         this.clearStaleBrowserBanner()
+        if (this.remoteRoot !== fs.rootLabel) {
+          const switching = this.remoteRoot !== ''
+          this.remoteRoot = fs.rootLabel
+          if (switching) {
+            this.remote = ''
+            this.remoteNeedsLoad = true
+          }
+        }
         if (this.surface !== 'ready') {
           this.clearWorktree()
           return
+        }
+        if (this.remoteNeedsLoad) {
+          this.remoteNeedsLoad = false
+          if (this.remote === '') {
+            try {
+              this.remote = (await backend.remoteUrl(fs.rootLabel, 'origin')) ?? ''
+            } catch {
+              this.remote = ''
+            }
+          }
         }
         this.branch = await currentBranch(backend, fs.rootLabel)
         const counts = await backend.aheadBehind(fs.rootLabel)
@@ -339,6 +376,12 @@ export class GitService extends Service {
     if (!home) return
     try {
       await initGit(fs, backend, home)
+      const url = this.remote.trim()
+      if (url) {
+        await gitAddRemote(fs, backend, url)
+        this.remote = url
+        this.remoteNeedsLoad = false
+      }
       await this.refresh()
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error)
@@ -715,9 +758,21 @@ export class GitService extends Service {
       }
       const fs = this.vault.fs
       if (!fs) return
+      const url = this.remote.trim()
+      if (!url) {
+        this.output = GIT_REMOTE_EMPTY
+        return
+      }
       try {
-        await gitAddRemote(fs, backend, this.remote.trim())
+        if (!(await fs.stat('.git'))) {
+          const home = await this.homeDirectory()
+          if (!home) return
+          await initGit(fs, backend, home)
+        }
+        await gitAddRemote(fs, backend, url)
         this.output = ''
+        this.remote = url
+        this.remoteNeedsLoad = false
         await this.refresh()
       } catch (error) {
         this.output = error instanceof Error ? error.message : String(error)
