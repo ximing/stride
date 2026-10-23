@@ -64,6 +64,12 @@ function summarize(value: unknown, secret: string): string {
   return redactSecret(text, secret).slice(0, 200)
 }
 
+/** Provider failures resolve the prompt; they are not a normal end. Tool `isError` is not this. */
+function providerErrorMessage(message: { role?: string; stopReason?: string; errorMessage?: string } | undefined): string | null {
+  if (!message || message.role !== 'assistant' || message.stopReason !== 'error') return null
+  return message.errorMessage?.trim() || 'Agent failed'
+}
+
 export async function runAgentLoop(input: {
   model: Model<Api>
   apiKey: string
@@ -148,6 +154,10 @@ export async function runAgentLoop(input: {
     input.signal?.removeEventListener('abort', onAbort)
   }
   const last = [...agent.state.messages].reverse().find((message) => message.role === 'assistant')
+  const failure = providerErrorMessage(last)
+  if (failure && !aborted && input.signal?.aborted !== true) {
+    throw new Error(redactSecret(failure, input.apiKey))
+  }
   const text = deltas || textOf(last)
   const result = { text, usage, aborted: aborted || input.signal?.aborted === true }
   emit({ type: 'done', ...result })

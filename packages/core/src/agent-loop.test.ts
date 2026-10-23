@@ -201,4 +201,102 @@ describe('runAgentLoop', () => {
     }
     expect(result.aborted).toBe(false)
   })
+
+  it('rejects a provider error instead of returning a normal end', async () => {
+    const events: AgentLoopEvent[] = []
+    const streamFn: StreamFn = () => {
+      const stream = createAssistantMessageEventStream()
+      queueMicrotask(() => {
+        const partial = assistant('hel')
+        const error = assistant('hel', 'error')
+        error.errorMessage = 'provider exploded sk-passed'
+        stream.push({ type: 'start', partial: assistant('') })
+        stream.push({ type: 'text_delta', contentIndex: 0, delta: 'hel', partial })
+        stream.push({ type: 'error', reason: 'error', error })
+        stream.end(error)
+      })
+      return stream
+    }
+    const failure = runAgentLoop({
+      model,
+      apiKey: 'sk-passed',
+      systemPrompt: 'test',
+      prompt: 'go',
+      streamFn,
+      onEvent: (event) => events.push(event),
+    })
+    await expect(failure).rejects.toThrow('provider exploded ••••')
+    await expect(failure).rejects.toThrow(/^provider exploded ••••$/)
+    expect(events.some((event) => event.type === 'text_delta')).toBe(true)
+    expect(events.some((event) => event.type === 'done')).toBe(false)
+  })
+
+  it('rejects a provider error that has no errorMessage', async () => {
+    const streamFn: StreamFn = () => {
+      const stream = createAssistantMessageEventStream()
+      queueMicrotask(() => {
+        const error = assistant('', 'error')
+        stream.push({ type: 'error', reason: 'error', error })
+        stream.end(error)
+      })
+      return stream
+    }
+    await expect(runAgentLoop({
+      model,
+      apiKey: 'sk-passed',
+      systemPrompt: 'test',
+      prompt: 'go',
+      streamFn,
+    })).rejects.toThrow('Agent failed')
+  })
+
+  it('returns a thrown tool error to the model instead of failing the loop', async () => {
+    let calls = 0
+    const events: AgentLoopEvent[] = []
+    const toolCall = { type: 'toolCall' as const, id: 'call_1', name: 'ping', arguments: { q: 'a' } }
+    const ping: AgentTool = {
+      name: 'ping',
+      label: 'Ping',
+      description: 'ping',
+      parameters: Type.Object({ q: Type.String() }),
+      execute: async () => {
+        throw new Error('path not found')
+      },
+    }
+    const streamFn: StreamFn = () => {
+      calls += 1
+      const stream = createAssistantMessageEventStream()
+      queueMicrotask(() => {
+        if (calls === 1) {
+          const partial = assistant('', 'toolUse', [toolCall])
+          stream.push({ type: 'start', partial })
+          stream.push({ type: 'toolcall_end', contentIndex: 0, toolCall, partial })
+          stream.push({ type: 'done', reason: 'toolUse', message: partial })
+          stream.end(partial)
+          return
+        }
+        const done = assistant('after')
+        stream.push({ type: 'start', partial: assistant('') })
+        stream.push({ type: 'text_delta', contentIndex: 0, delta: 'after', partial: done })
+        stream.push({ type: 'done', reason: 'stop', message: done })
+        stream.end(done)
+      })
+      return stream
+    }
+    const result = await runAgentLoop({
+      model,
+      apiKey: 'sk-passed',
+      systemPrompt: 'test',
+      prompt: 'go',
+      tools: [ping],
+      streamFn,
+      onEvent: (event) => events.push(event),
+    })
+    expect(calls).toBe(2)
+    const toolEnd = events.find((event) => event.type === 'tool_end')
+    expect(toolEnd).toMatchObject({ type: 'tool_end', name: 'ping', isError: true })
+    if (toolEnd?.type === 'tool_end') expect(toolEnd.resultSummary).toContain('path not found')
+    expect(result).toMatchObject({ text: 'after', aborted: false })
+    expect(events.at(-1)).toMatchObject({ type: 'done', text: 'after', aborted: false })
+  })
 })
