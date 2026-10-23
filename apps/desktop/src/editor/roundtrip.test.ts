@@ -1,5 +1,5 @@
 import { Editor, type JSONContent } from '@tiptap/core'
-import type { TipTapNode } from '@stride/core/note'
+import { applyBody, noteForSave, type TipTapNode } from '@stride/core/note'
 import { MemoryFileSystem } from '@stride/platform'
 import fc from 'fast-check'
 import { afterEach, describe, expect, it } from 'vitest'
@@ -170,5 +170,58 @@ describe('editor file round trip', () => {
     await fc.assert(fc.asyncProperty(docArb, async (doc) => {
       await roundTrip(editor, doc)
     }), { numRuns: 80 })
+  })
+
+  it('keeps inline nodes on a leading heading through applyBody', async () => {
+    const editor = createEditor()
+    const doc: JSONContent = {
+      type: 'doc',
+      content: [
+        {
+          type: 'heading',
+          attrs: { level: 1 },
+          content: [
+            text('See ', [{ type: 'bold' }]),
+            { type: 'wikilink', attrs: { target: 'Mass', alias: 'm' } },
+            text(' '),
+            { type: 'inlineMath', attrs: { latex: 'E=mc^2' } },
+          ],
+        },
+        paragraph('kept'),
+      ],
+    }
+    editor.commands.setContent(doc)
+    const canonical = editor.getJSON()
+    const applied = applyBody('See Mass', canonical as TipTapNode)
+    expect(applied.lifted).toBe(true)
+    expect(applied.title).toBe('See Mass')
+    expect(applied.doc).toEqual(canonical)
+
+    const fs = new MemoryFileSystem()
+    const saved = await saveNote(
+      fs,
+      noteForSave({
+        id: 'leading-heading',
+        title: applied.title,
+        type: 'note',
+        properties: {},
+        doc: applied.doc,
+      }),
+    )
+    expect(saved.doc).toEqual(canonical)
+    const heading = saved.doc.content?.[0]
+    expect(heading).toMatchObject({
+      type: 'heading',
+      attrs: { level: 1 },
+      content: [
+        { type: 'text', text: 'See ', marks: [{ type: 'bold' }] },
+        { type: 'wikilink', attrs: { target: 'Mass', alias: 'm' } },
+        { type: 'text', text: ' ' },
+        { type: 'inlineMath', attrs: { latex: 'E=mc^2' } },
+      ],
+    })
+    expect(heading?.content).not.toEqual([{ type: 'text', text: 'See Mass' }])
+    editor.commands.setContent(saved.doc)
+    expect(editor.getJSON()).toEqual(canonical)
   })
 })
