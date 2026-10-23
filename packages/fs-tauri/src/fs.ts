@@ -1,4 +1,5 @@
 import {
+  lstat,
   mkdir,
   readDir,
   readFile,
@@ -88,6 +89,7 @@ export class TauriFileSystem implements FileSystemBackend {
 
   async readText(filePath: string): Promise<string> {
     const relative = normalizeRelativePath(filePath)
+    await this.rejectSymlinks(relative)
     await this.assertFile(relative, filePath)
     try {
       return await readTextFile(joinRoot(this.rootLabel, relative))
@@ -99,6 +101,7 @@ export class TauriFileSystem implements FileSystemBackend {
 
   async readBytes(filePath: string): Promise<Uint8Array> {
     const relative = normalizeRelativePath(filePath)
+    await this.rejectSymlinks(relative)
     await this.assertFile(relative, filePath)
     try {
       return new Uint8Array(await readFile(joinRoot(this.rootLabel, relative)))
@@ -181,6 +184,7 @@ export class TauriFileSystem implements FileSystemBackend {
 
   async stat(filePath: string): Promise<FileStat | null> {
     const relative = normalizeRelativePath(filePath)
+    await this.rejectSymlinks(relative)
     try {
       const info = await stat(joinRoot(this.rootLabel, relative))
       return {
@@ -289,6 +293,7 @@ export class TauriFileSystem implements FileSystemBackend {
   private async prepareWrite(filePath: string): Promise<string> {
     const relative = normalizeRelativePath(filePath)
     if (!relative) throw new PlatformError('io', 'Cannot write a file at the root')
+    await this.rejectSymlinks(relative)
     const existing = await this.stat(relative)
     if (existing?.kind === 'directory') {
       throw new PlatformError('io', `Cannot write a file over a directory: ${relative}`)
@@ -300,6 +305,26 @@ export class TauriFileSystem implements FileSystemBackend {
   private async ensureParent(relativeFile: string): Promise<void> {
     const slash = relativeFile.lastIndexOf('/')
     const parent = slash === -1 ? '' : relativeFile.slice(0, slash)
+    await this.rejectSymlinks(parent)
     await this.mkdir(parent)
+  }
+
+  // lstat does not follow its last component, so each relative segment is
+  // checked alone. The opened root is not a segment and may be a symlink.
+  private async rejectSymlinks(relative: string): Promise<void> {
+    if (!relative) return
+    let walked = ''
+    for (const segment of relative.split('/')) {
+      walked = walked ? `${walked}/${segment}` : segment
+      let info: Awaited<ReturnType<typeof lstat>>
+      try {
+        info = await lstat(joinRoot(this.rootLabel, walked))
+      } catch (error) {
+        if (isNotFound(error)) return
+        throw mapError(error, relative)
+      }
+      if (info.isSymlink) throw new PlatformError('escape', `Path contains a symlink: ${walked}`)
+      if (!info.isDirectory) return
+    }
   }
 }

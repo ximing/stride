@@ -6,6 +6,7 @@ interface Stored {
   kind: 'file' | 'directory' | 'symlink'
   bytes: Uint8Array
   mtimeMs: number
+  target?: string
 }
 
 const plugin = vi.hoisted(() => {
@@ -54,10 +55,64 @@ const plugin = vi.hoisted(() => {
     nodes.set(path, { kind: 'directory', bytes: new Uint8Array(), mtimeMs: touch() })
   }
 
+  function splitAbsolute(path: string): { prefix: string; parts: string[]; sep: '\\' | '/' } {
+    if (path.startsWith('\\\\')) {
+      const bits = path.split('\\').filter((part) => part.length > 0)
+      return { prefix: `\\\\${bits[0] ?? ''}\\${bits[1] ?? ''}`, parts: bits.slice(2), sep: '\\' }
+    }
+    if (/^[A-Za-z]:/.test(path)) {
+      const sep: '\\' | '/' = path.includes('\\') ? '\\' : '/'
+      const body = path.slice(2)
+      const stripped = body.startsWith('/') || body.startsWith('\\') ? body.slice(1) : body
+      return { prefix: path.slice(0, 2), parts: stripped.split(sep).filter((part) => part.length > 0), sep }
+    }
+    return { prefix: '', parts: path.split('/').filter((part) => part.length > 0), sep: '/' }
+  }
+
+  function joinAbsolute(prefix: string, parts: string[], sep: '\\' | '/'): string {
+    if (prefix === '') return `/${parts.join('/')}`
+    if (parts.length === 0) return prefix
+    return `${prefix}${sep}${parts.join(sep)}`
+  }
+
+  function joinOnto(target: string, rest: string[]): string {
+    if (rest.length === 0) return target
+    const sep: '\\' | '/' = target.includes('\\') ? '\\' : '/'
+    const suffix = rest.join(sep)
+    if (target.endsWith('/') || target.endsWith('\\')) return `${target}${suffix}`
+    return `${target}${sep}${suffix}`
+  }
+
+  // Follows symlink components the way the plugin opens a path. `followFinal`
+  // is false for lstat, which keeps the last component itself.
+  function locate(path: string, followFinal: boolean): string {
+    let current = path
+    const seen = new Set<string>()
+    for (let hop = 0; hop < 40; hop += 1) {
+      const { prefix, parts, sep } = splitAbsolute(current)
+      let redirected = false
+      for (let index = 0; index < parts.length; index += 1) {
+        const cursor = joinAbsolute(prefix, parts.slice(0, index + 1), sep)
+        const node = nodes.get(cursor)
+        const isLast = index === parts.length - 1
+        if (node?.kind !== 'symlink' || (isLast && !followFinal)) continue
+        if (!node.target) throw new Error(`symlink has no target: ${cursor}`)
+        if (seen.has(cursor)) throw new Error(`symlink loop: ${cursor}`)
+        seen.add(cursor)
+        current = joinOnto(node.target, parts.slice(index + 1))
+        redirected = true
+        break
+      }
+      if (!redirected) return joinAbsolute(prefix, parts, sep)
+    }
+    throw new Error(`symlink loop: ${path}`)
+  }
+
   const api = {
     calls,
     nodes,
     statError: null as string | null,
+    lstatRootSymlink: false,
     windowsRename: false,
     failRename: null as ((oldPath: string, newPath: string) => boolean) | null,
     setStatError(message: string | null) {
@@ -68,6 +123,7 @@ const plugin = vi.hoisted(() => {
       nodes.clear()
       clock = 0
       api.statError = null
+      api.lstatRootSymlink = false
       api.windowsRename = false
       api.failRename = null
       nodes.set('/vault', { kind: 'directory', bytes: new Uint8Array(), mtimeMs: 0 })
@@ -79,6 +135,7 @@ const plugin = vi.hoisted(() => {
     requireNode,
     putDir,
     touch,
+    locate,
   }
   return api
 })
@@ -86,22 +143,25 @@ const plugin = vi.hoisted(() => {
 vi.mock('@tauri-apps/plugin-fs', () => ({
   async readTextFile(path: string): Promise<string> {
     plugin.calls.push(`readTextFile ${path}`)
-    const node = plugin.requireNode(path)
+    const resolved = plugin.locate(path, true)
+    const node = plugin.requireNode(resolved)
     if (node.kind !== 'file') throw new Error(`Is a directory (os error 21): ${path}`)
     return new TextDecoder().decode(node.bytes)
   },
   async readFile(path: string): Promise<Uint8Array> {
     plugin.calls.push(`readFile ${path}`)
-    const node = plugin.requireNode(path)
+    const resolved = plugin.locate(path, true)
+    const node = plugin.requireNode(resolved)
     if (node.kind !== 'file') throw new Error(`Is a directory (os error 21): ${path}`)
     return node.bytes.slice()
   },
   async writeTextFile(path: string, data: string, options?: { createNew?: boolean }): Promise<void> {
     plugin.calls.push(`writeTextFile ${path}`)
-    if (options?.createNew && plugin.nodes.has(path)) {
+    const resolved = plugin.locate(path, true)
+    if (options?.createNew && plugin.nodes.has(resolved)) {
       throw new Error(`File exists (os error 17): ${path}`)
     }
-    plugin.nodes.set(path, {
+    plugin.nodes.set(resolved, {
       kind: 'file',
       bytes: new TextEncoder().encode(data),
       mtimeMs: plugin.touch(),
@@ -109,18 +169,20 @@ vi.mock('@tauri-apps/plugin-fs', () => ({
   },
   async writeFile(path: string, data: Uint8Array, options?: { createNew?: boolean }): Promise<void> {
     plugin.calls.push(`writeFile ${path}`)
-    if (options?.createNew && plugin.nodes.has(path)) {
+    const resolved = plugin.locate(path, true)
+    if (options?.createNew && plugin.nodes.has(resolved)) {
       throw new Error(`File exists (os error 17): ${path}`)
     }
-    plugin.nodes.set(path, { kind: 'file', bytes: data.slice(), mtimeMs: plugin.touch() })
+    plugin.nodes.set(resolved, { kind: 'file', bytes: data.slice(), mtimeMs: plugin.touch() })
   },
   async readDir(path: string) {
     plugin.calls.push(`readDir ${path}`)
-    const node = plugin.requireNode(path)
+    const resolved = plugin.locate(path, true)
+    const node = plugin.requireNode(resolved)
     if (node.kind !== 'directory') throw new Error(`Not a directory: ${path}`)
     const entries = []
     for (const [full, child] of plugin.nodes) {
-      if (plugin.parentOf(full) !== path) continue
+      if (plugin.parentOf(full) !== resolved) continue
       entries.push({
         name: plugin.nameOf(full),
         isDirectory: child.kind === 'directory',
@@ -132,14 +194,15 @@ vi.mock('@tauri-apps/plugin-fs', () => ({
   },
   async mkdir(path: string, options?: { recursive?: boolean }): Promise<void> {
     plugin.calls.push(`mkdir ${path} ${String(options?.recursive ?? false)}`)
+    const resolved = plugin.locate(path, true)
     if (!options?.recursive) {
-      const parent = plugin.requireNode(plugin.parentOf(path))
+      const parent = plugin.requireNode(plugin.parentOf(resolved))
       if (parent.kind !== 'directory') throw new Error(`Not a directory: ${path}`)
-      plugin.putDir(path)
+      plugin.putDir(resolved)
       return
     }
     const chain: string[] = []
-    let current = path
+    let current = resolved
     while (true) {
       chain.push(current)
       const parent = plugin.parentOf(current)
@@ -187,11 +250,37 @@ vi.mock('@tauri-apps/plugin-fs', () => ({
   async stat(path: string) {
     plugin.calls.push(`stat ${path}`)
     if (plugin.statError) throw new Error(plugin.statError)
-    const node = plugin.requireNode(path)
+    const node = plugin.requireNode(plugin.locate(path, true))
     return {
       isFile: node.kind === 'file',
       isDirectory: node.kind === 'directory',
       isSymlink: false,
+      size: node.bytes.byteLength,
+      mtime: new Date(node.mtimeMs),
+      atime: null,
+      birthtime: null,
+      readonly: false,
+    }
+  },
+  async lstat(path: string) {
+    plugin.calls.push(`lstat ${path}`)
+    if (plugin.lstatRootSymlink && (path === '/vault' || path === '/vault/')) {
+      return {
+        isFile: false,
+        isDirectory: false,
+        isSymlink: true,
+        size: 0,
+        mtime: new Date(0),
+        atime: null,
+        birthtime: null,
+        readonly: false,
+      }
+    }
+    const node = plugin.requireNode(plugin.locate(path, false))
+    return {
+      isFile: node.kind === 'file',
+      isDirectory: node.kind === 'directory',
+      isSymlink: node.kind === 'symlink',
       size: node.bytes.byteLength,
       mtime: new Date(node.mtimeMs),
       atime: null,
@@ -438,5 +527,76 @@ describe('TauriFileSystem', () => {
     await expect(backend.writeText('empty', 'lost')).rejects.toMatchObject({ code: 'io' })
     expect(await backend.readText('empty')).toBe('next')
     expect(plugin.calls.includes('writeTextFile /vault/empty')).toBe(false)
+  })
+
+  it('refuses symlink components whose target is outside the vault prefix', async () => {
+    const backend = fs()
+    const outside = '/outside'
+    const underVault = (target: string) => target === '/vault' || target.startsWith('/vault/')
+    expect(underVault(outside)).toBe(false)
+    expect(underVault('/outside/secret.txt')).toBe(false)
+    plugin.nodes.set(outside, { kind: 'directory', bytes: new Uint8Array(), mtimeMs: 1 })
+    plugin.nodes.set('/outside/secret.txt', {
+      kind: 'file',
+      bytes: new TextEncoder().encode('secret'),
+      mtimeMs: 1,
+    })
+    plugin.nodes.set('/vault/link', {
+      kind: 'symlink',
+      target: outside,
+      bytes: new Uint8Array(),
+      mtimeMs: 1,
+    })
+    plugin.nodes.set('/vault/alias.txt', {
+      kind: 'symlink',
+      target: '/outside/secret.txt',
+      bytes: new Uint8Array(),
+      mtimeMs: 1,
+    })
+    await backend.mkdir('dir')
+    plugin.nodes.set('/vault/dir/link', {
+      kind: 'symlink',
+      target: outside,
+      bytes: new Uint8Array(),
+      mtimeMs: 1,
+    })
+    expect(plugin.locate('/vault/link/nested/owned.txt', true)).toBe('/outside/nested/owned.txt')
+    expect(plugin.locate('/vault/dir/link/file.txt', true)).toBe('/outside/file.txt')
+    expect(plugin.locate('/vault/alias.txt', true)).toBe('/outside/secret.txt')
+
+    const { writeTextFile } = await import('@tauri-apps/plugin-fs')
+    await writeTextFile('/vault/link/probe.txt', 'pwned')
+    expect(new TextDecoder().decode(plugin.nodes.get('/outside/probe.txt')?.bytes)).toBe('pwned')
+    plugin.nodes.delete('/outside/probe.txt')
+    plugin.calls.length = 0
+
+    await expect(backend.stat('link')).rejects.toMatchObject({ code: 'escape' })
+    await expect(backend.stat('link/secret.txt')).rejects.toMatchObject({ code: 'escape' })
+    await expect(backend.readText('link/secret.txt')).rejects.toMatchObject({ code: 'escape' })
+    await expect(backend.readBytes('alias.txt')).rejects.toMatchObject({ code: 'escape' })
+    await expect(backend.list('link')).rejects.toMatchObject({ code: 'escape' })
+    await expect(backend.writeText('link/nested/owned.txt', 'pwned')).rejects.toMatchObject({ code: 'escape' })
+    await expect(backend.writeBytes('alias.txt', new Uint8Array([1]))).rejects.toMatchObject({ code: 'escape' })
+    await expect(backend.writeText('dir/link/file.txt', 'pwned')).rejects.toMatchObject({ code: 'escape' })
+
+    expect(plugin.nodes.has('/outside/nested')).toBe(false)
+    expect(plugin.nodes.has('/outside/nested/owned.txt')).toBe(false)
+    expect(plugin.nodes.has('/outside/file.txt')).toBe(false)
+    expect(plugin.nodes.has('/outside/probe.txt')).toBe(false)
+    expect(new TextDecoder().decode(plugin.nodes.get('/outside/secret.txt')?.bytes)).toBe('secret')
+    expect(plugin.nodes.get('/vault/alias.txt')?.kind).toBe('symlink')
+    expect(plugin.calls.some((call) => call.includes('/outside'))).toBe(false)
+    expect(await backend.list('dir')).toEqual([])
+  })
+
+  it('does not refuse a vault whose opened root is itself a symlink', async () => {
+    plugin.lstatRootSymlink = true
+    const backend = fs()
+    expect(await backend.stat('')).toMatchObject({ kind: 'directory' })
+    await backend.writeText('note.txt', 'kept')
+    expect(await backend.readText('note.txt')).toBe('kept')
+    expect(await backend.readBytes('note.txt')).toEqual(new TextEncoder().encode('kept'))
+    expect(plugin.nodes.get('/vault/note.txt')?.kind).toBe('file')
+    expect(plugin.calls.some((call) => call === 'lstat /vault' || call === 'lstat /vault/')).toBe(false)
   })
 })
