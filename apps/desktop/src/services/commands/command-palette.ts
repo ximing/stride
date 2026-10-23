@@ -48,9 +48,14 @@ export function buildPaletteItems(options: {
   }
   const template = options.commands.find((command) => command.id === NEW_INSTANCE_COMMAND_ID)
   if (template) {
-    const types = options.typeTitles.filter(
+    const matchedTypes = options.typeTitles.filter(
       (title) => !needle || title.toLowerCase().includes(needle) || `new ${title.toLowerCase()}`.includes(needle),
     )
+    const commandMatches = filterCommands([template], options.query).length > 0
+    // Title or keywords can match while no type name does. Expand the real
+    // types instead of a disabled template; an empty type list still falls
+    // through to that disabled row.
+    const types = matchedTypes.length > 0 || !commandMatches ? matchedTypes : options.typeTitles
     if (types.length > 0) {
       for (const typeTitle of types) {
         items.push({
@@ -61,7 +66,7 @@ export function buildPaletteItems(options: {
           enabled: options.isRunnable(template),
         })
       }
-    } else if (filterCommands([template], options.query).length > 0) {
+    } else if (commandMatches) {
       // No types to expand into: show the template entry, disabled.
       items.push({ kind: 'command', key: `command:${template.id}`, command: template, enabled: false })
     }

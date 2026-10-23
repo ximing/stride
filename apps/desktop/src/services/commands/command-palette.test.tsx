@@ -5,6 +5,7 @@ import { createNote, type StrideNote } from '@stride/core/note'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { i18n } from '../../i18n'
 import { CommandPalette } from '../../ui/overlays/command-palette'
 import { buildPaletteItems, paletteItemTitle } from './command-palette'
 import { CommandPaletteService } from './command-palette.service'
@@ -71,6 +72,37 @@ describe('command palette items', () => {
     })
     const entry = typeless.find((item) => item.kind === 'command' && item.command.id === 'file.newInstance')
     expect(entry).toBeDefined()
+    expect(entry && entry.kind === 'command' && entry.enabled).toBe(false)
+  })
+
+  it('expands type rows when the new-note command matches but no type name does', async () => {
+    const commands = resolve(CommandService).commands
+    const template = commands.find((command) => command.id === 'file.newInstance')!
+    const seen = (query: string, isRunnable: (command: { id: string }) => boolean, typeTitles: string[]) =>
+      buildPaletteItems({ commands, query, isRunnable, notes: [], typeTitles })
+    for (const query of ['类型', 'New Note of Type']) {
+      const items = seen(query, (command) => command.id === template.id, ['项目'])
+      const instances = items.filter((item) => item.kind === 'instance')
+      expect(instances.map((item) => item.typeTitle)).toEqual(['项目'])
+      expect(instances.every((item) => item.enabled)).toBe(true)
+      expect(items.some((item) => item.kind === 'command' && item.command.id === 'file.newInstance')).toBe(false)
+    }
+    const exact = seen('项目', () => true, ['项目', '会议'])
+    expect(exact.filter((item) => item.kind === 'instance').map((item) => item.typeTitle)).toEqual(['项目'])
+
+    await i18n.changeLanguage('zh')
+    try {
+      const items = seen('按类型新建', () => false, ['项目'])
+      const instance = items.find((item) => item.kind === 'instance')
+      expect(instance && instance.kind === 'instance' && instance.typeTitle).toBe('项目')
+      expect(instance && instance.kind === 'instance' && instance.enabled).toBe(false)
+      expect(items.some((item) => item.kind === 'command' && item.command.id === 'file.newInstance')).toBe(false)
+    } finally {
+      await i18n.changeLanguage('en')
+    }
+
+    const disabled = seen('New Note of Type', (command) => command.id === template.id, [])
+    const entry = disabled.find((item) => item.kind === 'command' && item.command.id === 'file.newInstance')
     expect(entry && entry.kind === 'command' && entry.enabled).toBe(false)
   })
 })
