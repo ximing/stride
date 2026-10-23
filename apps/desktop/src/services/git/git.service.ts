@@ -382,6 +382,12 @@ export class GitService extends Service {
     const home = await this.homeDirectory()
     if (!home) return
     try {
+      try {
+        await this.vault.flush()
+      } catch (error) {
+        this.output = error instanceof Error ? error.message : String(error)
+        return
+      }
       await initGit(fs, backend, home)
       const url = this.remote.trim()
       if (url) {
@@ -760,6 +766,12 @@ export class GitService extends Service {
         return
       }
       try {
+        try {
+          await this.vault.flush()
+        } catch (error) {
+          this.output = error instanceof Error ? error.message : String(error)
+          return
+        }
         if (!(await fs.stat('.git'))) {
           const home = await this.homeDirectory()
           if (!home) return

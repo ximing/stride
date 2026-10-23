@@ -1481,6 +1481,85 @@ describe('browser panels', () => {
     expect(events.indexOf('resolve')).toBeGreaterThan(readAt)
     expect(git.busy).toBe(false)
   })
+
+  it('flushes before git init and does not initialize when flush fails', async () => {
+    const events: string[] = []
+    const files = new MemoryFileSystem('/tmp/vault-init-flush')
+    setGitBackendForTests(recordingGit(events))
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.broad = false
+    resolve(SettingsService).setGitEnabled(true)
+    const git = resolve(GitService)
+    vault.flush = () => {
+      events.push('flush')
+      return Promise.reject(new Error('flush failed'))
+    }
+    await git.init()
+    expect(events).toEqual(['flush'])
+    expect(git.output).toBe('flush failed')
+    expect(await files.stat('.git')).toBeNull()
+    expect(await files.stat('.gitignore')).toBeNull()
+
+    vault.flush = () => {
+      events.push('flush')
+      return Promise.resolve()
+    }
+    await git.init()
+    const flushAt = events.lastIndexOf('flush')
+    const initAt = events.indexOf('init /tmp/vault-init-flush')
+    expect(flushAt).toBeGreaterThan(0)
+    expect(initAt).toBeGreaterThan(flushAt)
+  })
+
+  it('flushes before addRemote and does not write git when flush fails', async () => {
+    const events: string[] = []
+    const files = new MemoryFileSystem('/tmp/vault-remote-flush')
+    const backend = recordingGit(events)
+    backend.init = (repo) => {
+      events.push(`init ${repo}`)
+      return files.mkdir('.git').then(() => undefined)
+    }
+    backend.addRemote = (_repo, url) => {
+      events.push(`add ${url}`)
+      return Promise.resolve()
+    }
+    setGitBackendForTests(backend)
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.broad = false
+    resolve(SettingsService).setGitEnabled(true)
+    const git = resolve(GitService)
+    git.setRemote('https://example.test/notes.git')
+    vault.flush = () => {
+      events.push('flush')
+      return Promise.reject(new Error('flush failed'))
+    }
+    await git.addRemote()
+    expect(events).toEqual(['flush'])
+    expect(git.output).toBe('flush failed')
+    expect(git.busy).toBe(false)
+    expect(await files.stat('.git')).toBeNull()
+
+    vault.flush = () => {
+      events.push('flush')
+      return Promise.resolve()
+    }
+    await git.addRemote()
+    const flushAt = events.lastIndexOf('flush')
+    const initAt = events.indexOf('init /tmp/vault-remote-flush')
+    const addAt = events.indexOf('add https://example.test/notes.git')
+    expect(flushAt).toBeGreaterThan(0)
+    expect(initAt).toBeGreaterThan(flushAt)
+    expect(addAt).toBeGreaterThan(initAt)
+    expect(git.busy).toBe(false)
+  })
 })
 
 async function openAutoGitVault(root: string) {
