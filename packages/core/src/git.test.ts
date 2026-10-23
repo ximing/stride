@@ -312,7 +312,7 @@ describe('gitAddRemote', () => {
       calls.push('remove')
       return Promise.reject(new Error('remove failed'))
     }
-    await expect(gitAddRemote(files, git, 'https://example.test/x.git')).rejects.toThrow('network down')
+    await expect(gitAddRemote(files, git, 'https://example.test/x.git')).rejects.toThrow('network down\nremove failed')
     expect(calls).toEqual(['add', 'fetch', 'remove'])
   })
 
@@ -385,8 +385,49 @@ describe('gitAddRemote', () => {
       return Promise.resolve()
     }
     git.sharesHistory = () => Promise.reject(new Error('merge-base failed'))
-    await expect(gitAddRemote(files, git, 'https://example.test/new.git')).rejects.toThrow('network down')
+    await expect(gitAddRemote(files, git, 'https://example.test/new.git')).rejects.toThrow('network down\nset-url failed')
     expect(calls).toEqual(['https://example.test/new.git', 'https://example.test/old.git'])
+  })
+
+  it('appends a failed rollback onto the GitError that is rethrown', async () => {
+    const files = new MemoryFileSystem('/tmp/rollback-git-error')
+    const git = fakeGit()
+    const fetchError = new GitError(128, 'network down')
+    git.fetch = () => Promise.reject(fetchError)
+    git.removeRemote = () => Promise.reject(new GitError(1, 'fatal: remove failed'))
+    const rejected = await gitAddRemote(files, git, 'https://example.test/x.git').then(
+      () => null,
+      (error: unknown) => error,
+    )
+    expect(rejected).toBe(fetchError)
+    expect(fetchError.message).toBe('network down\nfatal: remove failed')
+    expect(fetchError.output).toBe('network down\nfatal: remove failed')
+  })
+
+  it('uses a rollback GitError output when its message was replaced', async () => {
+    const files = new MemoryFileSystem('/tmp/rollback-output')
+    const git = fakeGit()
+    git.remoteUrl = () => Promise.resolve('https://example.test/old.git')
+    git.addRemote = (_repo, url) => {
+      if (url.endsWith('old.git')) {
+        const rollback = new GitError(1, 'fatal: set-url failed')
+        rollback.message = 'hidden message'
+        return Promise.reject(rollback)
+      }
+      return Promise.resolve()
+    }
+    git.fetch = () => Promise.reject(new Error('network down'))
+    await expect(gitAddRemote(files, git, 'https://example.test/new.git')).rejects.toThrow(
+      'network down\nfatal: set-url failed',
+    )
+  })
+
+  it('uses the rollback GitError message when its output is empty', async () => {
+    const files = new MemoryFileSystem('/tmp/rollback-empty-output')
+    const git = fakeGit()
+    git.fetch = () => Promise.reject(new Error('network down'))
+    git.removeRemote = () => Promise.reject(new GitError(2, ''))
+    await expect(gitAddRemote(files, git, 'https://example.test/x.git')).rejects.toThrow('network down\ngit exited 2')
   })
 })
 

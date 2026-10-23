@@ -172,18 +172,38 @@ export async function currentBranch(git: GitBackend, repo: string): Promise<stri
   return git.currentBranch(repo)
 }
 
+function failureText(error: unknown): string {
+  if (error instanceof GitError) return error.output || error.message
+  if (error instanceof Error) return error.message
+  return String(error)
+}
+
+// Callers report Error.message. Append the rollback text instead of dropping it.
+function attachRollback(error: unknown, rollback: unknown): unknown {
+  const detail = failureText(rollback)
+  if (!detail) return error
+  if (error instanceof GitError) {
+    const base = error.output || error.message
+    const combined = base ? `${base}\n${detail}` : detail
+    error.output = combined
+    error.message = combined
+    return error
+  }
+  if (error instanceof Error) {
+    error.message = error.message ? `${error.message}\n${detail}` : detail
+    return error
+  }
+  return new Error(`${String(error)}\n${detail}`)
+}
+
 async function restoreRemote(
   git: GitBackend,
   repo: string,
   name: string,
   previous: string | null,
 ): Promise<void> {
-  try {
-    if (previous === null) await git.removeRemote(repo, name)
-    else await git.addRemote(repo, previous, name)
-  } catch {
-    // Restore is best-effort. The original error is the one to report.
-  }
+  if (previous === null) await git.removeRemote(repo, name)
+  else await git.addRemote(repo, previous, name)
 }
 
 export async function gitAddRemote(
@@ -201,7 +221,11 @@ export async function gitAddRemote(
       throw new Error('Remote history is not compatible with this vault')
     }
   } catch (error) {
-    await restoreRemote(git, repo, name, previous)
+    try {
+      await restoreRemote(git, repo, name, previous)
+    } catch (rollback) {
+      throw attachRollback(error, rollback)
+    }
     throw error
   }
 }
