@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { MemoryFileSystem } from '@stride/platform'
 import { buildGraph, relationsOf } from './graph.ts'
 import {
+  applyBody,
   findMark,
   firstH1Text,
   formatProperty,
@@ -285,6 +286,50 @@ describe('note codec', () => {
     expect(prepared.doc.content?.filter((node) => node.type === 'heading')).toHaveLength(1)
     expect(plainText(prepared.doc.content?.[0] ?? { type: 'doc' })).toBe('Fresh')
     expect(prepared.doc.content?.[1]).toEqual(doc.content?.[1])
+  })
+
+  it('keeps a mark, a wikilink, and math when applyBody promotes the leading heading', async () => {
+    const heading: TipTapNode = {
+      type: 'heading',
+      attrs: { level: 1 },
+      content: [
+        { type: 'text', text: 'See ', marks: [{ type: 'bold' }] },
+        { type: 'wikilink', attrs: { target: 'Mass', alias: 'm' } },
+        { type: 'text', text: ' ' },
+        { type: 'inlineMath', attrs: { latex: 'E=mc^2' } },
+      ],
+    }
+    const paragraph: TipTapNode = { type: 'paragraph', content: [{ type: 'text', text: 'body' }] }
+    const applied = applyBody('Stale', { type: 'doc', content: [heading, paragraph] })
+    expect(applied.lifted).toBe(true)
+    expect(applied.title).toBe('See Mass')
+    expect(applied.doc.content?.[0]).toEqual(heading)
+    expect(applied.doc.content?.[0]?.content).not.toEqual([{ type: 'text', text: 'See Mass' }])
+    expect(applied.doc.content?.[1]).toEqual(paragraph)
+    expect(findMark(applied.doc, 'bold')?.text).toBe('See ')
+
+    const files = vault('/tmp/stride-promote-heading')
+    const saved = await saveNote(files, noteForSave({
+      id: 'promoted',
+      title: applied.title,
+      type: 'note',
+      properties: { status: 'draft' },
+      doc: applied.doc,
+    }))
+    expect(saved.title).toBe('See Mass')
+    expect(saved.type).toBe('note')
+    expect(saved.properties.status).toBe('draft')
+    expect(saved.doc.content?.[0]).toEqual(heading)
+    expect(saved.doc.content?.[1]).toEqual(paragraph)
+    const raw = JSON.parse(await files.readText('promoted.stride.json')) as {
+      format: string
+      title: string
+      doc: TipTapNode
+    }
+    expect(raw.format).toBe('tiptap')
+    expect(raw.title).toBe('See Mass')
+    expect(raw.doc.type).toBe('doc')
+    expect(raw.doc.content?.[0]).toEqual(heading)
   })
 
   it('allocates untitled-xxxx, retries collisions, and keeps a real title slug', async () => {

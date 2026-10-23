@@ -188,12 +188,20 @@ export function applyTitle(doc: TipTapNode, title: string): TipTapNode {
   return composeNoteDoc(title, stripLeadingH1(doc))
 }
 
+// Keep inline nodes on a leading H1 that already matches the title.
+// Placeholder titles still omit the heading.
+function composeStoredDoc(title: string, doc: TipTapNode): TipTapNode {
+  const leading = doc.content?.[0]
+  const keepInline = !isPlaceholderTitle(title) && isH1(leading) && plainText(leading) === title
+  return composeNoteDoc(title, keepInline ? doc : stripLeadingH1(doc))
+}
+
 export function applyBody(title: string, body: TipTapNode): { title: string; doc: TipTapNode; lifted: boolean } {
   const leading = body.content?.[0]
   if (isH1(leading)) {
     const lifted = plainText(leading)
     if (lifted.trim()) {
-      return { title: lifted, doc: composeNoteDoc(lifted, stripLeadingH1(body)), lifted: true }
+      return { title: lifted, doc: composeStoredDoc(lifted, body), lifted: true }
     }
   }
   return { title, doc: composeNoteDoc(title, body), lifted: false }
@@ -201,7 +209,7 @@ export function applyBody(title: string, body: TipTapNode): { title: string; doc
 
 export function noteForSave(note: StrideNote): StrideNote {
   const title = isPlaceholderTitle(note.title) ? 'Untitled' : note.title
-  return { ...note, title, doc: composeNoteDoc(title, stripLeadingH1(note.doc)) }
+  return { ...note, title, doc: composeStoredDoc(title, note.doc) }
 }
 
 export function slugTitle(title: string): string {
