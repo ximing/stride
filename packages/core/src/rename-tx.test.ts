@@ -121,7 +121,7 @@ describe('rewriteVaultLinks', () => {
           content: [
             { type: 'wikilink', attrs: { target: 'status-2', alias: 'keep' } },
             { type: 'wikilink', attrs: { target: 'Status' } },
-            { type: 'text', text: 'see [[status-2]] and [[Status]] and [[status-2 extra]]' },
+            { type: 'text', text: 'see [[status-2]] [[STATUS-2]] [[status 2]] [[Status]] [[STATUS]] [[status-2 extra]]' },
           ],
         },
       ],
@@ -145,7 +145,7 @@ describe('rewriteVaultLinks', () => {
     expect(saved.title).toBe('Linker')
     expect(nodes[0]?.attrs).toEqual({ target: 'status', alias: 'keep' })
     expect(nodes[1]?.attrs).toEqual({ target: 'Status' })
-    expect(textOf(saved.doc)).toBe('see [[status]] and [[Status]] and [[status-2 extra]]')
+    expect(textOf(saved.doc)).toBe('see [[status]] [[status]] [[status]] [[Status]] [[STATUS]] [[status-2 extra]]')
     expect((await readNoteFile(fs, 'status-2.stride.json', 'status-2')).title).toBe('Status')
     expect(await fs.stat('.stride/rename-tx/journal.json')).toBeNull()
 
@@ -165,7 +165,7 @@ describe('rewriteVaultLinks', () => {
           type: 'paragraph',
           content: [
             { type: 'wikilink', attrs: { target: 'status-2', alias: 'keep' } },
-            { type: 'text', text: '[[status-2]] [[Status]]' },
+            { type: 'text', text: '[[status-2]] [[STATUS-2]] [[Status]] [[STATUS]]' },
           ],
         },
       ],
@@ -184,8 +184,39 @@ describe('rewriteVaultLinks', () => {
     expect(await fs.stat('.stride/rename-tx/journal.json')).toBeNull()
   })
 
-  it('does not fold case or whitespace when the title changes', async () => {
+  it('folds case and id whitespace like the graph, and rewrites every match to the new title', async () => {
     const fs = new MemoryFileSystem('exact')
+    const text = '[[OLD TITLE]] [[Old  Title]] [[Old Title]] [[old-title]] [[OLD-TITLE]] [[old--title]]'
+    const doc = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'wikilink', attrs: { target: 'old title' } },
+            { type: 'text', text },
+          ],
+        },
+      ],
+    }
+    const linker = createNote('linker', 'Linker')
+    linker.doc = doc
+    const other = createNote('other-linker', 'Other Linker')
+    other.doc = doc
+    await writeNoteFile(fs, 'linker.stride.json', linker)
+    await writeNoteFile(fs, 'other-linker.stride.json', other)
+
+    await rewriteVaultLinks(fs, change)
+
+    for (const path of ['linker.stride.json', 'other-linker.stride.json']) {
+      const saved = await readNoteFile(fs, path, 'linker')
+      expect(wikilinkAttrs(saved.doc)?.target).toBe('New Title')
+      expect(textOf(saved.doc)).toBe('[[New Title]] [[New Title]] [[New Title]] [[New Title]] [[New Title]] [[old--title]]')
+    }
+  })
+
+  it('keeps a title link when only the id changes, even if spaces in it fold onto that id', async () => {
+    const fs = new MemoryFileSystem('title-beats-id')
     const linker = createNote('linker', 'Linker')
     linker.doc = {
       type: 'doc',
@@ -193,19 +224,24 @@ describe('rewriteVaultLinks', () => {
         {
           type: 'paragraph',
           content: [
-            { type: 'wikilink', attrs: { target: 'old title' } },
-            { type: 'text', text: '[[OLD TITLE]] [[Old  Title]] [[Old Title]] [[old-title]]' },
+            { type: 'wikilink', attrs: { target: 'Status Two' } },
+            { type: 'text', text: '[[status two]] [[STATUS-TWO]] [[status  two]]' },
           ],
         },
       ],
     }
     await writeNoteFile(fs, 'linker.stride.json', linker)
 
-    await rewriteVaultLinks(fs, change)
+    await rewriteVaultLinks(fs, {
+      fromTitle: 'Status Two',
+      toTitle: 'Status Two',
+      fromId: 'status-two',
+      toId: 'status-2',
+    })
 
     const saved = await readNoteFile(fs, 'linker.stride.json', 'linker')
-    expect(wikilinkAttrs(saved.doc)?.target).toBe('old title')
-    expect(textOf(saved.doc)).toBe('[[OLD TITLE]] [[Old  Title]] [[New Title]] [[New Title]]')
+    expect(wikilinkAttrs(saved.doc)?.target).toBe('Status Two')
+    expect(textOf(saved.doc)).toBe('[[status two]] [[status-2]] [[status-2]]')
   })
 
   it('rejects a corrupt journal without removing notes', async () => {

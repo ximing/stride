@@ -1,4 +1,5 @@
 import type { FileSystemBackend } from '@stride/platform'
+import { matchNoteLink } from './graph.ts'
 import type { NoteProperty, StrideNote, TipTapNode } from './note.ts'
 import { listNoteFiles, readNoteFile, writeNoteFile } from './vault.ts'
 
@@ -224,26 +225,20 @@ function rewriteWikilinks(text: string, change: RenameChange): string {
   })
 }
 
+// Same match as the graph: case-insensitive title or id, spaces folded onto ids.
 // Title changes still land on the new title, including old-id links.
 // An id-only change lands on the new id and leaves title links alone.
 function rewrittenTarget(inner: string, change: RenameChange): string | null {
-  if (change.fromTitle !== change.toTitle) {
-    if (!isRenameTarget(inner, change)) return null
-    return change.toTitle
-  }
-  if (inner === change.fromTitle) return null
-  if (change.fromId !== '' && change.fromId !== change.toId && inner === change.fromId) return change.toId
-  return null
+  const hit = matchNoteLink(inner, { title: change.fromTitle, id: change.fromId })
+  if (hit === null) return null
+  if (change.fromTitle !== change.toTitle) return change.toTitle
+  if (hit === 'title') return null
+  if (change.fromId === '' || change.toId === '' || change.fromId === change.toId) return null
+  return change.toId
 }
 
 function textNeedsRewrite(text: string, change: RenameChange): boolean {
   return rewriteWikilinks(text, change) !== text
-}
-
-function isRenameTarget(inner: string, change: RenameChange): boolean {
-  if (change.fromTitle !== '' && inner === change.fromTitle) return true
-  if (change.fromId !== '' && inner === change.fromId) return true
-  return false
 }
 
 async function removeJournal(fs: FileSystemBackend): Promise<void> {

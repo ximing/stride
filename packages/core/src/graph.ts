@@ -138,14 +138,31 @@ export function hasOutgoingRelationship(note: StrideNote): boolean {
   return relationshipFields(note).length > 0
 }
 
-export function resolveNote(notes: StrideNote[], ref: string): StrideNote | undefined {
+/** Title, exact id, or id after the link's whitespace is folded to `-`. Title wins on the same note. */
+export function matchNoteLink(
+  ref: string,
+  note: { title: string; id: string },
+): 'title' | 'id' | 'folded-id' | null {
   const key = ref.trim().toLowerCase()
-  if (!key) return undefined
-  return (
-    notes.find((note) => note.title.toLowerCase() === key) ??
-    notes.find((note) => note.id.toLowerCase() === key) ??
-    notes.find((note) => note.id.toLowerCase() === key.replace(/\s+/g, '-'))
-  )
+  if (!key) return null
+  if (note.title.toLowerCase() === key) return 'title'
+  if (note.id === '') return null
+  const id = note.id.toLowerCase()
+  if (id === key) return 'id'
+  if (id === key.replace(/\s+/g, '-')) return 'folded-id'
+  return null
+}
+
+export function resolveNote(notes: StrideNote[], ref: string): StrideNote | undefined {
+  let idHit: StrideNote | undefined
+  let foldedHit: StrideNote | undefined
+  for (const note of notes) {
+    const hit = matchNoteLink(ref, note)
+    if (hit === 'title') return note
+    if (hit === 'id') idHit ??= note
+    else if (hit === 'folded-id') foldedHit ??= note
+  }
+  return idHit ?? foldedHit
 }
 
 export function groupByType(notes: StrideNote[]): Map<string, StrideNote[]> {

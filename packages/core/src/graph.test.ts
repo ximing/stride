@@ -8,8 +8,9 @@ import {
   relationStorageKey,
   relationsOf,
   removeRelationTarget,
+  resolveNote,
 } from './graph.ts'
-import type { TipTapNode } from './note.ts'
+import { createNote, type TipTapNode } from './note.ts'
 import { loadNotes, notePath, saveNote } from './vault.ts'
 
 function doc(text: string, links: string[] = []): TipTapNode {
@@ -143,5 +144,34 @@ describe('relationships and inbox', () => {
     expect(isManagedRelation('belongs to', '[[Parent]]')).toBe(true)
     expect(isManagedRelation('belongs_to', 'Parent')).toBe(false)
     expect(isManagedRelation('supports', ['[[Peer]]'])).toBe(false)
+  })
+})
+
+describe('resolveNote', () => {
+  const ada = createNote('ada', 'Ada')
+  const status = createNote('status', 'Status')
+  const otherStatus = createNote('other-status', 'Status')
+  const planB = createNote('plan-b', 'One')
+  const planSpace = createNote('plan b', 'Two')
+  const titleAda = createNote('countess', 'Ada')
+  const idAda = createNote('ada', 'Countess')
+
+  it('folds case, prefers a title over an id, and takes the first title', () => {
+    expect(resolveNote([ada], '  ADA ')?.id).toBe('ada')
+    expect(resolveNote([titleAda, idAda], 'ADA')?.id).toBe('countess')
+    expect(resolveNote([idAda, titleAda], 'ada')?.id).toBe('countess')
+    expect(resolveNote([status, otherStatus], 'status')?.id).toBe('status')
+    expect(resolveNote([otherStatus, status], 'STATUS')?.id).toBe('other-status')
+    expect(resolveNote([ada], '   ')).toBeUndefined()
+    expect(resolveNote([ada], 'missing')).toBeUndefined()
+  })
+
+  it('matches an id case-insensitively, then folds spaces, with an exact id first', () => {
+    expect(resolveNote([planB], 'PLAN-B')?.id).toBe('plan-b')
+    expect(resolveNote([planB], 'plan b')?.id).toBe('plan-b')
+    expect(resolveNote([planB, planSpace], 'plan b')?.id).toBe('plan b')
+    expect(resolveNote([planSpace, planB], 'PLAN B')?.id).toBe('plan b')
+    expect(resolveNote([createNote('status-two', 'Status Two')], 'status  two')?.id).toBe('status-two')
+    expect(resolveNote([createNote('status-two', 'Else'), createNote('other', 'Status Two')], 'status two')?.id).toBe('other')
   })
 })
