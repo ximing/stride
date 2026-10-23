@@ -22,11 +22,47 @@ function countLabel(count: number, index: number): string {
   return `${matchIndex(index, count) + 1}/${count}`
 }
 
+type OpenSeeded = (seed: string) => void
+
+let editorFind: { service: FindService; openSeeded: OpenSeeded } | null = null
+const editorFindListeners = new Set<() => void>()
+
+function emitEditorFind() {
+  for (const listener of editorFindListeners) listener()
+}
+
+export function subscribeEditorFind(listener: () => void): () => void {
+  editorFindListeners.add(listener)
+  return () => {
+    editorFindListeners.delete(listener)
+  }
+}
+
+export function editorFindOpen(): boolean {
+  return editorFind?.service.open ?? false
+}
+
+export function openEditorFind(seed: string) {
+  editorFind?.openSeeded(seed)
+}
+
 const FindBar = observer(function FindBar({ editor }: { editor: Editor }) {
   const { t } = useTranslation()
   const service = useService(FindService)
   const commands = useService(CommandService)
   const inputRef = useRef<HTMLInputElement>(null)
+  const openSeededRef = useRef<OpenSeeded>(() => {})
+  openSeededRef.current = (seed: string) => {
+    if (seed) service.setQuery(seed)
+    const alreadyOpen = service.open
+    service.show()
+    if (alreadyOpen) inputRef.current?.focus()
+    if (!seed) return
+    const found = findTextMatches(editor.state.doc, seed, service.caseSensitive)
+    const first = found[0]
+    if (first) selectMatch(editor, first)
+    else clearFindHighlight(editor)
+  }
   // Bumped on editor updates so the count follows the document, not only the query.
   const revision = service.revision
   const caseSensitive = service.caseSensitive
@@ -44,10 +80,18 @@ const FindBar = observer(function FindBar({ editor }: { editor: Editor }) {
   }, [editor, service])
 
   useEffect(() => {
-    window.dispatchEvent(new CustomEvent('stride-editor-find-open', { detail: { open: service.open } }))
+    editorFind = { service, openSeeded: (seed) => openSeededRef.current(seed) }
+    emitEditorFind()
     return () => {
-      window.dispatchEvent(new CustomEvent('stride-editor-find-open', { detail: { open: false } }))
+      if (editorFind?.service === service) {
+        editorFind = null
+        emitEditorFind()
+      }
     }
+  }, [service])
+
+  useEffect(() => {
+    emitEditorFind()
   }, [service.open])
 
   useEffect(() => {
@@ -93,21 +137,6 @@ const FindBar = observer(function FindBar({ editor }: { editor: Editor }) {
       const match = found[index]
       if (match) selectMatch(editor, match)
     }
-    const onFind = (event: Event) => {
-      if (!(event instanceof CustomEvent)) return
-      const detail = event.detail as { seed?: unknown } | null
-      const seed = detail && typeof detail.seed === 'string' ? detail.seed : ''
-      if (seed) service.setQuery(seed)
-      const alreadyOpen = service.open
-      service.show()
-      if (alreadyOpen) inputRef.current?.focus()
-      if (!seed) return
-      const found = findTextMatches(editor.state.doc, seed, service.caseSensitive)
-      const first = found[0]
-      if (first) selectMatch(editor, first)
-      else clearFindHighlight(editor)
-    }
-    window.addEventListener('stride-editor-find', onFind)
     const unregisterKeys = registerOverlayKeys({
       id: 'find',
       layer: 'find',
@@ -130,7 +159,6 @@ const FindBar = observer(function FindBar({ editor }: { editor: Editor }) {
       },
     })
     return () => {
-      window.removeEventListener('stride-editor-find', onFind)
       unregisterKeys()
     }
   }, [editor, service])

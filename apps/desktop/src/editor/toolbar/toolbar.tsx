@@ -30,11 +30,12 @@ import {
 } from 'lucide-react'
 import { BubbleMenu } from '@tiptap/react/menus'
 import { useEditorState } from '@tiptap/react'
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
 import { t } from '../../i18n'
 import { formatShortcut } from '../../services/commands/commands'
-import { applyLink, clearFormatting, runFormat, unsetLink, type FormatName } from '../extensions'
+import { applyLink, clearFormatting, runFormat, setMathPromptOpener, unsetLink, type FormatName } from '../extensions'
+import { editorFindOpen, openEditorFind, subscribeEditorFind } from '../find/find-bar'
 import { findSeedFromSelection } from '../find/find-hits'
 import { insertStoredImages, storeImageFiles } from '../image/image'
 import { insertMathLatex } from '../math/math'
@@ -155,7 +156,7 @@ export function EditorToolbar({
   const [linkForm, setLinkForm] = useState<LinkForm | null>(null)
   const [linkSession, setLinkSession] = useState(0)
   const [mathOpen, setMathOpen] = useState(false)
-  const [findOpen, setFindOpen] = useState(false)
+  const findOpen = useSyncExternalStore(subscribeEditorFind, editorFindOpen, editorFindOpen)
   const imageInputRef = useRef<HTMLInputElement>(null)
 
   openLinkRef.current = () => {
@@ -173,17 +174,8 @@ export function EditorToolbar({
   }
 
   useEffect(() => {
-    const onMath = () => setMathOpen(true)
-    const onFind = (event: Event) => {
-      const open = Boolean((event as CustomEvent<{ open?: boolean }>).detail?.open)
-      setFindOpen(open)
-    }
-    window.addEventListener('stride-editor-math', onMath)
-    window.addEventListener('stride-editor-find-open', onFind)
-    return () => {
-      window.removeEventListener('stride-editor-math', onMath)
-      window.removeEventListener('stride-editor-find-open', onFind)
-    }
+    setMathPromptOpener(() => setMathOpen(true))
+    return () => setMathPromptOpener(null)
   }, [])
 
   function runTool(tool: ToolSpec) {
@@ -196,8 +188,8 @@ export function EditorToolbar({
 
   function openFind() {
     const { from, to } = editor.state.selection
-    const seed = findSeedFromSelection(editor.state.doc, from, to)
-    window.dispatchEvent(new CustomEvent('stride-editor-find', { detail: { seed } }))
+    const seed = findSeedFromSelection(editor.state.doc, from, to) ?? ''
+    openEditorFind(seed)
   }
 
   const tool = (id: string, label: string, icon: LucideIcon, onClick: () => void, extra?: { pressed?: boolean; disabled?: boolean }) =>

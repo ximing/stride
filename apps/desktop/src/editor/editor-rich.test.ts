@@ -1,5 +1,5 @@
 import { Editor, type JSONContent } from '@tiptap/core'
-import { act, createElement } from 'react'
+import { act, createElement, Fragment } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it } from 'vitest'
 import { clearFormatting, createEditorExtensions } from './extensions'
@@ -12,6 +12,8 @@ import { insertMathLatex } from './math/math'
 import { dispatchMarkdownPaste } from './paste/paste-dispatch'
 import { insertMermaid } from './mermaid/mermaid-insert'
 import { runTableCommand } from './table/table-actions'
+import { EditorFind } from './find/find-bar'
+import { slashCommands } from './slash/slash'
 import { EditorToolbar } from './toolbar/toolbar'
 
 globalThis.IS_REACT_ACT_ENVIRONMENT = true
@@ -190,7 +192,10 @@ describe('rich text aligned with inwit', () => {
     const root = createRoot(host)
     roots.push(root)
     await act(async () => {
-      root.render(createElement(EditorToolbar, { editor, openLinkRef: { current: () => true } }))
+      root.render(createElement(Fragment, null,
+        createElement(EditorFind, { editor }),
+        createElement(EditorToolbar, { editor, openLinkRef: { current: () => true } }),
+      ))
     })
 
     await act(async () => {
@@ -205,9 +210,25 @@ describe('rich text aligned with inwit', () => {
     expect(editor.getAttributes('textStyle').color).toBe('#ff4d4f')
 
     await act(async () => {
-      window.dispatchEvent(new CustomEvent('stride-editor-find-open', { detail: { open: true } }))
+      slashCommands.find((item) => item.id === 'math')?.run(editor)
     })
+    expect(document.querySelector('[data-testid="math-latex"]')).not.toBeNull()
+    await act(async () => {
+      ;(document.querySelector('.editor-prompt-cancel') as HTMLButtonElement).click()
+    })
+    expect(document.querySelector('[data-testid="math-latex"]')).toBeNull()
+
+    editor.commands.setTextSelection(1)
+    await act(async () => {
+      ;(document.querySelector('[data-testid="toolbar-find"]') as HTMLButtonElement).click()
+    })
+    expect(document.querySelector('[data-testid="find-bar"]')).not.toBeNull()
     expect(document.querySelector('[data-testid="toolbar-find"]')?.getAttribute('aria-pressed')).toBe('true')
+    await act(async () => {
+      ;(document.querySelector('[data-testid="find-bar"] [aria-label="Close"]') as HTMLButtonElement).click()
+    })
+    expect(document.querySelector('[data-testid="toolbar-find"]')?.getAttribute('aria-pressed')).toBeNull()
+    editor.commands.setTextSelection({ from: 1, to: 6 })
 
     await act(async () => {
       ;(document.querySelector('[data-testid="toolbar-table"]') as HTMLButtonElement).click()

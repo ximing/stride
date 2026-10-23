@@ -29,12 +29,20 @@ registerSlashCommand(taskSlashCommand)
 registerSlashCommand(tableSlashCommand)
 registerSlashCommand(calloutSlashCommand)
 registerSlashCommand(imageSlashCommand)
+
+// The toolbar owns the formula prompt. Slash math calls this instead of a window event.
+let openMathPrompt: (() => void) | null = null
+
+export function setMathPromptOpener(opener: (() => void) | null): void {
+  openMathPrompt = opener
+}
+
 registerSlashCommand({
   id: 'math',
   title: 'Math',
   keywords: 'math latex katex 公式 数学',
   run: () => {
-    window.dispatchEvent(new CustomEvent('stride-editor-math'))
+    openMathPrompt?.()
   },
 })
 registerSlashCommand({
