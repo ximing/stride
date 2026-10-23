@@ -32,12 +32,50 @@ if (typeof Range !== 'undefined' && typeof Range.prototype.getBoundingClientRect
 }
 import { afterEach, describe, expect, it } from 'vitest'
 import { formatShortcut } from '../services/commands/commands'
+import overlayDialogCss from '../ui/overlays/dialog.css?inline'
+import primitiveDialogCss from '../ui/primitives/dialog.css?inline'
+import tokensCss from '../ui/tokens.css?inline'
+import baseCss from './chrome/base.css?inline'
 import { applyLink, createEditorExtensions, runFormat, unsetLink, type FormatName } from './extensions'
+import { EditorPrompt } from './prompt'
 import { EditorToolbar, editorTools } from './toolbar/toolbar'
 
 const editors: Editor[] = []
 const roots: Root[] = []
 const hosts: HTMLElement[] = []
+const sheets: HTMLStyleElement[] = []
+
+// App order for the overlay/modal cascade: tokens, primitive dialog, overlay dialog, editor chrome.
+const promptStackingCss = [tokensCss, primitiveDialogCss, overlayDialogCss, baseCss]
+
+function mountPromptStackingCss(): void {
+  for (const css of promptStackingCss) {
+    const style = document.createElement('style')
+    style.textContent = css
+    document.head.appendChild(style)
+    sheets.push(style)
+  }
+}
+
+function numericZIndex(element: Element): number {
+  const view = element.ownerDocument.defaultView
+  if (!view) throw new Error('missing view')
+  return resolveZIndex(view.getComputedStyle(element).zIndex.trim(), view, 0)
+}
+
+function resolveZIndex(value: string, view: Window, depth: number): number {
+  if (depth > 4) throw new Error(`unresolved z-index ${value}`)
+  const variable = /^var\(\s*(--[\w-]+)\s*\)$/.exec(value)
+  if (variable) {
+    const next = view.getComputedStyle(view.document.documentElement).getPropertyValue(variable[1]).trim()
+    if (!next) throw new Error(`missing ${variable[1]}`)
+    return resolveZIndex(next, view, depth + 1)
+  }
+  if (value === '' || value === 'auto') throw new Error(`unresolved z-index ${JSON.stringify(value)}`)
+  const numeric = Number(value)
+  if (!Number.isFinite(numeric)) throw new Error(`unresolved z-index ${value}`)
+  return numeric
+}
 
 function createEditor(content?: JSONContent): Editor {
   const editor = new Editor({
@@ -81,6 +119,7 @@ function hasMark(doc: JSONContent, type: string): boolean {
 afterEach(() => {
   roots.splice(0).forEach((root) => root.unmount())
   hosts.splice(0).forEach((host) => host.remove())
+  sheets.splice(0).forEach((sheet) => sheet.remove())
   editors.splice(0).forEach((editor) => editor.destroy())
 })
 
@@ -345,5 +384,38 @@ describe('editor formats', () => {
       editor.commands.insertContent({ type: 'wikilink', attrs: { target: 'Other note' } })
     })
     expect(hasMark(editor.getJSON(), 'wikilink')).toBe(true)
+  })
+})
+
+describe('editor prompt stacking', () => {
+  it('keeps the backdrop under the apply button', async () => {
+    // jsdom has no elementFromPoint. These inlined sheets are the overlay/modal cascade;
+    // a backdrop z-index above the modal is what would paint the overlay over Apply.
+    mountPromptStackingCss()
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    hosts.push(host)
+    const root = createRoot(host)
+    roots.push(root)
+    await act(async () => {
+      root.render(createElement(EditorPrompt, {
+        title: 'Link',
+        description: 'Add a link',
+        label: 'Link URL',
+        initialValue: 'https://example.com',
+        onSubmit: () => {},
+        onClose: () => {},
+      }))
+    })
+    const apply = document.querySelector('.editor-prompt-submit')
+    const backdrop = document.querySelector('.editor-prompt-backdrop')
+    const modal = apply?.closest('.sd-modal')
+    expect(apply).not.toBeNull()
+    expect(backdrop).not.toBeNull()
+    expect(modal).not.toBeNull()
+    expect(backdrop?.contains(apply)).toBe(false)
+    expect(modal?.contains(apply)).toBe(true)
+    expect(backdrop?.parentElement).toBe(modal?.parentElement)
+    expect(numericZIndex(backdrop!)).toBeLessThan(numericZIndex(modal!))
   })
 })
