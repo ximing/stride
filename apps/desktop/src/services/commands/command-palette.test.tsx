@@ -9,7 +9,7 @@ import { i18n } from '../../i18n'
 import { CommandPalette } from '../../ui/overlays/command-palette'
 import { buildPaletteItems, paletteItemTitle } from './command-palette'
 import { CommandPaletteService } from './command-palette.service'
-import { CommandService } from './command.service'
+import { CommandService, DESKTOP_DISABLED_SHORTCUTS } from './command.service'
 import { formatShortcut, shortcutToKeyEventInit } from './commands'
 import { LayoutService } from '../layout/layout.service'
 import { ChatService } from '../chat/chat.service'
@@ -191,6 +191,7 @@ describe('command palette', () => {
     root = null
     host = null
     vi.restoreAllMocks()
+    delete (window as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__
   })
 
   async function mount(notes: StrideNote[], phase: 'chooser' | 'ready' = 'ready') {
@@ -255,6 +256,36 @@ describe('command palette', () => {
       press({ key: 'Escape' })
     })
     expect(host?.querySelector('[data-testid="command-palette"]')).toBeNull()
+  })
+
+  it('hides desktop-owned shortcut hints and keeps them in the browser', async () => {
+    const owned = [...DESKTOP_DISABLED_SHORTCUTS]
+    await mount([note('alpha', 'Alpha')])
+    await act(async () => {
+      resolve(CommandPaletteService).show()
+    })
+    for (const id of owned) {
+      const item = host?.querySelector(`[data-command-id="${id}"]`)
+      const command = resolve(CommandService).commands.find((entry) => entry.id === id)
+      expect(item).not.toBeNull()
+      expect(command?.shortcut).toBeTruthy()
+      expect(item?.querySelector('kbd')?.textContent).toBe(formatShortcut(command!.shortcut!))
+    }
+    expect(host?.querySelector('[data-command-id="file.newNote"] kbd')?.textContent).toBe(formatShortcut('Mod+N'))
+
+    root?.unmount()
+    host?.remove()
+    ;(window as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ = {}
+    await mount([note('alpha', 'Alpha')])
+    await act(async () => {
+      resolve(CommandPaletteService).show()
+    })
+    for (const id of owned) {
+      const item = host?.querySelector(`[data-command-id="${id}"]`)
+      expect(item).not.toBeNull()
+      expect(item?.querySelector('kbd')).toBeNull()
+    }
+    expect(host?.querySelector('[data-command-id="file.newNote"] kbd')?.textContent).toBe(formatShortcut('Mod+N'))
   })
 
   it('executes the selected command on Enter and jumps to notes', async () => {

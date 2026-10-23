@@ -5,7 +5,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it } from 'vitest'
 import manifest from '../../appCommandManifest.json'
-import { CommandService } from '../../services/commands/command.service'
+import { CommandService, DESKTOP_DISABLED_SHORTCUTS } from '../../services/commands/command.service'
 import { formatShortcut, parseAppCommandManifest } from '../../services/commands/commands'
 import { QuickOpenService } from '../../services/search/quick-open.service'
 import { SETTINGS_SECTION_IDS, SettingsPageService } from '../../services/settings/settings-page.service'
@@ -35,6 +35,7 @@ describe('settings dialog', () => {
     root = null
     host = null
     settingsTrigger = null
+    delete (window as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__
   })
 
   async function mount() {
@@ -186,5 +187,33 @@ describe('settings dialog', () => {
         expect(row.querySelector('.settings-shortcut-none')?.textContent).toBe('—')
       }
     }
+  })
+
+  it('hides desktop-owned shortcut hints and keeps manifest chords for the browser', async () => {
+    const service = await mount()
+    await act(async () => {
+      service.show('shortcuts')
+    })
+    for (const id of DESKTOP_DISABLED_SHORTCUTS) {
+      const command = commands.find((entry) => entry.id === id)!
+      expect(command.shortcut).toBeTruthy()
+      const row = document.querySelector(`.settings-shortcut-row[data-command-id="${id}"]`)!
+      expect(row.querySelector('kbd')?.textContent).toBe(formatShortcut(command.shortcut!))
+    }
+
+    ;(window as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ = {}
+    await act(async () => {
+      service.show('appearance')
+    })
+    await act(async () => {
+      service.show('shortcuts')
+    })
+    for (const id of DESKTOP_DISABLED_SHORTCUTS) {
+      const row = document.querySelector(`.settings-shortcut-row[data-command-id="${id}"]`)!
+      expect(row.querySelector('kbd')).toBeNull()
+      expect(row.querySelector('.settings-shortcut-none')?.textContent).toBe('—')
+    }
+    const kept = document.querySelector('.settings-shortcut-row[data-command-id="file.newNote"]')!
+    expect(kept.querySelector('kbd')?.textContent).toBe(formatShortcut('Mod+N'))
   })
 })

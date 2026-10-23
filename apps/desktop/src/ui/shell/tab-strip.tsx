@@ -2,7 +2,7 @@ import { observer, useService } from '@rabjs/react'
 import { PanelRight, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { commandTitle } from '../../i18n'
-import { CommandService } from '../../services/commands/command.service'
+import { CommandService, showsShortcutHint } from '../../services/commands/command.service'
 import { commandShortcut } from '../../services/commands/commands'
 import { LayoutService } from '../../services/layout/layout.service'
 import { TabsService } from '../../services/notes/tabs.service'
@@ -25,8 +25,8 @@ export const TabStrip = observer(function TabStrip() {
   const commands = useService(CommandService)
   const layout = useService(LayoutService)
   if (vault.phase !== 'ready') return null
-  // Tooltip shortcut text comes from the manifest, never a hard-coded chord.
-  const closeKeys = commandShortcut(commands.commands, 'tab.close')
+  // Chord text comes from the manifest. Desktop hint UI omits chords the webview does not dispatch.
+  const closeKeys = showsShortcutHint('tab.close') ? commandShortcut(commands.commands, 'tab.close') : null
   const closeName = commandTitle('tab.close', 'Close tab')
   const closeLabel = closeKeys ? `${closeName} (${closeKeys})` : closeName
   const saving = vault.saveStatus === 'pending' || vault.saveStatus === 'saving'

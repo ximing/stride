@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next'
 import manifest from '../../../appCommandManifest.json'
 import { commandTitle } from '../../../i18n'
+import { showsShortcutHint } from '../../../services/commands/command.service'
 import { formatShortcut, parseAppCommandManifest, type AppCommand } from '../../../services/commands/commands'
 
 interface ShortcutGroup {
@@ -40,7 +41,7 @@ export function ShortcutsSection() {
             {group.commands.map((command) => (
               <li key={command.id} className="settings-shortcut-row" data-command-id={command.id}>
                 <span className="settings-shortcut-title">{commandTitle(command.id, command.title)}</span>
-                {command.shortcut ? (
+                {command.shortcut && showsShortcutHint(command.id) ? (
                   <kbd className="settings-shortcut-kbd">{formatShortcut(command.shortcut)}</kbd>
                 ) : (
                   <span className="settings-shortcut-none">{t('settings.shortcuts.none')}</span>

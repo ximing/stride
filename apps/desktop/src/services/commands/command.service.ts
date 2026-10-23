@@ -36,6 +36,11 @@ function focusOverlayInput(selector: string) {
 // the palette, and tabs still close from the strip.
 export const DESKTOP_DISABLED_SHORTCUTS = new Set(['tab.close', 'file.newWindow', 'file.openProject'])
 
+/** Hint UI only. False on desktop for chords the webview does not dispatch. Manifest strings stay. */
+export function showsShortcutHint(commandId: string): boolean {
+  return !(DESKTOP_DISABLED_SHORTCUTS.has(commandId) && isDesktopRuntime())
+}
+
 /**
  * Single runtime registry for the app command manifest. Handlers only forward
  * to existing services; no business logic lives here. Manifest shortcuts are

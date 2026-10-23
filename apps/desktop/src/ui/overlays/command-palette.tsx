@@ -4,7 +4,7 @@ import { Fragment, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { paletteItemSection, paletteItemTitle, type PaletteItem } from '../../services/commands/command-palette'
 import { CommandPaletteService } from '../../services/commands/command-palette.service'
-import { CommandService } from '../../services/commands/command.service'
+import { CommandService, showsShortcutHint } from '../../services/commands/command.service'
 import { formatShortcut } from '../../services/commands/commands'
 import { handleOverlayListKey, registerOverlayKeys } from '../../services/platform/overlay-keys'
 import { EmptyState } from '../primitives/empty-state'
@@ -132,7 +132,7 @@ export const CommandPalette = observer(function CommandPalette() {
                   onClick={() => service.activate(item)}
                 >
                   <span className="sd-command-item-title">{paletteItemTitle(item)}</span>
-                  {item.kind === 'command' && item.command.shortcut ? (
+                  {item.kind === 'command' && item.command.shortcut && showsShortcutHint(item.command.id) ? (
                     <kbd className="command-item-shortcut sd-command-kbd">{formatShortcut(item.command.shortcut)}</kbd>
                   ) : null}
                 </button>
