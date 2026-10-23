@@ -156,7 +156,19 @@ function storedKey(value: unknown): Uint8Array | null {
   return new Uint8Array(value)
 }
 
-async function loadOrCreateKey(): Promise<Uint8Array> {
+// Concurrent first opens in this page share one create. Other tabs do not.
+let sealKeyInflight: Promise<Uint8Array> | null = null
+
+function loadOrCreateKey(): Promise<Uint8Array> {
+  if (!sealKeyInflight) {
+    sealKeyInflight = loadOrCreateKeyBody().finally(() => {
+      sealKeyInflight = null
+    })
+  }
+  return sealKeyInflight
+}
+
+async function loadOrCreateKeyBody(): Promise<Uint8Array> {
   const db = await openDatabase()
   try {
     const existing = storedKey(await readKey(db))

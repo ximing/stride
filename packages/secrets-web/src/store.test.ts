@@ -39,6 +39,8 @@ function cloneValue(value: unknown): unknown {
 class FakeIndexedDb {
   readonly databases = new Map<string, DbState>()
   readonly opens: OpenCall[] = []
+  putStarts = 0
+  holdWrites: Promise<void> | null = null
 
   seed(name: string, version: number, records: Record<string, Record<string, unknown>>): void {
     const stores = new Map<string, Map<string, unknown>>()
@@ -119,11 +121,20 @@ class FakeIndexedDb {
         },
         put: (value: unknown, key: string) => {
           const request = makeRequest()
-          queueMicrotask(() => {
+          this.putStarts += 1
+          const commit = () => {
             store.set(key, cloneValue(value))
             request.result = key
             request.onsuccess?.(new Event('success'))
             finish()
+          }
+          queueMicrotask(() => {
+            const held = this.holdWrites
+            if (held) {
+              void held.then(commit)
+              return
+            }
+            commit()
           })
           return request
         },
@@ -205,6 +216,37 @@ describe('webSecretsStore', () => {
     expect(idb.readSealKey()).toEqual(persisted)
     expect(await second.open(sealed)).toBe('shared-secret')
     expect(await first.open(sealed)).toBe('shared-secret')
+  })
+
+  it('stores one seal key when two first creates overlap', async () => {
+    let release: () => void = () => {}
+    idb.holdWrites = new Promise((resolve) => {
+      release = resolve
+    })
+    const pending = Promise.all([api.webSecretsStore(), api.webSecretsStore()])
+    try {
+      for (let i = 0; i < 30 && idb.putStarts === 0; i += 1) {
+        await new Promise((resolve) => queueMicrotask(resolve))
+      }
+      for (let i = 0; i < 10; i += 1) {
+        await new Promise((resolve) => queueMicrotask(resolve))
+      }
+      expect(idb.putStarts).toBe(1)
+      expect(idb.opens).toEqual([{ name: 'stride-secrets', version: 1 }])
+      expect(idb.readSealKey()).toBeUndefined()
+    } finally {
+      release()
+      idb.holdWrites = null
+    }
+    const [first, second] = await pending
+    expect(first).not.toBe(second)
+    expect(idb.putStarts).toBe(1)
+    const raw = idb.readSealKey()
+    expect(raw).toHaveLength(32)
+    const sealed = await first.seal('one-key')
+    expect(await second.open(sealed)).toBe('one-key')
+    expect(await first.open(await second.seal('one-key'))).toBe('one-key')
+    expect(await decryptLayout(raw!, sealed)).toBe('one-key')
   })
 
   it('fails open with io when the persisted key is different', async () => {
