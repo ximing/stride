@@ -61,6 +61,12 @@ importers:
       '@stride/search-web':
         specifier: workspace:*
         version: link:../../packages/search-web
+      '@stride/secrets-tauri':
+        specifier: workspace:*
+        version: link:../../packages/secrets-tauri
+      '@stride/secrets-web':
+        specifier: workspace:*
+        version: link:../../packages/secrets-web
       '@tauri-apps/api':
         specifier: ^2.8.0
         version: 2.12.3

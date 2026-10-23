@@ -96,14 +96,159 @@ function decodeKey(encoded: string): Uint8Array {
   return raw
 }
 
-async function loadOrCreateKey(): Promise<Uint8Array> {
+// Web store layout. Desktop used to keep the raw seal key here. Ciphertext lives
+// outside this database and is not deleted by the move into the keychain.
+const LEGACY_DB_NAME = 'stride-secrets'
+const LEGACY_STORE = 'secrets'
+const LEGACY_KEY = 'seal-key'
+
+function sameBytes(left: Uint8Array, right: Uint8Array): boolean {
+  if (left.length !== right.length) return false
+  for (let i = 0; i < left.length; i += 1) {
+    if (left[i] !== right[i]) return false
+  }
+  return true
+}
+
+function requestError(request: IDBRequest, fallback: string): Error {
+  return request.error ?? new Error(fallback)
+}
+
+function openLegacyDatabase(indexedDB: IDBFactory): Promise<{ db: IDBDatabase; created: boolean }> {
+  return new Promise((resolve, reject) => {
+    const request = indexedDB.open(LEGACY_DB_NAME)
+    let created = false
+    request.onupgradeneeded = () => {
+      created = true
+    }
+    request.onsuccess = () => resolve({ db: request.result, created })
+    request.onerror = (event) => {
+      event.preventDefault()
+      reject(requestError(request, 'Failed to open IndexedDB'))
+    }
+  })
+}
+
+function readLegacyRecord(db: IDBDatabase): Promise<unknown> {
+  return new Promise((resolve, reject) => {
+    const request = db.transaction(LEGACY_STORE, 'readonly').objectStore(LEGACY_STORE).get(LEGACY_KEY)
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = (event) => {
+      event.preventDefault()
+      reject(requestError(request, 'Failed to read the seal key'))
+    }
+  })
+}
+
+function deleteLegacyRecord(db: IDBDatabase): Promise<void> {
+  return new Promise((resolve, reject) => {
+    let settled = false
+    const fail = (error: unknown) => {
+      if (settled) return
+      settled = true
+      reject(error instanceof Error ? error : new Error('Failed to remove the old seal key'))
+    }
+    const ok = () => {
+      if (settled) return
+      settled = true
+      resolve()
+    }
+    const tx = db.transaction(LEGACY_STORE, 'readwrite')
+    tx.oncomplete = () => ok()
+    tx.onerror = (event) => {
+      event.preventDefault()
+      fail(tx.error ?? new Error('Failed to remove the old seal key'))
+    }
+    tx.onabort = () => fail(tx.error ?? new Error('Failed to remove the old seal key'))
+    const request = tx.objectStore(LEGACY_STORE).delete(LEGACY_KEY)
+    request.onerror = (event) => {
+      event.preventDefault()
+      fail(requestError(request, 'Failed to remove the old seal key'))
+    }
+  })
+}
+
+// A versionless open creates an empty database when none exists. Drop that probe
+// only. A failure here must not block creating a keychain key.
+function discardCreatedDatabase(indexedDB: IDBFactory): Promise<void> {
+  return new Promise((resolve) => {
+    const request = indexedDB.deleteDatabase(LEGACY_DB_NAME)
+    request.onsuccess = () => resolve()
+    request.onerror = () => resolve()
+    request.onblocked = () => resolve()
+  })
+}
+
+async function readLegacySealKey(): Promise<Uint8Array | null> {
+  const indexedDB = globalThis.indexedDB
+  if (!indexedDB) return null
+  if (typeof indexedDB.databases === 'function') {
+    const listed = await indexedDB.databases()
+    if (!listed.some((entry) => entry.name === LEGACY_DB_NAME)) return null
+  }
+  const opened = await openLegacyDatabase(indexedDB)
+  const dropEmptyProbe = opened.created && !opened.db.objectStoreNames.contains(LEGACY_STORE)
+  try {
+    if (!opened.db.objectStoreNames.contains(LEGACY_STORE)) return null
+    const value = await readLegacyRecord(opened.db)
+    if (value == null) return null
+    if (!(value instanceof Uint8Array) || value.length !== KEY_BYTES) {
+      throw new PlatformError('io', 'Failed to load the seal key')
+    }
+    return new Uint8Array(value)
+  } finally {
+    opened.db.close()
+    // Only a database this probe just created, and only when it has no seal store.
+    if (dropEmptyProbe) await discardCreatedDatabase(indexedDB)
+  }
+}
+
+async function removeLegacySealKey(): Promise<void> {
+  const indexedDB = globalThis.indexedDB
+  if (!indexedDB) throw new PlatformError('io', 'Failed to remove the old seal key')
+  const opened = await openLegacyDatabase(indexedDB)
+  try {
+    if (opened.created || !opened.db.objectStoreNames.contains(LEGACY_STORE)) return
+    await deleteLegacyRecord(opened.db)
+  } finally {
+    opened.db.close()
+    if (opened.created) await discardCreatedDatabase(indexedDB)
+  }
+}
+
+// Shared by concurrent first opens so only one seal key is written.
+let sealKeyInflight: Promise<Uint8Array> | null = null
+
+function loadOrCreateKey(): Promise<Uint8Array> {
+  if (!sealKeyInflight) {
+    sealKeyInflight = loadOrCreateKeyBody().finally(() => {
+      sealKeyInflight = null
+    })
+  }
+  return sealKeyInflight
+}
+
+async function loadOrCreateKeyBody(): Promise<Uint8Array> {
   const existing = await getPassword(SERVICE, ACCOUNT)
-  if (existing == null) {
-    const raw = randomKeyBytes()
-    await setPassword(SERVICE, ACCOUNT, encodeBase64(raw))
+  const legacy = await readLegacySealKey()
+  if (existing != null) {
+    const raw = decodeKey(existing)
+    if (legacy) {
+      if (!sameBytes(legacy, raw)) {
+        throw new PlatformError('io', 'Failed to move the seal key into the keychain')
+      }
+      await removeLegacySealKey()
+    }
     return raw
   }
-  return decodeKey(existing)
+  if (legacy) {
+    await setPassword(SERVICE, ACCOUNT, encodeBase64(legacy))
+    await removeLegacySealKey()
+    return legacy
+  }
+  const raw = randomKeyBytes()
+  await setPassword(SERVICE, ACCOUNT, encodeBase64(raw))
+  return raw
 }
 
 export async function tauriSecretsStore(): Promise<SecretsStore> {

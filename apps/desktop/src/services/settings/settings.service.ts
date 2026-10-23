@@ -23,7 +23,8 @@ import {
   type PublicLlmConfig,
 } from '@stride/core'
 import { MemoryFileSystem, type FileSystemBackend, type SecretsStore } from '@stride/platform'
-import { webSecretsStore } from '../../../../../packages/secrets-web/src/index.ts'
+import { webSecretsStore } from '@stride/secrets-web'
+import { isDesktopRuntime } from '../platform/runtime'
 import { VaultService } from '../vault/vault.service'
 
 interface PublicSettings {
@@ -743,12 +744,17 @@ export class SettingsService extends Service {
         return null
       }
     }
-    if (typeof globalThis.indexedDB === 'undefined' || !globalThis.indexedDB) return null
+    // A desktop WebView has IndexedDB too. The host chooses the store, not that API.
     try {
+      if (isDesktopRuntime()) {
+        const { tauriSecretsStore } = await import('@stride/secrets-tauri')
+        return await tauriSecretsStore()
+      }
+      if (typeof globalThis.indexedDB === 'undefined' || !globalThis.indexedDB) return null
       return await webSecretsStore()
     } catch (error) {
       const message = errorText(error)
-      if (message === 'IndexedDB is not available') return null
+      if (!isDesktopRuntime() && message === 'IndexedDB is not available') return null
       this.notice = message
       return null
     }
