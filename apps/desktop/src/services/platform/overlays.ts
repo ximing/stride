@@ -14,3 +14,12 @@ export function closeOtherOverlays(self: string, closeSelf: () => void): void {
     if (id !== self) close()
   }
 }
+
+/**
+ * Close cohort members that have already registered a closer.
+ * Does not register the caller, so find can dismiss the list panels without
+ * joining the cohort (settings stays open, and opening settings does not close find).
+ */
+export function closeOverlays(ids: readonly string[]): void {
+  for (const id of ids) closers.get(id)?.()
+}

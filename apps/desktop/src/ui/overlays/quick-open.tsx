@@ -2,7 +2,7 @@ import { observer, useService } from '@rabjs/react'
 import { FileText, Search } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { CommandService } from '../../services/commands/command.service'
+import { handleOverlayListKey, registerOverlayKeys } from '../../services/platform/overlay-keys'
 import { QuickOpenService, quickOpenResults } from '../../services/search/quick-open.service'
 import { VaultService } from '../../services/vault/vault.service'
 import { EmptyState } from '../primitives/empty-state'
@@ -11,40 +11,29 @@ export const QuickOpen = observer(function QuickOpen() {
   const { t } = useTranslation()
   const vault = useService(VaultService)
   const service = useService(QuickOpenService)
-  const commands = useService(CommandService)
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
   const results = service.open ? quickOpenResults(vault.notes, service.query) : []
   const selectedIndex = results.length === 0 ? -1 : Math.min(service.selected, results.length - 1)
   const selectedId = selectedIndex >= 0 ? results[selectedIndex].id : ''
 
-  useEffect(() => {
-    // Capture on window so Mod+P still opens while the editor is focused, and the browser does not print.
-    const onKeyDown = (event: KeyboardEvent) => {
-      // Shortcut bindings come from the command manifest; the dispatcher runs them.
-      if (commands.dispatchKeydown(event)) return
-      if (!service.open || event.isComposing) return
-      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-        event.preventDefault()
-        event.stopPropagation()
-        service.move(event.key === 'ArrowDown' ? 1 : -1)
-        return
-      }
-      if (event.key === 'Enter') {
-        event.preventDefault()
-        event.stopPropagation()
-        service.confirm()
-        return
-      }
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        event.stopPropagation()
-        service.close()
-      }
-    }
-    window.addEventListener('keydown', onKeyDown, true)
-    return () => window.removeEventListener('keydown', onKeyDown, true)
-  }, [service, commands])
+  useEffect(
+    () =>
+      registerOverlayKeys({
+        id: 'quickOpen',
+        layer: 'panel',
+        isOpen: () => service.open,
+        onKeyDown: (event) => {
+          if (!service.open) return
+          handleOverlayListKey(event, {
+            move: (delta) => service.move(delta),
+            confirm: () => service.confirm(),
+            close: () => service.close(),
+          })
+        },
+      }),
+    [service],
+  )
 
   useEffect(() => {
     if (!service.open) return

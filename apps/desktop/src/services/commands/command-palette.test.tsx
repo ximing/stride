@@ -383,4 +383,43 @@ describe('command palette', () => {
       unregisterFind()
     }
   })
+
+  it('runs Mod+N once and ignores a repeated keydown', async () => {
+    const { vault } = await mount([note('alpha', 'Alpha')])
+    const create = vi.spyOn(vault, 'createNote').mockResolvedValue()
+    await act(async () => {
+      press({ key: 'n', metaKey: true })
+    })
+    expect(create).toHaveBeenCalledTimes(1)
+    const repeated = press({ key: 'n', metaKey: true, repeat: true })
+    expect(repeated.defaultPrevented).toBe(false)
+    expect(create).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not confirm or move the palette while a dialog is covering it', async () => {
+    const { palette } = await mount([note('alpha', 'Alpha'), note('beta', 'Beta')])
+    const confirm = vi.spyOn(palette, 'confirm').mockImplementation(() => {})
+    await act(async () => {
+      palette.show()
+    })
+    const dialog = document.createElement('div')
+    dialog.setAttribute('role', 'dialog')
+    dialog.setAttribute('data-state', 'open')
+    document.body.appendChild(dialog)
+    try {
+      let enter!: KeyboardEvent
+      let down!: KeyboardEvent
+      await act(async () => {
+        enter = press({ key: 'Enter' })
+        down = press({ key: 'ArrowDown' })
+      })
+      expect(enter.defaultPrevented).toBe(false)
+      expect(down.defaultPrevented).toBe(false)
+      expect(confirm).not.toHaveBeenCalled()
+      expect(palette.open).toBe(true)
+      expect(palette.selected).toBe(0)
+    } finally {
+      dialog.remove()
+    }
+  })
 })

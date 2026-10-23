@@ -3,8 +3,13 @@ import { register, resolve } from '@rabjs/react'
 import { createNote, plainText } from '@stride/core/note'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { NoteEditor } from '../editor'
+import { CommandPalette } from '../../ui/overlays/command-palette'
+import { CommandPaletteService } from '../../services/commands/command-palette.service'
+import { QuickOpenService } from '../../services/search/quick-open.service'
+import { SearchPanelService } from '../../services/search/search-panel.service'
+import { SettingsPageService } from '../../services/settings/settings-page.service'
 import { createEditorExtensions } from '../extensions'
 import {
   findTextMatches,
@@ -333,5 +338,132 @@ describe('find bar', () => {
     expect(host.querySelector('.ProseMirror')?.textContent).toBe('机器学习')
     expect(JSON.stringify(vault.active?.doc)).toBe(before)
     expect(vault.saveStatus).toBe('idle')
+  })
+
+  it('steps on Enter and closes on Escape when only find is open', async () => {
+    const { host } = await mount('机器学习与机器学习')
+    await act(async () => {
+      press({ key: 'f', metaKey: true })
+    })
+    const input = host.querySelector('[data-testid="find-input"]') as HTMLInputElement
+    await act(async () => {
+      setInput(input, '机器学习')
+    })
+    expect(host.querySelector('[data-testid="find-count"]')?.textContent).toBe('1/2')
+    const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+    await act(async () => {
+      input.dispatchEvent(enter)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(enter.defaultPrevented).toBe(true)
+    expect(host.querySelector('[data-testid="find-count"]')?.textContent).toBe('2/2')
+    await act(async () => {
+      press({ key: 'Escape' })
+    })
+    expect(host.querySelector('[data-testid="find-bar"]')).toBeNull()
+  })
+
+  it('gives find-bar Enter to find when a panel is also open, and does not close settings', async () => {
+    register(QuickOpenService)
+    register(SearchPanelService)
+    const { vault, host } = await mount('机器学习与机器学习')
+    const paletteHost = document.createElement('div')
+    document.body.appendChild(paletteHost)
+    hosts.push(paletteHost)
+    const paletteRoot = createRoot(paletteHost)
+    roots.push(paletteRoot)
+    await act(async () => {
+      paletteRoot.render(<CommandPalette />)
+    })
+    const palette = resolve(CommandPaletteService)
+    const quick = resolve(QuickOpenService)
+    const search = resolve(SearchPanelService)
+    const settings = resolve(SettingsPageService)
+    const confirm = vi.spyOn(palette, 'confirm').mockImplementation(() => {})
+    const before = JSON.stringify(vault.active?.doc)
+    const noteCount = vault.notes.length
+    try {
+      await act(async () => {
+        quick.show()
+        search.show()
+        palette.show()
+      })
+      expect(palette.open).toBe(true)
+      await act(async () => {
+        press({ key: 'f', metaKey: true })
+      })
+      expect(palette.open).toBe(false)
+      expect(quick.open).toBe(false)
+      expect(search.open).toBe(false)
+      expect(host.querySelector('[data-testid="find-bar"]')).not.toBeNull()
+      expect(host.querySelector('.ProseMirror')).not.toBeNull()
+      expect(JSON.stringify(vault.active?.doc)).toBe(before)
+      expect(vault.notes).toHaveLength(noteCount)
+
+      await act(async () => {
+        settings.show()
+      })
+      expect(settings.open).toBe(true)
+      await act(async () => {
+        press({ key: 'f', metaKey: true })
+      })
+      expect(settings.open).toBe(true)
+      expect(host.querySelector('[data-testid="find-bar"]')).not.toBeNull()
+      await act(async () => {
+        settings.close()
+      })
+
+      const input = host.querySelector('[data-testid="find-input"]') as HTMLInputElement
+      await act(async () => {
+        setInput(input, '机器学习')
+      })
+      expect(host.querySelector('[data-testid="find-count"]')?.textContent).toBe('1/2')
+
+      await act(async () => {
+        palette.show()
+      })
+      expect(palette.open).toBe(true)
+      expect(host.querySelector('[data-testid="find-bar"]')).not.toBeNull()
+      input.focus()
+      const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+      await act(async () => {
+        input.dispatchEvent(enter)
+        await new Promise((resolve) => setTimeout(resolve, 0))
+      })
+      expect(enter.defaultPrevented).toBe(true)
+      expect(confirm).not.toHaveBeenCalled()
+      expect(host.querySelector('[data-testid="find-count"]')?.textContent).toBe('2/2')
+      expect(palette.open).toBe(true)
+      expect(JSON.stringify(vault.active?.doc)).toBe(before)
+      expect(vault.notes).toHaveLength(noteCount)
+
+      const dialog = document.createElement('div')
+      dialog.setAttribute('role', 'dialog')
+      dialog.setAttribute('data-state', 'open')
+      document.body.appendChild(dialog)
+      try {
+        const covered = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+        await act(async () => {
+          input.dispatchEvent(covered)
+          await new Promise((resolve) => setTimeout(resolve, 0))
+        })
+        expect(covered.defaultPrevented).toBe(false)
+        expect(confirm).not.toHaveBeenCalled()
+        expect(host.querySelector('[data-testid="find-count"]')?.textContent).toBe('2/2')
+        const escape = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+        input.dispatchEvent(escape)
+        expect(escape.defaultPrevented).toBe(false)
+        expect(palette.open).toBe(true)
+        expect(host.querySelector('[data-testid="find-bar"]')).not.toBeNull()
+      } finally {
+        dialog.remove()
+      }
+    } finally {
+      confirm.mockRestore()
+      palette.close()
+      quick.close()
+      search.close()
+      settings.close()
+    }
   })
 })

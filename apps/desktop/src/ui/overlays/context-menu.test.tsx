@@ -121,6 +121,45 @@ describe('ContextMenu', () => {
     expect(onSelect).toHaveBeenCalledTimes(1)
   })
 
+  it('resets highlight when a second menu replaces the items without unmounting', async () => {
+    const stale = vi.fn()
+    const fresh = vi.fn()
+    const other = vi.fn()
+    host = document.createElement('div')
+    document.body.appendChild(host)
+    root = createRoot(host)
+    await act(async () => {
+      root?.render(
+        <ContextMenu
+          x={20}
+          y={30}
+          items={[entry('keep'), entry('stale', { onSelect: stale })]}
+          onClose={() => {}}
+        />,
+      )
+    })
+    const menu = document.querySelector<HTMLElement>('[data-testid="context-menu"]')!
+    await act(async () => keydown(menu, 'ArrowDown'))
+    expect(menuItem('stale').hasAttribute('data-highlighted')).toBe(true)
+    await act(async () => {
+      root?.render(
+        <ContextMenu
+          x={80}
+          y={90}
+          items={[entry('fresh', { onSelect: fresh }), entry('other', { onSelect: other })]}
+          onClose={() => {}}
+        />,
+      )
+    })
+    expect(menuItem('fresh').hasAttribute('data-highlighted')).toBe(true)
+    expect(menuItem('other').hasAttribute('data-highlighted')).toBe(false)
+    const next = document.querySelector<HTMLElement>('[data-testid="context-menu"]')!
+    await act(async () => keydown(next, 'Enter'))
+    expect(fresh).toHaveBeenCalledTimes(1)
+    expect(other).not.toHaveBeenCalled()
+    expect(stale).not.toHaveBeenCalled()
+  })
+
   it('renders shortcut hints and icons', async () => {
     await mount([entry('one', { shortcut: '⌘B', icon: PencilSimple }), entry('two', { icon: Trash, danger: true })], () => {})
     expect(menuItem('one').querySelector('.sd-menu-shortcut')?.textContent).toBe('⌘B')

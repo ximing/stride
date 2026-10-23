@@ -47,6 +47,15 @@ export function ContextMenu({ x, y, items, onClose, testId = 'context-menu' }: C
   const rootRef = useRef<HTMLDivElement>(null)
   const [position, setPosition] = useState({ left: x, top: y })
   const [highlight, setHighlight] = useState(() => firstEnabled(items))
+  const itemsRef = useRef(items)
+  itemsRef.current = items
+  // Identity, not the array reference: parents rebuild `items` on render.
+  const menuKey = `${x}:${y}:${items.map((entry) => entry.id).join('\0')}`
+
+  // A second right-click on the same surface updates props without unmounting.
+  useLayoutEffect(() => {
+    setHighlight(firstEnabled(itemsRef.current))
+  }, [menuKey])
 
   // Clamp into the viewport once the popup has been measured.
   useLayoutEffect(() => {

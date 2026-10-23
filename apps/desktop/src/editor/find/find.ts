@@ -3,7 +3,10 @@ import { Extension, type Editor } from '@tiptap/core'
 import type { Node as PmNode } from '@tiptap/pm/model'
 import { NodeSelection, Plugin, PluginKey, TextSelection } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
+import { closeOverlays } from '../../services/platform/overlays'
 import { applyHitsReplace, findKeywordHits, type FindHit } from './find-hits'
+
+const LIST_OVERLAYS = ['commandPalette', 'quickOpen', 'searchPanel'] as const
 
 export type TextMatch = { from: number; to: number }
 
@@ -176,6 +179,10 @@ export class FindService extends Service {
   caseSensitive = false
 
   show() {
+    // Same mutual exclusion as the list panels. Settings is not in this list:
+    // opening find does not close it, and a settings dialog that is still open
+    // keeps local keys (see overlay-keys.ts).
+    closeOverlays(LIST_OVERLAYS)
     this.open = true
   }
 

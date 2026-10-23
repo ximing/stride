@@ -258,4 +258,17 @@ describe('quick open keyboard', () => {
     expect(vault.activeId).toBe('alpha')
     expect(host?.querySelector('[data-testid="quick-open"]')).toBeNull()
   })
+
+  it('moves the selection when an arrow key repeats', async () => {
+    await mount([note('alpha', 'Alpha'), note('bravo', 'Bravo')])
+    await act(async () => {
+      press({ key: 'p', metaKey: true })
+    })
+    let down!: KeyboardEvent
+    await act(async () => {
+      down = press({ key: 'ArrowDown', repeat: true })
+    })
+    expect(down.defaultPrevented).toBe(true)
+    expect(host?.querySelector('[aria-selected="true"]')?.getAttribute('data-note-id')).toBe('bravo')
+  })
 })

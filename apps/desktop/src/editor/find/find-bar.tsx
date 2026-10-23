@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronUp, X } from 'lucide-react'
 import { CommandService } from '../../services/commands/command.service'
+import { registerOverlayKeys } from '../../services/platform/overlay-keys'
 import { findKeywordHits, findSeedFromSelection, nextHitIndex } from './find-hits'
 import { imeBlocksEnterFromEvent, runAfterImeEnter } from '../ime-enter'
 import {
@@ -69,14 +70,15 @@ const FindBar = observer(function FindBar({ editor }: { editor: Editor }) {
           const { from, to } = editor.state.selection
           const seed = findSeedFromSelection(editor.state.doc, from, to)
           if (seed) service.setQuery(seed)
-          if (service.open) {
-            inputRef.current?.focus()
-            const query = seed ?? service.query
-            const found = findTextMatches(editor.state.doc, query, service.caseSensitive)
-            const current = found[matchIndex(service.index, found.length)]
-            if (current) selectMatch(editor, current)
-            else clearFindHighlight(editor)
-          } else service.show()
+          const alreadyOpen = service.open
+          service.show()
+          if (!alreadyOpen) return
+          inputRef.current?.focus()
+          const query = seed ?? service.query
+          const found = findTextMatches(editor.state.doc, query, service.caseSensitive)
+          const current = found[matchIndex(service.index, found.length)]
+          if (current) selectMatch(editor, current)
+          else clearFindHighlight(editor)
         },
       }),
     [commands, editor, service],
@@ -96,40 +98,42 @@ const FindBar = observer(function FindBar({ editor }: { editor: Editor }) {
       const detail = event.detail as { seed?: unknown } | null
       const seed = detail && typeof detail.seed === 'string' ? detail.seed : ''
       if (seed) service.setQuery(seed)
-      if (service.open) inputRef.current?.focus()
-      else service.show()
+      const alreadyOpen = service.open
+      service.show()
+      if (alreadyOpen) inputRef.current?.focus()
       if (!seed) return
       const found = findTextMatches(editor.state.doc, seed, service.caseSensitive)
       const first = found[0]
       if (first) selectMatch(editor, first)
       else clearFindHighlight(editor)
     }
-    const onKeyDown = (event: KeyboardEvent) => {
-      // Shortcut bindings come from the command manifest; the dispatcher runs them.
-      if (commands.dispatchKeydown(event)) return
-      if (!service.open) return
-      const target = event.target instanceof Element ? event.target : null
-      if (event.key === 'Enter' && target?.closest('[data-testid="find-bar"]')) {
-        if (imeBlocksEnterFromEvent(event)) return
+    window.addEventListener('stride-editor-find', onFind)
+    const unregisterKeys = registerOverlayKeys({
+      id: 'find',
+      layer: 'find',
+      isOpen: () => service.open,
+      onKeyDown: (event) => {
+        if (!service.open) return
+        const target = event.target instanceof Element ? event.target : null
+        if (event.key === 'Enter' && target?.closest('[data-testid="find-bar"]')) {
+          if (imeBlocksEnterFromEvent(event)) return
+          event.preventDefault()
+          event.stopPropagation()
+          const backward = event.shiftKey
+          runAfterImeEnter(event, () => step(backward ? -1 : 1))
+          return
+        }
+        if (event.key !== 'Escape') return
         event.preventDefault()
         event.stopPropagation()
-        const backward = event.shiftKey
-        runAfterImeEnter(event, () => step(backward ? -1 : 1))
-        return
-      }
-      if (event.key !== 'Escape') return
-      if (target?.closest('[data-testid="search-panel"], [data-testid="quick-open"], [data-testid="command-palette"]')) return
-      event.preventDefault()
-      event.stopPropagation()
-      service.close()
-    }
-    window.addEventListener('stride-editor-find', onFind)
-    window.addEventListener('keydown', onKeyDown, true)
+        service.close()
+      },
+    })
     return () => {
       window.removeEventListener('stride-editor-find', onFind)
-      window.removeEventListener('keydown', onKeyDown, true)
+      unregisterKeys()
     }
-  }, [editor, service, commands])
+  }, [editor, service])
 
   function revealQuery(value: string) {
     service.setQuery(value)

@@ -6,6 +6,7 @@ import { paletteItemSection, paletteItemTitle, type PaletteItem } from '../../se
 import { CommandPaletteService } from '../../services/commands/command-palette.service'
 import { CommandService } from '../../services/commands/command.service'
 import { formatShortcut } from '../../services/commands/commands'
+import { handleOverlayListKey, registerOverlayKeys } from '../../services/platform/overlay-keys'
 import { EmptyState } from '../primitives/empty-state'
 
 function itemTestId(item: PaletteItem): string {
@@ -33,32 +34,23 @@ export const CommandPalette = observer(function CommandPalette() {
   // Cmd+K lives in the manifest; the handler needs this component's service closure.
   useEffect(() => commands.registerHandler('app.commandPalette', { run: () => service.toggle() }), [commands, service])
 
-  useEffect(() => {
-    // Capture on window so Mod+K works while the editor is focused.
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (commands.dispatchKeydown(event)) return
-      if (!service.open || event.isComposing) return
-      if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-        event.preventDefault()
-        event.stopPropagation()
-        service.move(event.key === 'ArrowDown' ? 1 : -1)
-        return
-      }
-      if (event.key === 'Enter') {
-        event.preventDefault()
-        event.stopPropagation()
-        service.confirm()
-        return
-      }
-      if (event.key === 'Escape') {
-        event.preventDefault()
-        event.stopPropagation()
-        service.close()
-      }
-    }
-    window.addEventListener('keydown', onKeyDown, true)
-    return () => window.removeEventListener('keydown', onKeyDown, true)
-  }, [commands, service])
+  useEffect(
+    () =>
+      registerOverlayKeys({
+        id: 'commandPalette',
+        layer: 'panel',
+        isOpen: () => service.open,
+        onKeyDown: (event) => {
+          if (!service.open) return
+          handleOverlayListKey(event, {
+            move: (delta) => service.move(delta),
+            confirm: () => service.confirm(),
+            close: () => service.close(),
+          })
+        },
+      }),
+    [service],
+  )
 
   useEffect(() => {
     if (!service.open) return

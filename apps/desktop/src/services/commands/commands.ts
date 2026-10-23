@@ -18,8 +18,9 @@
 //     Those chords must never overlap a manifest chord; the dispatcher listens
 //     on window capture and wins any overlap, which would silently kill the
 //     editor binding.
-//   - Overlay-local keys (arrows, Enter, Escape) are handled by each overlay's
-//     own listener after dispatchKeydown passes, and only while it is open.
+//   - Overlay-local keys (arrows, Enter, Escape, and Tab where a menu already
+//     handles it) go to the frontmost overlay from one window capture listener,
+//     after dispatchKeydown passes. Arrow-key repeat inside that overlay stays.
 
 import { commandTitle, t } from '../../i18n'
 

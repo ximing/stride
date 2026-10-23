@@ -38,9 +38,9 @@ export const DESKTOP_DISABLED_SHORTCUTS = new Set(['tab.close', 'file.newWindow'
 
 /**
  * Single runtime registry for the app command manifest. Handlers only forward
- * to existing services; no business logic lives here. Overlays install a thin
- * keydown listener that calls `dispatchKeydown`, so shortcut bindings, the
- * palette, and the manifest stay the same data.
+ * to existing services; no business logic lives here. Manifest shortcuts are
+ * dispatched once from the overlay key listener, so the palette, quick open,
+ * search, and find bar do not each call this.
  */
 export class CommandService extends Service {
   readonly commands: AppCommand[] = parseAppCommandManifest(manifest)
@@ -96,15 +96,16 @@ export class CommandService extends Service {
 
   /**
    * Unified shortcut dispatcher: event → manifest match → enabled check → run.
-   * Safe to call from several capture listeners; only the first one acts.
+   * A held key repeats; those repeats are ignored so Mod+N does not create a
+   * note per repeat. `repeat` returns before preventDefault.
    *
    * Focus semantics: manifest chords are all Mod-based application commands, so
    * they fire no matter what element (input, textarea, editor) has focus — see
    * the policy comment in commands.ts. Overlay-local keys (arrows/Enter/Escape)
-   * never reach this dispatcher as bindings; each overlay handles them itself.
+   * are not bindings; the frontmost overlay handles them, including key repeat.
    */
   dispatchKeydown(event: KeyboardEvent): boolean {
-    if (event.defaultPrevented) return false
+    if (event.repeat || event.defaultPrevented) return false
     const command = commandForKeyEvent(this.commands, event)
     if (!command || !this.isRunnable(command)) return false
     // See DESKTOP_DISABLED_SHORTCUTS: the OS/Tauri menu owns these chords on desktop.
