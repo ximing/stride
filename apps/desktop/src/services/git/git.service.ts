@@ -307,12 +307,15 @@ export class GitService extends Service {
           return
         }
         if (this.remoteNeedsLoad) {
-          this.remoteNeedsLoad = false
-          if (this.remote === '') {
+          if (this.remote !== '') {
+            this.remoteNeedsLoad = false
+          } else {
             try {
               this.remote = (await backend.remoteUrl(fs.rootLabel, 'origin')) ?? ''
-            } catch {
+              this.remoteNeedsLoad = false
+            } catch (error) {
               this.remote = ''
+              console.warn(`stride git remote: read-failed ${errorText(error)}`)
             }
           }
         }

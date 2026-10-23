@@ -155,6 +155,67 @@ describe('browser panels', () => {
     expect(git.remote).toBe('https://example.test/typed.git')
   })
 
+  it('retries reading the origin after a failed remote lookup', async () => {
+    let reads = 0
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    setGitBackendForTests({
+      ...recordingGit([]),
+      remoteUrl: () => {
+        reads += 1
+        if (reads === 1) return Promise.reject(new Error('origin unavailable'))
+        return Promise.resolve('https://example.test/retry.git')
+      },
+    })
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const files = new MemoryFileSystem('/tmp/vault-remote-retry')
+    await files.mkdir('.git')
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.broad = false
+    resolve(SettingsService).setGitEnabled(true)
+    const git = resolve(GitService)
+    try {
+      await git.refresh()
+      expect(git.remote).toBe('')
+      expect(git.notice).toBe('')
+      expect(git.output).toBe('')
+      await git.refresh()
+      expect(git.remote).toBe('https://example.test/retry.git')
+      expect(reads).toBe(2)
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('stride git remote: read-failed'))
+      expect(String(warn.mock.calls[0]?.[0])).toContain('origin unavailable')
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('does not retry when the origin remote is missing', async () => {
+    let reads = 0
+    setGitBackendForTests({
+      ...recordingGit([]),
+      remoteUrl: () => {
+        reads += 1
+        return Promise.resolve(null)
+      },
+    })
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const files = new MemoryFileSystem('/tmp/vault-remote-missing')
+    await files.mkdir('.git')
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.broad = false
+    resolve(SettingsService).setGitEnabled(true)
+    const git = resolve(GitService)
+    await git.refresh()
+    await git.refresh()
+    expect(reads).toBe(1)
+    expect(git.remote).toBe('')
+  })
+
   it('initializes a vault that is not a repository before saving the remote URL', async () => {
     const calls: string[] = []
     const files = new MemoryFileSystem('/tmp/vault-connect')
