@@ -33,7 +33,7 @@ test('opens a memory vault and creates a note without console errors', async ({ 
     expect(evaluated).toEqual({ success: true, data: { value: '?fixture=memory' } })
 
     await page.getByTestId('open-vault').click()
-    await page.getByTestId('new-note').click()
+    await page.getByTestId('note-list-new').click()
     await expect(page.getByTestId('editor').locator('.ProseMirror')).toBeVisible()
     expect(pageErrors, pageErrors.join('\n')).toEqual([])
     expect(consoleErrors, consoleErrors.join('\n')).toEqual([])
