@@ -3,6 +3,7 @@ import { MemoryFileSystem } from '@stride/platform'
 import { buildGraph, relationsOf } from './graph.ts'
 import {
   applyBody,
+  bodyWikilinks,
   createNote,
   findMark,
   firstH1Text,
@@ -16,6 +17,9 @@ import {
   parseNote,
   parsePropertyInput,
   plainText,
+  plainWikilinks,
+  splitWikilinkText,
+  wikilinkTargets,
   type TipTapNode,
 } from './note.ts'
 import { createVaultNote, nextSlugId, notePath, openVault, readNoteFile, saveNote } from './vault.ts'
@@ -331,6 +335,37 @@ describe('note codec', () => {
     expect(raw.title).toBe('See Mass')
     expect(raw.doc.type).toBe('doc')
     expect(raw.doc.content?.[0]).toEqual(heading)
+  })
+
+  it('splits a plain-text wikilink alias and leaves a bare link unchanged', () => {
+    expect(splitWikilinkText('标题|别名')).toEqual({ target: '标题', alias: '别名' })
+    expect(splitWikilinkText('标题')).toEqual({ target: '标题', alias: '' })
+    expect(plainWikilinks('[[标题|别名]]')).toEqual([
+      { target: '标题', alias: '别名', start: 0, end: '[[标题|别名]]'.length },
+    ])
+    expect(plainWikilinks('[[ 标题 | 别名 | 更多 ]]')).toEqual([
+      { target: '标题', alias: '别名 | 更多', start: 0, end: '[[ 标题 | 别名 | 更多 ]]'.length },
+    ])
+    expect(wikilinkTargets('[[标题|别名]]')).toEqual(['标题'])
+    expect(wikilinkTargets('[[标题]]')).toEqual(['标题'])
+    expect(wikilinkTargets('[[  标题  ]]')).toEqual(['标题'])
+    expect(wikilinkTargets('见 [[ A | B ]] 与 [[C]]')).toEqual(['A', 'C'])
+    expect(wikilinkTargets(['[[标题|别名]]', '[[标题]]'])).toEqual(['标题', '标题'])
+    expect(wikilinkTargets('[[|别名]]')).toEqual([])
+    expect(plainWikilinks('[[|别名]]')).toEqual([])
+
+    const doc: TipTapNode = {
+      type: 'doc',
+      content: [{
+        type: 'paragraph',
+        content: [
+          { type: 'text', text: '[[标题|别名]] [[标题]]' },
+          { type: 'wikilink', attrs: { target: '节点', alias: '显示' } },
+        ],
+      }],
+    }
+    expect(bodyWikilinks(doc)).toEqual(['标题', '标题', '节点'])
+    expect(doc.content?.[0]?.content?.[0]?.text).toBe('[[标题|别名]] [[标题]]')
   })
 
   it('allocates untitled-xxxx, retries collisions, and keeps a real title slug', async () => {

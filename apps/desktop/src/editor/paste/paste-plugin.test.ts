@@ -5,8 +5,9 @@ import { MemoryFileSystem, type FileSystemBackend } from '@stride/platform'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createEditorExtensions } from '../extensions'
 import { createImageExtension } from '../image/image'
+import { createWikilinkNode } from '../wikilink/wikilink'
 import { VaultService } from '../../services/vault/vault.service'
-import { createPasteExtension } from './paste-plugin'
+import { createPasteExtension, pasteClipboardText } from './paste-plugin'
 
 const layoutBox = () => ({
   x: 0,
@@ -174,5 +175,72 @@ describe('image file paste failures', () => {
     expect(handled).toBeFalsy()
     expect(event.defaultPrevented).toBe(false)
     expect(editor.getJSON()).toEqual(before)
+  })
+})
+
+function wikilinkEditor(): Editor {
+  const editor = new Editor({
+    extensions: [
+      StarterKit.configure({ link: false }),
+      createWikilinkNode({ getNotes: () => [], onOpen: () => {} }),
+      createPasteExtension(() => null),
+    ],
+    content: { type: 'doc', content: [{ type: 'paragraph' }] },
+  })
+  editors.push(editor)
+  return editor
+}
+
+function linkAttrs(editor: Editor): { target: unknown; alias: unknown }[] {
+  const found: { target: unknown; alias: unknown }[] = []
+  editor.state.doc.descendants((node) => {
+    if (node.type.name !== 'wikilink') return
+    found.push({ target: node.attrs.target, alias: node.attrs.alias })
+  })
+  return found
+}
+
+function textClipboard(text: string): DataTransfer {
+  return {
+    getData: (type: string) => (
+      type === 'text/plain' || type === 'text' || type === 'text/markdown' || type === 'text/x-markdown' ? text : ''
+    ),
+    files: [],
+    items: [],
+  } as unknown as DataTransfer
+}
+
+describe('plain wikilink paste', () => {
+  it('pastes [[title|alias]] as a target and a separate alias', () => {
+    const editor = wikilinkEditor()
+    const pasteText = vi.spyOn(editor.view, 'pasteText')
+    pasteClipboardText(editor, '前 [[标题|别名]] 后', () => null)
+    expect(pasteText).not.toHaveBeenCalled()
+    expect(linkAttrs(editor)).toEqual([{ target: '标题', alias: '别名' }])
+    expect(editor.getText()).toContain('前')
+    expect(editor.getText()).toContain('后')
+    expect(editor.getText()).not.toContain('[[')
+    expect(editor.getText()).not.toContain('标题|别名')
+  })
+
+  it('pastes [[title]] without an alias', () => {
+    const editor = wikilinkEditor()
+    pasteClipboardText(editor, '[[标题]]', () => null)
+    expect(linkAttrs(editor)).toEqual([{ target: '标题', alias: null }])
+  })
+
+  it('uses the same split when the keyboard paste is not markdown', () => {
+    const editor = wikilinkEditor()
+    const text = '[[标题|别名]]\n[[标题]]'
+    const event = {
+      clipboardData: textClipboard(text),
+      preventDefault() {},
+    } as ClipboardEvent
+    expect(editor.view.pasteText(text, event)).toBe(true)
+    expect(linkAttrs(editor)).toEqual([
+      { target: '标题', alias: '别名' },
+      { target: '标题', alias: null },
+    ])
+    expect(editor.getText()).not.toContain('|')
   })
 })

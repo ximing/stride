@@ -231,11 +231,40 @@ export function isNoteFileName(name: string): boolean {
 
 const WIKILINK = /\[\[[^\]]+\]\]/g
 
-export function wikilinkTargets(value: unknown): string[] {
-  if (typeof value === 'string') {
-    const found = value.match(WIKILINK)
-    return found ? found.map((token) => token.slice(2, -2).trim()).filter(Boolean) : []
+export type PlainWikilink = {
+  target: string
+  alias: string
+  start: number
+  end: number
+}
+
+/** Inner text of `[[...]]`. The first `|` separates the target from the alias. */
+export function splitWikilinkText(inner: string): { target: string; alias: string } {
+  const pipe = inner.indexOf('|')
+  if (pipe < 0) return { target: inner.trim(), alias: '' }
+  return {
+    target: inner.slice(0, pipe).trim(),
+    alias: inner.slice(pipe + 1).trim(),
   }
+}
+
+/** Plain-text `[[target]]` and `[[target|alias]]` spans. An empty target is not a link. */
+export function plainWikilinks(value: string): PlainWikilink[] {
+  const links: PlainWikilink[] = []
+  WIKILINK.lastIndex = 0
+  for (const match of value.matchAll(WIKILINK)) {
+    const token = match[0]
+    const start = match.index
+    if (start === undefined) continue
+    const { target, alias } = splitWikilinkText(token.slice(2, -2))
+    if (!target) continue
+    links.push({ target, alias, start, end: start + token.length })
+  }
+  return links
+}
+
+export function wikilinkTargets(value: unknown): string[] {
+  if (typeof value === 'string') return plainWikilinks(value).map((link) => link.target)
   if (Array.isArray(value)) return value.flatMap((item) => wikilinkTargets(item))
   return []
 }

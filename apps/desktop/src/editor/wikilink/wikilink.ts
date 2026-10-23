@@ -1,9 +1,10 @@
-import { Extension, Node, mergeAttributes, type Editor, type Range } from '@tiptap/core'
-import { Plugin, PluginKey } from '@tiptap/pm/state'
+import { Extension, InputRule, Node, PasteRule, mergeAttributes, type Editor, type Range } from '@tiptap/core'
+import type { NodeType } from '@tiptap/pm/model'
+import { Plugin, PluginKey, type EditorState } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { ReactRenderer } from '@tiptap/react'
 import { Suggestion, type SuggestionProps } from '@tiptap/suggestion'
-import { isArchived } from '@stride/core/note'
+import { isArchived, plainWikilinks, splitWikilinkText } from '@stride/core/note'
 import { WikilinkMenu, type WikilinkMenuHandle, type WikilinkMenuItem } from './wikilink-menu'
 
 const MAX_NOTES = 8
@@ -29,12 +30,13 @@ function linkable(notes: readonly WikilinkSourceNote[]): WikilinkSourceNote[] {
 }
 
 export function filterWikilinkNotes(notes: readonly WikilinkSourceNote[], query: string): WikilinkMenuItem[] {
-  const needle = query.trim().toLowerCase()
+  const target = splitWikilinkText(query.endsWith(']]') ? query.slice(0, -2) : query).target
+  const needle = target.toLowerCase()
   const pool = linkable(notes)
   const matched = pool.filter((note) => note.title.toLowerCase().includes(needle)).slice(0, MAX_NOTES)
   const items: WikilinkMenuItem[] = matched.map((note) => ({ kind: 'note', id: note.id, title: note.title }))
   const exact = needle.length > 0 && pool.some((note) => note.title.trim().toLowerCase() === needle)
-  if (needle && !exact) items.push({ kind: 'create', title: query.trim() })
+  if (needle && !exact) items.push({ kind: 'create', title: target })
   return items
 }
 
@@ -60,15 +62,25 @@ export function wikilinkAt(editor: Editor, pos: number): { target: string; alias
   return { target, alias }
 }
 
-export function runWikilinkCommand(editor: Editor, range: Range, target: string): boolean {
+export function runWikilinkCommand(editor: Editor, range: Range, target: string, alias = ''): boolean {
   const title = target.trim()
+  const label = alias.trim()
   if (!title) return false
+  const attrs = label ? { target: title, alias: label } : { target: title }
   return editor
     .chain()
     .focus()
     .deleteRange(range)
-    .insertContent({ type: 'wikilink', attrs: { target: title } })
+    .insertContent({ type: 'wikilink', attrs })
     .run()
+}
+
+/** Completion uses the chosen title as the target. A typed `|alias` stays on the alias. */
+export function applyWikilinkSuggestion(editor: Editor, range: Range, title: string): boolean {
+  const typed = editor.state.doc.textBetween(range.from, range.to, '\n', '\0')
+  let inner = typed.startsWith('[[') ? typed.slice(2) : typed
+  if (inner.endsWith(']]')) inner = inner.slice(0, -2)
+  return runWikilinkCommand(editor, range, title, splitWikilinkText(inner).alias)
 }
 
 function placeMenu(renderer: ReactRenderer | null, props: { clientRect?: (() => DOMRect | null) | null }) {
@@ -124,7 +136,7 @@ export function createWikilinkSuggestion(getNotes: () => { id: string; title: st
     allowSpaces: true,
     items: ({ query }: { query: string }) => filterWikilinkNotes(getNotes(), query),
     command: ({ editor, range, props }: { editor: Editor; range: Range; props: WikilinkMenuItem }) => {
-      runWikilinkCommand(editor, range, props.title)
+      applyWikilinkSuggestion(editor, range, props.title)
     },
     render: renderWikilinkMenu,
   }
@@ -146,6 +158,32 @@ export function createWikilinkSuggestionExtension(getNotes: () => { id: string; 
 
 function wikilinkLabel(target: string, alias: string): string {
   return alias ? `[[${target}|${alias}]]` : `[[${target}]]`
+}
+
+function closedWikilink(text: string): { index: number; text: string; data: { target: string; alias: string } } | null {
+  const link = plainWikilinks(text).at(-1)
+  if (!link || link.end !== text.length) return null
+  return {
+    index: link.start,
+    text: text.slice(link.start, link.end),
+    data: { target: link.target, alias: link.alias },
+  }
+}
+
+function pastedWikilinks(text: string): { index: number; text: string; data: { target: string; alias: string } }[] {
+  return plainWikilinks(text).map((link) => ({
+    index: link.start,
+    text: text.slice(link.start, link.end),
+    data: { target: link.target, alias: link.alias },
+  }))
+}
+
+function writeWikilink(nodeType: NodeType, state: EditorState, range: Range, target: string, alias: string): void | null {
+  const title = target.trim()
+  if (!title) return null
+  const label = alias.trim()
+  const attrs = label ? { target: title, alias: label } : { target: title }
+  state.tr.replaceWith(range.from, range.to, nodeType.create(attrs))
 }
 
 export function createWikilinkNode(options: {
@@ -185,6 +223,30 @@ export function createWikilinkNode(options: {
       const target = typeof node.attrs.target === 'string' ? node.attrs.target : ''
       const alias = typeof node.attrs.alias === 'string' ? node.attrs.alias : ''
       return ['span', mergeAttributes(HTMLAttributes, { class: 'wikilink' }), wikilinkLabel(target, alias)]
+    },
+    addInputRules() {
+      const nodeType = this.type
+      return [
+        new InputRule({
+          find: (text) => closedWikilink(text),
+          handler: ({ state, range, match }) => {
+            const data = match.data as { target?: string; alias?: string } | undefined
+            writeWikilink(nodeType, state, range, data?.target ?? '', data?.alias ?? '')
+          },
+        }),
+      ]
+    },
+    addPasteRules() {
+      const nodeType = this.type
+      return [
+        new PasteRule({
+          find: (text) => pastedWikilinks(text),
+          handler: ({ state, range, match }) => {
+            const data = match.data as { target?: string; alias?: string } | undefined
+            writeWikilink(nodeType, state, range, data?.target ?? '', data?.alias ?? '')
+          },
+        }),
+      ]
     },
     addProseMirrorPlugins() {
       const getNotes = options.getNotes

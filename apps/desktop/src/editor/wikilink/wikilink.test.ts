@@ -2,7 +2,7 @@ import { Editor, type JSONContent } from '@tiptap/core'
 import { parseNote, serializeNote, type TipTapNode } from '@stride/core/note'
 import { afterEach, describe, expect, it } from 'vitest'
 import { createEditorExtensions } from '../extensions'
-import { filterWikilinkNotes, resolveWikilinkClick, runWikilinkCommand, type WikilinkSourceNote } from './wikilink'
+import { applyWikilinkSuggestion, filterWikilinkNotes, resolveWikilinkClick, runWikilinkCommand, type WikilinkSourceNote } from './wikilink'
 
 const layoutBox = () => ({
   x: 0,
@@ -133,6 +133,50 @@ describe('wikilink suggestions', () => {
     expect(wikilinks(parsed.doc)[0]?.attrs).toMatchObject({ target: 'Other note', alias: '别名' })
     editor.commands.setContent(parsed.doc)
     expect(editor.getJSON()).toEqual(canonical)
+  })
+
+  it('keeps a typed alias out of the completion target', () => {
+    const filtered = filterWikilinkNotes(notes, 'ot|别名')
+    expect(filtered.filter((item) => item.kind === 'note').map((item) => item.title)).toEqual(['Other note'])
+    expect(filtered.at(-1)).toEqual({ kind: 'create', title: 'ot' })
+
+    const editor = createEditor()
+    editor.commands.insertContent('[[ot|别名')
+    const chosen = filtered.find((item) => item.kind === 'note')
+    const title = chosen && chosen.kind === 'note' ? chosen.title : ''
+    expect(applyWikilinkSuggestion(editor, triggerRange(editor), title)).toBe(true)
+    expect(wikilinks(editor.getJSON())[0]?.attrs).toMatchObject({ target: 'Other note', alias: '别名' })
+    expect(editor.getText()).not.toContain('|')
+  })
+
+  it('turns typed [[target|alias]] into a wikilink and leaves [[target]] unchanged', () => {
+    const aliasEditor = createEditor()
+    const aliasFrom = aliasEditor.state.selection.from
+    const aliasTo = aliasEditor.state.selection.to
+    expect(aliasEditor.view.someProp('handleTextInput', (run) => run(
+      aliasEditor.view,
+      aliasFrom,
+      aliasTo,
+      '见 [[标题|别名]]',
+      () => aliasEditor.state.tr,
+    ))).toBe(true)
+    expect(wikilinks(aliasEditor.getJSON())[0]?.attrs).toMatchObject({ target: '标题', alias: '别名' })
+    expect(aliasEditor.getText()).toContain('见')
+    expect(aliasEditor.getText()).not.toContain('[[')
+
+    const plainEditor = createEditor()
+    const plainFrom = plainEditor.state.selection.from
+    const plainTo = plainEditor.state.selection.to
+    expect(plainEditor.view.someProp('handleTextInput', (run) => run(
+      plainEditor.view,
+      plainFrom,
+      plainTo,
+      '[[标题]]',
+      () => plainEditor.state.tr,
+    ))).toBe(true)
+    const attrs = wikilinks(plainEditor.getJSON())[0]?.attrs
+    expect(attrs?.target).toBe('标题')
+    expect(attrs?.alias ?? null).toBeNull()
   })
 
   it('resolves a click to select or create', () => {

@@ -1,7 +1,9 @@
 import { has, resolve } from '@rabjs/react'
+import { plainWikilinks } from '@stride/core/note'
 import type { FileSystemBackend } from '@stride/platform'
 import { Extension, type Editor } from '@tiptap/core'
-import { Plugin, type Transaction } from '@tiptap/pm/state'
+import { Fragment, Slice, type Node as PmNode } from '@tiptap/pm/model'
+import { Plugin, type EditorState, type Transaction } from '@tiptap/pm/state'
 import { t } from '../../i18n'
 import { VaultService } from '../../services/vault/vault.service'
 import {
@@ -49,7 +51,12 @@ export function createPasteExtension(
                 insertImagesLater(editor, from, to, storeImageFiles(fs, files, report), report)
                 return true
               }
-              if (!dispatchClipboardText(editor, data, getFs)) return false
+              if (dispatchClipboardText(editor, data, getFs)) {
+                event.preventDefault()
+                return true
+              }
+              const plain = data.getData('text/plain') ?? ''
+              if (!plain || !insertPlainWikilinks(editor, plain)) return false
               event.preventDefault()
               return true
             },
@@ -84,7 +91,8 @@ export function createPasteExtension(
 
 /**
  * Context-menu paste only has plain text. Markdown and a lone image URL use
- * the keyboard dispatch. Anything else is ProseMirror plain text, not HTML.
+ * the keyboard dispatch. A plain `[[target|alias]]` uses that same split.
+ * Anything else is ProseMirror plain text, not HTML.
  */
 export function pasteClipboardText(
   editor: Editor,
@@ -98,6 +106,7 @@ export function pasteClipboardText(
       type === 'text/plain' || type === 'text/markdown' || type === 'text/x-markdown' ? text : '',
   }
   if (dispatchClipboardText(editor, data, getFs, onError)) return
+  if (insertPlainWikilinks(editor, text)) return
   try {
     // pasteText builds a ClipboardEvent when none is passed. jsdom has no
     // ClipboardEvent, and a real one would make handlePaste read the clipboard
@@ -107,6 +116,61 @@ export function pasteClipboardText(
   } catch (error) {
     onError?.(error)
   }
+}
+
+function selectionInCode(state: EditorState): boolean {
+  const points = [state.selection.$from, state.selection.$to]
+  for (const pos of points) {
+    for (let depth = pos.depth; depth > 0; depth -= 1) {
+      if (pos.node(depth).type.spec.code) return true
+    }
+    if (pos.marks().some((mark) => mark.type.spec.code)) return true
+  }
+  return false
+}
+
+function inlineWikilinkContent(editor: Editor, line: string): Fragment {
+  const wikilink = editor.schema.nodes.wikilink
+  if (!wikilink) return Fragment.empty
+  const marks = editor.state.storedMarks ?? editor.state.selection.$from.marks()
+  const nodes: PmNode[] = []
+  let cursor = 0
+  for (const link of plainWikilinks(line)) {
+    const before = line.slice(cursor, link.start)
+    if (before) nodes.push(editor.schema.text(before, marks))
+    const attrs = link.alias ? { target: link.target, alias: link.alias } : { target: link.target }
+    nodes.push(wikilink.create(attrs))
+    cursor = link.end
+  }
+  const after = line.slice(cursor)
+  if (after) nodes.push(editor.schema.text(after, marks))
+  return Fragment.from(nodes)
+}
+
+function plainWikilinkSlice(editor: Editor, text: string): Slice | null {
+  const paragraph = editor.schema.nodes.paragraph
+  if (!paragraph) return null
+  const blocks = text.split(/\r\n?|\n/).map((line) => paragraph.create(null, inlineWikilinkContent(editor, line)))
+  const only = blocks[0]
+  if (blocks.length === 1 && only) return new Slice(only.content, 0, 0)
+  const openEdge = (node: PmNode | undefined) => (node?.type.name === 'paragraph' ? 1 : 0)
+  return new Slice(Fragment.from(blocks), openEdge(blocks[0]), openEdge(blocks[blocks.length - 1]))
+}
+
+/** Same `[[target|alias]]` split as plain-text extraction. Code stays plain text. */
+function insertPlainWikilinks(editor: Editor, text: string): boolean {
+  if (!editor.schema.nodes.wikilink || plainWikilinks(text).length === 0) return false
+  if (selectionInCode(editor.state)) return false
+  const slice = plainWikilinkSlice(editor, text)
+  if (!slice) return false
+  try {
+    const tr = editor.state.tr.replaceSelection(slice).scrollIntoView()
+    tr.doc.check()
+    editor.view.dispatch(tr)
+  } catch {
+    return false
+  }
+  return true
 }
 
 function dispatchClipboardText(
