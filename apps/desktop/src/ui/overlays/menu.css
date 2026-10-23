@@ -1,12 +1,4 @@
 /* Surviving rules moved from src/styles so each class has one source. */
-.sd-menu-item[data-danger='true'] {
-  color: var(--sd-danger);
-}
-
-.sd-menu-item[data-danger='true'] .sd-menu-item-icon {
-  color: var(--sd-danger);
-}
-
 /* Dropdowns and the self-managed context menu share one menu language. */
 .sd-menu {
   z-index: var(--sd-z-dropdown);
@@ -18,6 +10,9 @@
   border: 1px solid var(--sd-border);
   border-radius: var(--sd-radius-md);
   box-shadow: var(--sd-shadow-sm);
+  font-family: var(--sd-font-sans);
+  font-size: var(--sd-text-sm);
+  transform-origin: var(--radix-dropdown-menu-content-transform-origin, var(--radix-popover-content-transform-origin));
 }
 
 .sd-menu[data-state="open"],
@@ -32,12 +27,21 @@
   min-height: var(--sd-control-md);
   padding: 6px 8px;
   border-radius: var(--sd-radius);
+  color: var(--sd-fg);
+  line-height: 1.35;
   outline: none;
+  cursor: pointer;
+  user-select: none;
   transition: background-color var(--sd-motion-hover) var(--sd-ease-standard), color var(--sd-motion-hover) var(--sd-ease-standard);
 }
 
 .sd-menu-item[data-highlighted] {
   background: var(--sd-hover);
+  color: var(--sd-fg);
+}
+
+.sd-menu-item:active:not([data-disabled]) {
+  background: var(--sd-surface-active);
 }
 
 .sd-menu-item:focus-visible {
@@ -46,6 +50,7 @@
 }
 
 .sd-menu-item[data-disabled] {
+  color: var(--sd-muted);
   cursor: default;
   opacity: 0.45;
 }
@@ -82,6 +87,8 @@
 .sd-menu-shortcut {
   margin-left: auto;
   padding-left: 20px;
+  color: var(--sd-muted);
+  font-size: var(--sd-text-xs);
 }
 
 .sd-menu-separator {

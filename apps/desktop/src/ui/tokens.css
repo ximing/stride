@@ -330,8 +330,7 @@
 .sd-backlink,
 .sd-status-item,
 .sd-btn,
-.sd-theme,
-.sd-menu-item {
+.sd-theme {
   display: flex;
   align-items: center;
 }
@@ -475,7 +474,6 @@
   color: var(--muted);
 }
 
-.sd-menu,
 .sd-popover,
 .sd-modal,
 .sd-toast {
@@ -485,27 +483,9 @@
   box-shadow: var(--shadow);
 }
 
-.sd-menu,
 .sd-popover {
   border-radius: 8px;
   z-index: 30;
-}
-
-.sd-menu {
-  min-width: 12rem;
-  padding: 0.3rem;
-}
-
-.sd-menu-item {
-  gap: 0.45rem;
-  padding: 0.42rem 0.55rem;
-  border-radius: 5px;
-  cursor: pointer;
-  outline: none;
-}
-
-.sd-menu-item[data-highlighted] {
-  background: var(--bg);
 }
 
 .sd-overlay {
