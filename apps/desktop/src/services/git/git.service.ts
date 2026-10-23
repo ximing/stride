@@ -315,9 +315,12 @@ export class GitService extends Service {
             this.remoteNeedsLoad = false
           } else {
             try {
-              this.remote = (await backend.remoteUrl(fs.rootLabel, 'origin')) ?? ''
+              const remote = (await backend.remoteUrl(fs.rootLabel, 'origin')) ?? ''
+              if (this.vault.session !== session) return
+              this.remote = remote
               this.remoteNeedsLoad = false
             } catch (error) {
+              if (this.vault.session !== session) return
               this.remote = ''
               console.warn(`stride git remote: read-failed ${errorText(error)}`)
             }
@@ -333,6 +336,7 @@ export class GitService extends Service {
         this.applyChanges(next)
         this.conflicts = next.filter((change) => change.unmerged).map((change) => change.path)
       } catch (error) {
+        if (this.vault.session !== session) return
         this.output = error instanceof Error ? error.message : String(error)
       }
     } finally {
@@ -670,16 +674,20 @@ export class GitService extends Service {
   }
 
   async pull() {
+    const session = this.vault.session
     this.busyCount += 1
     this.busy = true
     try {
       try {
         await this.vault.flush()
       } catch (error) {
+        if (this.vault.session !== session) return
         this.output = error instanceof Error ? error.message : String(error)
         return
       }
+      if (this.vault.session !== session) return
       const backend = await resolveGitBackend()
+      if (this.vault.session !== session) return
       if (!backend.available) {
         this.output = GIT_BROWSER
         return
@@ -693,15 +701,21 @@ export class GitService extends Service {
       if (!fs) return
       try {
         const result = await gitPull(fs, backend)
-        if (result.conflict) {
-          this.conflicts = [...result.files]
-          this.output = result.output
-        } else {
-          this.conflicts = []
-          this.output = ''
-        }
+        if (this.vault.session !== session) return
+        const conflicts = result.conflict ? [...result.files] : []
+        const output = result.conflict ? result.output : ''
+        this.conflicts = conflicts
+        this.output = output
         await this.refresh()
+        if (this.vault.session === session) return
+        // Refresh bailed on a newer session. Drop only the fields this pull published.
+        // Observable assignment can copy the array, so compare entries rather than identity.
+        const sameConflicts = this.conflicts.length === conflicts.length
+          && this.conflicts.every((path, index) => path === conflicts[index])
+        if (sameConflicts) this.conflicts = []
+        if (this.output === output) this.output = ''
       } catch (error) {
+        if (this.vault.session !== session) return
         this.output = error instanceof Error ? error.message : String(error)
       }
     } finally {

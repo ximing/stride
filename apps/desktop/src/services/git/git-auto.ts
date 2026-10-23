@@ -148,11 +148,14 @@ export async function autoGitTick(git: GitService, deps: GitAutoDeps, now: numbe
   if (deps.vault.phase !== 'ready') return
   if (!deps.gitEnabled()) return
   if (git.surface !== 'ready') return
+  const session = deps.vault.session
   const backend = await deps.resolveGitBackend()
+  if (deps.vault.session !== session) return
   if (!backend.available) return
   const fs = deps.vault.fs
   if (!fs) return
   const unmerged = await unmergedFiles(fs, backend)
+  if (deps.vault.session !== session) return
   if (unmerged.length > 0) return
   git.busyCount += 1
   git.busy = true
@@ -160,26 +163,34 @@ export async function autoGitTick(git: GitService, deps: GitAutoDeps, now: numbe
     try {
       await deps.vault.flush()
     } catch (error) {
+      if (deps.vault.session !== session) return
       git.output = errorText(error)
       return
     }
+    if (deps.vault.session !== session) return
     let diff = ''
     try {
       diff = await gitDiff(fs, backend)
     } catch (error) {
+      if (deps.vault.session !== session) return
       git.output = errorText(error)
       return
     }
+    if (deps.vault.session !== session) return
     const message = await deps.checkpointMessage(diff)
+    // The commit still runs on this session. A newer vault must not see its output or refresh.
+    if (deps.vault.session !== session) return
     try {
       await gitCommit(fs, backend, message)
     } catch (error) {
       const output = error instanceof GitError ? error.output || error.message : errorText(error)
       if (!isNothingToCommit(output)) {
+        if (deps.vault.session !== session) return
         git.output = output
         return
       }
     }
+    if (deps.vault.session !== session) return
     if (idleDue) git.idleCheckpointAt = git.lastActivityAt
     if (blurDue) git.blurCheckpointAt = git.lastBlurAt
     await git.refresh()

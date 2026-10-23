@@ -976,6 +976,253 @@ describe('browser panels', () => {
     await git.autoSyncTick()
     expect(reopened).toBe(0)
   })
+
+  it('does not apply a remote read after the vault session changes', async () => {
+    const backend = recordingGit([])
+    let releaseRemote: (value: string | null) => void = () => {}
+    const started = new Promise<void>((resolveStarted) => {
+      backend.remoteUrl = () => {
+        resolveStarted()
+        return new Promise((resolve) => {
+          releaseRemote = resolve
+        })
+      }
+    })
+    backend.currentBranch = () => Promise.resolve('stale-branch')
+    backend.aheadBehind = () => Promise.resolve({ ahead: 9, behind: 8 })
+    backend.status = () => Promise.resolve({
+      repo: true,
+      porcelain: 'UU notes/old.md\n',
+      clean: false,
+    })
+    setGitBackendForTests(backend)
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const files = new MemoryFileSystem('/tmp/vault-session-remote')
+    await files.mkdir('.git')
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.broad = false
+    resolve(SettingsService).setGitEnabled(true)
+    const git = resolve(GitService)
+    git.branch = 'kept-branch'
+    git.ahead = 1
+    git.conflicts = ['notes/kept.md']
+    Object.assign(git, { remoteRoot: '', remoteNeedsLoad: true, remote: '' })
+    const refreshing = git.refresh()
+    await started
+    vault.session += 1
+    git.remote = 'https://example.test/new.git'
+    releaseRemote('https://example.test/old.git')
+    await refreshing
+    expect(git.remote).toBe('https://example.test/new.git')
+    expect(git.branch).toBe('kept-branch')
+    expect(git.ahead).toBe(1)
+    expect(git.conflicts).toEqual(['notes/kept.md'])
+  })
+
+  it('does not clear the remote when a stale lookup fails after the session changes', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const backend = recordingGit([])
+    let releaseRemote: (error: Error) => void = () => {}
+    const started = new Promise<void>((resolveStarted) => {
+      backend.remoteUrl = () => {
+        resolveStarted()
+        return new Promise((_resolve, reject) => {
+          releaseRemote = reject
+        })
+      }
+    })
+    setGitBackendForTests(backend)
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const files = new MemoryFileSystem('/tmp/vault-session-remote-fail')
+    await files.mkdir('.git')
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.broad = false
+    resolve(SettingsService).setGitEnabled(true)
+    const git = resolve(GitService)
+    git.branch = 'kept-branch'
+    Object.assign(git, { remoteRoot: '', remoteNeedsLoad: true, remote: '' })
+    const refreshing = git.refresh()
+    await started
+    vault.session += 1
+    git.remote = 'https://example.test/new.git'
+    releaseRemote(new Error('origin unavailable'))
+    await refreshing
+    expect(git.remote).toBe('https://example.test/new.git')
+    expect(git.branch).toBe('kept-branch')
+    expect(warn).not.toHaveBeenCalled()
+    warn.mockRestore()
+  })
+
+  it('drops pull conflicts when refresh returns on a new vault session', async () => {
+    const backend = recordingGit([])
+    let statusCalls = 0
+    backend.status = () => {
+      statusCalls += 1
+      if (statusCalls === 1) return Promise.resolve({ repo: true, porcelain: '', clean: true })
+      return Promise.resolve({ repo: true, porcelain: 'UU notes/old.md\n', clean: false })
+    }
+    backend.pull = () => Promise.resolve({
+      conflict: true,
+      files: ['notes/old.md'],
+      output: 'CONFLICT (content): Merge conflict in notes/old.md',
+    })
+    let releaseAhead: (counts: { ahead: number; behind: number }) => void = () => {}
+    const started = new Promise<void>((resolveStarted) => {
+      backend.aheadBehind = () => {
+        resolveStarted()
+        return new Promise((resolve) => {
+          releaseAhead = resolve
+        })
+      }
+    })
+    setGitBackendForTests(backend)
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const files = new MemoryFileSystem('/tmp/vault-session-pull')
+    await files.mkdir('.git')
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.broad = false
+    resolve(SettingsService).setGitEnabled(true)
+    const git = resolve(GitService)
+    const pulling = git.pull()
+    await started
+    vault.session += 1
+    releaseAhead({ ahead: 0, behind: 0 })
+    await pulling
+    expect(git.conflicts).toEqual([])
+    expect(git.output).toBe('')
+    expect(git.busy).toBe(false)
+  })
+
+  it('keeps the new vault conflict list when an older pull finishes', async () => {
+    const backend = recordingGit([])
+    let statusCalls = 0
+    backend.status = () => {
+      statusCalls += 1
+      if (statusCalls === 1) return Promise.resolve({ repo: true, porcelain: '', clean: true })
+      return Promise.resolve({ repo: true, porcelain: 'UU notes/old.md\n', clean: false })
+    }
+    backend.pull = () => Promise.resolve({
+      conflict: true,
+      files: ['notes/old.md'],
+      output: 'CONFLICT (content): Merge conflict in notes/old.md',
+    })
+    let releaseAhead: (counts: { ahead: number; behind: number }) => void = () => {}
+    const started = new Promise<void>((resolveStarted) => {
+      backend.aheadBehind = () => {
+        resolveStarted()
+        return new Promise((resolve) => {
+          releaseAhead = resolve
+        })
+      }
+    })
+    setGitBackendForTests(backend)
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const files = new MemoryFileSystem('/tmp/vault-session-pull-keep')
+    await files.mkdir('.git')
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.broad = false
+    resolve(SettingsService).setGitEnabled(true)
+    const git = resolve(GitService)
+    const pulling = git.pull()
+    await started
+    vault.session += 1
+    git.conflicts = ['notes/new.md']
+    git.output = 'kept'
+    releaseAhead({ ahead: 0, behind: 0 })
+    await pulling
+    expect(git.conflicts).toEqual(['notes/new.md'])
+    expect(git.output).toBe('kept')
+  })
+
+  it('commits the open vault and does not publish after the session changes', async () => {
+    const commits: Array<{ message: string; paths?: string[] }> = []
+    const backend = twoFileGit({ porcelain: ' M notes/a.stride.json\n' }, commits)
+    let bumpSession: () => void = () => {}
+    backend.commit = (_repo, message, paths) => {
+      commits.push({ message, paths: paths ? [...paths] : undefined })
+      bumpSession()
+      return Promise.resolve(message)
+    }
+    backend.currentBranch = () => Promise.resolve('stale-branch')
+    setGitBackendForTests(backend)
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const files = new MemoryFileSystem('/tmp/vault-session-autogit')
+    await files.mkdir('.git')
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.phase = 'ready'
+    vault.broad = false
+    bumpSession = () => {
+      vault.session += 1
+    }
+    const settings = resolve(SettingsService)
+    settings.setGitEnabled(true)
+    settings.setAutoGitEnabled(true)
+    settings.setAutoGitIdleSeconds(60)
+    settings.setAutoGitBlurSeconds(0)
+    const git = resolve(GitService)
+    git.surface = 'ready'
+    git.output = 'kept-output'
+    git.branch = 'kept-branch'
+    git.lastActivityAt = 1_000
+    await git.autoGitTick(61_000)
+    expect(commits).toEqual([{ message: 'Checkpoint', paths: undefined }])
+    expect(git.idleCheckpointAt).toBe(0)
+    expect(git.output).toBe('kept-output')
+    expect(git.branch).toBe('kept-branch')
+    expect(git.busy).toBe(false)
+  })
+
+  it('does not commit or publish auto-git output after the session changes', async () => {
+    const commits: Array<{ message: string; paths?: string[] }> = []
+    const backend = twoFileGit({ porcelain: ' M notes/a.stride.json\n' }, commits)
+    let bumpSession: () => void = () => {}
+    backend.diff = () => {
+      bumpSession()
+      return Promise.reject(new Error('stale diff'))
+    }
+    setGitBackendForTests(backend)
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const files = new MemoryFileSystem('/tmp/vault-session-autogit-diff')
+    await files.mkdir('.git')
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.phase = 'ready'
+    vault.broad = false
+    bumpSession = () => {
+      vault.session += 1
+    }
+    const settings = resolve(SettingsService)
+    settings.setGitEnabled(true)
+    settings.setAutoGitEnabled(true)
+    settings.setAutoGitIdleSeconds(60)
+    settings.setAutoGitBlurSeconds(0)
+    const git = resolve(GitService)
+    git.surface = 'ready'
+    git.output = 'kept-output'
+    git.lastActivityAt = 1_000
+    await git.autoGitTick(61_000)
+    expect(commits).toEqual([])
+    expect(git.output).toBe('kept-output')
+    expect(git.idleCheckpointAt).toBe(0)
+    expect(git.busy).toBe(false)
+  })
 })
 
 function setControlValue(element: HTMLInputElement, value: string) {
