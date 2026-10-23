@@ -526,6 +526,19 @@ export async function flushDiskNow(vault: VaultService): Promise<void> {
   await flushDisk(vault, vault.indexPhase === 'ready' && disk.vectorGap === 0)
 }
 
+function sameLiveNotes(
+  left: readonly { id: string; contentHash: string }[],
+  right: readonly { id: string; contentHash: string }[],
+): boolean {
+  if (left.length !== right.length) return false
+  for (let index = 0; index < left.length; index += 1) {
+    const before = left[index]
+    const after = right[index]
+    if (!before || !after || before.id !== after.id || before.contentHash !== after.contentHash) return false
+  }
+  return true
+}
+
 export async function flushDisk(vault: VaultService, commit: boolean): Promise<void> {
   const slot = searchSlot(vault)
   const disk = slot.disk
@@ -534,6 +547,7 @@ export async function flushDisk(vault: VaultService, commit: boolean): Promise<v
     clearTimeout(slot.flushTimer)
     slot.flushTimer = null
   }
+  const before = disk.liveNotes()
   let snapshot: Uint8Array | null = null
   if (commit && disk.vectorGap === 0 && slot.session?.capture) {
     try {
@@ -543,11 +557,15 @@ export async function flushDisk(vault: VaultService, commit: boolean): Promise<v
       snapshot = null
     }
   }
+  const live = disk.liveNotes()
+  // capture() bytes are already sealed. A live generation that moved during
+  // that await must not be committed against those bytes.
+  const moved = !sameLiveNotes(before, live)
   try {
     await disk.flush({
-      live: disk.liveNotes(),
-      commit: commit && disk.vectorGap === 0,
-      snapshot,
+      live,
+      commit: commit && disk.vectorGap === 0 && !moved,
+      snapshot: moved ? null : snapshot,
     })
   } catch {
     console.warn('stride search cache: flush-failed')
