@@ -68,11 +68,69 @@ describe('parsePorcelain', () => {
     expect(parsePorcelain('?? "notes\\\\a.stride.json"')[0]?.path).toBe('notes\\a.stride.json')
   })
 
+  it('decodes octal-quoted paths and still parses the rest of the table', () => {
+    const porcelain = [
+      '?? "\\347\\254\\224\\350\\256\\260.stride.json"',
+      'UU "\\347\\254\\224\\350\\256\\260.stride.json"',
+      ' M notes/a.stride.json',
+      '?? "\\344\\270\\255\\346\\226\\207 -> \\350\\267\\257\\345\\276\\204.stride.json"',
+      '?? "中文 -> 路径.stride.json"',
+    ].join('\n')
+    expect(parsePorcelain(porcelain)).toEqual([
+      change({ path: '笔记.stride.json', code: '??', untracked: true }),
+      change({ path: '笔记.stride.json', code: 'UU', unmerged: true }),
+      change({ path: 'notes/a.stride.json', code: ' M', unstaged: true }),
+      change({ path: '中文 -> 路径.stride.json', code: '??', untracked: true }),
+      change({ path: '中文 -> 路径.stride.json', code: '??', untracked: true }),
+    ])
+  })
+
+  it('splits renames on the status arrow, including quoted and octal paths', () => {
+    expect(parsePorcelain('R  "notes/old note.stride.json" -> "notes/new note.stride.json"')).toEqual([
+      change({ path: 'notes/new note.stride.json', code: 'R ', staged: true }),
+    ])
+    expect(parsePorcelain('R  old.stride.json -> "new note.stride.json"')).toEqual([
+      change({ path: 'new note.stride.json', code: 'R ', staged: true }),
+    ])
+    expect(parsePorcelain('R  "notes/a -> b.stride.json" -> notes/c.stride.json')).toEqual([
+      change({ path: 'notes/c.stride.json', code: 'R ', staged: true }),
+    ])
+    expect(parsePorcelain(
+      'R  "\\346\\234\\252\\346\\232\\202\\345\\255\\230\\347\\254\\224\\350\\256\\260.stride.json" -> "\\346\\226\\260\\347\\254\\224\\350\\256\\260.stride.json"',
+    )).toEqual([
+      change({ path: '新笔记.stride.json', code: 'R ', staged: true }),
+    ])
+    expect(parsePorcelain(
+      'RM "\\346\\234\\252\\346\\232\\202\\345\\255\\230\\347\\254\\224\\350\\256\\260.stride.json" -> "\\346\\226\\260\\347\\254\\224\\350\\256\\260.stride.json"',
+    )).toEqual([
+      change({ path: '新笔记.stride.json', code: 'RM', staged: true, unstaged: true }),
+    ])
+    expect(parsePorcelain(' R notes/old.stride.json -> notes/new.stride.json')).toEqual([
+      change({ path: 'notes/new.stride.json', code: ' R', unstaged: true }),
+    ])
+    expect(parsePorcelain('C  notes/old.stride.json -> notes/new.stride.json')).toEqual([
+      change({ path: 'notes/new.stride.json', code: 'C ', staged: true }),
+    ])
+  })
+
+  it('keeps an arrow that is part of the path when the status is not a rename', () => {
+    expect(parsePorcelain('?? notes/a -> b.stride.json')).toEqual([
+      change({ path: 'notes/a -> b.stride.json', code: '??', untracked: true }),
+    ])
+    expect(parsePorcelain('?? "notes/a -> b.stride.json"')).toEqual([
+      change({ path: 'notes/a -> b.stride.json', code: '??', untracked: true }),
+    ])
+    expect(parsePorcelain(' M "notes/a -> b.stride.json"')[0]?.path).toBe('notes/a -> b.stride.json')
+  })
+
   it('throws on a non-empty malformed line', () => {
     expect(() => parsePorcelain('M notes/a.stride.json')).toThrow('Malformed git status')
     expect(() => parsePorcelain('nope')).toThrow('Malformed git status')
     expect(() => parsePorcelain('?? "unterminated')).toThrow('Malformed git path')
     expect(() => parsePorcelain('?? "bad\\q"')).toThrow('Malformed git path')
+    expect(() => parsePorcelain('?? "\\400"')).toThrow('Malformed git path')
+    expect(() => parsePorcelain('?? "\\12"')).toThrow('Malformed git path')
+    expect(() => parsePorcelain('R  notes/only.stride.json')).toThrow('Malformed git status')
   })
 
   it('throws when a path escapes the vault', () => {
