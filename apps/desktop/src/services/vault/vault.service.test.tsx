@@ -1,5 +1,5 @@
 import { has, observer, register, resolve, useService } from '@rabjs/react'
-import { relationsOf, buildGraph } from '@stride/core/graph'
+import { relationsOf, buildGraph, resolveNote } from '@stride/core/graph'
 import { plainText, type StrideNote, type TipTapNode } from '@stride/core/note'
 import { MemoryFileSystem, MemorySecretsStore, PlatformError } from '@stride/platform'
 import { act } from 'react'
@@ -12,6 +12,7 @@ import { ChatService } from '../chat/chat.service'
 import { GitService } from '../git/git.service'
 import { resetSecretsStore, setSecretsStore, SETTINGS_STORAGE_KEY, SettingsService } from '../settings/settings.service'
 import { UpdateService } from '../update/update.service'
+import { NoteListService } from '../notes/note-list.service'
 import { FolderService } from './folder.service'
 import { ListFilterService } from '../search/list-filter.service'
 import { VAULT_REGISTRY_KEY, VaultService } from './vault.service'
@@ -323,6 +324,61 @@ describe('VaultService', () => {
     expect(vault.searchHits.some((hit) => hit.id === 'field-notes')).toBe(false)
   })
 
+  it('remaps the list selection and search hits when a folder is renamed', async () => {
+    useMemoryFixture()
+    register(VaultService)
+    register(FolderService)
+    if (!has(NoteListService)) register(NoteListService)
+    const vault = resolve(VaultService)
+    const folders = resolve(FolderService)
+    const list = resolve(NoteListService)
+    await vault.openFromDraft()
+    await vault.createNote()
+    const rootId = vault.activeId
+    await vault.createNote()
+    vault.updateTitle('Field notes')
+    await vault.commitHeadingRename()
+    await folders.createFolder('box')
+    await folders.moveNote(vault.activeId, 'box')
+    const movedId = vault.activeId
+    expect(movedId).toBe('box/field-notes')
+    vault.activeId = rootId
+    list.selectedIds = [movedId, rootId]
+    list.anchorId = movedId
+    vault.searchHits = [{ id: movedId, score: 3 }, { id: rootId, score: 1 }]
+
+    await folders.renameFolder('box', 'crate')
+
+    expect(vault.error).toBe('')
+    expect(vault.activeId).toBe(rootId)
+    expect(vault.notes.some((note) => note.id === 'crate/field-notes')).toBe(true)
+    expect(vault.searchHits.map((hit) => hit.id)).toEqual(['crate/field-notes', rootId])
+    expect(list.selectedIds).toEqual(['crate/field-notes', rootId])
+    expect(list.anchorId).toBe('crate/field-notes')
+  })
+
+  it('leaves a folder note in place when the title does not change', async () => {
+    useMemoryFixture()
+    register(VaultService)
+    register(FolderService)
+    const vault = resolve(VaultService)
+    const folders = resolve(FolderService)
+    await vault.openFromDraft()
+    await vault.createNote()
+    vault.updateTitle('Field notes')
+    await vault.commitHeadingRename()
+    await folders.createFolder('box')
+    await folders.moveNote('field-notes', 'box')
+    expect(vault.active?.id).toBe('box/field-notes')
+
+    await vault.commitHeadingRename()
+
+    expect(vault.error).toBe('')
+    expect(vault.active?.id).toBe('box/field-notes')
+    expect(await vault.fs!.stat('box/field-notes.stride.json')).not.toBeNull()
+    expect(await vault.fs!.stat('field-notes.stride.json')).toBeNull()
+  })
+
   it('drops a deleted note from search', async () => {
     useMemoryFixture()
     register(VaultService)
@@ -550,7 +606,10 @@ describe('VaultService', () => {
       content: [
         {
           type: 'paragraph',
-          content: [{ type: 'wikilink', attrs: { target: 'Old Title' } }],
+          content: [
+            { type: 'wikilink', attrs: { target: 'Old Title', alias: 'keep' } },
+            { type: 'wikilink', attrs: { target: 'box/old-title' } },
+          ],
         },
       ],
     })
@@ -567,10 +626,28 @@ describe('VaultService', () => {
     await folders.moveNote('old-title', 'box')
     await vault.commitHeadingRename()
     expect(vault.error).toBe('')
-    expect(vault.active?.id).toBe('new-title')
+    expect(vault.active?.id).toBe('box/new-title')
+    expect(await vault.fs!.stat('new-title.stride.json')).toBeNull()
+    expect(await vault.fs!.stat('box/old-title.stride.json')).toBeNull()
+    const saved = JSON.parse(await vault.fs!.readText('box/new-title.stride.json')) as {
+      format?: string
+      doc?: { type?: string }
+    }
+    expect(saved.format).toBe('tiptap')
+    expect(saved.doc?.type).toBe('doc')
+    const linkerFile = JSON.parse(await vault.fs!.readText(`${linkerId}.stride.json`)) as {
+      format?: string
+      doc?: { type?: string }
+    }
+    expect(linkerFile.format).toBe('tiptap')
+    expect(linkerFile.doc?.type).toBe('doc')
     const linked = vault.notes.find((note) => note.id === linkerId)
     expect(linked?.properties.related_to).toBe('[[New Title]]')
-    expect(wikilinkTarget(linked?.doc ?? { type: 'doc' })).toBe('New Title')
+    const links = linked?.doc.content?.[0]?.content ?? []
+    expect(links.map((node) => node.attrs?.target)).toEqual(['New Title', 'New Title'])
+    expect(links[0]?.attrs?.alias).toBe('keep')
+    expect(resolveNote(vault.notes, 'New Title')?.id).toBe('box/new-title')
+    expect(resolveNote(vault.notes, String(links[1]?.attrs?.target))?.id).toBe('box/new-title')
   })
 
   it('keeps a cancelled directory picker on the chooser', async () => {

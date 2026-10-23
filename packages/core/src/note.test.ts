@@ -3,6 +3,7 @@ import { MemoryFileSystem } from '@stride/platform'
 import { buildGraph, relationsOf } from './graph.ts'
 import {
   applyBody,
+  createNote,
   findMark,
   firstH1Text,
   formatProperty,
@@ -381,5 +382,20 @@ describe('note codec', () => {
     expect(second.id).toBe('status-2')
     expect(await nextSlugId(files, 'Status', 'status-2')).toBe('status-2')
     expect(await nextSlugId(files, 'Status', 'fresh')).toBe('status-3')
+  })
+
+  it('keeps the directory prefix and suffixes only inside that directory', async () => {
+    const files = vault('/tmp/stride-folder-slug')
+    await saveNote(files, createNote('status', 'Status'))
+    await saveNote(files, createNote('box/status', 'Status'))
+    await saveNote(files, createNote('box/status-2', 'Status'))
+    await saveNote(files, createNote('box/inner/other', 'Other'))
+
+    expect(await nextSlugId(files, 'Status', 'box/status')).toBe('box/status')
+    expect(await nextSlugId(files, 'Status', 'box/other')).toBe('box/status-3')
+    expect(await nextSlugId(files, 'Fresh Title', 'box/other')).toBe('box/fresh-title')
+    expect(await nextSlugId(files, 'Status', 'box/inner/other')).toBe('box/inner/status')
+    expect(await nextSlugId(files, 'Status', 'other')).toBe('status-2')
+    expect(await nextSlugId(files, 'Status', 'crate/other')).toBe('crate/status')
   })
 })

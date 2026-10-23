@@ -170,8 +170,12 @@ export async function createVaultNote(fs: FileSystemBackend, title = 'Untitled')
   return saveNote(fs, createNote(id, title))
 }
 
+// The id is the note path. A title rename keeps the current directory and only slugs the last segment.
 export async function nextSlugId(fs: FileSystemBackend, title: string, currentId = ''): Promise<string> {
-  const base = slugTitle(title)
+  const slug = slugTitle(title)
+  const slash = currentId.lastIndexOf('/')
+  const directory = slash === -1 ? '' : currentId.slice(0, slash)
+  const base = directory ? `${directory}/${slug}` : slug
   let id = base
   let n = 2
   while (id !== currentId && (await fs.stat(notePath(id)))) {
