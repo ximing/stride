@@ -104,6 +104,110 @@ describe('rewriteVaultLinks', () => {
     expect(await fs.readText('old-title.stride.json')).toBe(before.old)
   })
 
+  it('rewrites id links when the title string stays the same', async () => {
+    const fs = new MemoryFileSystem('same-title')
+    const note = createNote('status-2', 'Status')
+    const linker = createNote('linker', 'Linker')
+    linker.properties = {
+      related_to: '[[status-2]]',
+      also: ['[[Status]]', '[[status-2]]'],
+      count: 1,
+    }
+    linker.doc = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'wikilink', attrs: { target: 'status-2', alias: 'keep' } },
+            { type: 'wikilink', attrs: { target: 'Status' } },
+            { type: 'text', text: 'see [[status-2]] and [[Status]] and [[status-2 extra]]' },
+          ],
+        },
+      ],
+    }
+    await writeNoteFile(fs, 'status-2.stride.json', note)
+    await writeNoteFile(fs, 'linker.stride.json', linker)
+
+    const idOnly: RenameChange = {
+      fromTitle: 'Status',
+      toTitle: 'Status',
+      fromId: 'status-2',
+      toId: 'status',
+    }
+    await rewriteVaultLinks(fs, idOnly)
+
+    const saved = await readNoteFile(fs, 'linker.stride.json', 'linker')
+    const nodes = saved.doc.content?.[0]?.content ?? []
+    expect(saved.properties.related_to).toBe('[[status]]')
+    expect(saved.properties.also).toEqual(['[[Status]]', '[[status]]'])
+    expect(saved.properties.count).toBe(1)
+    expect(saved.title).toBe('Linker')
+    expect(nodes[0]?.attrs).toEqual({ target: 'status', alias: 'keep' })
+    expect(nodes[1]?.attrs).toEqual({ target: 'Status' })
+    expect(textOf(saved.doc)).toBe('see [[status]] and [[Status]] and [[status-2 extra]]')
+    expect((await readNoteFile(fs, 'status-2.stride.json', 'status-2')).title).toBe('Status')
+    expect(await fs.stat('.stride/rename-tx/journal.json')).toBeNull()
+
+    const before = await fs.readText('linker.stride.json')
+    await rewriteVaultLinks(fs, idOnly)
+    expect(await fs.readText('linker.stride.json')).toBe(before)
+  })
+
+  it('leaves links alone when the title and id are unchanged', async () => {
+    const fs = new MemoryFileSystem('unchanged')
+    const linker = createNote('linker', 'Linker')
+    linker.properties = { related_to: '[[status-2]]', also: '[[Status]]' }
+    linker.doc = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'wikilink', attrs: { target: 'status-2', alias: 'keep' } },
+            { type: 'text', text: '[[status-2]] [[Status]]' },
+          ],
+        },
+      ],
+    }
+    await writeNoteFile(fs, 'linker.stride.json', linker)
+    const before = await fs.readText('linker.stride.json')
+
+    await rewriteVaultLinks(fs, {
+      fromTitle: 'Status',
+      toTitle: 'Status',
+      fromId: 'status-2',
+      toId: 'status-2',
+    })
+
+    expect(await fs.readText('linker.stride.json')).toBe(before)
+    expect(await fs.stat('.stride/rename-tx/journal.json')).toBeNull()
+  })
+
+  it('does not fold case or whitespace when the title changes', async () => {
+    const fs = new MemoryFileSystem('exact')
+    const linker = createNote('linker', 'Linker')
+    linker.doc = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'wikilink', attrs: { target: 'old title' } },
+            { type: 'text', text: '[[OLD TITLE]] [[Old  Title]] [[Old Title]] [[old-title]]' },
+          ],
+        },
+      ],
+    }
+    await writeNoteFile(fs, 'linker.stride.json', linker)
+
+    await rewriteVaultLinks(fs, change)
+
+    const saved = await readNoteFile(fs, 'linker.stride.json', 'linker')
+    expect(wikilinkAttrs(saved.doc)?.target).toBe('old title')
+    expect(textOf(saved.doc)).toBe('[[OLD TITLE]] [[Old  Title]] [[New Title]] [[New Title]]')
+  })
+
   it('rejects a corrupt journal without removing notes', async () => {
     const fs = new MemoryFileSystem('corrupt')
     await seed(fs)

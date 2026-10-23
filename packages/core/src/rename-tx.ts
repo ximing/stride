@@ -31,8 +31,12 @@ export async function rewriteVaultLinks(
   change: RenameChange,
   options?: { afterFile?: (index: number, journal: RenameJournal) => void | Promise<void> },
 ): Promise<void> {
-  if (change.fromTitle === change.toTitle) return
-  if (change.fromTitle.trim() === '' || change.toTitle.trim() === '') return
+  // An unchanged title still rewrites links that name the old id. Title links stay.
+  if (change.fromTitle === change.toTitle) {
+    if (change.fromId === change.toId || change.fromId === '' || change.toId === '') return
+  } else if (change.fromTitle.trim() === '' || change.toTitle.trim() === '') {
+    return
+  }
 
   const paths = await listNoteFiles(fs)
   const files: RenameJournalFile[] = []
@@ -150,7 +154,7 @@ function nodeNeedsRewrite(node: TipTapNode | null | undefined, change: RenameCha
   if (!node || typeof node !== 'object') return false
   if (node.type === 'wikilink') {
     const target = wikilinkTarget(node)
-    if (target !== null && isRenameTarget(target.trim(), change)) return true
+    if (target !== null && rewrittenTarget(target.trim(), change) !== null) return true
   }
   if (node.type === 'text' && typeof node.text === 'string' && textNeedsRewrite(node.text, change)) {
     return true
@@ -188,7 +192,8 @@ function rewriteProperty(value: NoteProperty, change: RenameChange): NotePropert
 function rewriteNode(node: TipTapNode, change: RenameChange): void {
   if (node.type === 'wikilink') {
     const target = wikilinkTarget(node)
-    if (target !== null && isRenameTarget(target.trim(), change)) setWikilinkTarget(node, change.toTitle)
+    const next = target === null ? null : rewrittenTarget(target.trim(), change)
+    if (next !== null) setWikilinkTarget(node, next)
   }
   if (node.type === 'text' && typeof node.text === 'string') {
     node.text = rewriteWikilinks(node.text, change)
@@ -213,10 +218,22 @@ function setWikilinkTarget(node: TipTapNode, target: string): void {
 
 function rewriteWikilinks(text: string, change: RenameChange): string {
   return text.replace(/\[\[[^\]]+\]\]/g, (token) => {
-    const inner = token.slice(2, -2).trim()
-    if (!isRenameTarget(inner, change)) return token
-    return `[[${change.toTitle}]]`
+    const next = rewrittenTarget(token.slice(2, -2).trim(), change)
+    if (next === null) return token
+    return `[[${next}]]`
   })
+}
+
+// Title changes still land on the new title, including old-id links.
+// An id-only change lands on the new id and leaves title links alone.
+function rewrittenTarget(inner: string, change: RenameChange): string | null {
+  if (change.fromTitle !== change.toTitle) {
+    if (!isRenameTarget(inner, change)) return null
+    return change.toTitle
+  }
+  if (inner === change.fromTitle) return null
+  if (change.fromId !== '' && change.fromId !== change.toId && inner === change.fromId) return change.toId
+  return null
 }
 
 function textNeedsRewrite(text: string, change: RenameChange): boolean {

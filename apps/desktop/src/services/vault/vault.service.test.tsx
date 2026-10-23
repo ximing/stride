@@ -508,6 +508,75 @@ describe('VaultService', () => {
     expect(wikilinkTarget(linked?.doc ?? { type: 'doc' })).toBe('New Title')
   })
 
+  it('rewrites id links when the title stays and the slug id changes', async () => {
+    useMemoryFixture()
+    register(VaultService)
+    register(FolderService)
+    const vault = resolve(VaultService)
+    await vault.openFromDraft()
+
+    await vault.createNote()
+    vault.updateTitle('Field notes')
+    await vault.commitHeadingRename()
+    expect(vault.active?.id).toBe('field-notes')
+    const firstId = vault.activeId
+
+    await vault.createNote()
+    vault.updateTitle('Field notes')
+    await vault.commitHeadingRename()
+    expect(vault.active?.id).toBe('field-notes-2')
+    const secondId = vault.activeId
+
+    await vault.createNote()
+    const linkerId = vault.active?.id ?? ''
+    vault.updateDoc({
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'wikilink', attrs: { target: secondId, alias: 'keep' } },
+            { type: 'wikilink', attrs: { target: 'Field notes' } },
+            { type: 'text', text: ` see [[${secondId}]] and [[Field notes]]` },
+          ],
+        },
+      ],
+    })
+    vault.notes = vault.notes.map((note) =>
+      note.id === linkerId
+        ? { ...note, properties: { ...note.properties, related_to: `[[${secondId}]]`, also: '[[Field notes]]' } }
+        : note,
+    )
+    await vault.flush()
+
+    vault.activeId = secondId
+    await vault.commitHeadingRename()
+    expect(vault.error).toBe('')
+    expect(vault.active?.id).toBe(secondId)
+    const held = vault.notes.find((note) => note.id === linkerId)
+    expect(held?.properties.related_to).toBe(`[[${secondId}]]`)
+    expect(held?.properties.also).toBe('[[Field notes]]')
+
+    await vault.deleteNotes([firstId])
+    vault.activeId = secondId
+    await vault.commitHeadingRename()
+
+    expect(vault.error).toBe('')
+    expect(vault.active?.id).toBe('field-notes')
+    expect(await vault.fs!.stat('field-notes.stride.json')).not.toBeNull()
+    expect(await vault.fs!.stat('field-notes-2.stride.json')).toBeNull()
+    const linked = vault.notes.find((note) => note.id === linkerId)
+    expect(linked?.properties.related_to).toBe('[[field-notes]]')
+    expect(linked?.properties.also).toBe('[[Field notes]]')
+    const links = linked?.doc.content?.[0]?.content ?? []
+    expect(links.map((node) => (node.type === 'wikilink' ? node.attrs?.target : node.text))).toEqual([
+      'field-notes',
+      'Field notes',
+      ' see [[field-notes]] and [[Field notes]]',
+    ])
+    expect(links[0]?.attrs?.alias).toBe('keep')
+  })
+
   it('does not rewrite wikilinks when renameFromHeading is false', async () => {
     useMemoryFixture()
     register(VaultService)

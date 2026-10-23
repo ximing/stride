@@ -773,9 +773,7 @@ export class VaultService extends Service {
       if (!fresh || isPlaceholderTitle(fresh.title)) return
       const previous = this.titleBaseline.get(fromId) ?? diskTitle
       let nextId: string | undefined
-      if (previous && !isPlaceholderTitle(previous) && previous !== fresh.title) {
-        nextId = await nextSlugId(fs, fresh.title, fresh.id)
-        await rewriteVaultLinks(fs, { fromTitle: previous, toTitle: fresh.title, fromId, toId: nextId })
+      const reloadRewrittenNotes = async () => {
         const files = await listNoteFiles(fs)
         const disk = new Map<string, StrideNote>()
         for (const file of files) {
@@ -785,7 +783,17 @@ export class VaultService extends Service {
         this.notes = this.notes.map((note) => disk.get(note.id) ?? note)
         this.docEpoch += 1
       }
+      const titleChanged = Boolean(previous && !isPlaceholderTitle(previous) && previous !== fresh.title)
+      if (titleChanged) {
+        nextId = await nextSlugId(fs, fresh.title, fresh.id)
+        await rewriteVaultLinks(fs, { fromTitle: previous, toTitle: fresh.title, fromId, toId: nextId })
+        await reloadRewrittenNotes()
+      }
       if (nextId === undefined) nextId = await nextSlugId(fs, fresh.title, fresh.id)
+      if (!titleChanged && nextId !== fresh.id) {
+        await rewriteVaultLinks(fs, { fromTitle: fresh.title, toTitle: fresh.title, fromId, toId: nextId })
+        await reloadRewrittenNotes()
+      }
       if (nextId !== fresh.id) {
         await fs.rename(notePath(fromId), notePath(nextId))
         await applyNoteIdChanges(this, [{ fromId, toId: nextId }])
