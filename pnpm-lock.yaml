@@ -252,6 +252,9 @@ importers:
       '@stride/platform':
         specifier: workspace:*
         version: link:../platform
+      '@tauri-apps/api':
+        specifier: ^2.8.0
+        version: 2.12.3
       '@tauri-apps/plugin-fs':
         specifier: ^2.3.0
         version: 2.7.0

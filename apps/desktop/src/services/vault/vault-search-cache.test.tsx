@@ -225,7 +225,7 @@ describe('vault search cache', () => {
     useMemoryFixture()
     registerVault()
     const vault = resolve(VaultService)
-    const fs = new MemoryFileSystem('/Users/stride')
+    const fs = new MemoryFileSystem('/tmp/Downloads')
     await vault.openClonedVault(fs)
     await vault.createNote()
     await vault.flush()

@@ -32,6 +32,7 @@ import { initializeVault } from '../../../../../packages/core/src/seed'
 import { compareTypeDocuments, isTypeVisible, nextTypeOrder, templateBody } from '../../../../../packages/core/src/types'
 import { rewriteVaultLinks } from '../../../../../packages/core/src/rename-tx'
 import { applyViewFilter, VIEW_FILTER_PREFIX, type SavedView } from '../../../../../packages/core/src/views'
+import { hostHomeDirectory } from '../platform/home'
 import { isDesktopRuntime, isMemoryFixture } from '../platform/runtime'
 import { reportOpenProject, syncRecentProjects } from '../platform/windows'
 import {
@@ -87,9 +88,6 @@ const UNCONFIGURED_EMBEDDING: EmbeddingRuntime = {
   intended: false,
   active: false,
 }
-
-// The browser has no home directory. openVault only uses this to reject broad personal roots.
-const HOME_DIR = '/Users/stride'
 
 export { VAULT_REGISTRY_KEY }
 
@@ -445,7 +443,7 @@ export class VaultService extends Service {
       const backend = isMemoryFixture()
         ? new MemoryFileSystem('memory-vault')
         : await pickVaultBackend()
-      await initializeVault(backend, HOME_DIR)
+      await initializeVault(backend, await hostHomeDirectory())
       await this.openBackend(backend)
     } catch (error) {
       this.error = errorText(error)
@@ -458,7 +456,7 @@ export class VaultService extends Service {
       const backend = isMemoryFixture()
         ? new MemoryFileSystem('memory-vault')
         : await pickVaultBackend()
-      await initializeVault(backend, HOME_DIR)
+      await initializeVault(backend, await hostHomeDirectory())
       await writeSampleNotes(backend)
       await this.openBackend(backend)
     } catch (error) {

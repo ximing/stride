@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@stride/platform": "workspace:*",
+    "@tauri-apps/api": "^2.8.0",
     "@tauri-apps/plugin-fs": "^2.3.0"
   },
   "devDependencies": {

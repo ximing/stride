@@ -11,7 +11,7 @@ paths:
 
 ## 契约先行
 
-- 所有宿主能力必须先在 `@stride/platform` 中声明接口（`FileSystemBackend`、`GitBackend`、`SearchBackend`、`SecretsStore`、`UpdaterBackend`），并在 `@stride/platform` 内提供配套的内存替身（Test Doubles）。
+- 所有宿主能力必须先在 `@stride/platform` 中声明接口（`FileSystemBackend`、`GitBackend`、`SearchBackend`、`SecretsStore`、`UpdaterBackend`、`HostPaths`），并在 `@stride/platform` 内提供配套的内存替身（Test Doubles）。
 - `packages/*-tauri` 与 `packages/*-web` 仅负责将宿主 API 适配到 `@stride/platform` 接口，不包含领域业务规则。
 
 ## Tauri 端适配器（`*-tauri`）

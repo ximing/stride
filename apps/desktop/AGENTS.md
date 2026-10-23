@@ -31,7 +31,7 @@
 | `settings/` | 设置读写与设置页状态。 |
 | `update/` | 更新检查与安装。 |
 | `appearance/` | 主题与笔记外观。 |
-| `platform/` | 深链、浮层互斥、多窗口与最近项目菜单、`runtime.ts` 宿主探测。 |
+| `platform/` | 深链、浮层互斥、多窗口与最近项目菜单、`runtime.ts` 宿主探测、`home.ts` 家目录。 |
 
 ## `src/ui/`
 

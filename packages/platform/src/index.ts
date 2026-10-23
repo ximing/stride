@@ -1,6 +1,7 @@
 export * from './error.ts'
 export * from './fs.ts'
 export * from './git.ts'
+export * from './host.ts'
 export * from './search.ts'
 export * from './secrets.ts'
 export * from './updater.ts'

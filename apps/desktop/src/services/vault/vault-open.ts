@@ -12,6 +12,7 @@ import {
 } from '../../../../../packages/core/src/vault-config'
 import { openVault } from '../../../../../packages/core/src/vault'
 import { MemoryFileSystem, type FileSystemBackend } from '@stride/platform'
+import { hostHomeDirectory } from '../platform/home'
 import { isMemoryFixture } from '../platform/runtime'
 import { applyStageZoom } from '../layout/stage-zoom'
 import { NoteListService } from '../notes/note-list.service'
@@ -20,9 +21,6 @@ import { ViewsService } from '../views/views.service'
 import { bindPagehide, flushDiskNow, openSearchSession, searchSlot, startRebuild } from './vault-search-session'
 import { resetPropertyEditor } from './vault-properties'
 import type { VaultService } from './vault.service'
-
-// The browser has no home directory. openVault only uses this to reject broad personal roots.
-const HOME_DIR = '/Users/stride'
 
 function isTypeDocument(note: { type: string }): boolean {
   return note.type === 'Type'
@@ -34,7 +32,7 @@ export async function openBackendBody(vault: VaultService, backend: FileSystemBa
   const runtime = await vault.currentEmbedding()
   const dim = runtime.active ? runtime.dim : 0
   await recoverRename(backend)
-  const opened = await openVault(backend, HOME_DIR)
+  const opened = await openVault(backend, await hostHomeDirectory())
   const renameFromHeading = await readRenameFromHeading(backend)
   const advanceInbox = await readAdvanceInbox(backend)
   const agentMode = await readAgentMode(backend)

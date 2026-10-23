@@ -5,4 +5,5 @@ export {
   restoreVaultById,
   restoreVaultDirectory,
 } from './browser-fs.ts'
+export { BROWSER_HOME_SENTINEL, browserHostPaths } from './home.ts'
 export { readVaultHandleById, writeVaultHandleById } from './idb.ts'

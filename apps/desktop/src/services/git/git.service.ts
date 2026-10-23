@@ -29,6 +29,7 @@ import {
 } from '@stride/core'
 import { browserGitBackend } from '@stride/git-web'
 import { PlatformError, type FileSystemBackend, type GitBackend } from '@stride/platform'
+import { hostHomeDirectory } from '../platform/home'
 import { isDesktopRuntime } from '../platform/runtime'
 import { SettingsService } from '../settings/settings.service'
 import { pickVaultBackend, VaultService } from '../vault/vault.service'
@@ -59,7 +60,6 @@ export function isGitRemoteUrl(value: string): boolean {
   }
 }
 const GIT_KEY_NOTICE = 'Add a model provider, base URL, model, and key in Settings'
-const BROWSER_HOME = '/Users/stride'
 
 let testGitBackend: GitBackend | null = null
 let testGitBackendSet = false
@@ -215,15 +215,8 @@ export class GitService extends Service {
   }
 
   private async homeDirectory(): Promise<string> {
-    if (!isDesktopRuntime()) return BROWSER_HOME
     try {
-      const { homeDir } = await import('@tauri-apps/api/path')
-      const home = await homeDir()
-      if (!home) {
-        this.output = 'Could not resolve the home directory'
-        return ''
-      }
-      return home
+      return await hostHomeDirectory()
     } catch (error) {
       this.output = error instanceof Error ? error.message : String(error)
       return ''
