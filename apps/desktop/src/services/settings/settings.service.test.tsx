@@ -1,5 +1,5 @@
 import { has, register, resolve } from '@rabjs/react'
-import { emptyTokenHistory, localDateKey, serializeTokenUsage } from '@stride/core'
+import { emptyTokenHistory, localDateKey, serializeTokenUsage, TOKEN_USAGE_VAULT_FILE } from '@stride/core'
 import { MemoryFileSystem, MemorySecretsStore } from '@stride/platform'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { resetSecretsStore, setSecretsStore, SETTINGS_STORAGE_KEY, SettingsService, TOKEN_USAGE_STORAGE_KEY } from './settings.service'
@@ -37,9 +37,55 @@ function resetSettingsMemory() {
     usageFs: null,
     usageChain: Promise.resolve(),
     usageEpoch: (settings as unknown as { usageEpoch: number }).usageEpoch + 1,
+    usageRevision: 0,
     pendingUsage: [],
   })
   localStorage.removeItem(TOKEN_USAGE_STORAGE_KEY)
+}
+
+class FlakyTokenUsageDisk extends MemoryFileSystem {
+  attempts = 0
+
+  constructor(private remainingFailures: number, label = 'vault') {
+    super(label)
+  }
+
+  override async writeText(path: string, data: string): Promise<void> {
+    if (path === TOKEN_USAGE_VAULT_FILE) {
+      this.attempts += 1
+      if (this.remainingFailures > 0) {
+        this.remainingFailures -= 1
+        throw new Error('token-usage write failed')
+      }
+    }
+    await super.writeText(path, data)
+  }
+}
+
+function pendingUsageCount(settings: SettingsService): number {
+  return (settings as unknown as { pendingUsage: unknown[] }).pendingUsage.length
+}
+
+const gptSample = {
+  model: 'gpt-4o-mini',
+  input: 3,
+  output: 2,
+  cacheRead: 1,
+  cacheWrite: 0,
+  total: 4,
+}
+
+function gptDay(date: string, extra?: { input?: number; output?: number; total?: number; requests?: number }) {
+  return {
+    date,
+    model: 'gpt-4o-mini',
+    input: extra?.input ?? 3,
+    output: extra?.output ?? 2,
+    cacheRead: 1,
+    cacheWrite: 0,
+    total: extra?.total ?? 6,
+    requests: extra?.requests ?? 1,
+  }
 }
 
 describe('settings service', () => {
@@ -321,5 +367,176 @@ describe('settings service', () => {
     await settings.bindUsageVault(second)
     expect(settings.tokenHistory.days).toEqual([])
     await expect(second.stat('.stride/token-usage.json')).resolves.toBeNull()
+  })
+
+  it('retries a failed token usage write once without doubling the reloaded total', async () => {
+    register(SettingsService)
+    const settings = resolve(SettingsService)
+    const fs = new FlakyTokenUsageDisk(1)
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    try {
+      await settings.bindUsageVault(fs)
+      settings.recordTokenUsage(gptSample)
+      await settings.whenTokenUsageSettled()
+      expect(fs.attempts).toBe(2)
+      expect(JSON.parse(await fs.readText(TOKEN_USAGE_VAULT_FILE)).days).toEqual([gptDay(localDateKey())])
+      expect(warn).not.toHaveBeenCalled()
+      expect(settings.notice).toBe('')
+      await settings.bindUsageVault(fs)
+      expect(settings.tokenHistory.days).toEqual([gptDay(localDateKey())])
+      expect(pendingUsageCount(settings)).toBe(0)
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('does not replay a failed vault bind after a later usage write succeeds', async () => {
+    register(SettingsService)
+    const settings = resolve(SettingsService)
+    const fs = new FlakyTokenUsageDisk(2)
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const today = localDateKey()
+    try {
+      settings.recordTokenUsage(gptSample)
+      await expect(settings.bindUsageVault(fs)).resolves.toBeUndefined()
+      expect(fs.attempts).toBe(2)
+      await expect(fs.stat(TOKEN_USAGE_VAULT_FILE)).resolves.toBeNull()
+      expect(pendingUsageCount(settings)).toBe(1)
+      expect(settings.tokenHistory.days).toEqual([gptDay(today)])
+      expect(settings.notice).toBe('')
+      expect(String(warn.mock.calls[0]?.[0])).toContain('stride token usage: write-failed')
+      expect(String(warn.mock.calls[0]?.[0])).toContain('token-usage write failed')
+
+      settings.recordTokenUsage({
+        model: 'deepseek-chat',
+        input: 1,
+        output: 1,
+        cacheRead: 0,
+        cacheWrite: 0,
+        total: 2,
+      })
+      await settings.whenTokenUsageSettled()
+      expect(pendingUsageCount(settings)).toBe(0)
+      expect(JSON.parse(await fs.readText(TOKEN_USAGE_VAULT_FILE)).days).toEqual([
+        {
+          date: today,
+          model: 'deepseek-chat',
+          input: 1,
+          output: 1,
+          cacheRead: 0,
+          cacheWrite: 0,
+          total: 2,
+          requests: 1,
+        },
+        gptDay(today),
+      ])
+      await settings.bindUsageVault(fs)
+      expect(settings.tokenHistory.days).toEqual([
+        {
+          date: today,
+          model: 'deepseek-chat',
+          input: 1,
+          output: 1,
+          cacheRead: 0,
+          cacheWrite: 0,
+          total: 2,
+          requests: 1,
+        },
+        gptDay(today),
+      ])
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('keeps a twice-failed usage write until a later write reloads it once', async () => {
+    register(SettingsService)
+    const settings = resolve(SettingsService)
+    const fs = new FlakyTokenUsageDisk(2)
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const today = localDateKey()
+    try {
+      await settings.bindUsageVault(fs)
+      settings.recordTokenUsage(gptSample)
+      await settings.whenTokenUsageSettled()
+      expect(fs.attempts).toBe(2)
+      await expect(fs.stat(TOKEN_USAGE_VAULT_FILE)).resolves.toBeNull()
+      expect(pendingUsageCount(settings)).toBe(1)
+      expect(settings.notice).toBe('')
+
+      settings.recordTokenUsage({
+        model: 'gpt-4o-mini',
+        input: 1,
+        output: 1,
+        cacheRead: 0,
+        cacheWrite: 0,
+        total: 2,
+      })
+      await settings.whenTokenUsageSettled()
+      expect(pendingUsageCount(settings)).toBe(0)
+      expect(settings.tokenHistory.days).toEqual([gptDay(today, {
+        input: 4,
+        output: 3,
+        total: 8,
+        requests: 2,
+      })])
+      await settings.bindUsageVault(fs)
+      expect(settings.tokenHistory.days).toEqual([gptDay(today, {
+        input: 4,
+        output: 3,
+        total: 8,
+        requests: 2,
+      })])
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it('flushes outstanding usage replay once when the vault closes', async () => {
+    register(SettingsService)
+    const settings = resolve(SettingsService)
+    const fs = new FlakyTokenUsageDisk(2)
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const today = localDateKey()
+    try {
+      await settings.bindUsageVault(fs)
+      settings.recordTokenUsage(gptSample)
+      await settings.whenTokenUsageSettled()
+      expect(fs.attempts).toBe(2)
+      expect(pendingUsageCount(settings)).toBe(1)
+
+      await settings.bindUsageVault(null)
+      expect(fs.attempts).toBe(3)
+      expect(settings.tokenHistory.days).toEqual([])
+      expect(pendingUsageCount(settings)).toBe(0)
+      expect(JSON.parse(await fs.readText(TOKEN_USAGE_VAULT_FILE)).days).toEqual([gptDay(today)])
+      expect(settings.notice).toBe('')
+
+      await settings.bindUsageVault(fs)
+      expect(settings.tokenHistory.days).toEqual([gptDay(today)])
+      expect(fs.attempts).toBe(3)
+
+      const stuck = new FlakyTokenUsageDisk(5, 'stuck')
+      await settings.bindUsageVault(stuck)
+      settings.recordTokenUsage({
+        model: 'gpt-4o-mini',
+        input: 1,
+        output: 0,
+        cacheRead: 0,
+        cacheWrite: 0,
+        total: 1,
+      })
+      await settings.whenTokenUsageSettled()
+      const warns = warn.mock.calls.length
+      const attempts = stuck.attempts
+      await settings.bindUsageVault(null)
+      expect(stuck.attempts).toBe(attempts + 1)
+      expect(warn.mock.calls.length).toBe(warns + 1)
+      expect(String(warn.mock.calls.at(-1)?.[0])).toContain('stride token usage: write-failed')
+      await expect(stuck.stat(TOKEN_USAGE_VAULT_FILE)).resolves.toBeNull()
+      expect(settings.tokenHistory.days).toEqual([])
+    } finally {
+      warn.mockRestore()
+    }
   })
 })

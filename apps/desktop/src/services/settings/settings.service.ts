@@ -167,7 +167,14 @@ export class SettingsService extends Service {
   private usageFs: FileSystemBackend | null = null
   private usageChain: Promise<void> = Promise.resolve()
   private usageEpoch = 0
-  private pendingUsage: Array<{ sample: TokenUsageSample; date: string }> = []
+  private usageRevision = 0
+  // replay: already inside tokenHistory, still missing from the vault file.
+  private pendingUsage: Array<{
+    sample: TokenUsageSample
+    date: string
+    replay: boolean
+    revision: number
+  }> = []
   private memoryEmbeddingKey = ''
   private memoryLlmKeys: Record<string, string> = {}
   private loadTask: Promise<void> | null = null
@@ -295,22 +302,25 @@ export class SettingsService extends Service {
     const next = addTokenUsageDay(this.tokenHistory, sample, date)
     if (next === this.tokenHistory) return
     this.tokenHistory = next
+    const revision = ++this.usageRevision
     const fs = this.usageFs
     if (!fs) {
-      this.pendingUsage.push({ sample, date })
+      this.pendingUsage.push({ sample, date, replay: false, revision })
       return
     }
     const snapshot = next
-    this.usageChain = this.usageChain.then(async () => {
-      await writeTokenUsageHistory(fs, snapshot)
-    }).catch(() => undefined)
+    this.usageChain = this.usageChain.catch(() => undefined).then(async () => {
+      const saved = await this.persistUsage(fs, snapshot)
+      if (saved) this.dropReplay(revision, snapshot)
+      else this.pendingUsage.push({ sample, date, replay: true, revision })
+    })
   }
 
   /** Load this vault's history. A null backend clears it when the chooser is showing. */
   bindUsageVault(fs: FileSystemBackend | null): Promise<void> {
     const epoch = ++this.usageEpoch
     this.usageVaultOpen = fs !== null
-    this.usageChain = this.usageChain.then(async () => {
+    this.usageChain = this.usageChain.catch(() => undefined).then(async () => {
       if (this.usageEpoch !== epoch) return
       await this.activateUsageVault(fs)
     }).catch(() => undefined)
@@ -323,6 +333,14 @@ export class SettingsService extends Service {
 
   private async activateUsageVault(fs: FileSystemBackend | null) {
     if (!fs) {
+      const previous = this.usageFs
+      if (previous && this.pendingUsage.some((item) => item.replay)) {
+        try {
+          await writeTokenUsageHistory(previous, this.tokenHistory)
+        } catch (error) {
+          console.warn(`stride token usage: write-failed ${errorText(error)}`)
+        }
+      }
       this.usageFs = null
       this.usageVaultOpen = false
       this.pendingUsage = []
@@ -339,15 +357,38 @@ export class SettingsService extends Service {
     this.usageVaultOpen = true
     this.tokenHistory = history
     if (carried.length === 0 && legacy.models.length === 0) return
-    try {
-      await writeTokenUsageHistory(fs, history)
+    const saved = await this.persistUsage(fs, history)
+    if (saved) {
       if (legacy.models.length > 0 && typeof localStorage !== 'undefined') {
         localStorage.removeItem(TOKEN_USAGE_STORAGE_KEY)
       }
-    } catch (error) {
-      this.pendingUsage = [...carried, ...this.pendingUsage]
-      throw error
+      return
     }
+    const revision = this.usageRevision
+    const replay = carried.map((item) => ({ sample: item.sample, date: item.date, replay: true, revision }))
+    this.pendingUsage = [...replay, ...this.pendingUsage]
+  }
+
+  // One immediate retry. The caller keeps replay when both attempts fail.
+  private async persistUsage(fs: FileSystemBackend, history: TokenUsageHistory): Promise<boolean> {
+    try {
+      await writeTokenUsageHistory(fs, history)
+      return true
+    } catch {
+      try {
+        await writeTokenUsageHistory(fs, history)
+        return true
+      } catch (error) {
+        console.warn(`stride token usage: write-failed ${errorText(error)}`)
+        return false
+      }
+    }
+  }
+
+  // The current ledger covers every replay. An older snapshot covers replays up to its revision.
+  private dropReplay(revision: number, snapshot: TokenUsageHistory) {
+    const covered = snapshot === this.tokenHistory ? Number.POSITIVE_INFINITY : revision
+    this.pendingUsage = this.pendingUsage.filter((item) => !item.replay || item.revision > covered)
   }
 
   private readLegacyUsage() {
