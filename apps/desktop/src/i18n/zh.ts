@@ -596,6 +596,7 @@ export const zh: DeepString<Catalog> = {
     more: '更多',
     moreOf: '{{label}}更多',
     copy: '复制',
+    pasteFailed: '无法粘贴。',
     pickImage: '选择图片',
     openLink: '打开链接',
     linkTitle: '链接',

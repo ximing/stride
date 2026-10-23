@@ -23,9 +23,10 @@ interface HarnessProps {
   notes: StrideNote[]
   onOpen: (target: string) => void
   onOpenInNewTab: (id: string) => void
+  onPasteError?: (message: string) => void
 }
 
-function Harness({ editor, notes, onOpen, onOpenInNewTab }: HarnessProps) {
+function Harness({ editor, notes, onOpen, onOpenInNewTab, onPasteError }: HarnessProps) {
   const openLinkRef = useRef(() => true)
   const { onContextMenu, menuElement } = useEditorContextMenu({
     editor,
@@ -33,6 +34,7 @@ function Harness({ editor, notes, onOpen, onOpenInNewTab }: HarnessProps) {
     openLinkRef,
     onOpen,
     openInNewTab: onOpenInNewTab,
+    onPasteError,
   })
   return (
     <div data-testid="harness" onContextMenu={onContextMenu}>
@@ -72,6 +74,25 @@ function clickMenuItem(id: string) {
 
 function menu(): HTMLElement | null {
   return document.querySelector<HTMLElement>('[data-testid="context-menu"]')
+}
+
+function installClipboard(clipboard: { readText?: () => Promise<string>; writeText?: (text: string) => Promise<void> }) {
+  Object.defineProperty(window.navigator, 'clipboard', { value: clipboard, configurable: true })
+}
+
+function docText(node: JSONContent): string {
+  if (node.type === 'text') return node.text ?? ''
+  return (node.content ?? []).map(docText).join('')
+}
+
+async function pasteFromMenu(host: HTMLElement): Promise<void> {
+  await act(async () => {
+    rightClick(host)
+  })
+  await act(async () => {
+    clickMenuItem('paste')
+    await new Promise((resolve) => setTimeout(resolve, 0))
+  })
 }
 
 afterEach(async () => {
@@ -162,5 +183,52 @@ describe('editor context menu', () => {
     await act(async () => rightClick(host))
     await act(async () => clickMenuItem('copy-wikilink'))
     expect(writeText).toHaveBeenCalledWith('[[Alpha|A]]')
+  })
+
+  it('pastes vector<int> as text instead of HTML', async () => {
+    const readText = vi.fn().mockResolvedValue('vector<int>')
+    installClipboard({ readText })
+    const editor = createEditor({ type: 'doc', content: [{ type: 'paragraph' }] })
+    editor.commands.setTextSelection(1)
+    const host = await mount({ editor, notes: [], onOpen: () => {}, onOpenInNewTab: () => {} })
+    await pasteFromMenu(host)
+    expect(docText(editor.getJSON())).toBe('vector<int>')
+    expect(editor.getText()).toBe('vector<int>')
+  })
+
+  it('pastes markdown through the same dispatch as the keyboard path', async () => {
+    const readText = vi.fn().mockResolvedValue('# Title\n\n- one')
+    installClipboard({ readText })
+    const editor = createEditor({ type: 'doc', content: [{ type: 'paragraph' }] })
+    editor.commands.setTextSelection(1)
+    const host = await mount({ editor, notes: [], onOpen: () => {}, onOpenInNewTab: () => {} })
+    await pasteFromMenu(host)
+    expect(JSON.stringify(editor.getJSON())).toContain('"type":"heading"')
+    expect(editor.getText()).not.toContain('# Title')
+  })
+
+  it('reports a clipboard read failure instead of swallowing it', async () => {
+    const readText = vi.fn().mockRejectedValue(new Error('clipboard denied'))
+    installClipboard({ readText })
+    const onPasteError = vi.fn()
+    const editor = createEditor({ type: 'doc', content: [{ type: 'paragraph' }] })
+    const host = await mount({ editor, notes: [], onOpen: () => {}, onOpenInNewTab: () => {}, onPasteError })
+    await pasteFromMenu(host)
+    expect(onPasteError).toHaveBeenCalledWith('clipboard denied')
+    expect(editor.getText()).toBe('')
+  })
+
+  it('reports an insert failure instead of swallowing it', async () => {
+    const readText = vi.fn().mockResolvedValue('vector<int>')
+    installClipboard({ readText })
+    const onPasteError = vi.fn()
+    const editor = createEditor({ type: 'doc', content: [{ type: 'paragraph' }] })
+    vi.spyOn(editor.view, 'pasteText').mockImplementation(() => {
+      throw new Error('insert failed')
+    })
+    const host = await mount({ editor, notes: [], onOpen: () => {}, onOpenInNewTab: () => {}, onPasteError })
+    await pasteFromMenu(host)
+    expect(onPasteError).toHaveBeenCalledWith('insert failed')
+    expect(docText(editor.getJSON())).toBe('')
   })
 })

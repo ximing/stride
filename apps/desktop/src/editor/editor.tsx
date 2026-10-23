@@ -116,6 +116,9 @@ export const NoteEditor = observer(function NoteEditor() {
     getFs: () => fsRef.current,
     onOpen: (target) => onOpenRef.current(target),
     openInNewTab: (id) => tabs.openNote(id),
+    onPasteError: (message) => {
+      vault.error = message
+    },
   })
 
   if (!note || !editor) return null

@@ -18,12 +18,12 @@ import { useState, type MouseEvent as ReactMouseEvent, type ReactNode } from 're
 import type { Editor } from '@tiptap/core'
 import type { StrideNote } from '@stride/core/note'
 import type { FileSystemBackend } from '@stride/platform'
+import { t } from '../../i18n'
 import { formatShortcut } from '../../services/commands/commands'
 import { buildEditorMenu, type ContextMenuEntry } from '../../services/commands/context-menu'
 import { ContextMenu } from '../../ui/overlays/context-menu'
 import { runFormat } from '../extensions'
-import { insertStoredImages, localizeHttpImages, localizeRemoteImage, pastedImageUrl } from '../image/image'
-import { dispatchMarkdownPaste } from '../paste/paste-dispatch'
+import { pasteClipboardText } from '../paste/paste-plugin'
 import { editorTools } from '../toolbar/toolbar'
 import { resolveWikilinkClick, wikilinkAt } from '../wikilink/wikilink'
 
@@ -34,6 +34,12 @@ function toolChord(id: string): string | null {
 
 function clipboardCan(action: 'readText' | 'writeText'): boolean {
   return typeof navigator !== 'undefined' && typeof navigator.clipboard?.[action] === 'function'
+}
+
+function pasteErrorText(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message
+  if (typeof error === 'string' && error) return error
+  return t('editor.pasteFailed')
 }
 
 export interface EditorContextMenuDeps {
@@ -48,6 +54,8 @@ export interface EditorContextMenuDeps {
   onOpen: (target: string) => void
   /** Open a resolved note in its own tab (TabsService.openNote). */
   openInNewTab: (noteId: string) => void
+  /** Clipboard read or insert failed. The editor shows this on the vault error line. */
+  onPasteError?: (message: string) => void
 }
 
 export function useEditorContextMenu(deps: EditorContextMenuDeps): {
@@ -91,37 +99,20 @@ export function useEditorContextMenu(deps: EditorContextMenuDeps): {
           void navigator.clipboard?.writeText(editor.state.doc.textBetween(from, to, ' '))
         },
         paste: () => {
-          void navigator.clipboard
-            ?.readText()
-            .then(async (text) => {
-              if (!text || editor.isDestroyed) return
-              const clipboard = {
-                getData: (type: string) =>
-                  type === 'text/plain' || type === 'text/markdown' || type === 'text/x-markdown' ? text : '',
-              }
-              if (dispatchMarkdownPaste(editor.view, clipboard)) {
-                const fs = deps.getFs?.()
-                if (fs) queueMicrotask(() => {
-                  void localizeHttpImages(editor, fs)
-                })
-                return
-              }
-              const url = pastedImageUrl(text)
-              const fs = deps.getFs?.() ?? null
-              if (url && fs) {
-                const { from, to } = editor.state.selection
-                let src = url
-                try {
-                  src = await localizeRemoteImage(fs, url)
-                } catch {
-                  src = url
-                }
-                if (!editor.isDestroyed) insertStoredImages(editor, [src], from, to)
-                return
-              }
-              if (!editor.isDestroyed) editor.commands.insertContent(text)
+          const pending = navigator.clipboard?.readText()
+          if (!pending) {
+            deps.onPasteError?.(t('editor.pasteFailed'))
+            return
+          }
+          void pending
+            .then((text) => {
+              pasteClipboardText(editor, text, () => deps.getFs?.() ?? null, (error) => {
+                deps.onPasteError?.(pasteErrorText(error))
+              })
             })
-            .catch(() => {})
+            .catch((error: unknown) => {
+              deps.onPasteError?.(pasteErrorText(error))
+            })
         },
         selectAll: () => {
           editor.commands.selectAll()
