@@ -15,7 +15,7 @@ import {
   VAULT_ZOOM_MIN,
   type GitSetupPreference,
   type ViewMode,
-} from '../../../../../../packages/core/src/vault-config'
+} from '@stride/core'
 import { VaultService } from '../../../services/vault/vault.service'
 import { Mark } from '../../primitives/icon'
 import { Input } from '../../primitives/input'

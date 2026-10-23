@@ -39,3 +39,15 @@ describe('runtime probes', () => {
     expect(hits).toEqual(['services/platform/runtime.ts'])
   })
 })
+
+describe('core package surface', () => {
+  it('does not let production code reach into packages/core/src', () => {
+    const hits: string[] = []
+    for (const file of walkSource(SRC_ROOT)) {
+      const text = readFileSync(file, 'utf8')
+      if (!text.includes('packages/core/src')) continue
+      hits.push(relative(SRC_ROOT, file).replaceAll('\\', '/'))
+    }
+    expect(hits).toEqual([])
+  })
+})

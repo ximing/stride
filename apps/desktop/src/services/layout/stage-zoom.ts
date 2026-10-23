@@ -4,7 +4,7 @@
 // keeps layout math and caret coordinates intact; engines without zoom
 // support simply render 1x.
 
-import { VAULT_ZOOM_DEFAULT } from '../../../../../packages/core/src/vault-config'
+import { VAULT_ZOOM_DEFAULT } from '@stride/core'
 
 export const STAGE_ZOOM_VAR = '--sd-stage-zoom'
 

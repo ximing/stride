@@ -18,7 +18,7 @@ import {
   type ViewFilterOp,
   type ViewSortDir,
   type ViewSortKey,
-} from '../../../../../packages/core/src/views'
+} from '@stride/core'
 import { NoteListService } from '../notes/note-list.service'
 import { VaultService } from '../vault/vault.service'
 

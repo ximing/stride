@@ -5,7 +5,7 @@ import {
   listFolders,
   moveNotePath,
   renameFolder as renameFolderOnDisk,
-} from '../../../../../packages/core/src/folders'
+} from '@stride/core'
 import { applyNoteIdChanges, FOLDER_FILTER_PREFIX } from './note-identity'
 import { VaultService } from './vault.service'
 

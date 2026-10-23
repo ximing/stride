@@ -1,5 +1,5 @@
 import { Service } from '@rabjs/react'
-import { type RankedHit } from '../../../../../packages/core/src/search-rank'
+import { type RankedHit } from '@stride/core'
 import { closeOtherOverlays } from '../platform/overlays'
 import { TabsService } from '../notes/tabs.service'
 import { VaultService } from '../vault/vault.service'

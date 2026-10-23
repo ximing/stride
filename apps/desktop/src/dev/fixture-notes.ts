@@ -5,7 +5,7 @@
 
 import type { FileSystemBackend } from '@stride/platform'
 import type { StrideNote } from '@stride/core/note'
-import { notePath, writeNoteFile } from '../../../../packages/core/src/vault'
+import { notePath, writeNoteFile } from '@stride/core'
 
 /** Deterministic PRNG (mulberry32) so fixture vaults are reproducible. */
 export function mulberry32(seed: number): () => number {

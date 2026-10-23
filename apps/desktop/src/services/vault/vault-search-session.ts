@@ -1,18 +1,19 @@
 import { raw } from '@rabjs/react'
 import { isArchived, type StrideNote } from '@stride/core/note'
 import { memorySearchOpener, type SearchBackend } from '@stride/platform'
-import { EmbeddingClient } from '../../../../../packages/core/src/embeddings'
-import { searchIndex, type SearchHit } from '../../../../../packages/core/src/search'
 import {
   docsForRebuild,
+  EmbeddingClient,
   hashIndexTexts,
   indexText,
   QUERY_VECTOR_CACHE,
+  rankSearch,
   SearchDiskCache,
+  searchIndex,
   SNAPSHOT_FLUSH_MS,
   type CacheNote,
-} from '../../../../../packages/core/src/search-cache'
-import { rankSearch } from '../../../../../packages/core/src/search-rank'
+  type SearchHit,
+} from '@stride/core'
 import type { EmbeddingRuntime } from '../settings/settings.service'
 import { isMemoryFixture } from '../platform/runtime'
 import type { VaultService } from './vault.service'

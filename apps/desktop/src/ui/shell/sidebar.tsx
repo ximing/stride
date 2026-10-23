@@ -19,7 +19,7 @@ import {
 } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { typeSidebarLabel } from '../../../../../packages/core/src/types'
+import { typeSidebarLabel } from '@stride/core'
 import type { ContextMenuEntry } from '../../services/commands/context-menu'
 import { TabsService } from '../../services/notes/tabs.service'
 import { VaultService } from '../../services/vault/vault.service'

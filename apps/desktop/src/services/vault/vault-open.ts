@@ -1,16 +1,19 @@
 import { has, raw } from '@rabjs/react'
-import { noteIndex, noteRebuilder } from '../../../../../packages/core/src/search'
-import { embeddingSignature, indexText, SearchDiskCache } from '../../../../../packages/core/src/search-cache'
-import { recoverRename } from '../../../../../packages/core/src/rename-tx'
 import {
+  embeddingSignature,
+  indexText,
+  noteIndex,
+  noteRebuilder,
+  openVault,
   readAdvanceInbox,
   readAgentMode,
   readGitSetupPreference,
   readRenameFromHeading,
   readViewMode,
   readZoom,
-} from '../../../../../packages/core/src/vault-config'
-import { openVault } from '../../../../../packages/core/src/vault'
+  recoverRename,
+  SearchDiskCache,
+} from '@stride/core'
 import { MemoryFileSystem, type FileSystemBackend } from '@stride/platform'
 import { hostHomeDirectory } from '../platform/home'
 import { isMemoryFixture } from '../platform/runtime'

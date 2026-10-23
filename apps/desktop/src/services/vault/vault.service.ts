@@ -23,15 +23,44 @@ import {
   MemoryFileSystem,
   type FileSystemBackend,
 } from '@stride/platform'
-import type { EmbeddingClient } from '../../../../../packages/core/src/embeddings'
-import { type NoteIndex, type NoteRebuilder, type SearchHit } from '../../../../../packages/core/src/search'
-import { indexText, type CacheNote, type SearchDiskCache } from '../../../../../packages/core/src/search-cache'
+import {
+  applyViewFilter,
+  compareTypeDocuments,
+  createVaultNote,
+  indexText,
+  initializeVault,
+  isTypeVisible,
+  listNoteFiles,
+  nextSlugId,
+  nextTypeOrder,
+  noteIdFromPath,
+  notePath,
+  readNoteFile,
+  rewriteVaultLinks,
+  sanitizeGitSetupPreference,
+  sanitizeViewMode,
+  sanitizeZoom,
+  saveNote,
+  templateBody,
+  VIEW_FILTER_PREFIX,
+  writeAdvanceInbox,
+  writeAgentMode,
+  writeGitSetupPreference,
+  writeRenameFromHeading,
+  writeSampleNotes,
+  writeViewMode,
+  writeZoom,
+  type CacheNote,
+  type EmbeddingClient,
+  type GitSetupPreference,
+  type NoteIndex,
+  type NoteRebuilder,
+  type SavedView,
+  type SearchDiskCache,
+  type SearchHit,
+  type ViewMode,
+} from '@stride/core'
 import type { EmbeddingRuntime, IndexSignature } from '../settings/settings.service'
-import { writeSampleNotes } from '../../../../../packages/core/src/sample'
-import { initializeVault } from '../../../../../packages/core/src/seed'
-import { compareTypeDocuments, isTypeVisible, nextTypeOrder, templateBody } from '../../../../../packages/core/src/types'
-import { rewriteVaultLinks } from '../../../../../packages/core/src/rename-tx'
-import { applyViewFilter, VIEW_FILTER_PREFIX, type SavedView } from '../../../../../packages/core/src/views'
 import { hostHomeDirectory } from '../platform/home'
 import { isDesktopRuntime, isMemoryFixture } from '../platform/runtime'
 import { reportOpenProject, syncRecentProjects } from '../platform/windows'
@@ -45,28 +74,6 @@ import {
   VAULT_REGISTRY_KEY,
   type RecentProject,
 } from './vault-registry'
-import {
-  sanitizeGitSetupPreference,
-  sanitizeViewMode,
-  sanitizeZoom,
-  writeAdvanceInbox,
-  writeAgentMode,
-  writeGitSetupPreference,
-  writeRenameFromHeading,
-  writeViewMode,
-  writeZoom,
-  type GitSetupPreference,
-  type ViewMode,
-} from '../../../../../packages/core/src/vault-config'
-import {
-  createVaultNote,
-  listNoteFiles,
-  nextSlugId,
-  noteIdFromPath,
-  notePath,
-  readNoteFile,
-  saveNote,
-} from '../../../../../packages/core/src/vault'
 import { ListFilterService } from '../search/list-filter.service'
 import { applyStageZoom } from '../layout/stage-zoom'
 import { ViewsService } from '../views/views.service'
