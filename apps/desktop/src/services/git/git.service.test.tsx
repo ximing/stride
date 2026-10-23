@@ -1313,9 +1313,16 @@ describe('browser panels', () => {
     await unmergedStarted
     await git.autoGitTick(61_000)
     await git.pull()
+    expect(git.output).toBe('Another Git write is still in progress.')
+    git.output = 'kept'
     await git.push()
+    expect(git.output).toBe('Another Git write is still in progress.')
+    git.output = 'kept'
     await git.commitSelected(['notes/a.md'])
+    expect(git.output).toBe('Another Git write is still in progress.')
+    git.output = 'kept'
     await git.keepSide('notes/a.md', 'ours')
+    expect(git.output).toBe('kept')
     expect(unmergedCalls).toBe(1)
     expect(suggests).toBe(0)
     expect(writes).toEqual([])

@@ -14,6 +14,7 @@ export const GitPanel = observer(function GitPanel() {
   const statusCopy = (value: string) => {
     if (value === 'Git is not available in the browser') return t('git.unavailable')
     if (value === 'Git is turned off.') return t('git.off')
+    if (value === 'Another Git write is still in progress.') return t('git.writeBusy')
     if (value === DEDICATED_ERROR) return t('git.broadFolder')
     if (value === 'Add a model provider, base URL, model, and key in Settings') return t('chat.needProvider')
     return value

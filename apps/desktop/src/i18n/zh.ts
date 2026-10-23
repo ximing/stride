@@ -363,6 +363,7 @@ export const zh: DeepString<Catalog> = {
     unavailable: '浏览器中无法使用 Git',
     needsInitBrowser: '此仓库还不是 Git 仓库。请在桌面应用中初始化。',
     off: 'Git 已关闭。',
+    writeBusy: '另一次 Git 写入仍在进行。',
     notRepo: '此仓库还不是 Git 仓库。',
     init: '初始化 Git',
     ahead: '领先 {{count}}',

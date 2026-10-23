@@ -357,6 +357,7 @@ export const en = {
     unavailable: 'Git is not available in the browser',
     needsInitBrowser: 'This vault is not a Git repository. Initialize it in the desktop app.',
     off: 'Git is turned off.',
+    writeBusy: 'Another Git write is still in progress.',
     notRepo: 'This vault is not a Git repository.',
     init: 'Initialize Git',
     ahead: 'ahead {{count}}',

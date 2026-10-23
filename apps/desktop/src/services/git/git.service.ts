@@ -42,6 +42,7 @@ function errorText(error: unknown): string {
 
 const GIT_BROWSER = 'Git is not available in the browser'
 const GIT_OFF = 'Git is turned off.'
+const GIT_WRITE_BUSY = 'Another Git write is still in progress.'
 const GIT_REMOTE_EMPTY = 'Enter a git repository URL'
 
 /** Empty is allowed (leave the remote unchanged). Anything else must be a git remote URL. */
@@ -426,7 +427,10 @@ export class GitService extends Service {
   }
 
   async commitSelected(paths?: readonly string[]) {
-    if (!gitAuto.tryBeginGitWrite(this)) return
+    if (!gitAuto.tryBeginGitWrite(this)) {
+      this.output = GIT_WRITE_BUSY
+      return
+    }
     try {
       try {
         await this.vault.flush()
@@ -663,7 +667,10 @@ export class GitService extends Service {
   }
 
   async pull() {
-    if (!gitAuto.tryBeginGitWrite(this)) return
+    if (!gitAuto.tryBeginGitWrite(this)) {
+      this.output = GIT_WRITE_BUSY
+      return
+    }
     const session = this.vault.session
     try {
       try {
@@ -712,7 +719,10 @@ export class GitService extends Service {
   }
 
   async push() {
-    if (!gitAuto.tryBeginGitWrite(this)) return
+    if (!gitAuto.tryBeginGitWrite(this)) {
+      this.output = GIT_WRITE_BUSY
+      return
+    }
     try {
       try {
         await this.vault.flush()
