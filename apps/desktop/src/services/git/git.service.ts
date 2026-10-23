@@ -326,8 +326,9 @@ export class GitService extends Service {
             }
           }
         }
-        this.branch = await currentBranch(backend, fs.rootLabel)
+        const branch = await currentBranch(backend, fs.rootLabel)
         if (this.vault.session !== session) return
+        this.branch = branch
         const counts = await backend.aheadBehind(fs.rootLabel)
         if (this.vault.session !== session) return
         this.ahead = counts.ahead

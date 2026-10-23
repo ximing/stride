@@ -1022,6 +1022,44 @@ describe('browser panels', () => {
     expect(git.conflicts).toEqual(['notes/kept.md'])
   })
 
+  it('does not apply a branch name after the vault session changes', async () => {
+    const backend = recordingGit([])
+    let releaseBranch: (value: string) => void = () => {}
+    const started = new Promise<void>((resolveStarted) => {
+      backend.currentBranch = () => {
+        resolveStarted()
+        return new Promise((resolve) => {
+          releaseBranch = resolve
+        })
+      }
+    })
+    backend.aheadBehind = () => Promise.resolve({ ahead: 9, behind: 8 })
+    backend.status = () => Promise.resolve({ repo: true, porcelain: '', clean: true })
+    setGitBackendForTests(backend)
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const files = new MemoryFileSystem('/tmp/vault-session-branch')
+    await files.mkdir('.git')
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.broad = false
+    resolve(SettingsService).setGitEnabled(true)
+    const git = resolve(GitService)
+    git.branch = 'kept-branch'
+    git.ahead = 1
+    git.remote = 'https://example.test/kept.git'
+    Object.assign(git, { remoteRoot: files.rootLabel, remoteNeedsLoad: false })
+    const refreshing = git.refresh()
+    await started
+    vault.session += 1
+    git.branch = 'new-branch'
+    releaseBranch('stale-branch')
+    await refreshing
+    expect(git.branch).toBe('new-branch')
+    expect(git.ahead).toBe(1)
+  })
+
   it('does not clear the remote when a stale lookup fails after the session changes', async () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const backend = recordingGit([])
