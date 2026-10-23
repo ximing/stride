@@ -81,6 +81,14 @@ describe('matchShortcut', () => {
   })
 
   it('matches the legacy quick-open / search / find predicates exactly', () => {
+    const shipped = parseAppCommandManifest(manifest)
+    const shortcutFor = (id: string) => {
+      const shortcut = shipped.find((command) => command.id === id)?.shortcut
+      expect(shortcut, `${id} shortcut`).toBeTruthy()
+      return shortcut!
+    }
+    const findShortcut = shortcutFor('edit.find')
+    const searchShortcut = shortcutFor('search.global')
     const matrix: KeyboardEventInit[] = [
       { key: 'p' },
       { key: 'p', metaKey: true },
@@ -102,8 +110,8 @@ describe('matchShortcut', () => {
       expect(matchShortcut('Mod+P', event)).toBe(
         !event.shiftKey && !event.altKey && (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'p',
       )
-      expect(matchShortcut('Mod+Shift+F', event)).toBe(isSearchPanelShortcut(event))
-      expect(matchShortcut('Mod+F', event)).toBe(isFindShortcut(event))
+      expect(matchShortcut(searchShortcut, event)).toBe(isSearchPanelShortcut(event))
+      expect(matchShortcut(findShortcut, event)).toBe(isFindShortcut(event))
     }
   })
 

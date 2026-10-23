@@ -1,7 +1,12 @@
-import { has, register, resolve } from '@rabjs/react'
+import { register, resolve } from '@rabjs/react'
+
+globalThis.IS_REACT_ACT_ENVIRONMENT = true
 import { createNote, type StrideNote } from '@stride/core/note'
+import { act, createElement } from 'react'
+import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import manifest from '../../appCommandManifest.json'
+import { CommandPalette } from '../../ui/overlays/command-palette'
 import { CommandService } from './command.service'
 import {
   COMMAND_CONDITIONS,
@@ -11,6 +16,8 @@ import {
   shortcutToKeyEventInit,
   type AppCommand,
 } from './commands'
+import { GitService } from '../git/git.service'
+import { NoteListService } from '../notes/note-list.service'
 import { QuickOpenService } from '../search/quick-open.service'
 import { SearchPanelService } from '../search/search-panel.service'
 import { TabsService } from '../notes/tabs.service'
@@ -29,9 +36,12 @@ function chordOf(command: AppCommand): string {
 }
 
 // Chords the TipTap editor keymap binds (StarterKit, Highlight, toolbar labels).
-// They describe editing commands and must never collide with a manifest chord:
-// the dispatcher listens on window capture and would silently shadow the editor.
+// History owns Mod+Z, Mod+Shift+Z, and Mod+Y. A manifest chord on any of these
+// would win on window capture and silently shadow the editor.
 const EDITOR_KEYMAP_CHORDS = [
+  'Mod+Z',
+  'Mod+Shift+Z',
+  'Mod+Y',
   'Mod+B',
   'Mod+I',
   'Mod+E',
@@ -97,15 +107,17 @@ describe('shortcut matrix', () => {
   })
 
   it('keeps every enabledWhen condition implemented by CommandService', () => {
-    expect(new Set(COMMAND_CONDITIONS)).toEqual(
-      new Set(['vaultReady', 'hasActiveNote', 'gitReady', 'canGoBack', 'canGoForward', 'hasListSelection']),
-    )
-    // Behavioral spot-check: with no vault open, every conditioned command is disabled.
     register(VaultService)
+    register(GitService)
     const vault = resolve(VaultService)
-    vault.phase = 'chooser'
-    vault.activeId = ''
     const service = resolve(CommandService)
+    const conditions = (service as unknown as { conditions: Record<string, () => boolean> }).conditions
+    expect(new Set(Object.keys(conditions))).toEqual(new Set(COMMAND_CONDITIONS))
+
+    // Behavioral spot-check: with no vault open, every conditioned command is disabled.
+    vault.phase = 'chooser'
+    vault.notes = []
+    vault.activeId = ''
     for (const command of commands) {
       if (!command.enabledWhen) continue
       expect(service.isEnabled(command), `${command.id} gated on ${command.enabledWhen}`).toBe(false)
@@ -115,6 +127,42 @@ describe('shortcut matrix', () => {
       if (command.enabledWhen) continue
       expect(service.isEnabled(command), command.id).toBe(true)
     }
+
+    const probe = (enabledWhen: string): AppCommand => ({
+      id: `probe.${enabledWhen}`,
+      title: enabledWhen,
+      section: 'X',
+      enabledWhen,
+    })
+
+    vault.phase = 'ready'
+    vault.notes = [note('a', 'Alpha'), note('b', 'Beta'), note('c', 'Gamma')]
+    vault.activeId = 'a'
+    expect(conditions.vaultReady()).toBe(true)
+    expect(service.isEnabled(probe('vaultReady'))).toBe(true)
+    expect(conditions.hasActiveNote()).toBe(true)
+    expect(service.isEnabled(probe('hasActiveNote'))).toBe(true)
+
+    const git = resolve(GitService)
+    expect(conditions.gitReady()).toBe(false)
+    git.surface = 'ready'
+    expect(conditions.gitReady()).toBe(true)
+    expect(service.isEnabled(probe('gitReady'))).toBe(true)
+
+    const tabs = resolve(TabsService)
+    tabs.openNote('a')
+    tabs.followLink('b')
+    tabs.followLink('c')
+    tabs.goBack()
+    expect(conditions.canGoBack()).toBe(true)
+    expect(conditions.canGoForward()).toBe(true)
+    expect(service.isEnabled(probe('canGoBack'))).toBe(true)
+    expect(service.isEnabled(probe('canGoForward'))).toBe(true)
+
+    const list = resolve(NoteListService)
+    list.selectedIds = ['a', 'b']
+    expect(conditions.hasListSelection()).toBe(true)
+    expect(service.isEnabled(probe('hasListSelection'))).toBe(true)
   })
 })
 
@@ -122,6 +170,23 @@ describe('shortcut dispatch matrix', () => {
   afterEach(() => {
     vi.restoreAllMocks()
   })
+
+  // CommandPalette registers app.commandPalette on mount. FindBar is not mounted
+  // here: this matrix 不含组件 handler for edit.find. Do not stub it and claim coverage.
+  async function mountCommandPalette(): Promise<() => Promise<void>> {
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    await act(async () => {
+      root.render(createElement(CommandPalette))
+    })
+    return async () => {
+      await act(async () => {
+        root.unmount()
+      })
+      host.remove()
+    }
+  }
 
   function readyVault() {
     register(VaultService)
@@ -134,7 +199,7 @@ describe('shortcut dispatch matrix', () => {
     return vault
   }
 
-  it('routes every manifest shortcut through dispatchKeydown to a registered handler (no dead bindings)', () => {
+  it('routes every manifest shortcut through dispatchKeydown to a registered handler (no dead bindings)', async () => {
     const vault = readyVault()
     const service = resolve(CommandService)
     const tabs = resolve(TabsService)
@@ -148,18 +213,19 @@ describe('shortcut dispatch matrix', () => {
     expect(tabs.canGoBack).toBe(true)
     expect(tabs.canGoForward).toBe(true)
 
-    // The two component-owned handlers (palette, find bar) are stubbed here;
-    // their components register the real ones when mounted.
-    const unstub = [
-      service.registerHandler('app.commandPalette', { run: () => {} }),
-      service.registerHandler('edit.find', { run: () => {} }),
-    ]
+    const unmountPalette = await mountCommandPalette()
     const execute = vi.spyOn(service, 'execute').mockReturnValue(true)
     try {
-      const withShortcuts = commands.filter((command) => command.shortcut)
+      const find = commands.find((command) => command.id === 'edit.find')
+      expect(find?.shortcut).toBeTruthy()
+      // FindBar is not mounted. 不含组件 handler — a missing builtin still fails below.
+      expect(service.isRunnable(find!), 'edit.find is not covered by this matrix').toBe(false)
+
+      const withShortcuts = commands.filter((command) => command.shortcut && command.id !== 'edit.find')
       expect(withShortcuts.length).toBeGreaterThan(0)
+      expect(withShortcuts.some((command) => command.id === 'app.commandPalette')).toBe(true)
       for (const command of withShortcuts) {
-        // No dead bindings: a handler must be live for every shortcut command.
+        // No dead bindings: a builtin or mounted handler must be live.
         expect(service.isRunnable(command), `${command.id} has no runnable handler`).toBe(true)
         const init = shortcutToKeyEventInit(command.shortcut!)!
         const event = new KeyboardEvent('keydown', { bubbles: true, cancelable: true, ...init })
@@ -169,7 +235,7 @@ describe('shortcut dispatch matrix', () => {
       }
     } finally {
       execute.mockRestore()
-      for (const unregister of unstub) unregister()
+      await unmountPalette()
     }
   })
 
@@ -224,20 +290,20 @@ describe('shortcut dispatch matrix', () => {
     }
   })
 
-  it('registers a handler for every manifest id (presence, not runnability)', () => {
+  it('registers a handler for every manifest id (presence, not runnability)', async () => {
     readyVault()
     const service = resolve(CommandService)
-    const unstub = [
-      service.registerHandler('app.commandPalette', { run: () => {} }),
-      service.registerHandler('edit.find', { run: () => {} }),
-    ]
+    const unmountPalette = await mountCommandPalette()
     try {
       const handlers = (service as unknown as { handlers: Map<string, unknown> }).handlers
+      // FindBar is not mounted. 不含组件 handler for edit.find.
+      expect(handlers.has('edit.find'), 'edit.find must not be stubbed into this matrix').toBe(false)
       for (const command of commands) {
+        if (command.id === 'edit.find') continue
         expect(handlers.has(command.id), `${command.id} has no registered handler`).toBe(true)
       }
     } finally {
-      for (const unregister of unstub) unregister()
+      await unmountPalette()
     }
   })
 })
