@@ -19,7 +19,7 @@ if (!Element.prototype.scrollIntoView) {
 }
 for (const method of ['hasPointerCapture', 'setPointerCapture', 'releasePointerCapture'] as const) {
   if (!(method in Element.prototype)) {
-    ;(Element.prototype as Record<string, unknown>)[method] = () => false
+    ;(Element.prototype as unknown as Record<string, unknown>)[method] = () => false
   }
 }
 

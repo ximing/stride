@@ -82,13 +82,13 @@ describe('vault session generation', () => {
     await vault.flush()
     const fs = vault.fs!
     const original = fs.writeText.bind(fs)
-    let release: (() => void) | null = null
+    const gate: { resume: (() => void) | null } = { resume: null }
     const entered = new Promise<void>((resolveEntered) => {
       fs.writeText = async (path, data) => {
-        if (release === null && data.includes('user-old')) {
+        if (gate.resume === null && data.includes('user-old')) {
           resolveEntered()
           await new Promise<void>((resolveRelease) => {
-            release = resolveRelease
+            gate.resume = resolveRelease
           })
         }
         return original(path, data)
@@ -98,9 +98,9 @@ describe('vault session generation', () => {
     const flushing = vault.flush()
     await entered
     const tool = chatVaultHost(vault).writeSerialized(id, serialized('Noted', 'tool-new'))
-    release?.()
+    gate.resume?.()
     const flushResult = await flushing.then(() => 'flushed', (error: unknown) => error)
-    const toolResult = await tool.then(() => 'wrote', (error: unknown) => error)
+    const toolResult = await Promise.resolve(tool).then(() => 'wrote', (error: unknown) => error)
     const saved = await readNoteFile(fs, notePath(id), id)
     const onDisk = plainText(saved.doc)
     if (toolResult === 'wrote') {
