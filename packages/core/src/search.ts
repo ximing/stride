@@ -47,14 +47,110 @@ export interface RankedNotes {
   degraded: boolean
 }
 
-// Embed failures become a text search. index.search errors propagate.
-async function queryVector(client: EmbeddingClient, embedding: EmbeddingSettings, query: string): Promise<number[] | null> {
+// One query string. A warm local embedder finishes well under this; a stuck socket does not.
+export const QUERY_EMBED_TIMEOUT_MS = 10_000
+
+export interface QueryEmbedClock {
+  setTimeout: (callback: () => void, ms: number) => unknown
+  clearTimeout: (handle: unknown) => void
+}
+
+export interface QueryEmbedOptions {
+  signal?: AbortSignal
+  timeoutMs?: number
+  clock?: QueryEmbedClock
+}
+
+const hostClock: QueryEmbedClock = {
+  setTimeout(callback, ms) {
+    return setTimeout(callback, ms)
+  },
+  clearTimeout(handle) {
+    clearTimeout(handle as ReturnType<typeof setTimeout>)
+  },
+}
+
+function timeoutError(): Error {
+  const error = new Error('Query embedding timed out.')
+  error.name = 'TimeoutError'
+  return error
+}
+
+function abortReason(signal: AbortSignal): Error {
+  return signal.reason instanceof Error ? signal.reason : new Error('The operation was aborted.')
+}
+
+function linkAbort(controller: AbortController, signal: AbortSignal | undefined): () => void {
+  if (!signal) return () => {}
+  const onAbort = () => {
+    if (!controller.signal.aborted) controller.abort(signal.reason)
+  }
+  if (signal.aborted) {
+    onAbort()
+    return () => {}
+  }
+  signal.addEventListener('abort', onAbort, { once: true })
+  return () => {
+    signal.removeEventListener('abort', onAbort)
+  }
+}
+
+// Embed failures, hangs, and cancellation become a text search. index.search errors propagate.
+async function queryVector(
+  client: EmbeddingClient,
+  embedding: EmbeddingSettings,
+  query: string,
+  options: QueryEmbedOptions = {},
+): Promise<number[] | null> {
+  const timeoutMs = options.timeoutMs ?? QUERY_EMBED_TIMEOUT_MS
+  const clock = options.clock ?? hostClock
+  const controller = new AbortController()
+  const unlink = linkAbort(controller, options.signal)
+  let timer: unknown
+  let cleared = false
+  const clear = () => {
+    if (cleared) return
+    cleared = true
+    unlink()
+    if (timer !== undefined) clock.clearTimeout(timer)
+  }
   try {
-    const [vector] = await client.embed([query], embedding)
+    if (controller.signal.aborted) return null
+    const pending = client.embed([query], embedding, controller.signal)
+    const vectors = await new Promise<number[][]>((resolve, reject) => {
+      let settled = false
+      const fail = (error: unknown) => {
+        if (settled) return
+        settled = true
+        clear()
+        reject(error)
+      }
+      const succeed = (value: number[][]) => {
+        if (settled) return
+        settled = true
+        clear()
+        resolve(value)
+      }
+      const onAbort = () => fail(abortReason(controller.signal))
+      pending.then(succeed, fail)
+      if (controller.signal.aborted) {
+        onAbort()
+        return
+      }
+      controller.signal.addEventListener('abort', onAbort, { once: true })
+      timer = clock.setTimeout(() => {
+        const error = timeoutError()
+        if (!controller.signal.aborted) controller.abort(error)
+        fail(error)
+      }, timeoutMs)
+    })
+    const vector = vectors[0]
     if (!vector || vector.length !== embedding.dim) return null
     return vector
   } catch {
     return null
+  } finally {
+    clear()
   }
 }
 
@@ -65,12 +161,13 @@ export async function searchIndex(
   embedding: EmbeddingSettings | null,
   client: EmbeddingClient,
   vectorGap: number,
+  embedOptions?: QueryEmbedOptions,
 ): Promise<RankedNotes> {
   if (vectorGap > 0 || !embedding?.apiKey) {
     const hits = await index.search({ text: query, topK, mode: 'text' })
     return { mode: 'text', hits, degraded: vectorGap > 0 ? true : false }
   }
-  const vector = await queryVector(client, embedding, query)
+  const vector = await queryVector(client, embedding, query, embedOptions)
   if (!vector) {
     const hits = await index.search({ text: query, topK, mode: 'text' })
     return { mode: 'text', hits, degraded: true }
@@ -84,8 +181,9 @@ export async function searchNotes(
   query: string,
   embedding: EmbeddingSettings | null,
   client: EmbeddingClient,
+  embedOptions?: QueryEmbedOptions,
 ): Promise<RankedNotes> {
-  return searchIndex(index, query, 8, embedding, client, 0)
+  return searchIndex(index, query, 8, embedding, client, 0, embedOptions)
 }
 
 export interface NoteRebuildOptions {

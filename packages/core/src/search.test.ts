@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { MemoryFileSystem, MemorySearchBackend, MemorySecretsStore } from '@stride/platform'
 import { EmbeddingClient } from './embeddings.ts'
-import { noteIndex, noteRebuilder, searchIndex, searchNotes } from './search.ts'
+import { noteIndex, noteRebuilder, QUERY_EMBED_TIMEOUT_MS, searchIndex, searchNotes, type QueryEmbedClock } from './search.ts'
 import {
   defaultLlmConfig,
   defaultSettings,
@@ -14,6 +14,53 @@ import {
   type AppSettings,
 } from './settings.ts'
 import { saveNote } from './vault.ts'
+
+function manualClock(): {
+  clock: QueryEmbedClock
+  ms: () => number | undefined
+  fire: () => void
+  armed: () => boolean
+} {
+  let armed: { callback: () => void; ms: number } | null = null
+  return {
+    clock: {
+      setTimeout(callback, ms) {
+        const handle = { callback, ms }
+        armed = handle
+        return handle
+      },
+      clearTimeout(handle) {
+        if (armed === handle) armed = null
+      },
+    },
+    ms: () => armed?.ms,
+    fire() {
+      const current = armed
+      armed = null
+      current?.callback()
+    },
+    armed: () => armed !== null,
+  }
+}
+
+// Stays pending until release, even after abort, so a timeout cannot depend on the client rejecting.
+function hungEmbed(): {
+  client: EmbeddingClient
+  signal: () => AbortSignal | undefined
+  release: () => void
+} {
+  let signal: AbortSignal | undefined
+  let release = () => {}
+  const client = new EmbeddingClient((_input, init) => new Promise((_resolve, reject) => {
+    signal = init?.signal ?? undefined
+    release = () => reject(new Error('released'))
+  }))
+  return {
+    client,
+    signal: () => signal,
+    release: () => release(),
+  }
+}
 
 describe('search notes', () => {
   it('ranks text overlaps and switches to hybrid when an embedding key is set', async () => {
@@ -254,6 +301,101 @@ describe('search notes', () => {
     const kept = await backend.search({ text: 'kepttoken', topK: 5, mode: 'text' })
     expect(kept.map((hit) => hit.id)).toEqual(['n2'])
     await backend.close()
+  })
+
+  it('falls back to text when a query embedding hangs, and aborts that request', async () => {
+    const backend = new MemorySearchBackend()
+    const index = noteIndex(backend, 4)
+    await index.upsert([{ id: 'alpha', text: 'alpha xylophonequartz' }])
+    const embedding = { endpoint: 'http://127.0.0.1/v1', model: 'fixture-embed', apiKey: 'sk-test', dim: 4 }
+    const hung = hungEmbed()
+    const timer = manualClock()
+    const pending = searchNotes(index, 'xylophonequartz', embedding, hung.client, { clock: timer.clock })
+    expect(timer.ms()).toBe(QUERY_EMBED_TIMEOUT_MS)
+    expect(hung.signal()?.aborted).toBe(false)
+    timer.fire()
+    const ranked = await pending
+    expect(hung.signal()?.aborted).toBe(true)
+    expect((hung.signal()?.reason as Error | undefined)?.name).toBe('TimeoutError')
+    expect(ranked.mode).toBe('text')
+    expect(ranked.degraded).toBe(true)
+    expect(ranked.hits.map((hit) => hit.id)).toEqual(['alpha'])
+    expect(index.lastQuery?.mode).toBe('text')
+    expect(index.lastQuery?.vector).toBeUndefined()
+    hung.release()
+    await index.close()
+  })
+
+  it('falls back to text when the query embedding is cancelled', async () => {
+    const backend = new MemorySearchBackend()
+    const index = noteIndex(backend, 4)
+    await index.upsert([{ id: 'alpha', text: 'alpha xylophonequartz' }])
+    const embedding = { endpoint: 'http://127.0.0.1/v1', model: 'fixture-embed', apiKey: 'sk-test', dim: 4 }
+    const hung = hungEmbed()
+    const timer = manualClock()
+    const controller = new AbortController()
+    const pending = searchNotes(index, 'xylophonequartz', embedding, hung.client, {
+      signal: controller.signal,
+      clock: timer.clock,
+    })
+    expect(hung.signal()).toBeDefined()
+    controller.abort()
+    const ranked = await pending
+    expect(hung.signal()?.aborted).toBe(true)
+    expect(timer.armed()).toBe(false)
+    expect(ranked).toMatchObject({ mode: 'text', degraded: true })
+    expect(ranked.hits.map((hit) => hit.id)).toEqual(['alpha'])
+    hung.release()
+
+    const skipped = hungEmbed()
+    controller.abort()
+    const already = await searchNotes(index, 'xylophonequartz', embedding, skipped.client, {
+      signal: controller.signal,
+    })
+    expect(skipped.client.calls).toBe(0)
+    expect(already.hits.map((hit) => hit.id)).toEqual(['alpha'])
+    await index.close()
+  })
+
+  it('still uses the vector when the query embedding returns before the timeout', async () => {
+    const backend = new MemorySearchBackend()
+    const index = noteIndex(backend, 4)
+    await index.upsert([{ id: 'alpha', text: 'alpha xylophonequartz' }])
+    const embedding = { endpoint: 'http://127.0.0.1/v1', model: 'fixture-embed', apiKey: 'sk-test', dim: 4 }
+    let signal: AbortSignal | undefined
+    const client = new EmbeddingClient(async (_input, init) => {
+      signal = init?.signal ?? undefined
+      return new Response(JSON.stringify({
+        data: [{ index: 0, embedding: [1, 0, 0, 0] }],
+      }), { status: 200, headers: { 'content-type': 'application/json' } })
+    })
+    const timer = manualClock()
+    const ranked = await searchNotes(index, 'xylophonequartz', embedding, client, { clock: timer.clock })
+    expect(client.calls).toBe(1)
+    expect(timer.armed()).toBe(false)
+    expect(signal?.aborted).toBe(false)
+    expect(ranked.mode).toBe('hybrid')
+    expect(ranked.degraded).toBe(false)
+    expect(index.lastQuery?.vector).toEqual([1, 0, 0, 0])
+    expect(ranked.hits.map((hit) => hit.id)).toEqual(['alpha'])
+    await index.close()
+  })
+
+  it('aborts a hung query embedding on the host clock without waiting out the default', async () => {
+    const backend = new MemorySearchBackend()
+    const index = noteIndex(backend, 4)
+    await index.upsert([{ id: 'alpha', text: 'alpha xylophonequartz' }])
+    const embedding = { endpoint: 'http://127.0.0.1/v1', model: 'fixture-embed', apiKey: 'sk-test', dim: 4 }
+    const hung = hungEmbed()
+    const started = performance.now()
+    const ranked = await searchNotes(index, 'xylophonequartz', embedding, hung.client, { timeoutMs: 20 })
+    expect(performance.now() - started).toBeLessThan(2_000)
+    expect(hung.signal()?.aborted).toBe(true)
+    expect(ranked.mode).toBe('text')
+    expect(ranked.degraded).toBe(true)
+    expect(ranked.hits.map((hit) => hit.id)).toEqual(['alpha'])
+    hung.release()
+    await index.close()
   })
 
   it('cancel drops the live window opened by begin', async () => {
