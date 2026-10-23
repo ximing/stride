@@ -37,6 +37,7 @@ const PUBLIC_FIELDS = [
   'activeVaultId',
   'noteMtimes',
   'indexSignature',
+  'session',
 ] as const
 
 const PUBLIC_METHODS = [
@@ -108,8 +109,8 @@ const PUBLIC_METHODS = [
   'runSearch',
   'queryRanked',
   'clearSearch',
-  'adopt',
   'cancelPending',
+  'writeExternalNote',
   'restoreActiveNote',
   'flush',
   'openClonedVault',
@@ -174,7 +175,7 @@ describe('VaultService API snapshot', () => {
       expect(keys, field).toContain(field)
     }
     expect(keys).not.toContain('panel')
-    for (const name of ['slot', 'disk', 'session', 'queries']) {
+    for (const name of ['slot', 'disk', 'queries']) {
       expect(keys).not.toContain(name)
     }
   })

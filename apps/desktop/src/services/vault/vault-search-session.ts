@@ -198,11 +198,17 @@ export async function openSearchSession(
 }
 
 export async function upsertIndexed(vault: VaultService, note: StrideNote) {
-  if (!vault.rebuilder) return
+  const rebuilder = vault.rebuilder
+  if (!rebuilder) return
+  // Same epoch: a live upsert still lands in this rebuild and wins over the batch.
+  // A newer open or retry has a different epoch or session and must not write.
+  const epoch = vault.rebuildEpoch
+  const session = vault.session
+  const current = () => epoch === vault.rebuildEpoch && session === vault.session
   try {
-    const prepared = await prepareIndexed(vault, [{ id: note.id, text: indexText(note) }], () => true, 'upsert')
-    if (!prepared) return
-    await vault.rebuilder.upsert(prepared)
+    const prepared = await prepareIndexed(vault, [{ id: note.id, text: indexText(note) }], current, 'upsert')
+    if (!prepared || !current()) return
+    await rebuilder.upsert(prepared)
   } catch {
     console.warn('stride search cache: upsert-failed')
   }

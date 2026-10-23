@@ -228,6 +228,8 @@ export class VaultService extends Service {
   index: NoteIndex | null = null
   rebuilder: NoteRebuilder | null = null
   rebuildEpoch = 0
+  /** Bumped at the start of each open. Async work captures the value it started with. */
+  session = 0
   rebuildDone: Promise<void> = Promise.resolve()
   private openQueue: Promise<void> = Promise.resolve()
   private docTimer: ReturnType<typeof setTimeout> | null = null
@@ -912,16 +914,6 @@ export class VaultService extends Service {
     this.searchMode = ''
   }
 
-  adopt(notes: StrideNote[]) {
-    this.cancelPending()
-    this.notes = notes
-    this.docEpoch += 1
-    this.resetPropertyEditor()
-    if (!notes.some((note) => note.id === this.activeId)) {
-      this.activeId = notes[0]?.id ?? ''
-    }
-  }
-
   cancelPending() {
     if (this.docTimer) clearTimeout(this.docTimer)
     this.docTimer = null
@@ -938,6 +930,7 @@ export class VaultService extends Service {
   }
 
   async restoreActiveNote(raw: string): Promise<void> {
+    const session = this.session
     const id = this.activeId
     const fs = this.fs
     if (!id || !fs) throw new Error('No active note')
@@ -945,13 +938,51 @@ export class VaultService extends Service {
     const path = notePath(id)
     this.cancelPending()
     this.saveGeneration += 1
+    const generation = this.saveGeneration
     await this.enqueueWrite(async () => {
+      if (this.session !== session) throw new Error('Vault session changed')
+      if (this.saveGeneration !== generation) throw new Error('Note changed while writing; retry')
       await fs.writeText(path, raw)
+      if (this.session !== session) throw new Error('Vault session changed')
+      if (this.saveGeneration !== generation) throw new Error('Note changed while writing; retry')
     })
+    if (this.session !== session) throw new Error('Vault session changed')
     if (this.notes.some((item) => item.id === note.id)) this.replace(note)
     else this.notes = [note, ...this.notes]
     this.docEpoch += 1
     await this.upsertIndexed(note)
+  }
+
+  // Tool writes share the save chain: pending flushes land first, then this note.
+  async writeExternalNote(id: string, serialized: string): Promise<void> {
+    if (!this.fs) throw new Error('Open a vault first')
+    const note = parseNote(serialized, id)
+    const session = this.session
+    await this.flush()
+    if (this.session !== session || !this.fs) throw new Error('Vault session changed')
+    const fs = this.fs
+    const path = notePath(id)
+    const seen = this.saveGeneration
+    await this.enqueueWrite(async () => {
+      if (this.session !== session) throw new Error('Vault session changed')
+      if (this.saveGeneration !== seen) throw new Error('Note changed while writing; retry')
+      this.saveGeneration += 1
+      const generation = this.saveGeneration
+      await fs.writeText(path, serialized)
+      if (this.session !== session || this.saveGeneration !== generation) {
+        throw new Error(this.session !== session ? 'Vault session changed' : 'Note changed while writing; retry')
+      }
+      if (this.notes.some((item) => item.id === note.id)) this.replace(note)
+      else this.notes = [note, ...this.notes]
+      if (this.activeId === note.id) this.docEpoch += 1
+      this.noteMtimes = { ...this.noteMtimes, [note.id]: Date.now() }
+      this.error = ''
+      if (this.pendingId === note.id) {
+        this.pendingId = ''
+        this.saveStatus = 'saved'
+      }
+      await this.upsertIndexed(note)
+    })
   }
 
   async flush(): Promise<void> {
@@ -962,6 +993,7 @@ export class VaultService extends Service {
     if (!this.pendingId) return
     const id = this.pendingId
     const generation = this.saveGeneration
+    const session = this.session
     const note = this.notes.find((item) => item.id === id)
     if (!note || !this.fs) {
       this.pendingId = ''
@@ -971,6 +1003,7 @@ export class VaultService extends Service {
     const fs = this.fs
     this.saveStatus = 'saving'
     await this.enqueueWrite(async () => {
+      if (session !== this.session) return
       if (generation !== this.saveGeneration) {
         if (this.pendingId) this.saveStatus = 'pending'
         else if (this.saveStatus === 'saving') this.saveStatus = 'idle'
@@ -980,6 +1013,7 @@ export class VaultService extends Service {
       try {
         saved = await saveNote(fs, noteForSave(note))
       } catch (error) {
+        if (session !== this.session) return
         this.error = errorText(error)
         if (generation !== this.saveGeneration) {
           this.saveStatus = this.pendingId ? 'pending' : 'error'
@@ -994,6 +1028,8 @@ export class VaultService extends Service {
         this.retryDelay = Math.min(delay * 2, 8000)
         return
       }
+      // The open moved on. The file landed on the captured vault; leave the new session alone.
+      if (session !== this.session) return
       // A newer edit landed while the file write was in flight.
       if (generation !== this.saveGeneration) {
         if (this.pendingId) this.saveStatus = 'pending'

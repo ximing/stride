@@ -89,6 +89,7 @@ export async function autoSyncTick(git: GitService, deps: GitAutoDeps) {
   if (deps.vault.phase !== 'ready') return
   if (!deps.gitEnabled()) return
   if (git.surface !== 'ready') return
+  const session = deps.vault.session
   const backend = await deps.resolveGitBackend()
   if (!backend.available) return
   const fs = deps.vault.fs
@@ -102,6 +103,7 @@ export async function autoSyncTick(git: GitService, deps: GitAutoDeps) {
       git.output = error instanceof Error ? error.message : String(error)
       return
     }
+    if (deps.vault.session !== session) return
     let result: Awaited<ReturnType<typeof gitPull>>
     try {
       result = await gitPull(fs, backend)
@@ -109,6 +111,7 @@ export async function autoSyncTick(git: GitService, deps: GitAutoDeps) {
       git.output = error instanceof Error ? error.message : String(error)
       return
     }
+    if (deps.vault.session !== session) return
     if (result.conflict) {
       git.conflicts = [...result.files]
       git.output = result.output

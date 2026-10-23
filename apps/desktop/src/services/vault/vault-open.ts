@@ -29,6 +29,8 @@ function isTypeDocument(note: { type: string }): boolean {
 }
 
 export async function openBackendBody(vault: VaultService, backend: FileSystemBackend) {
+  // Monotonic for this open. In-flight saves and upserts captured the previous value.
+  vault.session += 1
   const runtime = await vault.currentEmbedding()
   const dim = runtime.active ? runtime.dim : 0
   await recoverRename(backend)
@@ -39,55 +41,55 @@ export async function openBackendBody(vault: VaultService, backend: FileSystemBa
   const zoom = await readZoom(backend)
   const viewMode = await readViewMode(backend)
   const gitSetupPreference = await readGitSetupPreference(backend)
-  vault.rebuildEpoch += 1
-  const epoch = vault.rebuildEpoch
-  const retiring = vault.index
-  const retiringRebuild = vault.rebuildDone
-  vault.index = null
-  vault.rebuilder = null
-  vault.indexWork = 'idle'
-  await retiringRebuild.catch(() => undefined)
-  await flushDiskNow(vault)
-  await retiring?.close().catch(() => undefined)
-  const slot = searchSlot(vault)
-  slot.session = null
-  slot.disk = null
   const cacheIdentity = runtime.active
     ? { endpoint: runtime.endpoint, model: runtime.model, dim: runtime.dim }
     : { endpoint: '', model: '', dim: 0 }
   const signature = await embeddingSignature(cacheIdentity)
+  let disk: SearchDiskCache | null = null
+  if (opened.dedicated) {
+    try {
+      disk = await SearchDiskCache.open(backend, cacheIdentity, { signature })
+    } catch {
+      console.warn('stride search cache: open-failed')
+      disk = null
+    }
+  }
+  // Open the next index before retiring the current one. A throw leaves the old
+  // index mounted so search and a later open can still run.
+  const openedSession = await openSearchSession(
+    vault,
+    backend.rootLabel,
+    dim,
+    isMemoryFixture() || backend instanceof MemoryFileSystem,
+  )
+  const index = noteIndex(openedSession.backend, dim)
+  const rebuilder = noteRebuilder(index)
+  await flushDiskNow(vault)
+  const retiring = vault.index
+  const retiringRebuild = vault.rebuildDone
+  vault.rebuildEpoch += 1
+  const epoch = vault.rebuildEpoch
+  vault.index = index
+  vault.rebuilder = rebuilder
+  vault.indexWork = 'idle'
+  const slot = searchSlot(vault)
   const fsKey = raw(backend)
   if (slot.fsKey !== fsKey || slot.signature !== signature) {
     slot.queries = []
     slot.fsKey = fsKey
     slot.signature = signature
   }
-  if (opened.dedicated) {
-    try {
-      slot.disk = await SearchDiskCache.open(backend, cacheIdentity, { signature })
-    } catch {
-      console.warn('stride search cache: open-failed')
-      slot.disk = null
-    }
-  }
-  const session = await openSearchSession(
-    vault,
-    backend.rootLabel,
-    dim,
-    isMemoryFixture() || backend instanceof MemoryFileSystem,
-  )
-  slot.session = session
+  slot.session = openedSession
+  slot.disk = disk
   bindPagehide(vault)
+  await retiringRebuild.catch(() => undefined)
+  await retiring?.close().catch(() => undefined)
   vault.indexSignature = { endpoint: runtime.endpoint, model: runtime.model, dim, active: runtime.active }
-  const index = noteIndex(session.backend, dim)
-  vault.index = index
-  vault.rebuilder = noteRebuilder(index)
   vault.fs = backend
   vault.vaultPath = opened.path
   vault.broad = opened.broad
   vault.notes = opened.notes
   vault.docEpoch += 1
-  vault.activeId = opened.notes.find((note) => !isTypeDocument(note))?.id ?? ''
   vault.listFilter = 'all'
   vault.searchHits = []
   vault.searchQuery = ''
@@ -111,8 +113,9 @@ export async function openBackendBody(vault: VaultService, backend: FileSystemBa
   vault.error = ''
   void vault.refreshMtimes(epoch, opened.notes)
   await vault.rememberVault(backend)
-  // Tabs restore the per-vault scene only now: activeVaultId became final in
-  // rememberVault, so earlier activeId reactions belong to the old vault.
+  // activeVaultId is final only after rememberVault. Publishing activeId earlier
+  // lets the tab reaction write the new note into the previous vault's stride:tabs.
+  vault.activeId = opened.notes.find((note) => !isTypeDocument(note))?.id ?? ''
   if (has(TabsService)) vault.resolve(TabsService).onVaultOpened()
   // Same handover for the list: load this vault's persisted sort and drop any
   // selection left over from the previous vault.

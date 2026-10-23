@@ -922,6 +922,60 @@ describe('browser panels', () => {
     expect(git.output).toMatch(/not TipTap JSON/)
     expect(await files.readText('a.stride.json')).toBe(previous)
   })
+
+  it('drops a stale history blob and skips reopen after the vault session changes', async () => {
+    const previous = serializeNote(createNote('a', 'Previous'))
+    const backend = recordingGit([])
+    let releaseShow: (value: string) => void = () => {}
+    const started = new Promise<void>((resolveStarted) => {
+      backend.show = () => {
+        resolveStarted()
+        return new Promise((resolve) => {
+          releaseShow = resolve
+        })
+      }
+    })
+    backend.history = () => Promise.resolve([{ hash: 'abc', subject: 'Add note' }])
+    setGitBackendForTests(backend)
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const files = new MemoryFileSystem('/tmp/vault-session-git')
+    await files.mkdir('.git')
+    await files.writeText('a.stride.json', serializeNote(createNote('a', 'Current')))
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.notes = [createNote('a', 'Current')]
+    vault.activeId = 'a'
+    vault.phase = 'ready'
+    vault.broad = false
+    resolve(SettingsService).setGitEnabled(true)
+    resolve(SettingsService).setAutoSyncMinutes(1)
+    const git = resolve(GitService)
+    git.surface = 'ready'
+    await git.loadHistory()
+    const showing = git.showHistory('abc')
+    await started
+    const session = vault.session
+    vault.session += 1
+    releaseShow(previous)
+    await showing
+    expect(git.historyText).toBe('')
+    expect(vault.session).not.toBe(session)
+
+    let reopened = 0
+    vault.reopenForSettings = () => {
+      reopened += 1
+      return Promise.resolve()
+    }
+    backend.pull = () => {
+      vault.session += 1
+      return Promise.resolve({ conflict: false, files: [], output: 'Fast-forward\n a.stride.json' })
+    }
+    backend.status = () => Promise.resolve({ repo: true, porcelain: '', clean: true })
+    await git.autoSyncTick()
+    expect(reopened).toBe(0)
+  })
 })
 
 function setControlValue(element: HTMLInputElement, value: string) {

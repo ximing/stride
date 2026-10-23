@@ -235,10 +235,12 @@ export class GitService extends Service {
   }
 
   async refresh() {
+    const session = this.vault.session
     this.busyCount += 1
     this.busy = true
     try {
       const backend = await resolveGitBackend()
+      if (this.vault.session !== session) return
       const fs = this.vault.fs
       if (!backend.available) {
         if (!fs) {
@@ -284,9 +286,11 @@ export class GitService extends Service {
       }
       try {
         const status = await gitStatus(fs, backend)
+        if (this.vault.session !== session) return
         this.hasVault = true
         this.isRepo = status.repo
         const broadBlocked = this.vault.broad && !(await isDedicatedVault(fs))
+        if (this.vault.session !== session) return
         this.surface = gitSurface({
           backendAvailable: true,
           gitEnabled,
@@ -320,7 +324,9 @@ export class GitService extends Service {
           }
         }
         this.branch = await currentBranch(backend, fs.rootLabel)
+        if (this.vault.session !== session) return
         const counts = await backend.aheadBehind(fs.rootLabel)
+        if (this.vault.session !== session) return
         this.ahead = counts.ahead
         this.behind = counts.behind
         const next = parsePorcelain(status.porcelain)
@@ -817,8 +823,11 @@ export class GitService extends Service {
     }
     const fs = this.vault.fs
     if (!fs || !this.historyPath) return
+    const session = this.vault.session
     try {
-      this.historyText = await gitShow(fs, backend, rev, this.historyPath)
+      const text = await gitShow(fs, backend, rev, this.historyPath)
+      if (this.vault.session !== session) return
+      this.historyText = text
       this.historyRev = rev
       this.output = ''
     } catch (error) {
@@ -832,6 +841,7 @@ export class GitService extends Service {
       this.output = GIT_BROWSER
       return
     }
+    const session = this.vault.session
     const fs = this.vault.fs
     const id = this.vault.activeId
     if (!fs || !id || !this.historyPath || !this.historyRev) return
@@ -839,8 +849,10 @@ export class GitService extends Service {
       this.output = 'Open the note whose history you are restoring'
       return
     }
+    if (this.vault.session !== session) return
     try {
       await this.vault.restoreActiveNote(this.historyText)
+      if (this.vault.session !== session) return
       this.output = ''
     } catch (error) {
       this.output = error instanceof Error ? error.message : String(error)
@@ -858,11 +870,15 @@ export class GitService extends Service {
       }
       const fs = this.vault.fs
       if (!fs) return
+      const session = this.vault.session
       try {
         await gitResolveKeepingCheckpoint(fs, backend, path, side)
+        if (this.vault.session !== session) return
         this.conflicts = await backend.unmerged(fs.rootLabel)
+        if (this.vault.session !== session) return
         this.output = ''
         await this.refresh()
+        if (this.vault.session !== session) return
         await this.vault.reopenForSettings()
       } catch (error) {
         this.output = error instanceof Error ? error.message : String(error)

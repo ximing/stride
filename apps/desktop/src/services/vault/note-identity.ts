@@ -1,4 +1,5 @@
 import { has, resolve } from '@rabjs/react'
+import { NoteListService } from '../notes/note-list.service'
 import { TabsService } from '../notes/tabs.service'
 import type { VaultService } from './vault.service'
 
@@ -20,9 +21,19 @@ export async function applyNoteIdChanges(
     const nextActive = byFrom.get(vault.activeId)
     if (nextActive) vault.activeId = nextActive
     for (const change of moved) vault.retargetTitleBaseline(change.fromId, change.toId)
+    if (vault.searchHits.some((hit) => byFrom.has(hit.id))) {
+      vault.searchHits = vault.searchHits.map((hit) => {
+        const toId = byFrom.get(hit.id)
+        return toId ? { ...hit, id: toId } : hit
+      })
+    }
     if (has(TabsService)) {
       const tabs = resolve(TabsService)
       for (const change of moved) tabs.remapNoteId(change.fromId, change.toId)
+    }
+    if (has(NoteListService)) {
+      const list = resolve(NoteListService)
+      for (const change of moved) list.remapNoteId(change.fromId, change.toId)
     }
   }
   if (opts?.remapFolderFilter && vault.listFilter.startsWith(FOLDER_FILTER_PREFIX)) {

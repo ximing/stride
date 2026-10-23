@@ -126,6 +126,17 @@ export class NoteListService extends Service {
     this.anchorId = ''
   }
 
+  /** One id map with tabs and search hits. Does not replace the active-note selection reaction. */
+  remapNoteId(fromId: string, toId: string) {
+    if (!fromId || fromId === toId) return
+    const mapId = (id: string) => (id === fromId ? toId : id)
+    const selectedIds = this.selectedIds.map(mapId)
+    const anchorId = mapId(this.anchorId)
+    if (selectedIds.every((id, index) => id === this.selectedIds[index]) && anchorId === this.anchorId) return
+    this.selectedIds = selectedIds
+    this.anchorId = anchorId
+  }
+
   setSort(sort: ListSort) {
     this.sort = sort
     const vaultId = this.sortVaultKey || this.vault?.activeVaultId || ''

@@ -1,4 +1,4 @@
-import { buildAgentContext, loadNotes, notePath, plainText, type VaultToolHost } from '@stride/core'
+import { buildAgentContext, plainText, type VaultToolHost } from '@stride/core'
 import { VaultService } from '../vault/vault.service'
 
 export function chatSystemPrompt(vault: VaultService): string {
@@ -34,9 +34,7 @@ export function chatVaultHost(vault: VaultService): VaultToolHost {
       return note
     },
     async writeSerialized(id, serialized) {
-      if (!vault.fs) throw new Error('Open a vault first')
-      await vault.fs.writeText(notePath(id), serialized)
-      vault.adopt(await loadNotes(vault.fs))
+      await vault.writeExternalNote(id, serialized)
     },
     async searchVault(query) {
       const hits = await vault.queryRanked(query)
