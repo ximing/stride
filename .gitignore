@@ -12,3 +12,4 @@ test-results
 minisign.key
 *.key.pub
 .claude/scheduled_tasks.lock
+design/
