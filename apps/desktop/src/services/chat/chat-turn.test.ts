@@ -1,5 +1,5 @@
-import { createAssistantMessageEventStream } from '../../../../../packages/core/node_modules/@earendil-works/pi-ai/dist/utils/event-stream.js'
-import { Type, type AssistantMessage, type Model, type StopReason } from '../../../../../packages/core/node_modules/@earendil-works/pi-ai/dist/index.js'
+import { createAssistantMessageEventStream } from '@earendil-works/pi-ai/utils/event-stream'
+import { Type, type AssistantMessage, type Model, type StopReason } from '@earendil-works/pi-ai'
 import type { AgentTool, StreamFn } from '@earendil-works/pi-agent-core'
 import { has, register, resolve } from '@rabjs/react'
 import { describe, expect, it } from 'vitest'
