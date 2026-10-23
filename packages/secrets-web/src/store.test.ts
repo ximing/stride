@@ -226,10 +226,10 @@ describe('webSecretsStore', () => {
     const pending = Promise.all([api.webSecretsStore(), api.webSecretsStore()])
     try {
       for (let i = 0; i < 30 && idb.putStarts === 0; i += 1) {
-        await new Promise((resolve) => queueMicrotask(resolve))
+        await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
       }
       for (let i = 0; i < 10; i += 1) {
-        await new Promise((resolve) => queueMicrotask(resolve))
+        await new Promise<void>((resolve) => queueMicrotask(() => resolve()))
       }
       expect(idb.putStarts).toBe(1)
       expect(idb.opens).toEqual([{ name: 'stride-secrets', version: 1 }])
