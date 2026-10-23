@@ -171,15 +171,20 @@ export class ShellGitBackend implements GitBackend {
   async pull(repo: string): Promise<PullResult> {
     const branch = await this.currentBranch(repo)
     let output = ''
+    let failure: GitError | undefined
     try {
       const result = await runGit(repo, ['-c', 'pull.rebase=false', 'pull', 'origin', branch])
       output = `${result.stdout}${result.stderr}`
     } catch (error) {
       if (!(error instanceof GitError)) throw error
+      failure = error
       output = error.output
     }
     const files = await this.unmerged(repo)
-    return parsePullResult(output, files)
+    const parsed = parsePullResult(output, files)
+    // Conflict stays a result. Any other non-zero pull is still a failure.
+    if (failure && !parsed.conflict) throw failure
+    return parsed
   }
 
   async unmerged(repo: string): Promise<string[]> {

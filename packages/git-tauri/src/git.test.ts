@@ -290,6 +290,28 @@ describe('ShellGitBackend', () => {
     ])
   })
 
+  it('rejects a non-conflict pull GitError', async () => {
+    const stderr = "fatal: refusing to merge unrelated histories\n"
+    shell.handle((call) => {
+      if (call.args[0] === 'rev-parse') return ok('main\n')
+      if (call.args.includes('pull')) return fail(128, stderr)
+      return ok('')
+    })
+    try {
+      await git.pull('/repo')
+      expect.unreachable()
+    } catch (error) {
+      expect(error).toBeInstanceOf(GitError)
+      expect((error as GitError).code).toBe(128)
+      expect((error as GitError).output).toBe(stderr.trim())
+    }
+    expect(argLines()).toEqual([
+      ['rev-parse', '--abbrev-ref', 'HEAD'],
+      ['-c', 'pull.rebase=false', 'pull', 'origin', 'main'],
+      ['diff', '--name-only', '--diff-filter=U'],
+    ])
+  })
+
   it('lists unmerged paths', async () => {
     shell.handle(() => ok('note.md\n\nother.md\n'))
     await expect(git.unmerged('/repo')).resolves.toEqual(['note.md', 'other.md'])
