@@ -142,9 +142,11 @@ interface IdbLog {
   stores: string[]
   puts: unknown[]
   gets: unknown[]
+  failPuts: boolean
+  blockOpen: boolean
 }
 
-let idbLog: IdbLog = { opens: [], stores: [], puts: [], gets: [] }
+let idbLog: IdbLog = { opens: [], stores: [], puts: [], gets: [], failPuts: false, blockOpen: false }
 
 type IdbDatabaseRecord = { version: number; stores: Map<string, Map<IDBValidKey, unknown>> }
 
@@ -187,9 +189,15 @@ function installIdb(log: IdbLog): void {
         onsuccess: null as ((ev: Event) => void) | null,
         onerror: null as ((ev: Event) => void) | null,
         onupgradeneeded: null as ((ev: Event) => void) | null,
+        onblocked: null as ((ev: Event) => void) | null,
       }
       queueMicrotask(() => {
         try {
+          if (log.blockOpen) {
+            log.blockOpen = false
+            request.onblocked?.(event)
+            return
+          }
           let found = databases.get(name)
           const oldVersion = found?.version ?? 0
           if (!found) {
@@ -238,6 +246,11 @@ function installIdb(log: IdbLog): void {
                       onerror: null as ((ev: Event) => void) | null,
                     }
                     queueMicrotask(() => {
+                      if (log.failPuts) {
+                        putRequest.error = new DOMException('', 'QuotaExceededError')
+                        putRequest.onerror?.(event)
+                        return
+                      }
                       store.set(key, value)
                       putRequest.result = key
                       putRequest.onsuccess?.(event)
@@ -287,7 +300,7 @@ function relocate(node: MemNode, dest: MemDir, name: string): void {
 }
 
 beforeEach(() => {
-  idbLog = { opens: [], stores: [], puts: [], gets: [] }
+  idbLog = { opens: [], stores: [], puts: [], gets: [], failPuts: false, blockOpen: false }
   installIdb(idbLog)
   Reflect.deleteProperty(globalThis, 'showDirectoryPicker')
 })
@@ -654,6 +667,56 @@ describe('vault directory picker', () => {
     const restored = await restoreVaultDirectory()
     expect(restored?.rootLabel).toBe('newer')
     expect(idbLog.puts).toEqual(['vault-a', 'vault-directory', 'vault-b', 'vault-directory'])
+  })
+
+  it('does not turn a cancelled picker into an io failure', async () => {
+    const abort = new DOMException('The user aborted a request.', 'AbortError')
+    setPicker(async () => {
+      throw abort
+    })
+    const error = await pickVaultDirectory().then(() => null, (caught: unknown) => caught)
+    expect(error).toBe(abort)
+    expect(error).not.toBeInstanceOf(PlatformError)
+    expect(idbLog.puts).toEqual([])
+  })
+
+  it('still wraps a picker failure that is not a cancel', async () => {
+    setPicker(async () => {
+      throw new DOMException('no access', 'NotAllowedError')
+    })
+    const error = await pickVaultDirectory().then(() => null, (caught: unknown) => caught)
+    expect(error).toBeInstanceOf(PlatformError)
+    expect(error).toMatchObject({ code: 'io' })
+    expect((error as { fileSystem?: unknown }).fileSystem).toBeUndefined()
+    expect(idbLog.puts).toEqual([])
+  })
+
+  it('keeps the granted directory when the handle cannot be stored', async () => {
+    const root = createRoot('vault')
+    idbLog.failPuts = true
+    setPicker(async () => root as unknown as FileSystemDirectoryHandle)
+    const error = await pickVaultDirectory().then(() => null, (caught: unknown) => caught)
+    expect(error).toBeInstanceOf(PlatformError)
+    expect(error).toMatchObject({ code: 'io', message: 'Failed to store the directory handle' })
+    const kept = (error as { fileSystem?: BrowserFileSystem }).fileSystem
+    expect(kept).toBeInstanceOf(BrowserFileSystem)
+    expect(kept?.rootLabel).toBe('vault')
+    await kept!.writeText('note.txt', 'kept')
+    expect(await kept!.readText('note.txt')).toBe('kept')
+    idbLog.failPuts = false
+    expect(await restoreVaultDirectory()).toBeNull()
+  })
+
+  it('rejects a blocked IndexedDB open instead of hanging', async () => {
+    const root = createRoot('vault')
+    idbLog.blockOpen = true
+    setPicker(async () => root as unknown as FileSystemDirectoryHandle)
+    const error = await pickVaultDirectory().then(() => null, (caught: unknown) => caught)
+    expect(error).toBeInstanceOf(PlatformError)
+    expect(error).toMatchObject({ code: 'io', message: 'Failed to open IndexedDB' })
+    const kept = (error as { fileSystem?: BrowserFileSystem }).fileSystem
+    expect(kept).toBeInstanceOf(BrowserFileSystem)
+    expect(kept?.rootLabel).toBe('vault')
   })
 
   it('throws unsupported when showDirectoryPicker is absent', async () => {

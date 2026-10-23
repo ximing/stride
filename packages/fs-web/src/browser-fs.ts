@@ -32,10 +32,20 @@ export async function pickVaultDirectory(): Promise<BrowserFileSystem> {
   try {
     handle = await picker.call(globalThis, { mode: 'readwrite' })
   } catch (error) {
+    // AbortError is the picker cancel, not a disk failure. Callers tell them apart by name.
+    if (isDomError(error, 'AbortError')) throw error
     throw wrapIo(error, 'Failed to pick a directory')
   }
-  await writeVaultHandle(handle)
-  return new BrowserFileSystem(handle)
+  const filesystem = new BrowserFileSystem(handle)
+  try {
+    await writeVaultHandle(handle)
+  } catch (error) {
+    // The grant is already held. Keep it on the existing io error so this session can still open.
+    const failure = wrapIo(error, 'Failed to store the directory handle')
+    Object.defineProperty(failure, 'fileSystem', { value: filesystem })
+    throw failure
+  }
+  return filesystem
 }
 
 export async function restoreVaultDirectory(): Promise<BrowserFileSystem | null> {

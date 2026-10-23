@@ -128,6 +128,35 @@ function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
 }
 
+function isDirectoryPickCancel(error: unknown): boolean {
+  return typeof error === 'object' && error !== null && 'name' in error && (error as { name?: unknown }).name === 'AbortError'
+}
+
+function keptBrowserDirectory(error: unknown): BrowserFileSystem | null {
+  if (!error || typeof error !== 'object' || !('fileSystem' in error)) return null
+  const kept = (error as { fileSystem?: unknown }).fileSystem
+  return kept instanceof BrowserFileSystem ? kept : null
+}
+
+// Cancel is not a vault failure. A store failure still carries the granted directory for this session.
+async function finishVaultPick(
+  error: unknown,
+  resume: (backend: BrowserFileSystem) => Promise<void>,
+  fail: (message: string) => void,
+): Promise<void> {
+  if (isDirectoryPickCancel(error)) return
+  const kept = keptBrowserDirectory(error)
+  if (!kept) {
+    fail(errorText(error))
+    return
+  }
+  try {
+    await resume(kept)
+  } catch (openError) {
+    if (!isDirectoryPickCancel(openError)) fail(errorText(openError))
+  }
+}
+
 function isTypeDocument(note: StrideNote): boolean {
   return note.type === 'Type'
 }
@@ -440,7 +469,12 @@ export class VaultService extends Service {
       await this.seedMemoryFixture(backend)
       await this.openBackend(backend)
     } catch (error) {
-      this.error = errorText(error)
+      await finishVaultPick(error, async (kept) => {
+        await this.seedMemoryFixture(kept)
+        await this.openBackend(kept)
+      }, (message) => {
+        this.error = message
+      })
     }
   }
 
@@ -453,7 +487,12 @@ export class VaultService extends Service {
       await initializeVault(backend, await hostHomeDirectory())
       await this.openBackend(backend)
     } catch (error) {
-      this.error = errorText(error)
+      await finishVaultPick(error, async (kept) => {
+        await initializeVault(kept, await hostHomeDirectory())
+        await this.openBackend(kept)
+      }, (message) => {
+        this.error = message
+      })
     }
   }
 
@@ -467,7 +506,13 @@ export class VaultService extends Service {
       await writeSampleNotes(backend)
       await this.openBackend(backend)
     } catch (error) {
-      this.error = errorText(error)
+      await finishVaultPick(error, async (kept) => {
+        await initializeVault(kept, await hostHomeDirectory())
+        await writeSampleNotes(kept)
+        await this.openBackend(kept)
+      }, (message) => {
+        this.error = message
+      })
     }
   }
 

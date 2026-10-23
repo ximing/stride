@@ -68,16 +68,33 @@ function isDirectoryHandle(value: unknown): value is FileSystemDirectoryHandle {
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
+    let settled = false
+    const fail = (error: unknown) => {
+      if (settled) return
+      settled = true
+      reject(error ?? new Error('Failed to open IndexedDB'))
+    }
     const request = globalThis.indexedDB.open(DB_NAME, DB_VERSION)
     request.onupgradeneeded = () => {
       const db = request.result
       if (!db.objectStoreNames.contains(HANDLE_STORE)) db.createObjectStore(HANDLE_STORE)
       if (!db.objectStoreNames.contains(VAULT_STORE)) db.createObjectStore(VAULT_STORE)
     }
-    request.onsuccess = () => resolve(request.result)
+    request.onsuccess = () => {
+      if (settled) {
+        request.result.close()
+        return
+      }
+      settled = true
+      resolve(request.result)
+    }
     request.onerror = (event) => {
       event.preventDefault()
-      reject(request.error ?? new Error('Failed to open IndexedDB'))
+      fail(request.error ?? new Error('Failed to open IndexedDB'))
+    }
+    // Another connection can hold the upgrade forever. Fail instead of leaving the open pending.
+    request.onblocked = () => {
+      fail(request.error ?? new Error('Failed to open IndexedDB'))
     }
   })
 }

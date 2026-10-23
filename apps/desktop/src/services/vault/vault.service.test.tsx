@@ -1,7 +1,7 @@
 import { has, observer, register, resolve, useService } from '@rabjs/react'
 import { relationsOf, buildGraph, resolveNote } from '@stride/core/graph'
 import { plainText, type StrideNote, type TipTapNode } from '@stride/core/note'
-import { MemoryFileSystem, MemorySecretsStore, PlatformError } from '@stride/platform'
+import { MemoryFileSystem, MemorySecretsStore } from '@stride/platform'
 import { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -722,14 +722,14 @@ describe('VaultService', () => {
   it('keeps a cancelled directory picker on the chooser', async () => {
     window.history.replaceState(null, '', '/')
     vi.stubGlobal('showDirectoryPicker', vi.fn(async () => {
-      throw new PlatformError('io', 'The user aborted a request.')
+      throw new DOMException('The user aborted a request.', 'AbortError')
     }))
     register(VaultService)
     register(FolderService)
     const vault = resolve(VaultService)
     await expect(vault.openFromDraft()).resolves.toBeUndefined()
     expect(vault.phase).toBe('chooser')
-    expect(vault.error).toBe('The user aborted a request.')
+    expect(vault.error).toBe('')
   })
 
   it('shows search controls after the memory fixture opens', async () => {
