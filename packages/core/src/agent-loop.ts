@@ -17,7 +17,7 @@ export type AgentLoopEvent =
   | { type: 'tool_start'; toolCallId: string; name: string; args: unknown }
   | { type: 'tool_end'; toolCallId: string; name: string; isError: boolean; durationMs: number; resultSummary: string }
   | { type: 'usage'; usage: AgentUsage }
-  | { type: 'done'; text: string; usage: AgentUsage; aborted: boolean }
+  | { type: 'done'; text: string; usage: AgentUsage; aborted: boolean; turnLimit: boolean }
 
 function emptyUsage(): AgentUsage {
   return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, costTotal: 0 }
@@ -80,10 +80,11 @@ export async function runAgentLoop(input: {
   signal?: AbortSignal
   streamFn: StreamFn
   onEvent?: (event: AgentLoopEvent) => void
-}): Promise<{ text: string; usage: AgentUsage; aborted: boolean }> {
+}): Promise<{ text: string; usage: AgentUsage; aborted: boolean; turnLimit: boolean }> {
   const maxTurns = input.maxTurns ?? 24
   let turns = 0
   let aborted = Boolean(input.signal?.aborted)
+  let turnLimit = false
   let usage = emptyUsage()
   let deltas = ''
   const emit = (event: AgentLoopEvent) => { input.onEvent?.(event) }
@@ -99,7 +100,10 @@ export async function runAgentLoop(input: {
       const reason = turn.message.stopReason
       if (reason === 'error' || reason === 'aborted') return
       turns += 1
-      if (turns >= maxTurns) return { action: 'end' as const }
+      if (turns >= maxTurns) {
+        turnLimit = true
+        return { action: 'end' as const }
+      }
     },
     toolExecution: 'sequential',
   })
@@ -159,7 +163,7 @@ export async function runAgentLoop(input: {
     throw new Error(redactSecret(failure, input.apiKey))
   }
   const text = deltas || textOf(last)
-  const result = { text, usage, aborted: aborted || input.signal?.aborted === true }
+  const result = { text, usage, aborted: aborted || input.signal?.aborted === true, turnLimit: turnLimit && !aborted && input.signal?.aborted !== true }
   emit({ type: 'done', ...result })
   return result
 }

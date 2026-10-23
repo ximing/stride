@@ -572,6 +572,7 @@ export const en = {
     mode: 'Agent mode',
     placeholder: 'Ask about the open note',
     thinking: 'Thinking',
+    turnLimit: 'Reached the 8-turn limit and stopped.',
     needProvider: 'Add a model provider, base URL, model, and key in Settings',
     model: 'Model',
     noModel: 'Add a model in Settings',

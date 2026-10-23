@@ -578,6 +578,7 @@ export const zh: DeepString<Catalog> = {
     mode: '助手模式',
     placeholder: '询问当前笔记',
     thinking: '思考',
+    turnLimit: '已达到 8 轮上限并停止。',
     needProvider: '请在设置中添加模型供应商、Base URL、模型和密钥',
     model: '模型',
     noModel: '请在设置里添加模型',

@@ -86,6 +86,7 @@ describe('runAgentLoop', () => {
       expect(seenKey).not.toBe(process.env.OPENAI_API_KEY)
       expect(result.text).toBe('hello')
       expect(result.aborted).toBe(false)
+      expect(result.turnLimit).toBe(false)
       expect(result.usage).toEqual({
         input: 3,
         output: 2,
@@ -96,7 +97,7 @@ describe('runAgentLoop', () => {
       })
       expect(events.filter((event) => event.type === 'text_delta').map((event) => event.type === 'text_delta' ? event.delta : '')).toEqual(['hel', 'lo'])
       expect(events.some((event) => event.type === 'usage' && event.usage.output === 2)).toBe(true)
-      expect(events.at(-1)).toMatchObject({ type: 'done', text: 'hello', aborted: false })
+      expect(events.at(-1)).toMatchObject({ type: 'done', text: 'hello', aborted: false, turnLimit: false })
     } finally {
       if (previous === undefined) delete process.env.OPENAI_API_KEY
       else process.env.OPENAI_API_KEY = previous
@@ -145,6 +146,7 @@ describe('runAgentLoop', () => {
     })
     expect(calls).toBe(1)
     expect(result.aborted).toBe(true)
+    expect(result.turnLimit).toBe(false)
   })
 
   it('stops after one tool turn when maxTurns is 1 and redacts the key', async () => {
@@ -200,6 +202,8 @@ describe('runAgentLoop', () => {
       expect(toolEnd.resultSummary.length).toBeLessThanOrEqual(200)
     }
     expect(result.aborted).toBe(false)
+    expect(result.turnLimit).toBe(true)
+    expect(events.at(-1)).toMatchObject({ type: 'done', aborted: false, turnLimit: true })
   })
 
   it('rejects a provider error instead of returning a normal end', async () => {
@@ -296,7 +300,7 @@ describe('runAgentLoop', () => {
     const toolEnd = events.find((event) => event.type === 'tool_end')
     expect(toolEnd).toMatchObject({ type: 'tool_end', name: 'ping', isError: true })
     if (toolEnd?.type === 'tool_end') expect(toolEnd.resultSummary).toContain('path not found')
-    expect(result).toMatchObject({ text: 'after', aborted: false })
-    expect(events.at(-1)).toMatchObject({ type: 'done', text: 'after', aborted: false })
+    expect(result).toMatchObject({ text: 'after', aborted: false, turnLimit: false })
+    expect(events.at(-1)).toMatchObject({ type: 'done', text: 'after', aborted: false, turnLimit: false })
   })
 })

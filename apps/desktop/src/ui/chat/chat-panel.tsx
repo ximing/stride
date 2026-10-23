@@ -2,7 +2,7 @@ import { MessageCircle, Plus, Send, Square } from 'lucide-react'
 import type { PublicLlmConfig } from '@stride/core'
 import { observer, useService } from '@rabjs/react'
 import { useTranslation } from 'react-i18next'
-import { ChatService } from '../../services/chat/chat.service'
+import { CHAT_TURN_LIMIT_ERROR, ChatService } from '../../services/chat/chat.service'
 import { SettingsService } from '../../services/settings/settings.service'
 import { VaultService } from '../../services/vault/vault.service'
 import { ChatMarkdown } from './chat-markdown'
@@ -11,6 +11,12 @@ import { EmptyState } from '../primitives/empty-state'
 import { Mark } from '../primitives/icon'
 import { Select } from '../primitives/select'
 import { Tabs, TabsList, TabsTrigger } from '../primitives/tabs'
+
+function chatErrorText(error: string, translate: (key: string) => string): string {
+  if (error === 'Add a model provider, base URL, model, and key in Settings') return translate('chat.needProvider')
+  if (error === CHAT_TURN_LIMIT_ERROR) return translate('chat.turnLimit')
+  return error
+}
 
 function modelOptionLabel(config: PublicLlmConfig): string {
   const name = config.name.trim()
@@ -87,7 +93,7 @@ export const ChatPanel = observer(function ChatPanel() {
       </div>
       {chat.error && (
         <p className="error" data-testid="chat-error" role="alert">
-          {chat.error === 'Add a model provider, base URL, model, and key in Settings' ? t('chat.needProvider') : chat.error}
+          {chatErrorText(chat.error, t)}
         </p>
       )}
       <div className="chat-compose">

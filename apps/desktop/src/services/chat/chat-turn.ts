@@ -112,7 +112,7 @@ export async function playChatTurn(input: {
   onToolStart?: (call: { id: string; name: string; args: unknown }) => void
   onToolEnd?: (call: { id: string; name: string; isError: boolean; durationMs: number; resultSummary: string }) => void
   onUsage?: (usage: AgentUsage) => void
-}): Promise<{ text: string; usage: AgentUsage; aborted: boolean }> {
+}): Promise<{ text: string; usage: AgentUsage; aborted: boolean; turnLimit: boolean }> {
   return runAgentLoop({
     model: input.model,
     apiKey: input.apiKey,

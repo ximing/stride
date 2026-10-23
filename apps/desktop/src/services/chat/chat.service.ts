@@ -7,6 +7,9 @@ import {
   type LlmConfig,
 } from '@stride/core'
 import { appendAssistantDelta, appendToolEnd, appendToolStart, playChatTurn, type ChatSession } from './chat-turn'
+
+/** Stored in `error` when the loop stops at max turns. The panel translates it. */
+export const CHAT_TURN_LIMIT_ERROR = 'max-turns'
 import { chatSystemPrompt, chatVaultHost } from './chat-vault-host'
 import { SettingsService } from '../settings/settings.service'
 import { VaultService } from '../vault/vault.service'
@@ -95,7 +98,7 @@ export class ChatService extends Service {
         isDefault: true,
       }
       const resolved = resolveLlm(config)
-      await playChatTurn({
+      const result = await playChatTurn({
         model: resolved.model,
         apiKey: resolved.apiKey,
         systemPrompt: chatSystemPrompt(this.resolve(VaultService)),
@@ -119,6 +122,7 @@ export class ChatService extends Service {
           total: usage.totalTokens,
         }),
       })
+      if (result.turnLimit && !result.aborted) this.error = CHAT_TURN_LIMIT_ERROR
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Agent failed'
       this.error = redactSecret(message, runtime.apiKey)
