@@ -443,8 +443,12 @@
   display: flex;
   flex-direction: column;
   gap: 0.28rem;
-  flex: 0 1 16rem;
   min-width: 12rem;
+}
+
+/* Sample sheet only. An unqualified basis leaks into every production field. */
+.sd-preview .sd-field {
+  flex: 0 1 16rem;
 }
 
 .sd-field-label {
