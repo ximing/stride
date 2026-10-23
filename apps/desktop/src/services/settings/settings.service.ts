@@ -136,6 +136,67 @@ function sameIndexSignature(left: IndexSignature, right: IndexSignature): boolea
     && left.active === right.active
 }
 
+function sameJson(left: unknown, right: unknown): boolean {
+  return JSON.stringify(left) === JSON.stringify(right)
+}
+
+// Fields the snapshot did not change stay on `fallback` (the newer load or save).
+function mergePartitions(preferred: PublicSettings, baseline: PublicSettings, fallback: PublicSettings): PublicSettings {
+  const pick = <K extends keyof PublicSettings>(key: K): PublicSettings[K] => (
+    sameJson(preferred[key], baseline[key]) ? fallback[key] : preferred[key]
+  )
+  return {
+    embedding: pick('embedding'),
+    llmConfigs: pick('llmConfigs'),
+    releasesUrl: pick('releasesUrl'),
+    gitEnabled: pick('gitEnabled'),
+    autoSyncMinutes: pick('autoSyncMinutes'),
+    autoGitEnabled: pick('autoGitEnabled'),
+    autoGitIdleSeconds: pick('autoGitIdleSeconds'),
+    autoGitBlurSeconds: pick('autoGitBlurSeconds'),
+    appearance: pick('appearance'),
+    editor: pick('editor'),
+    updates: pick('updates'),
+    privacy: pick('privacy'),
+  }
+}
+
+function keySealValues(value: unknown, found: string[]): void {
+  if (!value || typeof value !== 'object') return
+  if (Array.isArray(value)) {
+    for (const item of value) keySealValues(item, found)
+    return
+  }
+  for (const [name, child] of Object.entries(value as Record<string, unknown>)) {
+    if (name === 'keySeal' && typeof child === 'string') {
+      if (child) found.push(child)
+      continue
+    }
+    if (child && typeof child === 'object') keySealValues(child, found)
+  }
+}
+
+// keyMask legally repeats the last 4 characters. Only a keySeal can leak.
+function keySealContainsPlaintext(written: string, rawKeys: string[]): boolean {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(written)
+  } catch {
+    return true
+  }
+  const seals: string[] = []
+  keySealValues(parsed, seals)
+  return rawKeys.some((key) => seals.some((seal) => seal.includes(key)))
+}
+
+interface SettingsShot {
+  form: PublicSettings
+  baseline: PublicSettings
+  embeddingKey: string
+  llmKeyDrafts: Record<string, string>
+  embeddingDimText: string
+}
+
 async function settingsFile(): Promise<MemoryFileSystem> {
   const fs = new MemoryFileSystem('settings')
   if (typeof localStorage === 'undefined') return fs
@@ -179,6 +240,10 @@ export class SettingsService extends Service {
   private memoryLlmKeys: Record<string, string> = {}
   private loadTask: Promise<void> | null = null
   private loaded = false
+  // load and save share this so an older snapshot cannot land after a newer partition.
+  private ioChain: Promise<void> = Promise.resolve()
+  // Last form read or written. A save captured before that must not put defaults back.
+  private committedForm: PublicSettings = emptySettings()
 
   patchEmbedding(partial: Partial<PublicSettings['embedding']>) {
     this.form = { ...this.form, embedding: { ...this.form.embedding, ...partial } }
@@ -421,11 +486,12 @@ export class SettingsService extends Service {
     }
   }
 
-  // Overlapping calls share one read. A later call loads again.
+  // Overlapping loads share one read. A later call loads again.
+  // The read waits on the same chain as save.
   load(): Promise<void> {
     if (this.loadTask) return this.loadTask
-    const task = this.loadBody().finally(() => {
-      this.loadTask = null
+    const task = this.enqueue(() => this.loadBody()).finally(() => {
+      if (this.loadTask === task) this.loadTask = null
       this.loaded = true
     })
     this.loadTask = task
@@ -442,61 +508,91 @@ export class SettingsService extends Service {
     return this.loadTask !== null
   }
 
-  async save() {
+  async save(): Promise<void> {
+    const shot = this.captureShot()
+    const after = await this.enqueue(() => this.persistShot(shot))
+    if (after) await this.syncVault(after)
+  }
+
+  private captureShot(): SettingsShot {
+    return {
+      form: this.form,
+      baseline: this.committedForm,
+      embeddingKey: this.embeddingKey,
+      llmKeyDrafts: this.llmKeyDrafts,
+      embeddingDimText: this.embeddingDimText,
+    }
+  }
+
+  private enqueue<T>(job: () => Promise<T>): Promise<T> {
+    const run = this.ioChain.then(job, job)
+    this.ioChain = run.then(() => undefined, () => undefined)
+    return run
+  }
+
+  // syncVault stays outside the chain: reopen waits on waitUntilLoaded.
+  private async persistShot(shot: SettingsShot): Promise<EmbeddingRuntime | null> {
     const secrets = await this.openSecrets()
-    if (!secrets) return
-    let after: EmbeddingRuntime
+    if (!secrets) return null
     try {
-      const embeddingKey = resolveKey(this.embeddingKey, this.memoryEmbeddingKey)
-      const llmConfigs: LlmConfig[] = this.form.llmConfigs.map((config) => ({
+      const form = mergePartitions(shot.form, shot.baseline, this.committedForm)
+      const embeddingKey = resolveKey(shot.embeddingKey, this.memoryEmbeddingKey)
+      const llmConfigs: LlmConfig[] = form.llmConfigs.map((config) => ({
         id: config.id,
         name: config.name,
         provider: config.provider,
         model: config.model,
         baseUrl: config.baseUrl,
-        apiKey: resolveLlmKey(this.llmKeyDrafts[config.id], this.memoryLlmKeys[config.id] ?? ''),
+        apiKey: resolveLlmKey(
+          Object.prototype.hasOwnProperty.call(shot.llmKeyDrafts, config.id) ? shot.llmKeyDrafts[config.id] : undefined,
+          this.memoryLlmKeys[config.id] ?? '',
+        ),
         isDefault: config.isDefault,
       }))
-      const dim = parsePositiveInt(this.embeddingDimText)
       const settings: AppSettings = {
         embedding: {
-          endpoint: this.form.embedding.endpoint.trim(),
-          model: this.form.embedding.model.trim(),
+          endpoint: form.embedding.endpoint.trim(),
+          model: form.embedding.model.trim(),
           apiKey: embeddingKey,
-          dim: dim ?? 0,
+          dim: form.embedding.dim,
         },
         llmConfigs,
-        releasesUrl: this.form.releasesUrl,
-        gitEnabled: this.form.gitEnabled,
-        autoSyncMinutes: this.form.autoSyncMinutes,
-        autoGitEnabled: this.form.autoGitEnabled,
-        autoGitIdleSeconds: this.form.autoGitIdleSeconds,
-        autoGitBlurSeconds: this.form.autoGitBlurSeconds,
-        appearance: { ...this.form.appearance },
-        editor: { ...this.form.editor },
-        updates: { ...this.form.updates },
-        privacy: { ...this.form.privacy },
+        releasesUrl: form.releasesUrl,
+        gitEnabled: form.gitEnabled,
+        autoSyncMinutes: form.autoSyncMinutes,
+        autoGitEnabled: form.autoGitEnabled,
+        autoGitIdleSeconds: form.autoGitIdleSeconds,
+        autoGitBlurSeconds: form.autoGitBlurSeconds,
+        appearance: { ...form.appearance },
+        editor: { ...form.editor },
+        updates: { ...form.updates },
+        privacy: { ...form.privacy },
       }
       const fs = await settingsFile()
       await writeSettings(fs, SETTINGS_FILE, settings, secrets)
       const written = await fs.readText(SETTINGS_FILE)
       const rawKeys = [embeddingKey, ...llmConfigs.map((config) => config.apiKey)].filter((key) => key)
-      if (rawKeys.some((key) => written.includes(key))) {
-        if (typeof localStorage !== 'undefined') localStorage.removeItem(SETTINGS_STORAGE_KEY)
+      if (keySealContainsPlaintext(written, rawKeys)) {
+        // Keep the previous sealed document. Settings are not vault files.
         throw new Error('Refusing to keep a plaintext key')
       }
       if (typeof localStorage !== 'undefined') localStorage.setItem(SETTINGS_STORAGE_KEY, written)
       this.memoryEmbeddingKey = embeddingKey
       this.memoryLlmKeys = Object.fromEntries(llmConfigs.map((config) => [config.id, config.apiKey]))
-      this.embeddingKey = ''
-      this.llmKeyDrafts = {}
-      this.embeddingDimText = dim === null ? this.embeddingDimText : String(dim)
-      this.form = {
+      if (this.embeddingKey === shot.embeddingKey) this.embeddingKey = ''
+      if (sameJson(this.llmKeyDrafts, shot.llmKeyDrafts)) this.llmKeyDrafts = {}
+      if (this.embeddingDimText === shot.embeddingDimText) {
+        const parsed = parsePositiveInt(shot.embeddingDimText)
+        this.embeddingDimText = parsed === null
+          ? shot.embeddingDimText
+          : (settings.embedding.dim > 0 ? String(settings.embedding.dim) : '')
+      }
+      const savedForm: PublicSettings = {
         embedding: {
           endpoint: settings.embedding.endpoint,
           model: settings.embedding.model,
           keyMask: maskSecret(embeddingKey),
-          dim: dim ?? 0,
+          dim: settings.embedding.dim,
         },
         llmConfigs: llmConfigs.map((config) => ({
           id: config.id,
@@ -518,13 +614,23 @@ export class SettingsService extends Service {
         updates: settings.updates,
         privacy: settings.privacy,
       }
+      this.committedForm = savedForm
+      this.form = mergePartitions(this.form, shot.form, savedForm)
       this.notice = ''
-      after = this.embeddingRuntime()
+      return this.savedRuntime(settings, embeddingKey)
     } catch (error) {
       this.notice = errorText(error)
-      return
+      return null
     }
-    await this.syncVault(after)
+  }
+
+  private savedRuntime(settings: AppSettings, apiKey: string): EmbeddingRuntime {
+    const endpoint = canonicalEmbeddingEndpoint(settings.embedding.endpoint)
+    const model = settings.embedding.model
+    const dim = settings.embedding.dim
+    const intended = endpoint !== '' && model !== '' && dim > 0
+    const active = intended && apiKey !== ''
+    return { endpoint, model, apiKey, dim, intended, active }
   }
 
   async testEmbedding() {
@@ -621,6 +727,7 @@ export class SettingsService extends Service {
         updates: settings.updates,
         privacy: settings.privacy,
       }
+      this.committedForm = this.form
       this.notice = ''
     } catch (error) {
       this.notice = errorText(error)

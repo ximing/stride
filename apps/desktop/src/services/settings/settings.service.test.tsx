@@ -34,6 +34,8 @@ function resetSettingsMemory() {
     memoryLlmKeys: {},
     loaded: false,
     loadTask: null,
+    ioChain: Promise.resolve(),
+    committedForm: settings.form,
     usageFs: null,
     usageChain: Promise.resolve(),
     usageEpoch: (settings as unknown as { usageEpoch: number }).usageEpoch + 1,
@@ -241,6 +243,86 @@ describe('settings service', () => {
     await settings.save()
     expect(settings.notice).toContain('plaintext')
     expect(localStorage.getItem(SETTINGS_STORAGE_KEY) ?? '').not.toContain('sk-plaintext-should-not-land')
+    expect(localStorage.getItem(SETTINGS_STORAGE_KEY)).not.toBeNull()
+  })
+
+  it('keeps sealed settings when a short secret or keyMask fragment matches', async () => {
+    const secrets = new MemorySecretsStore()
+    setSecretsStore(secrets)
+    register(SettingsService)
+    const settings = resolve(SettingsService)
+    settings.setReleasesUrl('https://kept.example/releases')
+    settings.setAutoSyncMinutes(6)
+    settings.embeddingKey = 'sk-stride-embed-AAAA密钥'
+    await settings.save()
+    expect(settings.notice).toBe('')
+    const fragment = settings.form.embedding.keyMask.slice(4)
+    expect(fragment.length).toBeLessThanOrEqual(4)
+    expect(fragment.length).toBeGreaterThan(0)
+    expect(settings.form.embedding.keyMask).toContain(fragment)
+
+    settings.embeddingKey = fragment
+    await settings.save()
+    expect(settings.notice).toBe('')
+    const stored = localStorage.getItem(SETTINGS_STORAGE_KEY)
+    expect(stored).toBeTruthy()
+    const parsed = JSON.parse(stored ?? '{}') as {
+      releasesUrl: string
+      autoSyncMinutes: number
+      embedding: { keySeal: string; keyMask: string }
+    }
+    expect(parsed.releasesUrl).toBe('https://kept.example/releases')
+    expect(parsed.autoSyncMinutes).toBe(6)
+    expect(parsed.embedding.keySeal.includes(fragment)).toBe(false)
+    expect(parsed.embedding.keyMask).toContain(fragment)
+    expect(settings.embeddingRuntime().apiKey).toBe(fragment)
+
+    const kept = localStorage.getItem(SETTINGS_STORAGE_KEY)
+    setSecretsStore({
+      seal: async (value) => value,
+      open: async (value) => value,
+    })
+    settings.embeddingKey = fragment
+    await settings.save()
+    expect(settings.notice).toContain('plaintext')
+    expect(localStorage.getItem(SETTINGS_STORAGE_KEY)).toBe(kept)
+  })
+
+  it('does not let an older save overwrite a partition written by a later save', async () => {
+    const secrets = new MemorySecretsStore()
+    let entered = 0
+    let releaseFirst: () => void = () => {}
+    const gate = new Promise<void>((resolveGate) => {
+      releaseFirst = resolveGate
+    })
+    setSecretsStore({
+      seal: async (value) => {
+        entered += 1
+        if (entered === 1) await gate
+        return secrets.seal(value)
+      },
+      open: (value) => secrets.open(value),
+    })
+    register(SettingsService)
+    const settings = resolve(SettingsService)
+    settings.setReleasesUrl('https://kept.example/releases')
+    settings.embeddingKey = 'sk-stride-embed-test-key'
+    const first = settings.save()
+    for (let attempt = 0; attempt < 40 && entered === 0; attempt += 1) {
+      await new Promise((resolveWait) => setTimeout(resolveWait, 10))
+    }
+    expect(entered).toBe(1)
+    settings.setAutoSyncMinutes(12)
+    const second = settings.save()
+    releaseFirst()
+    await first
+    await second
+    const stored = JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY) ?? '{}') as {
+      releasesUrl: string
+      autoSyncMinutes: number
+    }
+    expect(stored.releasesUrl).toBe('https://kept.example/releases')
+    expect(stored.autoSyncMinutes).toBe(12)
   })
 
   it('reports a successful llm probe from the selected config', async () => {
