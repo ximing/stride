@@ -7,6 +7,7 @@
     "dev": "pnpm --filter @stride/desktop dev",
     "build": "pnpm --filter @stride/desktop build",
     "test": "pnpm -r --if-present test",
+    "typecheck": "pnpm -r --if-present typecheck",
     "tauri": "pnpm --filter @stride/desktop tauri"
   },
   "pnpm": {
