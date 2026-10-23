@@ -48,4 +48,34 @@ describe('embedding endpoint', () => {
     await expect(client.embed(['hello'], { ...settings, endpoint: '   ' })).rejects.toThrow('No embedding endpoint')
     expect(client.calls).toBe(0)
   })
+
+  it('rejects a hanging fetch when the passed signal aborts', async () => {
+    const controller = new AbortController()
+    let received: AbortSignal | null | undefined
+    const client = new EmbeddingClient((_input, init) => new Promise((_resolve, reject) => {
+      received = init?.signal
+      const signal = init?.signal
+      if (!signal) {
+        reject(new Error('expected a signal'))
+        return
+      }
+      const fail = () => {
+        const reason = signal.reason
+        reject(reason instanceof Error ? reason : new DOMException('The operation was aborted.', 'AbortError'))
+      }
+      if (signal.aborted) {
+        fail()
+        return
+      }
+      signal.addEventListener('abort', fail, { once: true })
+    }))
+    const pending = client.embed(
+      ['hello'],
+      { ...settings, endpoint: 'https://example.com/v1' },
+      controller.signal,
+    )
+    expect(received).toBe(controller.signal)
+    controller.abort()
+    await expect(pending).rejects.toThrow(/abort/i)
+  })
 })

@@ -18,6 +18,7 @@ import { isMemoryFixture } from '../platform/runtime'
 import type { VaultService } from './vault.service'
 
 const EMBED_BATCH = 16
+const EMBED_ABORT_POLL_MS = 200
 
 function errorText(error: unknown): string {
   return error instanceof Error ? error.message : String(error)
@@ -375,10 +376,22 @@ export async function embedGroups(
     if (!shouldContinue()) return null
     const slice = rows.slice(offset, offset + EMBED_BATCH)
     let vectors: number[][] | null = null
+    // A later open only flips shouldContinue. Abort the in-flight embed so that open is not stuck on fetch.
+    const controller = new AbortController()
+    const watch = setInterval(() => {
+      if (!shouldContinue()) controller.abort()
+    }, EMBED_ABORT_POLL_MS)
     try {
-      vectors = await embeddingClient.embed(slice.map(([, group]) => group.text), embeddingSettings(vault, runtime))
+      if (!shouldContinue()) controller.abort()
+      vectors = await embeddingClient.embed(
+        slice.map(([, group]) => group.text),
+        embeddingSettings(vault, runtime),
+        controller.signal,
+      )
     } catch {
       vectors = null
+    } finally {
+      clearInterval(watch)
     }
     if (!shouldContinue()) return null
     if (!vectors || vectors.length !== slice.length) continue

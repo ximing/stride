@@ -91,6 +91,51 @@ describe('vault search cache', () => {
     expect(await fs.stat('.stride/search/v1/snapshots/1.vane')).toBeNull()
   })
 
+  it('aborts a hung embed so the next vault open finishes', async () => {
+    useMemoryFixture()
+    setSecretsStore(new MemorySecretsStore())
+    const fetchMock = vi.fn((input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input)
+      if (!url.includes('/embeddings')) {
+        return Promise.resolve(new Response('{}', { status: 200, headers: { 'content-type': 'application/json' } }))
+      }
+      return new Promise<Response>((_resolve, reject) => {
+        const signal = init?.signal
+        const fail = () => reject(new DOMException('The operation was aborted.', 'AbortError'))
+        if (!signal) return
+        if (signal.aborted) {
+          fail()
+          return
+        }
+        signal.addEventListener('abort', fail, { once: true })
+      })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    registerVault()
+    const vault = resolve(VaultService)
+    const settings = resolve(SettingsService)
+    const fs = new MemoryFileSystem('cancel-vault')
+    await vault.openClonedVault(fs)
+    await vault.createNote()
+    settings.patchEmbedding({ endpoint: 'https://user:secret@example.com/v1/', model: 'fixture-embed' })
+    settings.setEmbeddingDim('4')
+    settings.embeddingKey = 'sk-test'
+    const saving = settings.save()
+    for (let attempt = 0; attempt < 100 && !fetchMock.mock.calls.some((call) => String(call[0]).includes('/embeddings')); attempt += 1) {
+      await new Promise((resolvePromise) => setTimeout(resolvePromise, 10))
+    }
+    expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('/embeddings'))).toBe(true)
+    const opened = Promise.race([
+      vault.openClonedVault(new MemoryFileSystem('cancel-vault-next')).then(() => 'opened' as const),
+      new Promise<'hung'>((resolvePromise) => {
+        setTimeout(() => resolvePromise('hung'), 4000)
+      }),
+    ])
+    await expect(opened).resolves.toBe('opened')
+    expect(vault.error).toBe('')
+    await saving
+  }, 10_000)
+
   it('embeds identical note text once', async () => {
     useMemoryFixture()
     setSecretsStore(new MemorySecretsStore())

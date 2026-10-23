@@ -9,7 +9,7 @@ export class EmbeddingClient {
   calls = 0
   constructor(private fetchImpl: typeof fetch = fetch) {}
 
-  async embed(texts: string[], settings: EmbeddingSettings): Promise<number[][]> {
+  async embed(texts: string[], settings: EmbeddingSettings, signal?: AbortSignal): Promise<number[][]> {
     if (!settings.apiKey) throw new Error('No embedding key')
     const endpoint = canonicalEmbeddingEndpoint(settings.endpoint)
     if (!endpoint) throw new Error('No embedding endpoint')
@@ -21,6 +21,7 @@ export class EmbeddingClient {
         authorization: `Bearer ${settings.apiKey}`,
       },
       body: JSON.stringify({ model: settings.model, input: texts }),
+      signal,
     })
     if (!response.ok) {
       throw new Error(`Embedding request failed (${response.status})`)
