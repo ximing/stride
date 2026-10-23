@@ -420,8 +420,7 @@ export class GitService extends Service {
   }
 
   async commitSelected(paths?: readonly string[]) {
-    this.busyCount += 1
-    this.busy = true
+    if (!gitAuto.tryBeginGitWrite(this)) return
     try {
       try {
         await this.vault.flush()
@@ -450,11 +449,7 @@ export class GitService extends Service {
         this.output = error instanceof Error ? error.message : String(error)
       }
     } finally {
-      this.busyCount -= 1
-      if (this.busyCount <= 0) {
-        this.busyCount = 0
-        this.busy = false
-      }
+      gitAuto.endGitWrite(this)
     }
   }
 
@@ -599,7 +594,7 @@ export class GitService extends Service {
       settings: this.settings,
       gitEnabled: () => this.gitEnabled(),
       resolveGitBackend,
-      checkpointMessage: (diff) => this.checkpointMessage(diff),
+      checkpointMessage: (diff, signal) => this.checkpointMessage(diff, signal),
     }
   }
 
@@ -635,25 +630,19 @@ export class GitService extends Service {
     return gitAuto.autoGitTick(this, this.autoGitDeps(), now)
   }
 
-  private async checkpointMessage(diff: string): Promise<string> {
-    try {
-      const signal = new AbortController().signal
-      const hooked = commitMessageSuggestForTests
-      let suggested = ''
-      if (hooked) {
-        const result = await hooked(diff, signal)
-        suggested = result?.message ?? ''
-      } else {
-        const runtime = this.settings.llmRuntime()
-        if (runtime?.apiKey && runtime.model && runtime.baseUrl) {
-          const result = await this.suggestWithLlm(diff, signal)
-          suggested = result?.message ?? ''
-        }
-      }
-      return suggested.trim() || 'Checkpoint'
-    } catch {
-      return 'Checkpoint'
+  private async checkpointMessage(diff: string, signal: AbortSignal): Promise<string | null> {
+    if (signal.aborted) return null
+    const hooked = commitMessageSuggestForTests
+    if (hooked) {
+      const result = await hooked(diff, signal)
+      if (signal.aborted || result.aborted) return null
+      return result.message.trim() || 'Checkpoint'
     }
+    const runtime = this.settings.llmRuntime()
+    if (!runtime?.apiKey || !runtime.model || !runtime.baseUrl) return 'Checkpoint'
+    const result = await this.suggestWithLlm(diff, signal)
+    if (signal.aborted || result?.aborted) return null
+    return result?.message.trim() || 'Checkpoint'
   }
 
   private async assertTauriCloneDestEmpty(dest: string): Promise<void> {
@@ -668,9 +657,8 @@ export class GitService extends Service {
   }
 
   async pull() {
+    if (!gitAuto.tryBeginGitWrite(this)) return
     const session = this.vault.session
-    this.busyCount += 1
-    this.busy = true
     try {
       try {
         await this.vault.flush()
@@ -713,17 +701,12 @@ export class GitService extends Service {
         this.output = error instanceof Error ? error.message : String(error)
       }
     } finally {
-      this.busyCount -= 1
-      if (this.busyCount <= 0) {
-        this.busyCount = 0
-        this.busy = false
-      }
+      gitAuto.endGitWrite(this)
     }
   }
 
   async push() {
-    this.busyCount += 1
-    this.busy = true
+    if (!gitAuto.tryBeginGitWrite(this)) return
     try {
       try {
         await this.vault.flush()
@@ -751,11 +734,7 @@ export class GitService extends Service {
         this.output = error instanceof Error ? error.message : String(error)
       }
     } finally {
-      this.busyCount -= 1
-      if (this.busyCount <= 0) {
-        this.busyCount = 0
-        this.busy = false
-      }
+      gitAuto.endGitWrite(this)
     }
   }
 
@@ -868,17 +847,25 @@ export class GitService extends Service {
   }
 
   async keepSide(path: string, side: 'ours' | 'theirs') {
-    this.busyCount += 1
-    this.busy = true
+    if (!gitAuto.tryBeginGitWrite(this)) return
+    const session = this.vault.session
     try {
+      try {
+        await this.vault.flush()
+      } catch (error) {
+        if (this.vault.session !== session) return
+        this.output = error instanceof Error ? error.message : String(error)
+        return
+      }
+      if (this.vault.session !== session) return
       const backend = await resolveGitBackend()
+      if (this.vault.session !== session) return
       if (!backend.available) {
         this.output = GIT_BROWSER
         return
       }
       const fs = this.vault.fs
       if (!fs) return
-      const session = this.vault.session
       try {
         await gitResolveKeepingCheckpoint(fs, backend, path, side)
         if (this.vault.session !== session) return
@@ -889,14 +876,11 @@ export class GitService extends Service {
         if (this.vault.session !== session) return
         await this.vault.reopenForSettings()
       } catch (error) {
+        if (this.vault.session !== session) return
         this.output = error instanceof Error ? error.message : String(error)
       }
     } finally {
-      this.busyCount -= 1
-      if (this.busyCount <= 0) {
-        this.busyCount = 0
-        this.busy = false
-      }
+      gitAuto.endGitWrite(this)
     }
   }
 }

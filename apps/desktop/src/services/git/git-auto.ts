@@ -21,12 +21,40 @@ export interface GitAutoDeps {
   settings: SettingsService
   gitEnabled: () => boolean
   resolveGitBackend: () => Promise<GitBackend>
-  checkpointMessage: (diff: string) => Promise<string>
+  checkpointMessage: (diff: string, signal: AbortSignal) => Promise<string | null>
 }
 
 interface AutoTimers {
   autoSyncTimer: ReturnType<typeof setInterval> | null
   autoGitTimer: ReturnType<typeof setInterval> | null
+  checkpointAbort: AbortController | null
+}
+
+// Single-flight for git writes. `busy` stays a reentrant status count because
+// `refresh` nests inside a write. Core `gitCommit` and `vault.flush` must not
+// take this lock, or a tick that already holds it will skip its own commit.
+const writeLocks = new WeakMap<object, boolean>()
+
+export function tryBeginGitWrite(git: GitService): boolean {
+  const key = raw(git)
+  if (writeLocks.get(key)) return false
+  writeLocks.set(key, true)
+  git.busyCount += 1
+  git.busy = true
+  return true
+}
+
+export function endGitWrite(git: GitService) {
+  writeLocks.set(raw(git), false)
+  git.busyCount -= 1
+  if (git.busyCount <= 0) {
+    git.busyCount = 0
+    git.busy = false
+  }
+}
+
+export function resetGitWriteLock(git: GitService) {
+  writeLocks.set(raw(git), false)
 }
 
 const timers = new WeakMap<object, AutoTimers>()
@@ -35,7 +63,7 @@ function autoTimers(host: object): AutoTimers {
   const key = raw(host)
   let slot = timers.get(key)
   if (!slot) {
-    slot = { autoSyncTimer: null, autoGitTimer: null }
+    slot = { autoSyncTimer: null, autoGitTimer: null, checkpointAbort: null }
     timers.set(key, slot)
   }
   return slot
@@ -77,6 +105,8 @@ export function ensureAutoGit(git: GitService, deps: GitAutoDeps) {
 
 export function stopAutoGit(git: GitService) {
   const slot = autoTimers(git)
+  slot.checkpointAbort?.abort()
+  slot.checkpointAbort = null
   if (slot.autoGitTimer === null) return
   clearInterval(slot.autoGitTimer)
   slot.autoGitTimer = null
@@ -89,14 +119,13 @@ export async function autoSyncTick(git: GitService, deps: GitAutoDeps) {
   if (deps.vault.phase !== 'ready') return
   if (!deps.gitEnabled()) return
   if (git.surface !== 'ready') return
+  if (!tryBeginGitWrite(git)) return
   const session = deps.vault.session
-  const backend = await deps.resolveGitBackend()
-  if (!backend.available) return
-  const fs = deps.vault.fs
-  if (!fs) return
-  git.busyCount += 1
-  git.busy = true
   try {
+    const backend = await deps.resolveGitBackend()
+    if (!backend.available) return
+    const fs = deps.vault.fs
+    if (!fs) return
     try {
       await deps.vault.flush()
     } catch (error) {
@@ -123,11 +152,7 @@ export async function autoSyncTick(git: GitService, deps: GitAutoDeps) {
     if (!/already up to date/i.test(result.output)) await deps.vault.reopenForSettings()
     await git.refresh()
   } finally {
-    git.busyCount -= 1
-    if (git.busyCount <= 0) {
-      git.busyCount = 0
-      git.busy = false
-    }
+    endGitWrite(git)
   }
 }
 
@@ -148,18 +173,25 @@ export async function autoGitTick(git: GitService, deps: GitAutoDeps, now: numbe
   if (deps.vault.phase !== 'ready') return
   if (!deps.gitEnabled()) return
   if (git.surface !== 'ready') return
+  if (!tryBeginGitWrite(git)) return
+  const slot = autoTimers(git)
+  const checkpointAbort = new AbortController()
+  slot.checkpointAbort = checkpointAbort
   const session = deps.vault.session
-  const backend = await deps.resolveGitBackend()
-  if (deps.vault.session !== session) return
-  if (!backend.available) return
-  const fs = deps.vault.fs
-  if (!fs) return
-  const unmerged = await unmergedFiles(fs, backend)
-  if (deps.vault.session !== session) return
-  if (unmerged.length > 0) return
-  git.busyCount += 1
-  git.busy = true
+  const rememberCheckpoint = () => {
+    if (deps.vault.session !== session) return
+    if (idleDue) git.idleCheckpointAt = git.lastActivityAt
+    if (blurDue) git.blurCheckpointAt = git.lastBlurAt
+  }
   try {
+    const backend = await deps.resolveGitBackend()
+    if (deps.vault.session !== session) return
+    if (!backend.available) return
+    const fs = deps.vault.fs
+    if (!fs) return
+    const unmerged = await unmergedFiles(fs, backend)
+    if (deps.vault.session !== session) return
+    if (unmerged.length > 0) return
     try {
       await deps.vault.flush()
     } catch (error) {
@@ -176,10 +208,24 @@ export async function autoGitTick(git: GitService, deps: GitAutoDeps, now: numbe
       git.output = errorText(error)
       return
     }
-    if (deps.vault.session !== session) return
-    const message = await deps.checkpointMessage(diff)
-    // The commit still runs on this session. A newer vault must not see its output or refresh.
-    if (deps.vault.session !== session) return
+    if (deps.vault.session !== session || checkpointAbort.signal.aborted) return
+    let message: string | null
+    try {
+      message = await deps.checkpointMessage(diff, checkpointAbort.signal)
+    } catch (error) {
+      if (deps.vault.session !== session || checkpointAbort.signal.aborted) return
+      git.output = errorText(error)
+      rememberCheckpoint()
+      return
+    }
+    // A newer vault must not see this tick's output, stamp, or refresh.
+    // stopAutoGit aborts the signal and leaves the stamp unset. A partial or
+    // failed suggestion still backs off so the next second does not call the model.
+    if (deps.vault.session !== session || checkpointAbort.signal.aborted) return
+    if (message === null) {
+      rememberCheckpoint()
+      return
+    }
     try {
       await gitCommit(fs, backend, message)
     } catch (error) {
@@ -187,18 +233,15 @@ export async function autoGitTick(git: GitService, deps: GitAutoDeps, now: numbe
       if (!isNothingToCommit(output)) {
         if (deps.vault.session !== session) return
         git.output = output
+        rememberCheckpoint()
         return
       }
     }
     if (deps.vault.session !== session) return
-    if (idleDue) git.idleCheckpointAt = git.lastActivityAt
-    if (blurDue) git.blurCheckpointAt = git.lastBlurAt
+    rememberCheckpoint()
     await git.refresh()
   } finally {
-    git.busyCount -= 1
-    if (git.busyCount <= 0) {
-      git.busyCount = 0
-      git.busy = false
-    }
+    if (slot.checkpointAbort === checkpointAbort) slot.checkpointAbort = null
+    endGitWrite(git)
   }
 }

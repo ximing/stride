@@ -1,5 +1,5 @@
 import { has, register, resolve } from '@rabjs/react'
-import { DEDICATED_ERROR, VAULT_GITIGNORE } from '@stride/core'
+import { DEDICATED_ERROR, GitError, VAULT_GITIGNORE } from '@stride/core'
 import { createNote, serializeNote } from '@stride/core/note'
 import { MemoryFileSystem, type GitBackend } from '@stride/platform'
 import { act } from 'react'
@@ -9,6 +9,7 @@ import { App } from '../../app'
 import { SettingsService, SETTINGS_STORAGE_KEY, resetSecretsStore } from '../settings/settings.service'
 import { UpdateService } from '../update/update.service'
 import { VaultService } from '../vault/vault.service'
+import { resetGitWriteLock } from './git-auto'
 import { GitService, setCloneDestForTests, setCloneParentForTests, setCommitMessageSuggestForTests, setGitBackendForTests } from './git.service'
 
 function resetSettingsMemory() {
@@ -76,6 +77,8 @@ describe('browser panels', () => {
       git.behind = 0
       git.suggesting = false
       git.busy = false
+      git.busyCount = 0
+      resetGitWriteLock(git)
       git.diff = ''
       git.message = ''
       git.conflicts = []
@@ -1261,7 +1264,246 @@ describe('browser panels', () => {
     expect(git.idleCheckpointAt).toBe(0)
     expect(git.busy).toBe(false)
   })
+
+  it('blocks a second tick and manual writes while a checkpoint is in flight', async () => {
+    const commits: Array<{ message: string; paths?: string[] }> = []
+    const writes: string[] = []
+    const backend = twoFileGit({ porcelain: '' }, commits)
+    backend.status = () => Promise.resolve({ repo: true, porcelain: '', clean: true })
+    let unmergedCalls = 0
+    let releaseUnmerged: (files: string[]) => void = () => {}
+    const unmergedStarted = new Promise<void>((resolveStarted) => {
+      backend.unmerged = () => {
+        unmergedCalls += 1
+        if (unmergedCalls === 1) {
+          resolveStarted()
+          return new Promise((resolve) => {
+            releaseUnmerged = resolve
+          })
+        }
+        return Promise.resolve([])
+      }
+    })
+    backend.pull = () => {
+      writes.push('pull')
+      return Promise.resolve({ conflict: false, files: [], output: '' })
+    }
+    backend.push = () => {
+      writes.push('push')
+      return Promise.resolve('')
+    }
+    backend.resolve = () => {
+      writes.push('resolve')
+      return Promise.resolve()
+    }
+    backend.commit = (_repo, message, paths) => {
+      writes.push(`commit ${message}`)
+      commits.push({ message, paths: paths ? [...paths] : undefined })
+      return Promise.resolve(message)
+    }
+    let suggests = 0
+    setCommitMessageSuggestForTests(() => {
+      suggests += 1
+      return Promise.resolve({ message: 'Save notes', aborted: false })
+    })
+    setGitBackendForTests(backend)
+    const { files, git } = await openAutoGitVault('/tmp/vault-autogit-lock')
+    await files.writeText('notes/a.md', 'local\n')
+    const first = git.autoGitTick(61_000)
+    await unmergedStarted
+    await git.autoGitTick(61_000)
+    await git.pull()
+    await git.push()
+    await git.commitSelected(['notes/a.md'])
+    await git.keepSide('notes/a.md', 'ours')
+    expect(unmergedCalls).toBe(1)
+    expect(suggests).toBe(0)
+    expect(writes).toEqual([])
+    expect(git.busy).toBe(true)
+    releaseUnmerged([])
+    await first
+    expect(suggests).toBe(1)
+    expect(commits).toEqual([{ message: 'Save notes', paths: undefined }])
+    expect(git.busy).toBe(false)
+    expect(git.idleCheckpointAt).toBe(1_000)
+  })
+
+  it('does not ask the model again after a checkpoint commit fails', async () => {
+    const commits: Array<{ message: string; paths?: string[] }> = []
+    const backend = twoFileGit({ porcelain: ' M notes/a.stride.json\n' }, commits)
+    backend.commit = () => Promise.reject(new GitError(1, 'hook declined'))
+    let suggests = 0
+    setCommitMessageSuggestForTests(() => {
+      suggests += 1
+      return Promise.resolve({ message: 'Save notes', aborted: false })
+    })
+    setGitBackendForTests(backend)
+    const { git } = await openAutoGitVault('/tmp/vault-autogit-fail')
+    await git.autoGitTick(61_000)
+    expect(suggests).toBe(1)
+    expect(commits).toEqual([])
+    expect(git.output).toBe('hook declined')
+    expect(git.idleCheckpointAt).toBe(1_000)
+    expect(git.busy).toBe(false)
+    await git.autoGitTick(62_000)
+    expect(suggests).toBe(1)
+    git.lastActivityAt = 70_000
+    await git.autoGitTick(140_000)
+    expect(suggests).toBe(2)
+    expect(git.busy).toBe(false)
+  })
+
+  it('stamps a nothing-to-commit checkpoint without recording an error', async () => {
+    const commits: Array<{ message: string; paths?: string[] }> = []
+    const backend = twoFileGit({ porcelain: '' }, commits)
+    backend.commit = () => Promise.reject(new GitError(1, 'nothing to commit, working tree clean'))
+    let suggests = 0
+    setCommitMessageSuggestForTests(() => {
+      suggests += 1
+      return Promise.resolve({ message: 'Save notes', aborted: false })
+    })
+    setGitBackendForTests(backend)
+    const { git } = await openAutoGitVault('/tmp/vault-autogit-empty')
+    await git.autoGitTick(61_000)
+    expect(suggests).toBe(1)
+    expect(commits).toEqual([])
+    expect(git.output).toBe('')
+    expect(git.idleCheckpointAt).toBe(1_000)
+    await git.autoGitTick(62_000)
+    expect(suggests).toBe(1)
+    expect(git.busy).toBe(false)
+  })
+
+  it('does not commit an aborted or thrown checkpoint suggestion', async () => {
+    const commits: Array<{ message: string; paths?: string[] }> = []
+    const backend = twoFileGit({ porcelain: ' M notes/a.stride.json\n' }, commits)
+    let suggests = 0
+    setCommitMessageSuggestForTests(() => {
+      suggests += 1
+      return Promise.resolve({ message: 'half a subject line', aborted: true })
+    })
+    setGitBackendForTests(backend)
+    const { git } = await openAutoGitVault('/tmp/vault-autogit-abort')
+    await git.autoGitTick(61_000)
+    expect(commits).toEqual([])
+    expect(suggests).toBe(1)
+    expect(git.idleCheckpointAt).toBe(1_000)
+    expect(git.busy).toBe(false)
+    await git.autoGitTick(62_000)
+    expect(suggests).toBe(1)
+
+    git.lastActivityAt = 80_000
+    Object.assign(git, { idleCheckpointAt: 0 })
+    setCommitMessageSuggestForTests(() => {
+      suggests += 1
+      return Promise.reject(new Error('model down'))
+    })
+    await git.autoGitTick(150_000)
+    expect(commits).toEqual([])
+    expect(git.output).toBe('model down')
+    expect(git.idleCheckpointAt).toBe(80_000)
+    expect(git.busy).toBe(false)
+    await git.autoGitTick(151_000)
+    expect(suggests).toBe(2)
+
+    git.lastActivityAt = 160_000
+    Object.assign(git, { idleCheckpointAt: 0 })
+    let signal: AbortSignal | null = null
+    setCommitMessageSuggestForTests((_diff, next) => {
+      suggests += 1
+      signal = next
+      return new Promise((resolveSuggestion) => {
+        next.addEventListener('abort', () => {
+          resolveSuggestion({ message: 'half a subject line', aborted: true })
+        }, { once: true })
+      })
+    })
+    const pending = git.autoGitTick(230_000)
+    await vi.waitFor(() => expect(signal).not.toBeNull())
+    git.stopAutoGit()
+    await pending
+    expect(signal!.aborted).toBe(true)
+    expect(commits).toEqual([])
+    expect(git.idleCheckpointAt).toBe(0)
+    expect(git.busy).toBe(false)
+    expect(suggests).toBe(3)
+  })
+
+  it('flushes before a conflict checkpoint and does not checkout when flush fails', async () => {
+    const marker = '<<<<<<< ours\nlocal\n=======\nremote\n>>>>>>> theirs\n'
+    const events: string[] = []
+    const files = new MemoryFileSystem('/tmp/vault-keep-flush')
+    await files.mkdir('.git')
+    await files.writeText('notes/a.md', marker)
+    const readText = files.readText.bind(files)
+    files.readText = (path: string) => {
+      events.push(`read ${path}`)
+      return readText(path)
+    }
+    const backend = recordingGit(events)
+    backend.unmerged = () => Promise.resolve(['notes/a.md'])
+    backend.resolve = () => {
+      events.push('resolve')
+      return Promise.resolve()
+    }
+    backend.status = () => Promise.resolve({ repo: true, porcelain: '', clean: true })
+    setGitBackendForTests(backend)
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.broad = false
+    vault.phase = 'chooser'
+    resolve(SettingsService).setGitEnabled(true)
+    const git = resolve(GitService)
+    vault.flush = () => {
+      events.push('flush')
+      return Promise.reject(new Error('flush failed'))
+    }
+    await git.keepSide('notes/a.md', 'ours')
+    expect(events).toEqual(['flush'])
+    expect(git.output).toBe('flush failed')
+    expect(git.busy).toBe(false)
+    expect(await readText('notes/a.md')).toBe(marker)
+    expect(await files.stat('.stride/conflict-checkpoints')).toBeNull()
+
+    vault.flush = () => {
+      events.push('flush')
+      return Promise.resolve()
+    }
+    await git.keepSide('notes/a.md', 'ours')
+    const flushAt = events.lastIndexOf('flush')
+    const readAt = events.indexOf('read notes/a.md')
+    expect(flushAt).toBeGreaterThan(0)
+    expect(readAt).toBeGreaterThan(flushAt)
+    expect(events).toContain('resolve')
+    expect(events.indexOf('resolve')).toBeGreaterThan(readAt)
+    expect(git.busy).toBe(false)
+  })
 })
+
+async function openAutoGitVault(root: string) {
+  register(VaultService)
+  register(SettingsService)
+  register(GitService)
+  const files = new MemoryFileSystem(root)
+  await files.mkdir('.git')
+  const vault = resolve(VaultService)
+  vault.fs = files
+  vault.phase = 'ready'
+  vault.broad = false
+  const settings = resolve(SettingsService)
+  settings.setGitEnabled(true)
+  settings.setAutoGitEnabled(true)
+  settings.setAutoGitIdleSeconds(60)
+  settings.setAutoGitBlurSeconds(0)
+  const git = resolve(GitService)
+  git.surface = 'ready'
+  git.lastActivityAt = 1_000
+  git.output = ''
+  return { files, vault, git }
+}
 
 function setControlValue(element: HTMLInputElement, value: string) {
   const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set
