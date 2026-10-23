@@ -19,6 +19,7 @@ interface ShellResult {
 const GIT_ENV = {
   GIT_MERGE_AUTOEDIT: 'no',
   GIT_TERMINAL_PROMPT: '0',
+  LC_ALL: 'C',
 }
 
 const COMMIT_PREFIX = ['-c', 'user.name=Stride', '-c', 'user.email=stride@localhost', '-c', 'commit.gpgsign=false']

@@ -20,6 +20,7 @@ const COMMIT_ARGS = ['-c', 'user.name=Stride', '-c', 'user.email=stride@localhos
 const GIT_ENV = {
   GIT_MERGE_AUTOEDIT: 'no',
   GIT_TERMINAL_PROMPT: '0',
+  LC_ALL: 'C',
 }
 
 interface GitOutput {
