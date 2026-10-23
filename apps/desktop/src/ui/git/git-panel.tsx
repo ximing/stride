@@ -57,6 +57,24 @@ function changeBadge(change: GitChange): { label: string; tone: string } {
   return { label: 'M', tone: 'is-modified' }
 }
 
+function DialogCopy(props: {
+  notice?: string
+  error?: string
+  copy: (value: string) => string
+}) {
+  if (!props.notice && !props.error) return null
+  return (
+    <>
+      {props.notice ? (
+        <p className="meta git-notice git-modal-note" data-testid="git-notice">{props.copy(props.notice)}</p>
+      ) : null}
+      {props.error ? (
+        <p className="error git-modal-error" data-testid="git-error" role="alert">{props.copy(props.error)}</p>
+      ) : null}
+    </>
+  )
+}
+
 /** Renders a unified diff with add/del/hunk line colors. textContent is preserved verbatim. */
 function DiffLines({ diff }: { diff: string }) {
   const lines = diff.split('\n')
@@ -283,6 +301,7 @@ export function GitPanelView(props: {
                   onChange={(event) => props.onMessage(event.target.value)}
                 />
               </label>
+              <DialogCopy notice={props.notice} error={props.error} copy={statusCopy} />
               <div className="sd-modal-actions">
                 <Button
                   size="sm"
@@ -323,7 +342,7 @@ export function GitPanelView(props: {
             // Dismiss is not a choice. The list stays until each file keeps a side.
           }}
         >
-          <ModalContent title={t('git.conflictsTitle')} description={t('git.conflictsBody')}>
+          <ModalContent dismissible={false} title={t('git.conflictsTitle')} description={t('git.conflictsBody')}>
             <div data-testid="git-conflict">
               {conflicts.map((path) => (
                 <div key={path} className="field git-conflict-row">
@@ -350,6 +369,7 @@ export function GitPanelView(props: {
                   </div>
                 </div>
               ))}
+              <DialogCopy error={props.error} copy={statusCopy} />
             </div>
           </ModalContent>
         </Modal>

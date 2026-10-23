@@ -210,6 +210,12 @@
   margin-bottom: 0;
 }
 
+.git-modal-note,
+.git-modal-error {
+  margin: 12px 0 0;
+  overflow-wrap: anywhere;
+}
+
 .git-commit-message {
   min-height: 96px;
   padding: 8px;

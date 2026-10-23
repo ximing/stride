@@ -335,6 +335,71 @@ describe('GitPanelView', () => {
     expect(document.querySelectorAll('[data-testid="git-conflict"]')).toHaveLength(1)
   })
 
+  it('shows conflict output inside a dialog that cannot be dismissed', async () => {
+    await render(<Harness conflicts={['notes/a.md']} error="could not replace the file" />)
+    const conflict = document.querySelector('[data-testid="git-conflict"]')
+    const dialog = conflict?.closest('.sd-modal')
+    expect(dialog).not.toBeNull()
+    expect(dialog?.querySelector('.sd-modal-x')).toBeNull()
+    expect(conflict?.querySelector('[data-testid="git-error"]')?.textContent).toBe('could not replace the file')
+
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    const overlay = document.querySelector('.sd-overlay')
+    expect(overlay).not.toBeNull()
+    await act(async () => {
+      overlay?.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, cancelable: true, button: 0 }))
+      overlay?.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 }))
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
+    })
+    expect(document.querySelector('[data-testid="git-conflict"]')).not.toBeNull()
+    expect(document.querySelector('[data-testid="git-conflict"]')?.closest('.sd-modal')?.querySelector('.sd-modal-x')).toBeNull()
+  })
+
+  it('keeps a failed commit dialog open with the error inside', async () => {
+    const committed: string[][] = []
+    await render(
+      <Harness
+        changes={changes}
+        initialSelected={['notes/b.stride.json']}
+        onCommit={(paths) => committed.push(paths)}
+      />,
+    )
+    await act(async () => {
+      host?.querySelector<HTMLButtonElement>('[data-testid="git-commit-open"]')?.click()
+    })
+    const message = document.querySelector<HTMLTextAreaElement>('[data-testid="git-commit-message"]')
+    await act(async () => {
+      setControlValue(message!, 'Save notes')
+    })
+    await rerender(
+      <Harness
+        changes={changes}
+        initialSelected={['notes/b.stride.json']}
+        error="index locked"
+        notice="Add a model provider, base URL, model, and key in Settings"
+        onCommit={(paths) => committed.push(paths)}
+      />,
+    )
+    const dialog = document.querySelector('[data-testid="git-commit-confirm"]')?.closest('.sd-modal')
+    expect(dialog?.querySelector('[data-testid="git-error"]')?.textContent).toBe('index locked')
+    expect(dialog?.querySelector('[data-testid="git-notice"]')?.textContent).toBe(
+      'Add a model provider, base URL, model, and key in Settings',
+    )
+    expect(dialog?.querySelector('.sd-modal-x')).not.toBeNull()
+    await act(async () => {
+      document.querySelector<HTMLButtonElement>('[data-testid="git-commit-confirm"]')?.click()
+    })
+    expect(committed).toEqual([['notes/b.stride.json']])
+    expect(document.querySelector('[data-testid="git-commit-confirm"]')).not.toBeNull()
+    await act(async () => {
+      dialog?.querySelector<HTMLButtonElement>('.sd-modal-x')?.click()
+    })
+    expect(document.querySelector('[data-testid="git-commit-confirm"]')).toBeNull()
+    expect(host?.querySelector('[data-testid="git-error"]')?.textContent).toBe('index locked')
+  })
+
   it('opens a restore confirm and writes nothing until confirm', async () => {
     const restored: string[] = []
     const shown: string[] = []

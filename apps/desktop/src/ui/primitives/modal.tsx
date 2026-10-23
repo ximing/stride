@@ -81,6 +81,8 @@ export type ModalContentProps = Omit<ComponentPropsWithoutRef<typeof Dialog.Cont
   description?: ReactNode
   children?: ReactNode
   size?: 'sm' | 'md' | 'lg'
+  /** False: no shared close button, and overlay / Escape do not dismiss. */
+  dismissible?: boolean
 }
 
 export const ModalContent = forwardRef<HTMLDivElement, ModalContentProps>(function ModalContent(
@@ -90,8 +92,12 @@ export const ModalContent = forwardRef<HTMLDivElement, ModalContentProps>(functi
     children,
     className,
     size = 'md',
+    dismissible = true,
     'aria-describedby': ariaDescribedBy,
     onCloseAutoFocus,
+    onEscapeKeyDown,
+    onPointerDownOutside,
+    onInteractOutside,
     ...props
   },
   ref,
@@ -103,15 +109,30 @@ export const ModalContent = forwardRef<HTMLDivElement, ModalContentProps>(functi
   const descriptionProps = description
     ? ariaDescribedBy !== undefined ? { 'aria-describedby': ariaDescribedBy } : {}
     : { 'aria-describedby': undefined }
+  const keepOpen = (event: { preventDefault: () => void }) => {
+    if (!dismissible) event.preventDefault()
+  }
 
   return (
     <Dialog.Portal container={layer ?? undefined}>
       <Dialog.Overlay className="sd-overlay" />
       <Dialog.Content
         ref={ref}
-        className={['sd-modal', `sd-modal-${size}`, className].filter(Boolean).join(' ')}
+        className={['sd-modal', dismissible ? '' : 'sd-modal-no-dismiss', `sd-modal-${size}`, className].filter(Boolean).join(' ')}
         {...descriptionProps}
         {...props}
+        onEscapeKeyDown={(event) => {
+          onEscapeKeyDown?.(event)
+          keepOpen(event)
+        }}
+        onPointerDownOutside={(event) => {
+          onPointerDownOutside?.(event)
+          keepOpen(event)
+        }}
+        onInteractOutside={(event) => {
+          onInteractOutside?.(event)
+          keepOpen(event)
+        }}
         onCloseAutoFocus={(event) => {
           onCloseAutoFocus?.(event)
           if (!event.defaultPrevented && !modal?.triggerRef.current) restoreFocus(event)
@@ -120,9 +141,11 @@ export const ModalContent = forwardRef<HTMLDivElement, ModalContentProps>(functi
         <Dialog.Title className="sd-modal-title">{title}</Dialog.Title>
         {description ? <Dialog.Description className="sd-modal-copy">{description}</Dialog.Description> : null}
         {children}
-        <Dialog.Close className="sd-modal-x" aria-label={t('common.close')}>
-          <Mark icon={X} size={16} />
-        </Dialog.Close>
+        {dismissible ? (
+          <Dialog.Close className="sd-modal-x" aria-label={t('common.close')}>
+            <Mark icon={X} size={16} />
+          </Dialog.Close>
+        ) : null}
       </Dialog.Content>
     </Dialog.Portal>
   )
