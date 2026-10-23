@@ -99,12 +99,18 @@ export function imageFiles(data: DataTransfer | null): File[] {
   return files
 }
 
-export async function storeImageFiles(fs: FileSystemBackend, files: File[]): Promise<string[]> {
+export async function storeImageFiles(
+  fs: FileSystemBackend,
+  files: File[],
+  onError?: (error: unknown) => void,
+): Promise<string[]> {
   const srcs: string[] = []
   try {
     for (const file of files) srcs.push(await saveAttachment(fs, file))
-  } catch {
-    // Keep whatever already saved. Do not insert blob: or data: urls.
+  } catch (error) {
+    // Resolve the saved prefix. The toolbar only chains .then, so a rejection
+    // would be unhandled and would drop files that already landed.
+    onError?.(error)
   }
   return srcs
 }

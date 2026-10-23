@@ -1,7 +1,9 @@
+import { has, resolve } from '@rabjs/react'
 import type { FileSystemBackend } from '@stride/platform'
 import { Extension, type Editor } from '@tiptap/core'
 import { Plugin, type Transaction } from '@tiptap/pm/state'
 import { t } from '../../i18n'
+import { VaultService } from '../../services/vault/vault.service'
 import {
   imageFiles,
   insertStoredImages,
@@ -20,7 +22,13 @@ type ClipboardReader = {
  * Paste and drop live here, after the image node, so a file is not inserted twice.
  * Files first, then Markdown, then a lone image URL. Real rich HTML falls through.
  */
-export function createPasteExtension(getFs: () => FileSystemBackend | null) {
+export function createPasteExtension(
+  getFs: () => FileSystemBackend | null,
+  onPasteError?: (message: string) => void,
+) {
+  const report = (error: unknown) => {
+    showPasteError(error, onPasteError)
+  }
   return Extension.create({
     name: 'stridePaste',
     addProseMirrorPlugins() {
@@ -33,11 +41,12 @@ export function createPasteExtension(getFs: () => FileSystemBackend | null) {
               if (!data || editor.isDestroyed) return false
               const files = imageFiles(data)
               if (files.length > 0) {
-                event.preventDefault()
                 const fs = getFs()
-                if (!fs) return true
+                // No filesystem: do not cancel the event. Returning true here drops the file.
+                if (!fs) return false
+                event.preventDefault()
                 const { from, to } = editor.state.selection
-                insertImagesLater(editor, from, to, storeImageFiles(fs, files))
+                insertImagesLater(editor, from, to, storeImageFiles(fs, files, report), report)
                 return true
               }
               if (!dispatchClipboardText(editor, data, getFs)) return false
@@ -49,13 +58,13 @@ export function createPasteExtension(getFs: () => FileSystemBackend | null) {
               const data = event.dataTransfer
               if (!data) return false
               const files = imageFiles(data)
+              const imageFs = files.length > 0 ? getFs() : null
+              if (files.length > 0 && !imageFs) return false
               const coords = view.posAtCoords({ left: event.clientX, top: event.clientY })
               const pos = coords?.pos ?? view.state.selection.from
-              if (files.length > 0) {
+              if (files.length > 0 && imageFs) {
                 event.preventDefault()
-                const fs = getFs()
-                if (!fs) return true
-                insertImagesLater(editor, pos, pos, storeImageFiles(fs, files))
+                insertImagesLater(editor, pos, pos, storeImageFiles(imageFs, files, report), report)
                 return true
               }
               if (!dispatchMarkdownPaste(view, data, pos)) return false
@@ -171,4 +180,19 @@ function insertImagesLater(
 
 function clampPos(editor: Editor, pos: number): number {
   return Math.max(0, Math.min(pos, editor.state.doc.content.size))
+}
+
+function showPasteError(error: unknown, onPasteError?: (message: string) => void): void {
+  const message = pasteErrorMessage(error)
+  if (onPasteError) {
+    onPasteError(message)
+    return
+  }
+  if (has(VaultService)) resolve(VaultService).error = message
+}
+
+function pasteErrorMessage(error: unknown): string {
+  if (error instanceof Error && error.message) return error.message
+  if (typeof error === 'string' && error) return error
+  return t('editor.pasteFailed')
 }
