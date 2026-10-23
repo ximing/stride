@@ -161,21 +161,30 @@ export class BrowserFileSystem implements FileSystemBackend {
     }
     const source = await this.lookup(sourcePath)
     if (!source) throw new PlatformError('not-found', `No such path: ${sourcePath}`)
-    await this.replaceDestination(destPath)
+    const existing = await this.lookup(destPath)
+    if (existing?.kind === 'directory') {
+      const children = await this.list(destPath)
+      if (children.length > 0) {
+        throw new PlatformError('already-exists', `Destination is not empty: ${destPath}`)
+      }
+    }
     const destParent = await this.ensureDirectory(parentPath(destPath))
     const destName = baseName(destPath)
-    const move = movable(source)
-    // move() is missing in some browsers that still ship the directory picker.
-    if (move) {
-      try {
-        await move(destParent, destName)
-      } catch (error) {
-        throw wrapIo(error, `Failed to rename ${sourcePath}`)
-      }
+    if (!existing) {
+      await this.placeAt(source, sourcePath, destParent, destName)
       return
     }
-    await this.copyHandle(source, destParent, destName)
-    await this.remove(sourcePath)
+    // A file publish swaps on close. Deleting the destination first would drop the previous bytes if the write failed.
+    if (source.kind === 'file' && existing.kind === 'file') {
+      await this.copyHandle(source, destParent, destName)
+      await this.remove(sourcePath)
+      return
+    }
+    if (movable(source) && movable(existing)) {
+      await this.replaceWithMove(source, sourcePath, existing, destParent, destName)
+      return
+    }
+    await this.replaceWithoutMove(source, sourcePath, existing, destParent, destName, destPath)
   }
 
   async remove(path: string): Promise<void> {
@@ -266,14 +275,147 @@ export class BrowserFileSystem implements FileSystemBackend {
     return current
   }
 
-  private async replaceDestination(destPath: string): Promise<void> {
-    const existing = await this.stat(destPath)
-    if (!existing) return
-    if (existing.kind === 'directory') {
-      const children = await this.list(destPath)
-      if (children.length > 0) throw new PlatformError('already-exists', `Destination is not empty: ${destPath}`)
+  private async placeAt(
+    source: FileSystemHandle,
+    sourcePath: string,
+    destParent: FileSystemDirectoryHandle,
+    destName: string,
+  ): Promise<void> {
+    const move = movable(source)
+    // move() is missing in some browsers that still ship the directory picker.
+    if (move) {
+      try {
+        await move(destParent, destName)
+      } catch (error) {
+        throw wrapIo(error, `Failed to rename ${sourcePath}`)
+      }
+      return
     }
-    await this.remove(destPath)
+    await this.copyHandle(source, destParent, destName)
+    await this.remove(sourcePath)
+  }
+
+  private async replaceWithMove(
+    source: FileSystemHandle,
+    sourcePath: string,
+    existing: FileSystemHandle,
+    destParent: FileSystemDirectoryHandle,
+    destName: string,
+  ): Promise<void> {
+    const moveSource = movable(source)
+    const moveExisting = movable(existing)
+    if (!moveSource || !moveExisting) throw new PlatformError('io', `Failed to rename ${sourcePath}`)
+    const backup = await this.vacantName(destParent, `${destName}.stride-bak`)
+    try {
+      await moveExisting(destParent, backup)
+    } catch (error) {
+      throw wrapIo(error, `Failed to rename ${sourcePath}`)
+    }
+    try {
+      await moveSource(destParent, destName)
+    } catch (error) {
+      try {
+        await moveExisting(destParent, destName)
+      } catch {
+        // The previous entry is still at the backup name when the restore move fails.
+      }
+      throw wrapIo(error, `Failed to rename ${sourcePath}`)
+    }
+    try {
+      await destParent.removeEntry(backup, { recursive: true })
+    } catch {
+      // The new tree is already at the destination name.
+    }
+  }
+
+  private async replaceWithoutMove(
+    source: FileSystemHandle,
+    sourcePath: string,
+    existing: FileSystemHandle,
+    destParent: FileSystemDirectoryHandle,
+    destName: string,
+    destPath: string,
+  ): Promise<void> {
+    const parent = parentPath(destPath)
+    const tempName = await this.vacantName(destParent, `${destName}.stride-w`)
+    try {
+      await this.copyHandle(source, destParent, tempName)
+    } catch (error) {
+      await destParent.removeEntry(tempName, { recursive: true }).catch(() => undefined)
+      throw wrapIo(error, `Failed to rename ${sourcePath}`)
+    }
+    let savedFile: Uint8Array | null = null
+    if (existing.kind === 'file') {
+      try {
+        const file = await (existing as FileSystemFileHandle).getFile()
+        savedFile = bytesFrom(await file.arrayBuffer())
+      } catch (error) {
+        await destParent.removeEntry(tempName, { recursive: true }).catch(() => undefined)
+        throw wrapIo(error, `Failed to rename ${sourcePath}`)
+      }
+    }
+    try {
+      await destParent.removeEntry(destName, { recursive: true })
+    } catch (error) {
+      await destParent.removeEntry(tempName, { recursive: true }).catch(() => undefined)
+      throw wrapIo(error, `Failed to rename ${sourcePath}`)
+    }
+    const tempPath = parent ? `${parent}/${tempName}` : tempName
+    try {
+      const tempHandle = await this.lookup(tempPath)
+      if (!tempHandle) throw new PlatformError('io', `Failed to rename ${sourcePath}`)
+      await this.placeAt(tempHandle, tempPath, destParent, destName)
+    } catch (error) {
+      await destParent.removeEntry(tempName, { recursive: true }).catch(() => undefined)
+      await this.restoreDisplaced(destParent, destName, destPath, savedFile)
+      throw wrapIo(error, `Failed to rename ${sourcePath}`)
+    }
+    await this.remove(sourcePath)
+  }
+
+  private async restoreDisplaced(
+    destParent: FileSystemDirectoryHandle,
+    destName: string,
+    destPath: string,
+    savedFile: Uint8Array | null,
+  ): Promise<void> {
+    await destParent.removeEntry(destName, { recursive: true }).catch(() => undefined)
+    try {
+      if (savedFile) {
+        const restored = await destParent.getFileHandle(destName, { create: true })
+        await this.writeHandle(restored, savedFile, destPath)
+        return
+      }
+      await destParent.getDirectoryHandle(destName, { create: true })
+    } catch {
+      // Best effort. The saved bytes stay in memory only for this call.
+    }
+  }
+
+  private async vacantName(parent: FileSystemDirectoryHandle, hint: string): Promise<string> {
+    for (let index = 0; index < 1000; index += 1) {
+      const name = index === 0 ? hint : `${hint}-${index}`
+      if (await this.nameFree(parent, name)) return name
+    }
+    throw new PlatformError('io', 'Failed to allocate a temporary name')
+  }
+
+  private async nameFree(parent: FileSystemDirectoryHandle, name: string): Promise<boolean> {
+    try {
+      await parent.getFileHandle(name)
+      return false
+    } catch (error) {
+      if (isDomError(error, 'TypeMismatchError')) return false
+      if (!isDomError(error, 'NotFoundError')) throw wrapIo(error, 'Failed to allocate a temporary name')
+    }
+    try {
+      await parent.getDirectoryHandle(name)
+      return false
+    } catch (error) {
+      if (isDomError(error, 'NotFoundError')) return true
+      if (isDomError(error, 'TypeMismatchError')) return false
+      throw wrapIo(error, 'Failed to allocate a temporary name')
+    }
   }
 
   private async writeHandle(handle: FileSystemFileHandle, data: Uint8Array, path: string): Promise<void> {

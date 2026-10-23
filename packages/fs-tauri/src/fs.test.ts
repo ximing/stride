@@ -34,6 +34,13 @@ const plugin = vi.hoisted(() => {
     return path.slice(slash + 1)
   }
 
+  function hasChild(path: string): boolean {
+    for (const full of nodes.keys()) {
+      if (full.startsWith(`${path}/`) || full.startsWith(`${path}\\`)) return true
+    }
+    return false
+  }
+
   function requireNode(path: string): Stored {
     const node = nodes.get(path)
     if (!node) throw notFound(path)
@@ -51,6 +58,8 @@ const plugin = vi.hoisted(() => {
     calls,
     nodes,
     statError: null as string | null,
+    windowsRename: false,
+    failRename: null as ((oldPath: string, newPath: string) => boolean) | null,
     setStatError(message: string | null) {
       api.statError = message
     },
@@ -59,11 +68,14 @@ const plugin = vi.hoisted(() => {
       nodes.clear()
       clock = 0
       api.statError = null
+      api.windowsRename = false
+      api.failRename = null
       nodes.set('/vault', { kind: 'directory', bytes: new Uint8Array(), mtimeMs: 0 })
     },
     notFound,
     parentOf,
     nameOf,
+    hasChild,
     requireNode,
     putDir,
     touch,
@@ -84,16 +96,22 @@ vi.mock('@tauri-apps/plugin-fs', () => ({
     if (node.kind !== 'file') throw new Error(`Is a directory (os error 21): ${path}`)
     return node.bytes.slice()
   },
-  async writeTextFile(path: string, data: string): Promise<void> {
+  async writeTextFile(path: string, data: string, options?: { createNew?: boolean }): Promise<void> {
     plugin.calls.push(`writeTextFile ${path}`)
+    if (options?.createNew && plugin.nodes.has(path)) {
+      throw new Error(`File exists (os error 17): ${path}`)
+    }
     plugin.nodes.set(path, {
       kind: 'file',
       bytes: new TextEncoder().encode(data),
       mtimeMs: plugin.touch(),
     })
   },
-  async writeFile(path: string, data: Uint8Array): Promise<void> {
+  async writeFile(path: string, data: Uint8Array, options?: { createNew?: boolean }): Promise<void> {
     plugin.calls.push(`writeFile ${path}`)
+    if (options?.createNew && plugin.nodes.has(path)) {
+      throw new Error(`File exists (os error 17): ${path}`)
+    }
     plugin.nodes.set(path, { kind: 'file', bytes: data.slice(), mtimeMs: plugin.touch() })
   },
   async readDir(path: string) {
@@ -132,7 +150,21 @@ vi.mock('@tauri-apps/plugin-fs', () => ({
   },
   async rename(oldPath: string, newPath: string): Promise<void> {
     plugin.calls.push(`rename ${oldPath} ${newPath}`)
-    plugin.requireNode(oldPath)
+    const source = plugin.requireNode(oldPath)
+    if (plugin.failRename?.(oldPath, newPath)) {
+      throw new Error('failed to rename path with error: Access is denied. (os error 5)')
+    }
+    const dest = plugin.nodes.get(newPath)
+    if (dest && plugin.windowsRename) {
+      throw new Error('Cannot create a file when that file already exists. (os error 183)')
+    }
+    if (dest?.kind === 'directory') {
+      if (plugin.hasChild(newPath)) throw new Error('Directory not empty (os error 66)')
+      if (source.kind !== 'directory') throw new Error('Is a directory (os error 21)')
+    } else if (dest && source.kind === 'directory') {
+      throw new Error('Not a directory (os error 20)')
+    }
+    if (dest && oldPath !== newPath) plugin.nodes.delete(newPath)
     const moved: [string, Stored][] = []
     for (const [full, node] of plugin.nodes) {
       if (full === oldPath || full.startsWith(`${oldPath}/`) || full.startsWith(`${oldPath}\\`)) {
@@ -177,6 +209,24 @@ function fs(): TauriFileSystem {
   return new TauriFileSystem('/vault')
 }
 
+function published(command: 'writeTextFile' | 'writeFile', destination: string): boolean {
+  const direct = plugin.calls.includes(`${command} ${destination}`)
+  const wroteTemp = plugin.calls.some((call) => {
+    if (!call.startsWith(`${command} `)) return false
+    const path = call.slice(command.length + 1)
+    return path.startsWith(`${destination}.`) && path.endsWith('.stride-w')
+  })
+  const renamed = plugin.calls.some((call) => {
+    if (!call.startsWith('rename ')) return false
+    const rest = call.slice('rename '.length)
+    const marker = ` ${destination}`
+    if (!rest.endsWith(marker)) return false
+    const from = rest.slice(0, -marker.length)
+    return from.startsWith(`${destination}.`) && from.endsWith('.stride-w')
+  })
+  return wroteTemp && renamed && !direct
+}
+
 describe('TauriFileSystem', () => {
   it('rejects a relative root with escape', () => {
     expect(() => new TauriFileSystem('vault')).toThrow(PlatformError)
@@ -205,8 +255,9 @@ describe('TauriFileSystem', () => {
     payload[0] = 9
     const read = await backend.readBytes('bin/data.bin')
     expect([...read]).toEqual([0, 1, 2, 255])
-    expect(plugin.calls).toContain('writeTextFile /vault/notes/hello.txt')
+    expect(published('writeTextFile', '/vault/notes/hello.txt')).toBe(true)
     expect(plugin.calls).toContain('readFile /vault/bin/data.bin')
+    expect(published('writeFile', '/vault/bin/data.bin')).toBe(true)
   })
 
   it('creates parent directories before write and lists one level sorted by name', async () => {
@@ -285,18 +336,107 @@ describe('TauriFileSystem', () => {
   it('joins windows separators and watches as a no-op', async () => {
     const windows = new TauriFileSystem('C:\\vault')
     await windows.writeText('a/b.txt', 'x')
-    expect(plugin.calls).toContain('writeTextFile C:\\vault\\a\\b.txt')
+    expect(published('writeTextFile', 'C:\\vault\\a\\b.txt')).toBe(true)
     const posixDrive = new TauriFileSystem('C:/vault')
     await posixDrive.writeText('a.txt', 'x')
-    expect(plugin.calls).toContain('writeTextFile C:/vault/a.txt')
+    expect(published('writeTextFile', 'C:/vault/a.txt')).toBe(true)
     const unc = new TauriFileSystem('\\\\server\\share')
     await unc.writeBytes('a/b.bin', new Uint8Array([1]))
-    expect(plugin.calls).toContain('writeFile \\\\server\\share\\a\\b.bin')
+    expect(published('writeFile', '\\\\server\\share\\a\\b.bin')).toBe(true)
     const slashed = new TauriFileSystem('/vault/')
     await slashed.writeText('a.txt', 'x')
-    expect(plugin.calls).toContain('writeTextFile /vault/a.txt')
+    expect(published('writeTextFile', '/vault/a.txt')).toBe(true)
     expect(plugin.calls).not.toContain('writeTextFile /vault//a.txt')
     const stop = await fs().watch('notes', () => {})
     expect(stop()).toBeUndefined()
+  })
+
+  it('keeps the previous file when a temp write fails', async () => {
+    const backend = fs()
+    await backend.writeText('notes/hello.txt', 'old')
+    plugin.failRename = () => true
+    await expect(backend.writeText('notes/hello.txt', 'new')).rejects.toMatchObject({ code: 'io' })
+    expect(await backend.readText('notes/hello.txt')).toBe('old')
+    expect(plugin.calls.includes('writeTextFile /vault/notes/hello.txt')).toBe(false)
+  })
+
+  it('replaces a file on Windows when rename returns os error 183', async () => {
+    const backend = fs()
+    await backend.writeText('keep.txt', 'new')
+    await backend.writeText('live.txt', 'old')
+    plugin.windowsRename = true
+    await backend.rename('keep.txt', 'live.txt')
+    expect(await backend.readText('live.txt')).toBe('new')
+    expect(await backend.stat('keep.txt')).toBeNull()
+    const attempts = plugin.calls.filter((call) => call === 'rename /vault/keep.txt /vault/live.txt')
+    expect(attempts.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('keeps both files when a Windows replace cannot park the destination', async () => {
+    const backend = fs()
+    await backend.writeText('keep.txt', 'new')
+    await backend.writeText('live.txt', 'old')
+    plugin.windowsRename = true
+    plugin.failRename = (_oldPath, newPath) => newPath.includes('.stride-bak')
+    await expect(backend.rename('keep.txt', 'live.txt')).rejects.toMatchObject({ code: 'io' })
+    expect(await backend.readText('live.txt')).toBe('old')
+    expect(await backend.readText('keep.txt')).toBe('new')
+  })
+
+  it('restores the destination when the Windows commit rename fails', async () => {
+    const backend = fs()
+    await backend.writeText('keep.txt', 'new')
+    await backend.writeText('live.txt', 'old')
+    plugin.windowsRename = true
+    let commit = 0
+    plugin.failRename = (oldPath, newPath) => {
+      if (!oldPath.endsWith('/vault/keep.txt') || !newPath.endsWith('/vault/live.txt')) return false
+      commit += 1
+      return commit > 1
+    }
+    await expect(backend.rename('keep.txt', 'live.txt')).rejects.toMatchObject({ code: 'io' })
+    expect(await backend.readText('live.txt')).toBe('old')
+    expect(await backend.readText('keep.txt')).toBe('new')
+  })
+
+  it('returns already-exists for a non-empty directory on Unix and Windows', async () => {
+    const backend = fs()
+    await backend.writeText('dir/a.txt', 'a')
+    await backend.writeText('file.txt', 'f')
+    await backend.mkdir('empty')
+    await expect(backend.rename('file.txt', 'dir')).rejects.toMatchObject({ code: 'already-exists' })
+    expect(await backend.readText('file.txt')).toBe('f')
+    expect(await backend.readText('dir/a.txt')).toBe('a')
+
+    plugin.windowsRename = true
+    await expect(backend.rename('file.txt', 'dir')).rejects.toMatchObject({ code: 'already-exists' })
+    expect(await backend.readText('file.txt')).toBe('f')
+    expect(await backend.readText('dir/a.txt')).toBe('a')
+    expect(await backend.stat('empty')).toMatchObject({ kind: 'directory' })
+  })
+
+  it('replaces an empty directory and overwrites a file without truncating it first', async () => {
+    const backend = fs()
+    await backend.mkdir('empty')
+    await backend.writeText('file.txt', 'body')
+    await backend.rename('file.txt', 'empty')
+    expect(await backend.readText('empty')).toBe('body')
+    expect(await backend.stat('file.txt')).toBeNull()
+
+    await backend.writeText('again.txt', 'windows')
+    plugin.windowsRename = true
+    await backend.rename('again.txt', 'empty')
+    expect(await backend.readText('empty')).toBe('windows')
+    expect(await backend.stat('again.txt')).toBeNull()
+
+    plugin.calls.length = 0
+    await backend.writeText('empty', 'next')
+    expect(await backend.readText('empty')).toBe('next')
+    expect(published('writeTextFile', '/vault/empty')).toBe(true)
+
+    plugin.failRename = (_oldPath, newPath) => newPath.includes('.stride-bak')
+    await expect(backend.writeText('empty', 'lost')).rejects.toMatchObject({ code: 'io' })
+    expect(await backend.readText('empty')).toBe('next')
+    expect(plugin.calls.includes('writeTextFile /vault/empty')).toBe(false)
   })
 })

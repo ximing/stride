@@ -74,6 +74,20 @@ class ThrowIoKeepDestFs extends MemoryFileSystem {
   }
 }
 
+class ExistsConflictFs extends MemoryFileSystem {
+  removed: string[] = []
+
+  override async rename(from: string, to: string): Promise<void> {
+    if (await this.stat(to)) throw new PlatformError('io', 'os error 183')
+    await super.rename(from, to)
+  }
+
+  override async remove(path: string): Promise<void> {
+    this.removed.push(path)
+    await super.remove(path)
+  }
+}
+
 class CountingFs extends MemoryFileSystem {
   removed: string[] = []
   override async remove(path: string): Promise<void> {
@@ -172,6 +186,17 @@ describe('search cache bytes', () => {
     expect(isExistsConflict(new Error('ERROR_ALREADY_EXISTS'))).toBe(true)
     expect(isExistsConflict(new Error('file already exists'))).toBe(true)
     expect(isExistsConflict(new PlatformError('io', 'disk io'))).toBe(false)
+  })
+
+  it('does not delete the live file when rename reports an exists conflict', async () => {
+    const good = new TextEncoder().encode('good-bytes')
+    const next = new TextEncoder().encode('next-bytes')
+    const fs = new ExistsConflictFs('exists')
+    await fs.writeBytes('pack.bin', good)
+    await expect(atomicWrite(fs, 'pack.bin', next)).rejects.toThrow(/os error 183/)
+    expect(new TextDecoder().decode(await fs.readBytes('pack.bin'))).toBe('good-bytes')
+    expect(fs.removed).toEqual([])
+    expect((await fs.stat('pack.bin.tmp'))?.kind).toBe('file')
   })
 })
 

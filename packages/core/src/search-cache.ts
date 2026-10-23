@@ -1,4 +1,4 @@
-import { PlatformError, type FileStat, type FileSystemBackend } from '@stride/platform'
+import { PlatformError, type FileSystemBackend } from '@stride/platform'
 import { plainText, type StrideNote } from './note.ts'
 import { sha256HexSync } from './sha256.ts'
 
@@ -251,23 +251,11 @@ export function isExistsConflict(error: unknown): boolean {
     || /\balready exists\b/i.test(text)
 }
 
+// The backend replaces an existing file. Deleting it here first drops the live bytes when the second rename fails.
 export async function atomicWrite(fs: FileSystemBackend, path: string, bytes: Uint8Array): Promise<void> {
   const tmp = `${path}.tmp`
   await fs.writeBytes(tmp, bytes)
-  try {
-    await fs.rename(tmp, path)
-  } catch (error) {
-    let dest: FileStat | null
-    try {
-      dest = await fs.stat(path)
-    } catch {
-      throw error
-    }
-    if (!dest) throw error
-    if (!isExistsConflict(error)) throw error
-    await fs.remove(path)
-    await fs.rename(tmp, path)
-  }
+  await fs.rename(tmp, path)
 }
 
 export async function readValidFile(
@@ -895,7 +883,7 @@ export class SearchDiskCache {
     return null
   }
 
-  // Rename of a non-empty claims directory. atomicWrite would delete a live held/ on exists conflicts.
+  // held/ is a directory. A non-empty destination must stay; rename fails instead of replacing it.
   private async tryAcquireOnce(allowSteal: boolean): Promise<string | null> {
     const holder = newHolder()
     const claim = `${lockDir()}/claims/${holder}`

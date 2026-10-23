@@ -18,6 +18,7 @@ class MemDir {
   readonly calls: string[] = []
   readonly removed: Array<{ name: string; recursive?: boolean }> = []
   parent: MemDir | null = null
+  move?: (dir: MemDir, name?: string) => Promise<void>
   permission: PermissionState = 'granted'
   requestResult: PermissionState = 'granted'
   queryCalls = 0
@@ -367,6 +368,7 @@ describe('BrowserFileSystem', () => {
     await fs.writeText('loose.txt', 'loose')
     await expect(fs.rename('loose.txt', 'new')).rejects.toMatchObject({ code: 'already-exists' })
     expect(await fs.readText('loose.txt')).toBe('loose')
+    expect(await fs.readText('new/place/b.txt')).toBe('A')
     await expect(fs.rename('missing.txt', 'gone/new.txt')).rejects.toMatchObject({ code: 'not-found' })
     expect(await fs.stat('gone')).toBeNull()
 
@@ -376,6 +378,97 @@ describe('BrowserFileSystem', () => {
     expect(await fs.stat('new/place/b.txt')).toBeNull()
     expect(await fs.list('')).toEqual([{ name: 'loose.txt', kind: 'file' }])
     await expect(fs.remove('new')).rejects.toMatchObject({ code: 'not-found' })
+  })
+
+  it('replaces a file without removing it first', async () => {
+    const root = createRoot()
+    const fs = fsFrom(root)
+    await fs.writeText('a.txt', 'new')
+    await fs.writeText('b.txt', 'old')
+    const dest = root.children.get('b.txt') as MemFile
+    const parentRemoved = root.removed.map((entry) => entry.name)
+    await fs.rename('a.txt', 'b.txt')
+    expect(root.children.get('b.txt')).toBe(dest)
+    expect(await fs.readText('b.txt')).toBe('new')
+    expect(await fs.stat('a.txt')).toBeNull()
+    expect(root.removed.map((entry) => entry.name)).toEqual([...parentRemoved, 'a.txt'])
+  })
+
+  it('keeps the destination file when the replacement write fails', async () => {
+    const root = createRoot()
+    const fs = fsFrom(root)
+    await fs.writeText('a.txt', 'new')
+    await fs.writeText('b.txt', 'old')
+    const dest = root.children.get('b.txt') as MemFile
+    dest.createWritable = async () => {
+      throw new DOMException('disk full', 'QuotaExceededError')
+    }
+    await expect(fs.rename('a.txt', 'b.txt')).rejects.toMatchObject({ code: 'io' })
+    expect(root.children.get('b.txt')).toBe(dest)
+    expect(await fs.readText('b.txt')).toBe('old')
+    expect(await fs.readText('a.txt')).toBe('new')
+    expect(root.removed).toEqual([])
+  })
+
+  it('keeps an occupied directory when move fails before the source is published', async () => {
+    const root = createRoot()
+    const fs = fsFrom(root)
+    await fs.mkdir('empty')
+    await fs.writeText('file.txt', 'body')
+    const empty = root.children.get('empty') as MemDir
+    const file = root.children.get('file.txt') as MemFile
+    empty.move = async () => {
+      throw new DOMException('busy', 'InvalidModificationError')
+    }
+    file.move = async () => {
+      throw new Error('source should stay until the destination is parked')
+    }
+    await expect(fs.rename('file.txt', 'empty')).rejects.toMatchObject({ code: 'io' })
+    expect(await fs.stat('empty')).toEqual({ kind: 'directory', size: 0, mtimeMs: 0 })
+    expect(await fs.readText('file.txt')).toBe('body')
+    expect(root.removed).toEqual([])
+    expect(root.children.get('empty')).toBe(empty)
+  })
+
+  it('replaces an empty directory via move and a file via a directory copy', async () => {
+    const root = createRoot()
+    const fs = fsFrom(root)
+    await fs.mkdir('empty')
+    await fs.writeText('file.txt', 'body')
+    const empty = root.children.get('empty') as MemDir
+    const file = root.children.get('file.txt') as MemFile
+    empty.move = async (parent, name) => {
+      relocate(empty, parent, name ?? empty.name)
+    }
+    file.move = async (parent, name) => {
+      relocate(file, parent, name ?? file.name)
+    }
+    await fs.rename('file.txt', 'empty')
+    expect(await fs.readText('empty')).toBe('body')
+    expect(await fs.stat('file.txt')).toBeNull()
+    expect(root.children.has('empty.stride-bak')).toBe(false)
+
+    await fs.writeText('live.txt', 'old')
+    await fs.writeText('tree/a.txt', 'A')
+    await fs.rename('tree', 'live.txt')
+    expect(await fs.readText('live.txt/a.txt')).toBe('A')
+    expect(await fs.stat('tree')).toBeNull()
+    expect(await fs.readText('empty')).toBe('body')
+  })
+
+  it('keeps a file when copying a directory onto it fails', async () => {
+    const root = createRoot()
+    const fs = fsFrom(root)
+    await fs.writeText('live.txt', 'old')
+    await fs.mkdir('tree')
+    const tree = root.children.get('tree') as MemDir
+    tree.entries = async function* entries() {
+      throw new DOMException('unreadable', 'NotReadableError')
+    }
+    await expect(fs.rename('tree', 'live.txt')).rejects.toMatchObject({ code: 'io' })
+    expect(await fs.readText('live.txt')).toBe('old')
+    expect(await fs.stat('tree')).toEqual({ kind: 'directory', size: 0, mtimeMs: 0 })
+    expect(root.children.has('live.txt.stride-w')).toBe(false)
   })
 
   it('uses move() when the handle implements it', async () => {
