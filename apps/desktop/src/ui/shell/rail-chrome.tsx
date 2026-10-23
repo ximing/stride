@@ -1,5 +1,5 @@
 import { observer, useService } from '@rabjs/react'
-import { Book, Check, ChevronDown, PanelLeft, Plus, Search } from 'lucide-react'
+import { Check, ChevronDown, Files, Inbox, PanelLeft, Plus, Search } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { CommandService } from '../../services/commands/command.service'
@@ -67,7 +67,6 @@ export const VaultSwitcher = observer(function VaultSwitcher() {
           })
         }}
       >
-        <span className="statusbar-icon statusbar-icon-vault"><Mark icon={Book} size={14} /></span>
         <span className="vault-switcher-label">{vault.currentVaultLabel}</span>
         <Mark icon={ChevronDown} size={14} />
       </Button>
@@ -156,52 +155,92 @@ const SidebarToggle = observer(function SidebarToggle() {
   )
 })
 
-const RailSearch = observer(function RailSearch() {
+function useSearchHint() {
   const { t } = useTranslation()
   const vault = useService(VaultService)
   const commands = useService(CommandService)
   const searchKeys = commandShortcut(commands.commands, 'search.global')
   const degraded = vault.searchDegraded ? t('search.degraded') : ''
   const title = degraded || (searchKeys ? `${t('search.vault')} (${searchKeys})` : t('search.vault'))
+  return { commands, searchKeys, degraded, title, t }
+}
+
+/** Full-width pseudo input under the rail header; opens global search. */
+export const RailSearchField = observer(function RailSearchField() {
+  const { commands, searchKeys, degraded, title, t } = useSearchHint()
   return (
-    <span className="rail-search-slot">
-      <IconButton
-        icon={Search}
-        label={t('search.vault')}
-        title={title}
-        className={degraded ? 'rail-search is-degraded' : 'rail-search'}
+    <div className="rail-search-block">
+      <button
+        type="button"
+        className="rail-search-field"
         data-testid="vault-search"
-        size="sm"
+        title={title}
         onClick={() => commands.execute('search.global')}
-      />
+      >
+        <Mark icon={Search} size={14} />
+        <span className="rail-search-placeholder">{t('search.allNotes')}</span>
+        {searchKeys ? <kbd className="rail-search-kbd">{searchKeys}</kbd> : null}
+      </button>
       {degraded ? (
         <span className="rail-search-degraded" data-testid="search-degraded">{degraded}</span>
       ) : null}
-    </span>
+    </div>
   )
 })
 
-/** Window buttons, sidebar toggle, and search. One row, aligned with the other column headers. */
+/** Window buttons, vault switcher, and the sidebar toggle. One 40px row. */
 export const RailChrome = observer(function RailChrome() {
   const desktop = isTauriRuntime()
   return (
     <div className="rail-chrome" data-tauri-drag-region="deep">
       {desktop ? <WindowControls /> : null}
-      <SidebarToggle />
-      <RailSearch />
+      <VaultSwitcher />
       <div className="rail-drag" />
+      <SidebarToggle />
     </div>
   )
 })
 
-/** Window buttons, sidebar toggle, and search, shown in the note-list header when the rail is hidden. */
-export const CollapsedChrome = observer(function CollapsedChrome() {
+/** Activity rail shown while the sidebar is collapsed. */
+export const RailMini = observer(function RailMini() {
+  const { t } = useTranslation()
+  const vault = useService(VaultService)
+  const { commands, degraded, title } = useSearchHint()
   const desktop = isTauriRuntime()
   return (
-    <div className="collapsed-chrome">
+    <aside className="rail-mini" data-tauri-drag-region="deep">
       {desktop ? <WindowControls /> : null}
       <SidebarToggle />
-      <RailSearch />
-    </div>
+      <span className="rail-search-slot">
+        <IconButton
+          icon={Search}
+          label={t('search.vault')}
+          title={title}
+          className={degraded ? 'rail-search is-degraded' : 'rail-search'}
+          data-testid="vault-search"
+          size="sm"
+          onClick={() => commands.execute('search.global')}
+        />
+        {degraded ? (
+          <span className="rail-search-degraded" data-testid="search-degraded">{degraded}</span>
+        ) : null}
+      </span>
+      <div className="rail-mini-divider" />
+      <IconButton
+        icon={Files}
+        label={t('sidebar.all')}
+        active={vault.listFilter === 'all'}
+        size="sm"
+        onClick={() => vault.setFilter('all')}
+      />
+      <IconButton
+        icon={Inbox}
+        label={t('sidebar.inbox')}
+        active={vault.listFilter === 'inbox'}
+        data-testid="rail-inbox"
+        size="sm"
+        onClick={() => vault.setFilter('inbox')}
+      />
+    </aside>
   )
 })

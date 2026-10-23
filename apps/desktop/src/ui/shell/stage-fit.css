@@ -4,7 +4,9 @@
   min-width: 320px;
   display: flex;
   flex-direction: column;
-  background: var(--sd-surface);
+  /* The stage sits on the desk tone so the active tab (--sd-bg) merges into
+     the document below it. */
+  background: var(--sd-bg);
   padding: 0;
   overflow: hidden;
   zoom: var(--sd-stage-zoom, 1);
@@ -31,11 +33,5 @@
   flex: 1 1 auto;
   width: auto;
   min-width: 0;
-}
-
-/* Save feedback rides the title row's right edge instead of its own line. */
-.stage-head .save-status,
-.stage-head .save-retry {
-  flex: none;
 }
 

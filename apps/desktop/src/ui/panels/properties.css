@@ -59,20 +59,204 @@
 }
 
 .property-row {
-  grid-template-columns: minmax(0, 1fr) auto;
-  gap: 8px;
-  align-items: end;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2px;
+  align-items: start;
   min-width: 0;
   margin-bottom: 12px;
 }
 
-.property-row .sd-field {
+.property-row > .property-grip {
+  display: flex;
+  align-items: center;
+  min-height: 20px;
+  margin-top: 1px;
+  margin-bottom: 0;
+  color: var(--sd-muted);
+  cursor: grab;
+  opacity: 0;
+  transition: opacity var(--sd-motion-hover) var(--sd-ease-standard);
+}
+
+.property-row:hover .property-grip,
+.property-row:focus-within .property-grip {
+  opacity: 1;
+}
+
+.property-row.is-drop-before {
+  box-shadow: 0 -2px 0 var(--sd-accent);
+}
+
+.property-row.is-drop-after {
+  box-shadow: 0 2px 0 var(--sd-accent);
+}
+
+.property-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sd-space-1);
+  min-width: 0;
+}
+
+.property-body .sd-field {
   width: 100%;
   min-width: 0;
 }
 
+.property-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  min-width: 0;
+  min-height: 20px;
+}
+
+.property-name {
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  color: var(--sd-muted);
+  font-family: var(--sd-font-sans);
+  font-size: var(--sd-text-xs);
+  font-weight: 500;
+  line-height: 1.35;
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: transparent;
+  border: none;
+  border-radius: var(--sd-radius);
+  cursor: text;
+}
+
+.property-name:focus-visible {
+  outline: 2px solid var(--sd-focus-ring);
+  outline-offset: 2px;
+}
+
+.property-rename {
+  min-height: 22px;
+  padding: 1px var(--sd-space-1);
+  font-size: var(--sd-text-xs);
+}
+
+.property-tools {
+  display: flex;
+  flex: none;
+  gap: 2px;
+  opacity: 0;
+  transition: opacity var(--sd-motion-hover) var(--sd-ease-standard);
+}
+
+.property-row:hover .property-tools,
+.property-row:focus-within .property-tools,
+.property-tools:has([data-state='open']) {
+  opacity: 1;
+}
+
 .property-remove {
   margin-bottom: 2px;
+}
+
+/* list values as chips */
+.sd-chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  min-width: 0;
+  min-height: var(--sd-control-md);
+  padding: 3px var(--sd-space-2);
+  background: var(--sd-inset);
+  border: 1px solid transparent;
+  border-radius: var(--sd-radius);
+  transition:
+    background-color var(--sd-motion-hover) var(--sd-ease-standard),
+    border-color var(--sd-motion-hover) var(--sd-ease-standard);
+}
+
+.sd-chips:hover {
+  background: var(--sd-inset-hover);
+}
+
+.sd-chips:focus-within {
+  background: var(--sd-surface);
+  border-color: var(--sd-accent);
+}
+
+.sd-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  min-width: 0;
+  max-width: 100%;
+  padding: 1px 2px 1px 6px;
+  color: var(--sd-fg);
+  font-family: var(--sd-font-sans);
+  font-size: var(--sd-text-xs);
+  line-height: 1.4;
+  background: var(--sd-bg-elevated);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+}
+
+.sd-chip-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sd-chip-remove {
+  min-width: 18px;
+  min-height: 18px;
+  padding: 1px;
+}
+
+.sd-chips-input {
+  flex: 1;
+  min-width: 72px;
+  min-height: 22px;
+  padding: 1px 2px;
+  color: var(--sd-fg);
+  font-family: var(--sd-font-sans);
+  font-size: var(--sd-text-xs);
+  background: transparent;
+  border: none;
+}
+
+.sd-chips-input:focus {
+  outline: none;
+}
+
+.sd-chips-input::placeholder {
+  color: var(--sd-muted);
+  opacity: 0.85;
+}
+
+.property-add-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* relationship groups */
+.relation-group-label {
+  margin: 10px 0 2px;
+  padding: 0 8px;
+  color: var(--sd-muted);
+  font-family: var(--sd-font-sans);
+  font-size: var(--sd-text-xs);
+  font-weight: 500;
+  line-height: 1.35;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .property-grip,
+  .property-tools,
+  .sd-chips {
+    transition: none;
+  }
 }
 
 .property-add-form {
@@ -121,13 +305,14 @@
   border-radius: var(--sd-radius);
 }
 
-.relation-match:hover {
+.relation-match:hover,
+.relation-match.is-active {
   background: color-mix(in srgb, var(--sd-fg) 4%, transparent);
 }
 
 .relation-line {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 4px;
   align-items: center;
   min-width: 0;

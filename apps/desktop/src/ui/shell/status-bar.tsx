@@ -2,6 +2,7 @@ import { observer, useService } from '@rabjs/react'
 import { syncState } from '@stride/core'
 import type { GitSurface, SyncState } from '@stride/core'
 import { GitBranch, RefreshCw, Search, Settings, Sparkles } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { t } from '../../i18n'
 import { LayoutService } from '../../services/layout/layout.service'
@@ -86,6 +87,51 @@ function indexStatusLabel(
   return ''
 }
 
+/** Save feedback in the status bar: "saved" confirms briefly then folds away
+   (the element collapses via `.save-status:empty`); pending/saving and error
+   states stay visible until they resolve. */
+export const SaveStatus = observer(function SaveStatus() {
+  const { t } = useTranslation()
+  const vault = useService(VaultService)
+  const [showSaved, setShowSaved] = useState(false)
+  useEffect(() => {
+    if (vault.saveStatus !== 'saved') {
+      setShowSaved(false)
+      return
+    }
+    setShowSaved(true)
+    const timer = setTimeout(() => setShowSaved(false), 2600)
+    return () => clearTimeout(timer)
+  }, [vault.saveStatus])
+  const status = vault.saveStatus
+  if (status === 'error') {
+    return (
+      <>
+        <span className="statusbar-item save-status is-error" data-testid="save-status">
+          {t('shell.saveFailed')}
+        </span>
+        <Button
+          tone="quiet"
+          size="sm"
+          className="statusbar-item statusbar-action statusbar-save-retry"
+          data-testid="save-retry"
+          onClick={() => { void vault.flush() }}
+        >
+          {t('common.retry')}
+        </Button>
+      </>
+    )
+  }
+  return (
+    <span
+      className={status === 'pending' || status === 'saving' ? 'statusbar-item save-status is-saving' : 'statusbar-item save-status is-saved'}
+      data-testid="save-status"
+    >
+      {status === 'pending' || status === 'saving' ? t('shell.saving') : showSaved ? t('shell.saved') : ''}
+    </span>
+  )
+})
+
 export const StatusBar = observer(function StatusBar() {
   const { t: translate } = useTranslation()
   const vault = useService(VaultService)
@@ -142,6 +188,7 @@ export const StatusBar = observer(function StatusBar() {
           {updateCheck.feedbackText}
         </span>
       ) : null}
+      <SaveStatus />
       <Button
         tone="quiet"
         size="sm"

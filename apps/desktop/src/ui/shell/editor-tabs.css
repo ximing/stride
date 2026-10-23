@@ -6,10 +6,8 @@
 
 .tab-strip {
   display: flex;
-  overflow-x: auto;
   flex: none;
   margin: 0;
-  scrollbar-width: thin;
 }
 
 .stage-head {
@@ -37,7 +35,11 @@
   background: transparent;
 }
 
-.editor {
+/* The .editor shell spans the full stage width so the toolbar row can use the
+   space right of the paper column; the paper constraint lives on the content
+   itself, keeping the same left edge as the title. */
+.editor .ProseMirror,
+.editor .find-bar {
   max-width: var(--sd-note-max-width);
 }
 
@@ -168,47 +170,56 @@
 /* ---------- editor and inspector tabs ---------- */
 
 /* Column header band: sidebar, note list, tab strip, and panel head share
-   one 44px line across the top of the workspace. */
+   one 40px line across the top of the workspace. Tabs scroll on the left;
+   the action group stays pinned to the right edge. */
 .tab-strip {
-  align-items: center;
-  gap: 2px;
-  height: 44px;
-  min-height: 44px;
+  align-items: stretch;
+  height: 40px;
+  min-height: 40px;
   margin: 0;
-  padding: 0 8px;
+  border-bottom: 1px solid var(--sd-border);
   background: var(--sd-bg);
   user-select: none;
+}
+
+.tabs-scroll {
+  display: flex;
+  flex: 1;
+  align-items: stretch;
+  min-width: 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabs-scroll::-webkit-scrollbar {
+  display: none;
 }
 
 .tab {
   display: flex;
   align-items: center;
-  height: 32px;
-  min-width: 96px;
-  max-width: 192px;
-  flex: 0 1 192px;
+  flex: none;
+  max-width: 180px;
+  padding: 0 4px 0 14px;
   overflow: hidden;
-  /* Quiet pill, centered in the strip: no connected-slab corners, so no
-     notch artifacts where the strip meets neighboring columns. */
-  border: 1px solid transparent;
-  border-radius: var(--sd-radius);
+  border-right: 1px solid var(--sd-border);
+  background: color-mix(in srgb, var(--sd-fg) 3%, var(--sd-bg));
   box-shadow: none;
   color: var(--sd-muted);
-  font-size: 13px;
+  font-size: var(--sd-text-sm);
+  white-space: nowrap;
 }
 
 .tab:hover {
-  background: color-mix(in srgb, var(--sd-fg) 4%, transparent);
-  color: var(--sd-fg);
+  background: var(--sd-surface-hover);
 }
 
 .tab[aria-selected="true"],
 .tab[aria-selected="true"]:hover {
-  /* No outline: the surface background alone merges the tab into the
-     document below, like a folder tab. */
-  border-color: transparent;
-  background: var(--sd-surface);
-  box-shadow: none;
+  /* The strip background continues into the document below, so the active
+     tab reads as the folder tab of the open note. */
+  background: var(--sd-bg);
+  box-shadow: inset 0 2px 0 var(--sd-accent);
   color: var(--sd-fg);
 }
 
@@ -218,12 +229,12 @@
   align-items: center;
   min-width: 0;
   height: 100%;
-  padding: 0 4px 0 10px;
+  padding: 0 4px 0 0;
   border: 0;
   border-radius: 0;
   background: transparent;
   color: inherit;
-  font-size: 13px;
+  font-size: var(--sd-text-sm);
 }
 
 .tab-main:hover:not(:disabled),
@@ -238,10 +249,19 @@
 .tab-title {
   display: block;
   overflow: hidden;
-  font-size: 13px;
+  font-size: var(--sd-text-sm);
   line-height: 1.2;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.dirty-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  margin: 0 4px;
+  border-radius: 50%;
+  background: var(--sd-fg);
 }
 
 .tab-close.sd-icon-button {
@@ -249,7 +269,7 @@
   height: 24px;
   min-height: 24px;
   flex: none;
-  margin-right: 3px;
+  margin-right: 2px;
   padding: 0;
   border: 1px solid transparent;
   background: transparent;
@@ -270,6 +290,21 @@
   opacity: 1;
 }
 
+/* Unsaved active tab: the dirty dot replaces the close button until hover
+   swaps it back (VSCode convention, pure CSS). */
+.tab.dirty .tab-close.sd-icon-button {
+  display: none;
+}
+
+.tab.dirty:hover .dirty-dot {
+  display: none;
+}
+
+.tab.dirty:hover .tab-close.sd-icon-button,
+.tab.dirty:focus-within .tab-close.sd-icon-button {
+  display: inline-flex;
+}
+
 .tab-close.sd-icon-button:hover:not(:disabled),
 .tab-close.sd-icon-button:active:not(:disabled) {
   border-color: transparent;
@@ -278,50 +313,12 @@
   color: var(--sd-danger);
 }
 
-.panel-head {
-  height: 44px;
-  min-height: 44px;
-  gap: 4px;
-  padding: 6px 8px;
-  user-select: none;
-}
-
-.panel-tabs {
+.stage-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
   gap: 2px;
-}
-
-.panel-tab.sd-icon-button {
-  width: 32px;
-  height: 32px;
-  min-height: 32px;
-  padding: 0;
-  border: 1px solid transparent;
-  color: var(--sd-muted);
-}
-
-.panel-tab.sd-icon-button:hover:not(:disabled) {
-  border-color: transparent;
-  background: color-mix(in srgb, var(--sd-fg) 5%, transparent);
-  color: var(--sd-fg);
-}
-
-.panel-tab.sd-icon-button[aria-selected="true"] {
-  border-color: transparent;
-  background: color-mix(in srgb, var(--sd-accent) 12%, transparent);
-  box-shadow: none;
-  color: var(--sd-accent);
-}
-
-.panel-rail {
-  width: 44px;
-  padding: 8px 0;
-}
-
-.panel-rail .panel-tabs {
-  gap: 4px;
-}
-
-.panel-body {
-  padding: 12px 12px 24px;
+  padding: 0 8px;
+  border-left: 1px solid var(--sd-border);
 }
 

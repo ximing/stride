@@ -1,6 +1,6 @@
 import { observer, useService } from '@rabjs/react'
 import { Book, BookOpen, FolderOpen, FolderPlus, GitBranch, Notebook } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { NoteEditor } from './editor'
 import { LayoutService } from './services/layout/layout.service'
@@ -17,11 +17,11 @@ import { Input } from './ui/primitives/input'
 import { NoteList, relativeDay } from './ui/note-list/note-list'
 import { QuickOpen } from './ui/overlays/quick-open'
 import { ResizeHandle } from './ui/shell/resize-handle'
-import { PanelRail, RightPanel } from './ui/panels/right-panel'
+import { InspectorRail, RightPanel } from './ui/panels/right-panel'
 import { SearchPanel } from './ui/overlays/search-panel'
 import { SettingsPage } from './ui/settings/settings-page'
 import { Rail } from './ui/shell/sidebar'
-import { CollapsedChrome, RailChrome } from './ui/shell/rail-chrome'
+import { RailChrome, RailMini, RailSearchField } from './ui/shell/rail-chrome'
 import { StatusBar } from './ui/shell/status-bar'
 import { TabStrip } from './ui/shell/tab-strip'
 import { TooltipProvider } from './ui/primitives/tooltip'
@@ -164,49 +164,8 @@ const Chooser = observer(function Chooser() {
   )
 })
 
-/** Save feedback beside the note title: "saved" confirms briefly then folds
-   away (the element collapses via `.save-status:empty`); pending/saving and
-   error states stay visible until they resolve. */
-const SaveStatus = observer(function SaveStatus() {
-  const { t } = useTranslation()
-  const vault = useService(VaultService)
-  const [showSaved, setShowSaved] = useState(false)
-  useEffect(() => {
-    if (vault.saveStatus !== 'saved') {
-      setShowSaved(false)
-      return
-    }
-    setShowSaved(true)
-    const timer = setTimeout(() => setShowSaved(false), 2600)
-    return () => clearTimeout(timer)
-  }, [vault.saveStatus])
-  const status = vault.saveStatus
-  return (
-    <>
-      <span className={status === 'error' ? 'save-status is-error' : 'save-status'} data-testid="save-status">
-        {status === 'pending' || status === 'saving'
-          ? t('shell.saving')
-          : status === 'error'
-            ? t('shell.saveFailed')
-            : showSaved
-              ? t('shell.saved')
-              : ''}
-      </span>
-      {status === 'error' && (
-        <Button
-          tone="secondary"
-          size="sm"
-          className="save-retry"
-          data-testid="save-retry"
-          onClick={() => { void vault.flush() }}
-        >
-          {t('common.retry')}
-        </Button>
-      )}
-    </>
-  )
-})
-
+/** Save feedback lives in the status bar now; the stage head keeps only the
+   title input. */
 const Workspace = observer(function Workspace() {
   const { t } = useTranslation()
   const vault = useService(VaultService)
@@ -233,10 +192,13 @@ const Workspace = observer(function Workspace() {
     <div className="shell" data-testid="vault-surface">
       <UpdateBanner />
       <div className="workspace">
-        {!layout.sidebarCollapsed && (
+        {layout.sidebarCollapsed ? (
+          <RailMini />
+        ) : (
           <>
             <aside className="rail" data-testid="sidebar" style={{ width: layout.sidebarWidth }}>
               <RailChrome />
+              <RailSearchField />
               <div className="rail-scroll">
                 <Rail />
               </div>
@@ -245,7 +207,7 @@ const Workspace = observer(function Workspace() {
           </>
         )}
         <section className="note-list-col" style={{ width: layout.noteListWidth }} aria-label={t('shell.notes')}>
-          <NoteList leading={layout.sidebarCollapsed ? <CollapsedChrome /> : undefined} />
+          <NoteList />
         </section>
         <ResizeHandle column="noteList" label={t('shell.resizeNotes')} />
         <main className="stage">
@@ -261,7 +223,6 @@ const Workspace = observer(function Workspace() {
                     onChange={(event) => vault.updateTitle(event.target.value)}
                     onBlur={() => { void vault.commitHeadingRename() }}
                   />
-                  <SaveStatus />
                 </div>
                 <NoteEditor key={note.id} />
               </>
@@ -281,9 +242,7 @@ const Workspace = observer(function Workspace() {
             {vault.broad && <p className="meta">{t('chooser.broadRoot')}</p>}
           </div>
         </main>
-        {layout.rightPanelCollapsed ? (
-          <PanelRail />
-        ) : (
+        {layout.rightPanelCollapsed ? null : (
           <>
             <ResizeHandle
               column="rightPanel"
@@ -296,6 +255,7 @@ const Workspace = observer(function Workspace() {
             </aside>
           </>
         )}
+        <InspectorRail />
       </div>
       <QuickOpen />
       <SearchPanel />

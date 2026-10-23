@@ -12,6 +12,7 @@ import {
   parseListInput,
   parsePropertyInput,
   type NoteProperty,
+  type PropertyKind,
   type StrideNote,
 } from '@stride/core/note'
 import type { VaultService } from './vault.service'
@@ -129,6 +130,87 @@ export function removeProperty(vault: VaultService, field: string) {
   delete properties[field]
   vault.replace({ ...current, properties })
   vault.schedule(current.id)
+}
+
+/** Rename a property key in place, preserving key order and value. Rejects empty,
+ * unchanged, `_`-prefixed, or colliding names by leaving the field as-is. */
+export function renameProperty(vault: VaultService, field: string, next: string) {
+  const current = vault.active
+  const name = next.trim()
+  if (!current || !Object.hasOwn(current.properties, field)) return
+  if (!name || name === field || name.startsWith('_') || Object.hasOwn(current.properties, name)) return
+  const properties: Record<string, NoteProperty> = {}
+  for (const [key, value] of Object.entries(current.properties)) {
+    properties[key === field ? name : key] = value
+  }
+  clearFieldDraft(vault, field)
+  vault.replace({ ...current, properties })
+  vault.schedule(current.id)
+}
+
+/** Convert a property to another kind. Unconvertible values (e.g. text that is
+ * not a finite number) leave the property untouched. */
+export function convertProperty(vault: VaultService, field: string, kind: PropertyKind) {
+  const current = vault.active
+  if (!current) return
+  const value = current.properties[field]
+  if (value === undefined) return
+  let next: NoteProperty | undefined
+  if (kind === 'string') next = formatProperty(value)
+  else if (kind === 'number') next = typeof value === 'number' ? value : parseFiniteNumber(formatProperty(value))
+  else if (kind === 'boolean') {
+    if (typeof value === 'boolean') next = value
+    else if (value === 'true') next = true
+    else if (value === 'false') next = false
+  } else {
+    next = Array.isArray(value) ? value : parseListInput(formatProperty(value))
+    if (next.length === 0) next = undefined
+  }
+  if (next === undefined) return
+  clearFieldDraft(vault, field)
+  writeProperty(vault, field, next)
+}
+
+/** Move a property so it sits before `beforeField` (or last when null). */
+export function moveProperty(vault: VaultService, field: string, beforeField: string | null) {
+  const current = vault.active
+  if (!current || !Object.hasOwn(current.properties, field) || beforeField === field) return
+  const value = current.properties[field] as NoteProperty
+  const properties: Record<string, NoteProperty> = {}
+  let inserted = false
+  for (const [key, item] of Object.entries(current.properties)) {
+    if (key === field) continue
+    if (!inserted && key === beforeField) {
+      properties[field] = value
+      inserted = true
+    }
+    properties[key] = item
+  }
+  if (!inserted) properties[field] = value
+  vault.replace({ ...current, properties })
+  vault.schedule(current.id)
+}
+
+export function addListItem(vault: VaultService, field: string, item: string) {
+  const current = vault.active
+  const name = item.trim()
+  if (!current || !name) return
+  const value = current.properties[field]
+  const items = Array.isArray(value) ? value : parseListInput(formatProperty(value))
+  if (items.includes(name)) return
+  clearFieldDraft(vault, field)
+  writeProperty(vault, field, [...items, name])
+}
+
+export function removeListItemAt(vault: VaultService, field: string, index: number) {
+  const current = vault.active
+  if (!current) return
+  const value = current.properties[field]
+  if (!Array.isArray(value)) return
+  const items = value.filter((_, position) => position !== index)
+  clearFieldDraft(vault, field)
+  if (items.length === 0) removeProperty(vault, field)
+  else writeProperty(vault, field, items)
 }
 
 export function commitListProperty(vault: VaultService, field: string) {

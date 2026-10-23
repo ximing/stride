@@ -7,6 +7,7 @@ export type SelectOption = {
   value: string
   label: string
   disabled?: boolean
+  testId?: string
 }
 
 export type SelectProps = Omit<SelectPrimitive.SelectTriggerProps, 'children' | 'value'> & {
@@ -56,6 +57,7 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
                   value={option.value}
                   disabled={option.disabled}
                   className="sd-select-item"
+                  data-testid={option.testId}
                 >
                   <SelectPrimitive.ItemText>{option.label}</SelectPrimitive.ItemText>
                   <SelectPrimitive.ItemIndicator className="sd-select-item-indicator">

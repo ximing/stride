@@ -1,6 +1,9 @@
 /* Surviving rules moved from src/styles so each class has one source. */
 .rail {
-  background: var(--sd-bg);
+  /* Nav plane sits a half step below the note list, with a hairline at the
+     boundary (mockup: dividers, not bare tonal steps). */
+  background: var(--sd-bg-nav);
+  border-right: 1px solid var(--sd-border);
 }
 
 .rail button {
@@ -389,15 +392,15 @@
   box-shadow: inset 0 2px 0 var(--sd-accent);
 }
 
-/* Sidebar header shares the 44px column band with the note list, tabs, and panel. */
+/* Sidebar header shares the 40px column band with the other column headers. */
 
 .rail-chrome {
   display: flex;
   flex: none;
   align-items: center;
   gap: 4px;
-  height: 44px;
-  min-height: 44px;
+  height: 40px;
+  min-height: 40px;
   padding: 0 8px 0 12px;
   user-select: none;
 }
@@ -440,5 +443,103 @@
   clip: rect(0, 0, 0, 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* Global search pseudo input, between the rail header and the scroll area. */
+
+.rail-search-block {
+  flex: none;
+  margin: 2px 8px 8px;
+}
+
+.rail .rail-search-field {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  height: 30px;
+  min-height: 30px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--sd-radius-sm);
+  background: var(--sd-inset);
+  color: var(--sd-muted);
+  font-size: var(--sd-text-sm);
+  text-align: left;
+}
+
+.rail .rail-search-field:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--sd-inset-hover);
+  color: var(--sd-fg);
+}
+
+.rail-search-field svg {
+  flex: none;
+}
+
+.rail-search-placeholder {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.rail-search-kbd {
+  flex: none;
+  padding: 1px 4px;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-sm);
+  background: var(--sd-surface);
+  color: var(--sd-muted);
+  font-family: var(--sd-font-mono);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+/* The expanded search field shows the degraded hint as visible small text. */
+
+.rail-search-block .rail-search-degraded {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 2px 2px 0;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+  border: 0;
+  color: var(--sd-danger);
+  font-size: 11px;
+}
+
+/* Activity rail shown while the sidebar is collapsed. */
+
+.rail-mini {
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  width: 60px;
+  padding-bottom: 12px;
+  border-right: 1px solid var(--sd-border);
+  background: var(--sd-bg-nav);
+  user-select: none;
+}
+
+/* Traffic lights land on the same coordinates as the expanded header. */
+
+.rail-mini .window-controls {
+  align-self: stretch;
+  padding: 14px 0 10px 12px;
+}
+
+.rail-mini-divider {
+  flex: none;
+  width: 28px;
+  height: 1px;
+  margin: 4px 0;
+  background: var(--sd-border);
 }
 

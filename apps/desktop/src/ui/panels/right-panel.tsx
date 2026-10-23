@@ -4,7 +4,6 @@ import {
   GitBranch,
   List,
   MessageCircle,
-  PanelRightClose,
   SlidersHorizontal,
   type LucideIcon,
 } from 'lucide-react'
@@ -61,11 +60,15 @@ const PanelTabs = observer(function PanelTabs({ collapsed }: { collapsed: boolea
   )
 })
 
-/** Slim vertical icon strip shown while the right panel is collapsed. */
-export const PanelRail = observer(function PanelRail() {
+/**
+ * Always-on icon rail pinned to the window's right edge. Rendered in both
+ * collapsed and expanded inspector states; the collapsed state is "rail only".
+ */
+export const InspectorRail = observer(function InspectorRail() {
+  const layout = useService(LayoutService)
   return (
     <aside className="panel-rail" data-testid="panel-rail">
-      <PanelTabs collapsed />
+      <PanelTabs collapsed={layout.rightPanelCollapsed} />
     </aside>
   )
 })
@@ -76,14 +79,7 @@ export const RightPanel = observer(function RightPanel() {
   return (
     <div className="panel-wrap" data-testid="right-panel">
       <div className="panel-head" data-tauri-drag-region="deep">
-        <PanelTabs collapsed={false} />
-        <IconButton
-          icon={PanelRightClose}
-          label={t('shell.hidePanel')}
-          className="panel-tab panel-collapse"
-          data-testid="panel-collapse"
-          onClick={() => layout.setRightPanelCollapsed(true)}
-        />
+        <span className="panel-title">{t(TAB_CHROME[layout.rightPanelTab].labelKey)}</span>
       </div>
       <div className="panel-body">
         {layout.rightPanelTab === 'properties' && <PropertiesPanel />}

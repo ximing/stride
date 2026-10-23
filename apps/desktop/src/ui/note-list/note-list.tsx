@@ -1,4 +1,4 @@
-import { ArrowUpDown, Bookmark, Check, FileText, Inbox, Plus, Search, X } from 'lucide-react'
+import { ArrowUpDown, Bookmark, Check, FileText, Inbox, ListFilter, Plus, Search, X } from 'lucide-react'
 import { has, observer, raw, resolve, useService } from '@rabjs/react'
 import { plainText, type StrideNote } from '@stride/core/note'
 import { memo, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
@@ -367,7 +367,7 @@ interface RowMenuState {
   items: ContextMenuEntry[]
 }
 
-export const NoteList = observer(function NoteList({ leading }: { leading?: ReactNode }) {
+export const NoteList = observer(function NoteList() {
   const { t: translate, i18n } = useTranslation()
   const vault = useService(VaultService)
   const listFilter = useService(ListFilterService)
@@ -556,21 +556,12 @@ export const NoteList = observer(function NoteList({ leading }: { leading?: Reac
       }}
     >
       <header className="note-list-head" data-tauri-drag-region="deep">
-        {leading}
         <h2 className="note-list-title" data-testid="note-list-title">{title}</h2>
         <span className="note-list-count" data-testid="note-list-count">{notes.length}</span>
         <IconButton
-          className="note-list-new"
-          data-testid="note-list-new"
-          icon={Plus}
-          label={translate('shell.newNote')}
-          size="sm"
-          onClick={() => void createNoteFromList()}
-        />
-        <IconButton
           className="note-list-filter-toggle"
           data-testid="list-filter-toggle"
-          icon={Search}
+          icon={ListFilter}
           label={translate('notes.showFilter')}
           size="sm"
           active={filterShown}
@@ -579,6 +570,14 @@ export const NoteList = observer(function NoteList({ leading }: { leading?: Reac
           onClick={toggleListFilter}
         />
         <SortMenu />
+        <IconButton
+          className="note-list-new"
+          data-testid="note-list-new"
+          icon={Plus}
+          label={translate('shell.newNote')}
+          size="sm"
+          onClick={() => void createNoteFromList()}
+        />
       </header>
       {filterShown && (
         <ListFilterInput inputRef={filterInputRef} onDismiss={dismissListFilter} />

@@ -8,68 +8,13 @@
   flex: none;
   min-width: 0;
   overflow: hidden;
-  background: var(--sd-bg);
+  /* One tonal step above the stage (--sd-bg) plus a hairline so the
+     inspector reads as its own column, especially in dark mode. The
+     ResizeHandle stays transparent, so this border is the only divider. */
+  background: var(--sd-surface);
+  border-left: 1px solid var(--sd-border);
   display: flex;
   flex-direction: column;
-}
-
-.panel-wrap {
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  flex: 1;
-}
-
-.panel-head {
-  display: flex;
-  align-items: center;
-}
-
-.panel-tabs {
-  display: flex;
-  align-items: center;
-}
-
-.panel-rail .panel-tabs {
-  flex-direction: column;
-}
-
-.panel-tab {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  border: 1px solid transparent;
-  border-radius: var(--sd-radius);
-  color: var(--sd-muted);
-}
-
-.panel-tab:hover:not(:disabled) {
-  background: var(--sd-bg-elevated);
-  border-color: transparent;
-  color: var(--sd-fg);
-}
-
-.panel-tab[aria-selected="true"] {
-  background: var(--sd-bg-elevated);
-  border-color: var(--sd-border);
-  color: var(--sd-accent);
-}
-
-.panel-rail {
-  flex: none;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  background: var(--sd-bg);
-}
-
-.panel-body {
-  flex: 1;
-  min-height: 0;
-  overflow: auto;
 }
 
 .panel h2 {

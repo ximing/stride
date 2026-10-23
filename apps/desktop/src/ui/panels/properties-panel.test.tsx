@@ -56,6 +56,25 @@ async function selectPropertyType(host: HTMLElement, label: string) {
   })
 }
 
+async function openAddPropertyForm(host: HTMLElement) {
+  const toggle = host.querySelector<HTMLButtonElement>('[data-testid="add-property-open"]')
+  if (!toggle) return
+  await act(async () => {
+    toggle.click()
+  })
+}
+
+/** Radix dropdown triggers toggle on pointerdown, which element.click() skips. */
+async function openRowMenu(host: HTMLElement, name: string) {
+  const trigger = host.querySelector<HTMLButtonElement>(
+    `[data-testid="property-field"][data-name="${name}"] [data-testid="property-actions"]`,
+  )!
+  await act(async () => {
+    trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, cancelable: true }))
+    trigger.click()
+  })
+}
+
 describe('PropertiesPanel', () => {
   beforeEach(() => {
     window.HTMLElement.prototype.scrollIntoView = vi.fn()
@@ -92,6 +111,7 @@ describe('PropertiesPanel', () => {
       expect(host.querySelector('[data-testid="property-field"][data-name="visible"]')).not.toBeNull()
       expect(host.querySelector('[data-name="_icon"]')).toBeNull()
 
+      await openAddPropertyForm(host)
       await act(async () => {
         setControlValue(host.querySelector<HTMLInputElement>('[data-testid="property-name"]')!, 'count')
       })
@@ -167,6 +187,7 @@ describe('PropertiesPanel', () => {
       await act(async () => {
         root.render(<PropertiesPanel />)
       })
+      await openAddPropertyForm(host)
       await act(async () => {
         setControlValue(host.querySelector<HTMLInputElement>('[data-testid="property-name"]')!, 'label')
       })
@@ -221,7 +242,8 @@ describe('PropertiesPanel', () => {
       const toB = host.querySelector<HTMLButtonElement>('[data-testid="relation-link"][data-target="note-b"]')
       const backToB = host.querySelector<HTMLButtonElement>('[data-testid="backlink"][data-source="note-b"]')
       expect(toB).not.toBeNull()
-      expect(toB?.textContent).toContain('body')
+      expect(toB?.textContent).toContain('Note B')
+      expect(host.querySelector('[data-testid="relation-group-body"]')?.textContent).toContain('Body links')
       expect(backToB).not.toBeNull()
       await act(async () => {
         toB!.click()
@@ -231,7 +253,7 @@ describe('PropertiesPanel', () => {
       const toA = host.querySelector<HTMLButtonElement>('[data-testid="relation-link"][data-target="note-a"]')
       const backToA = host.querySelector<HTMLButtonElement>('[data-testid="backlink"][data-source="note-a"]')
       expect(toA).not.toBeNull()
-      expect(toA?.textContent).toContain('Related to')
+      expect(host.querySelector('[data-testid="relation-group-related_to"]')?.textContent).toContain('Related to')
       expect(backToA).not.toBeNull()
       await act(async () => {
         backToA!.click()
@@ -396,6 +418,217 @@ describe('PropertiesPanel', () => {
       })
       expect(await vault.fs!.stat(notePath(id))).toBeNull()
       expect(vault.notes.some((note) => note.id === id)).toBe(false)
+    } finally {
+      vault.cancelPending()
+      await act(async () => {
+        root.unmount()
+      })
+      host.remove()
+    }
+  })
+
+  it('renames a property inline and rejects duplicate names', async () => {
+    useMemoryFixture()
+    register(VaultService)
+    const vault = resolve(VaultService)
+    await vault.openFromDraft()
+    await vault.createNote()
+    vault.updateProperty('status', 'open')
+    vault.updateProperty('owner', 'me')
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    const pressEnter = (element: HTMLElement) => {
+      element.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+    }
+    try {
+      await act(async () => {
+        root.render(<PropertiesPanel />)
+      })
+      const row = () => host.querySelector('[data-testid="property-field"][data-name="status"]')!
+      await act(async () => {
+        row().querySelector<HTMLButtonElement>('[data-testid="property-rename-open"]')!.click()
+      })
+      await act(async () => {
+        setControlValue(host.querySelector<HTMLInputElement>('[data-testid="property-rename"]')!, 'state')
+      })
+      await act(async () => {
+        pressEnter(host.querySelector<HTMLElement>('[data-testid="property-rename"]')!)
+      })
+      expect(vault.active?.properties.state).toBe('open')
+      expect(vault.active?.properties.status).toBeUndefined()
+      expect(vault.active?.properties.owner).toBe('me')
+
+      await act(async () => {
+        host.querySelector<HTMLButtonElement>('[data-testid="property-field"][data-name="state"] [data-testid="property-rename-open"]')!.click()
+      })
+      await act(async () => {
+        setControlValue(host.querySelector<HTMLInputElement>('[data-testid="property-rename"]')!, 'owner')
+      })
+      await act(async () => {
+        pressEnter(host.querySelector<HTMLElement>('[data-testid="property-rename"]')!)
+      })
+      expect(vault.active?.properties.state).toBe('open')
+      expect(vault.active?.properties.owner).toBe('me')
+    } finally {
+      vault.cancelPending()
+      await act(async () => {
+        root.unmount()
+      })
+      host.remove()
+    }
+  })
+
+  it('converts a property kind from the row menu and refuses invalid numbers', async () => {
+    useMemoryFixture()
+    register(VaultService)
+    const vault = resolve(VaultService)
+    await vault.openFromDraft()
+    await vault.createNote()
+    vault.updateProperty('count', '12')
+    vault.updateProperty('label', 'abc')
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    try {
+      await act(async () => {
+        root.render(<PropertiesPanel />)
+      })
+      await openRowMenu(host, 'count')
+      await act(async () => {
+        document.querySelector<HTMLElement>('[data-testid="convert-to-number"]')!.click()
+      })
+      expect(vault.active?.properties.count).toBe(12)
+
+      await openRowMenu(host, 'label')
+      await act(async () => {
+        document.querySelector<HTMLElement>('[data-testid="convert-to-number"]')!.click()
+      })
+      expect(vault.active?.properties.label).toBe('abc')
+    } finally {
+      vault.cancelPending()
+      await act(async () => {
+        root.unmount()
+      })
+      host.remove()
+    }
+  })
+
+  it('edits a list property as chips', async () => {
+    useMemoryFixture()
+    register(VaultService)
+    const vault = resolve(VaultService)
+    await vault.openFromDraft()
+    await vault.createNote()
+    vault.updateListProperty('tags', 'alpha beta')
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    const row = () => host.querySelector('[data-testid="property-field"][data-name="tags"]')
+    const input = () => row()?.querySelector<HTMLInputElement>('[data-testid="list-item-input"]')
+    try {
+      await act(async () => {
+        root.render(<PropertiesPanel />)
+      })
+      expect(row()?.querySelectorAll('[data-testid="list-item"]')).toHaveLength(2)
+
+      await act(async () => {
+        setControlValue(input()!, 'gamma')
+      })
+      await act(async () => {
+        input()!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+      })
+      expect(vault.active?.properties.tags).toEqual(['alpha', 'beta', 'gamma'])
+
+      await act(async () => {
+        row()!.querySelector<HTMLButtonElement>('[data-testid="list-item-remove"][data-index="0"]')!.click()
+      })
+      expect(vault.active?.properties.tags).toEqual(['beta', 'gamma'])
+
+      await act(async () => {
+        input()!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true, cancelable: true }))
+      })
+      expect(vault.active?.properties.tags).toEqual(['beta'])
+
+      await act(async () => {
+        row()!.querySelector<HTMLButtonElement>('[data-testid="list-item-remove"][data-index="0"]')!.click()
+      })
+      expect(vault.active?.properties.tags).toBeUndefined()
+      expect(row()).toBeNull()
+    } finally {
+      vault.cancelPending()
+      await act(async () => {
+        root.unmount()
+      })
+      host.remove()
+    }
+  })
+
+  it('creates a note from an unresolved relation link', async () => {
+    useMemoryFixture()
+    register(VaultService)
+    const vault = resolve(VaultService)
+    await vault.openFromDraft()
+    await vault.createNote()
+    const sourceId = vault.active?.id ?? ''
+    vault.updateTitle('Source')
+    vault.updateProperty('related_to', '[[Ghost]]')
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    try {
+      await act(async () => {
+        root.render(<PropertiesPanel />)
+      })
+      const create = host.querySelector<HTMLButtonElement>('[data-testid="relation-create"][data-field="related_to"]')
+      expect(create).not.toBeNull()
+      await act(async () => {
+        create!.click()
+        await new Promise((resolvePromise) => setTimeout(resolvePromise, 0))
+      })
+      const ghost = vault.notes.find((note) => note.title === 'Ghost')
+      expect(ghost).toBeDefined()
+      expect(vault.activeId).toBe(ghost?.id ?? '')
+      expect(vault.activeId).not.toBe(sourceId)
+    } finally {
+      vault.cancelPending()
+      await act(async () => {
+        root.unmount()
+      })
+      host.remove()
+    }
+  })
+
+  it('flags duplicate property names in the add form', async () => {
+    useMemoryFixture()
+    register(VaultService)
+    const vault = resolve(VaultService)
+    await vault.openFromDraft()
+    await vault.createNote()
+    vault.updateProperty('template', 'daily')
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    try {
+      await act(async () => {
+        root.render(<PropertiesPanel />)
+      })
+      await openAddPropertyForm(host)
+      await act(async () => {
+        setControlValue(host.querySelector<HTMLInputElement>('[data-testid="property-name"]')!, 'template')
+      })
+      expect(host.querySelector<HTMLButtonElement>('[data-testid="add-property"]')?.disabled).toBe(true)
+      expect(host.textContent).toContain('already exists')
+
+      await act(async () => {
+        setControlValue(host.querySelector<HTMLInputElement>('[data-testid="property-name"]')!, 'fresh')
+      })
+      expect(host.querySelector<HTMLButtonElement>('[data-testid="add-property"]')?.disabled).toBe(false)
     } finally {
       vault.cancelPending()
       await act(async () => {

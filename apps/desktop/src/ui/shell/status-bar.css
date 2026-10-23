@@ -2,7 +2,8 @@
 .statusbar {
   display: flex;
   align-items: center;
-  background: var(--sd-bg);
+  background: var(--sd-bg-nav);
+  border-top: 1px solid var(--sd-border);
   color: var(--sd-muted);
 }
 
@@ -178,6 +179,33 @@
 
 .statusbar-version {
   padding: 0 4px;
+}
+
+/* Save feedback item (moved out of the stage head). */
+.statusbar .save-status {
+  font-size: var(--sd-text-xs);
+  white-space: nowrap;
+}
+
+.statusbar .save-status:empty {
+  display: none;
+}
+
+.statusbar .save-status.is-saving {
+  color: var(--sd-warning);
+}
+
+.statusbar .save-status.is-saved {
+  color: var(--sd-accent);
+}
+
+.statusbar .save-status.is-error {
+  color: var(--sd-danger);
+}
+
+.statusbar .statusbar-save-retry.sd-btn,
+.statusbar .statusbar-save-retry.sd-btn:hover:not(:disabled) {
+  color: var(--sd-danger);
 }
 
 .statusbar .vault-switcher .vault-switcher-trigger.sd-btn {

@@ -143,14 +143,8 @@ describe('search notes', () => {
     expect((await readSettings(files, 'empty.json', secrets)).embedding.apiKey).toBe('')
     expect((await readSettings(files, 'empty.json', secrets)).embedding.dim).toBe(4)
     await writeSettings(files, 'zero-dim.json', {
+      ...defaultSettings(),
       embedding: { endpoint: 'http://127.0.0.1/v1', model: 'fixture-embed', apiKey: '', dim: 0 },
-      llmConfigs: [],
-      releasesUrl: '',
-      gitEnabled: true,
-      autoSyncMinutes: 0,
-      autoGitEnabled: false,
-      autoGitIdleSeconds: 0,
-      autoGitBlurSeconds: 0,
     }, secrets)
     expect((await readSettings(files, 'zero-dim.json', secrets)).embedding.dim).toBe(0)
     expect(defaultSettingsPath('/Users/someone')).toBe('/Users/someone/.stride/settings.json')

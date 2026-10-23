@@ -849,6 +849,30 @@ export class VaultService extends Service {
     return propertyEditor.removeProperty(this, field)
   }
 
+  renameProperty(field: string, next: string) {
+    return propertyEditor.renameProperty(this, field, next)
+  }
+
+  convertProperty(field: string, kind: PropertyKind) {
+    return propertyEditor.convertProperty(this, field, kind)
+  }
+
+  moveProperty(field: string, beforeField: string | null) {
+    return propertyEditor.moveProperty(this, field, beforeField)
+  }
+
+  addListItem(field: string, item: string) {
+    return propertyEditor.addListItem(this, field, item)
+  }
+
+  removeListItemAt(field: string, index: number) {
+    return propertyEditor.removeListItemAt(this, field, index)
+  }
+
+  discardPropertyDraft(field: string) {
+    return propertyEditor.clearFieldDraft(this, field)
+  }
+
   commitListProperty(field: string) {
     return propertyEditor.commitListProperty(this, field)
   }
@@ -1119,7 +1143,7 @@ export class VaultService extends Service {
   replaceRecentProjects(projects: readonly RecentProject[]) {
     if (isMemoryFixture()) return
     this.ensureRegistry()
-    const next = projects.map((project) => {
+    const next: VaultRecord[] = projects.map((project) => {
       const previous = this.vaults.find((entry) => entry.id === project.id || entry.label === project.path)
       return {
         id: previous?.id ?? project.id,

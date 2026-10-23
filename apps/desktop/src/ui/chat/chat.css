@@ -269,7 +269,8 @@
   max-width: 100%;
 }
 
-.chat-compose .chat-model.sd-select-trigger {
+.chat-compose .chat-model.sd-select-trigger,
+.chat-compose .chat-mode-select.sd-select-trigger {
   min-height: 28px;
   height: 28px;
   padding: 0 8px;
@@ -277,14 +278,14 @@
   background: transparent;
 }
 
-.chat-compose .chat-model.sd-select-trigger:hover:not(:disabled) {
+.chat-compose .chat-model.sd-select-trigger:hover:not(:disabled),
+.chat-compose .chat-mode-select.sd-select-trigger:hover:not(:disabled) {
   background: color-mix(in srgb, var(--sd-fg) 5%, transparent);
 }
 
-/* The segmented track sits inside the composer card, so it stays quiet. */
-.chat-compose .chat-mode.sd-tabs-list {
-  padding: 0;
-  background: transparent;
+.chat-mode-select.sd-select-trigger {
+  flex: none;
+  width: auto;
 }
 
 .chat-model-empty {
@@ -297,47 +298,6 @@
   line-height: 28px;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.chat-mode-tabs {
-  flex: none;
-  align-self: center;
-  max-width: 100%;
-}
-
-.chat-mode.sd-tabs-list {
-  display: flex;
-  gap: 2px;
-  min-height: 0;
-  max-width: 100%;
-  padding: 2px;
-  background: var(--sd-inset);
-  border: 1px solid transparent;
-  border-bottom: 0;
-  border-radius: 8px;
-}
-
-.chat-mode-trigger {
-  min-height: 28px;
-  margin: 0;
-  padding: 4px 10px;
-  color: var(--sd-muted);
-  font-size: 12px;
-  border: 1px solid transparent;
-  border-bottom: 1px solid transparent;
-  border-radius: var(--sd-radius);
-}
-
-.chat-mode-trigger:hover:not(:disabled):not([data-state='active']) {
-  color: var(--sd-fg);
-}
-
-.chat-mode-trigger[data-state='active'] {
-  color: var(--sd-fg);
-  font-weight: 500;
-  background: var(--sd-bg-elevated);
-  border-color: transparent;
-  box-shadow: 0 1px 2px color-mix(in srgb, var(--sd-fg) 18%, transparent);
 }
 
 /* The draft is chromeless inside the composer card; the card's

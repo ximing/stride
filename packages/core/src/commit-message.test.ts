@@ -78,9 +78,9 @@ describe('suggestCommitMessage', () => {
 
   it('does not call streamFn for an empty diff', async () => {
     let calls = 0
-    const streamFn: StreamFn = () => {
+    const streamFn: StreamFn = (calledModel, context, options) => {
       calls += 1
-      return textStream(['fix: rename the note'])()
+      return textStream(['fix: rename the note'])(calledModel, context, options)
     }
     const empty = await suggestCommitMessage({
       diff: '',

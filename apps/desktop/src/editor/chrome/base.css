@@ -256,16 +256,6 @@
   max-height: 90vh;
 }
 
-.save-status {
-  color: var(--sd-muted);
-  font-size: 0.75rem;
-  white-space: nowrap;
-}
-
-.save-status:empty {
-  display: none;
-}
-
 .save-retry {
   width: auto;
   padding: 0.1rem 0.5rem;
@@ -292,10 +282,6 @@
 
 .save-retry:hover {
   border-color: var(--sd-danger);
-}
-
-.save-status.is-error {
-  color: var(--sd-danger);
 }
 
 .editor .ProseMirror .editor-code {
@@ -908,6 +894,8 @@
   color: var(--sd-muted);
   font-size: 13px;
   line-height: 1;
+  /* Labels like "Align left" must never wrap onto a second line. */
+  white-space: nowrap;
   transition: background-color 120ms ease, border-color 120ms ease, color 120ms ease;
 }
 

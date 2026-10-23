@@ -2,11 +2,14 @@
 .col-resize {
   flex: none;
   width: 5px;
-  margin: 0 -1px;
+  /* Net-zero layout width: the 5px drag hot zone straddles the boundary
+     (2.5px over each column) so the transparent strip never shows the
+     shell background as a phantom band beside the hairline. */
+  margin: 0 -2.5px;
   z-index: 5;
   cursor: col-resize;
-  /* No hairline: columns are separated by their tonal step. The accent fill
-     on hover/active/focus is the drag affordance. */
+  /* No hairline of its own: columns carry the divider borders. The accent
+     fill on hover/active/focus is the drag affordance. */
   background: transparent;
   transition: background-color 120ms ease;
 }

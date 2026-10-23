@@ -3,9 +3,10 @@
   flex: none;
   min-width: 0;
   overflow: hidden;
-  /* Half step up from the rail's desk tone: separates the two nav columns
-     by luminance instead of a hairline. */
-  background: var(--sd-bg-nav);
+  /* Half step above the rail, with a hairline toward the stage: zone
+     boundaries come from divider lines, not bare background steps. */
+  background: var(--sd-surface);
+  border-right: 1px solid var(--sd-border);
   display: flex;
   flex-direction: column;
 }
@@ -19,7 +20,7 @@
 
 .note-list-head {
   display: flex;
-  height: 44px;
+  height: 40px;
 }
 
 .note-list-title {
@@ -175,16 +176,16 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
-  height: 44px;
-  min-height: 44px;
-  padding: 0 8px 0 12px;
+  height: 40px;
+  min-height: 40px;
+  padding: 0 8px;
   user-select: none;
 }
 
 .note-list-title {
   flex: 0 1 auto;
   min-width: 0;
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 500;
   line-height: 24px;
   text-overflow: ellipsis;
@@ -192,11 +193,11 @@
 
 .note-list-count {
   flex: none;
-  font-size: 12px;
+  font-size: var(--sd-text-xs);
   line-height: 20px;
 }
 
-.note-list-head .note-list-new {
+.note-list-head .note-list-filter-toggle {
   flex: none;
   width: 28px;
   height: 28px;
@@ -205,7 +206,7 @@
   padding: 0;
 }
 
-.note-list-head .note-list-filter-toggle {
+.note-list-head .note-list-new {
   flex: none;
   width: 28px;
   height: 28px;

@@ -60,19 +60,6 @@
   background: var(--sd-window-zoom);
 }
 
-.collapsed-chrome {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex: none;
-}
-
-.collapsed-chrome .rail-drag {
-  width: 16px;
-  flex: none;
-  align-self: stretch;
-}
-
 .chooser-window {
   position: absolute;
   top: 0;

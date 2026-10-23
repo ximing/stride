@@ -13,6 +13,16 @@ function host(): { host: HTMLDivElement; root: Root } {
   return { host: element, root: createRoot(element) }
 }
 
+// jsdom lacks the pointer/scroll APIs Radix Select touches when it opens.
+if (!Element.prototype.scrollIntoView) {
+  Element.prototype.scrollIntoView = () => {}
+}
+for (const method of ['hasPointerCapture', 'setPointerCapture', 'releasePointerCapture'] as const) {
+  if (!(method in Element.prototype)) {
+    ;(Element.prototype as Record<string, unknown>)[method] = () => false
+  }
+}
+
 async function render(root: Root, node: ReactNode) {
   await act(async () => {
     root.render(node)
@@ -53,14 +63,18 @@ describe('ChatPanel', () => {
       expect(sessions?.querySelector('[data-testid="chat-tabs"]')).not.toBeNull()
       expect(sessions?.querySelector('[data-testid="chat-new"]')).not.toBeNull()
       expect(element.querySelector('[data-testid="chat-model-empty"]')?.textContent).toBe('Add a model in Settings')
-      expect(element.querySelector('[data-testid="chat-mode-safe"]')).not.toBeNull()
-      expect(element.querySelector('[data-testid="chat-mode-power"]')).not.toBeNull()
+      const modeTrigger = element.querySelector('[data-testid="chat-mode"]')!
+      expect(modeTrigger.textContent).toContain('Safe')
       expect(element.querySelector('.chat-compose')).not.toBeNull()
 
       await act(async () => {
-        element.querySelector('[data-testid="chat-mode-power"]')?.dispatchEvent(
-          new MouseEvent('mousedown', { bubbles: true, button: 0 }),
-        )
+        modeTrigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+      })
+      const power = document.querySelector('[data-testid="chat-mode-power"]')
+      expect(power).not.toBeNull()
+      expect(document.querySelector('[data-testid="chat-mode-safe"]')).not.toBeNull()
+      await act(async () => {
+        power!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
       expect(resolve(VaultService).agentMode).toBe('power')
     } finally {

@@ -1,4 +1,4 @@
-import { has, register, Service } from '@rabjs/react'
+import { has, observe, register, Service, untracked } from '@rabjs/react'
 import {
   DEFAULT_LIST_SORT,
   readVaultSort,
@@ -43,6 +43,31 @@ export class NoteListService extends Service {
   retypeOpen = false
   /** Vault the currently loaded sort belongs to; '' before the first open. */
   private sortVaultKey = ''
+
+  constructor() {
+    super()
+    // The list highlight follows the open note: activating a tab, following a
+    // wikilink, or any programmatic vault.select() collapses the selection to
+    // that note. Multi-select gestures (Mod/Shift+click, right-click menu)
+    // never touch vault.activeId, so they are unaffected. Mutations happen
+    // untracked so the reaction cannot ping-pong on its own writes.
+    observe(() => {
+      if (!has(VaultService)) return
+      const vault = this.resolve(VaultService)
+      const activeId = vault.activeId
+      untracked(() => this.syncSelectionToActive(activeId))
+    })
+  }
+
+  private syncSelectionToActive(activeId: string) {
+    if (!activeId) {
+      this.clearSelection()
+      return
+    }
+    if (this.selectedIds.length === 1 && this.selectedIds[0] === activeId && this.anchorId === activeId) return
+    this.selectedIds = [activeId]
+    this.anchorId = activeId
+  }
 
   private get vault(): VaultService | null {
     return has(VaultService) ? this.resolve(VaultService) : null

@@ -111,32 +111,19 @@ export const ChatPanel = observer(function ChatPanel() {
           ) : (
             <p className="chat-model-empty" data-testid="chat-model-empty">{t('chat.noModel')}</p>
           )}
-          <Tabs
-            className="chat-mode-tabs"
+          <Select
+            className="chat-mode-select"
+            aria-label={t('chat.mode')}
+            data-testid="chat-mode"
             value={vault.agentMode}
+            options={[
+              { value: 'safe', label: t('chat.safe'), testId: 'chat-mode-safe' },
+              { value: 'power', label: t('chat.power'), testId: 'chat-mode-power' },
+            ]}
             onValueChange={(mode) => {
               if (mode === 'safe' || mode === 'power') void vault.setAgentMode(mode)
             }}
-          >
-            <TabsList className="chat-mode" aria-label={t('chat.mode')}>
-              <TabsTrigger
-                className="chat-mode-trigger"
-                value="safe"
-                data-testid="chat-mode-safe"
-                aria-pressed={vault.agentMode === 'safe'}
-              >
-                {t('chat.safe')}
-              </TabsTrigger>
-              <TabsTrigger
-                className="chat-mode-trigger"
-                value="power"
-                data-testid="chat-mode-power"
-                aria-pressed={vault.agentMode === 'power'}
-              >
-                {t('chat.power')}
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+          />
           <span className="chat-compose-spacer" />
           {chat.running ? (
             <Button

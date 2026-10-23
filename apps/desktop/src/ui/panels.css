@@ -1,4 +1,5 @@
 @import "./panels/shared.css";
+@import "./panels/right-panel.css";
 @import "./note-list/note-list.css";
 @import "./folders/folder-tree.css";
 @import "./panels/properties.css";

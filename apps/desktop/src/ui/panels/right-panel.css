@@ -1,0 +1,80 @@
+/* Inspector chrome: the expanded panel head and the always-on right-edge
+   icon rail. Single source for panel-head / panel-tabs / panel-tab /
+   panel-rail / panel-body / panel-wrap. */
+
+.panel-wrap {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  flex: 1;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  height: 40px;
+  min-height: 40px;
+  gap: 4px;
+  padding: 0 8px;
+  user-select: none;
+}
+
+.panel-title {
+  overflow: hidden;
+  color: var(--sd-fg);
+  font-size: var(--sd-text-sm);
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.panel-tabs {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.panel-rail .panel-tabs {
+  flex-direction: column;
+  gap: 4px;
+}
+
+.panel-tab.sd-icon-button {
+  width: 32px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: 1px solid transparent;
+  color: var(--sd-muted);
+}
+
+.panel-tab.sd-icon-button:hover:not(:disabled) {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--sd-fg) 5%, transparent);
+  color: var(--sd-fg);
+}
+
+.panel-tab.sd-icon-button[aria-selected="true"] {
+  border-color: transparent;
+  background: var(--sd-accent-soft);
+  box-shadow: none;
+  color: var(--sd-accent);
+}
+
+.panel-rail {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 40px;
+  padding: 6px 0;
+  background: var(--sd-surface);
+  border-left: 1px solid var(--sd-border);
+}
+
+.panel-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 12px 12px 24px;
+}
