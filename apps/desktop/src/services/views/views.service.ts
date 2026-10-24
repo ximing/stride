@@ -6,6 +6,7 @@ import {
   moveViewBefore,
   readViewsOrder,
   removeViewFile,
+  saveVaultView,
   VIEW_FILE_VERSION,
   VIEW_FILTER_PREFIX,
   VIEWS_DIR,
@@ -230,6 +231,28 @@ export class ViewsService extends Service {
     this.draft = { ...draft, filters: draft.filters.filter((_, item) => item !== index) }
   }
 
+  /**
+   * Create or replace a saved view without going through the editor draft.
+   * `file` empty creates; a slug updates that view. A rename keeps an active filter.
+   */
+  async saveView(input: { file?: string; view: SavedView }): Promise<LoadedView | null> {
+    const vault = this.vault
+    const fs = vault?.fs
+    if (!vault || !fs) return null
+    const editing = input.file?.trim() ?? ''
+    const wasActive = editing !== '' && vault.listFilter === `${VIEW_FILTER_PREFIX}${editing}`
+    try {
+      const saved = await this.writeThrough(() => saveVaultView(fs, input))
+      await this.reload()
+      if (wasActive) vault.setFilter(`${VIEW_FILTER_PREFIX}${saved.file}`)
+      vault.error = ''
+      return saved
+    } catch (error) {
+      vault.error = errorText(error)
+      throw error
+    }
+  }
+
   /** Create or update the view described by the editor draft. */
   async saveDraft() {
     const draft = this.draft
@@ -300,10 +323,10 @@ export class ViewsService extends Service {
   }
 
   /** Watch events from our own writes are ignored; the write path already updates state. */
-  private async writeThrough(job: () => Promise<void>) {
+  private async writeThrough<T>(job: () => Promise<T>): Promise<T> {
     this.localWrites += 1
     try {
-      await job()
+      return await job()
     } finally {
       this.localWrites -= 1
     }

@@ -4,8 +4,10 @@ import { describe, expect, it } from 'vitest'
 import {
   applyViewFilter,
   applyViewsOrder,
+  deleteVaultView,
   dedupeViewSlug,
   listViews,
+  saveVaultView,
   matchesPropertyFilter,
   moveViewBefore,
   parseViewFile,
@@ -265,5 +267,29 @@ describe('applyViewFilter', () => {
 
   it('matches everything (except Type docs and archived) with no conditions', () => {
     expect(applyViewFilter(notes, view({ name: 'Open' })).map((item) => item.id)).toEqual(['a', 'b', 'c'])
+  })
+})
+
+describe('saveVaultView', () => {
+  it('appends a new view, keeps a rename in its slot, and deletes cleanly', async () => {
+    const fs = new MemoryFileSystem('/tmp/stride-save-view')
+    const first = await saveVaultView(fs, { view: view({ name: 'Reading', type: 'Article' }) })
+    const second = await saveVaultView(fs, { view: view({ name: 'People', type: 'Person' }) })
+    expect([first.file, second.file]).toEqual(['reading', 'people'])
+
+    const renamed = await saveVaultView(fs, {
+      file: 'reading',
+      view: view({ name: 'People', type: 'Article', propertyFilters: [{ key: 'status', op: 'exists' }] }),
+    })
+    expect(renamed.file).toBe('people-2')
+    expect(renamed.view.propertyFilters).toEqual([{ key: 'status', op: 'exists' }])
+    expect(await fs.stat('views/reading.json')).toBeNull()
+    const order = JSON.parse(await fs.readText(VIEWS_ORDER_PATH)) as { order: string[] }
+    expect(order.order).toEqual(['people-2', 'people'])
+
+    await deleteVaultView(fs, 'people')
+    expect((await listViews(fs)).map((item) => item.file)).toEqual(['people-2'])
+    await expect(deleteVaultView(fs, 'missing')).rejects.toThrow('View not found')
+    await expect(saveVaultView(fs, { view: { version: 1, name: '  ' } })).rejects.toThrow('View needs a name')
   })
 })

@@ -166,6 +166,18 @@ describe('ViewsService', () => {
     expect(order.order).toEqual([])
   })
 
+  it('saveView writes a view and keeps the active filter across a rename', async () => {
+    const { vault, views } = await openVault()
+    const created = await views.saveView({ view: { version: 1, name: 'Reading', type: 'Article' } })
+    expect(created?.file).toBe('reading')
+    views.activate('reading')
+    const renamed = await views.saveView({ file: 'reading', view: { version: 1, name: 'Queue', type: 'Article' } })
+    expect(renamed?.file).toBe('queue')
+    expect(vault.listFilter).toBe('view:queue')
+    expect(await vault.fs!.stat('views/reading.json')).toBeNull()
+    expect(views.views.map((item) => item.file)).toEqual(['queue'])
+  })
+
   it('reorders views via moveView and persists the order file', async () => {
     const { vault, views } = await openVault()
     for (const name of ['Alpha', 'Beta', 'Gamma']) {

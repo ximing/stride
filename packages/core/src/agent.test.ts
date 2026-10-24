@@ -89,7 +89,6 @@ describe('pi-agent vault turn', () => {
       },
       searchVault: async () => [],
       writeSerialized: async () => {},
-      listNotes: async () => [],
       createNote: async () => note,
       loadNotes: async () => [note],
     })

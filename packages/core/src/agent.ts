@@ -7,7 +7,23 @@ import {
 } from '@earendil-works/pi-ai'
 import { openAICompletionsApi } from '@earendil-works/pi-ai/api/openai-completions.lazy'
 import type { LlmSettings } from './settings.ts'
-export { vaultTools, toolsForAgentMode, WRITE_VAULT_TOOLS, type VaultToolHost } from './vault-tools.ts'
+import {
+  VAULT_ASSISTANT_PROMPT,
+  toolsForAgentMode,
+  vaultTools,
+  WRITE_VAULT_TOOLS,
+  type VaultToolHost,
+  type VaultViewStore,
+} from './vault-tools.ts'
+
+export {
+  VAULT_ASSISTANT_PROMPT,
+  toolsForAgentMode,
+  vaultTools,
+  WRITE_VAULT_TOOLS,
+  type VaultToolHost,
+  type VaultViewStore,
+}
 
 export interface ChatLine {
   role: 'user' | 'assistant'
@@ -126,7 +142,7 @@ export async function runVaultTurn(input: {
       }),
     getApiKey: () => input.settings.apiKey,
     initialState: {
-      systemPrompt: 'You are Stride, a local vault assistant. Use the vault tools to read and search notes before answering.',
+      systemPrompt: VAULT_ASSISTANT_PROMPT,
       model: resolved,
       tools: input.tools,
       messages: prior,

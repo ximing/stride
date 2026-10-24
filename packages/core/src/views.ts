@@ -224,6 +224,48 @@ export async function removeViewFile(fs: FileSystemBackend, file: string): Promi
   await fs.remove(viewFilePath(file))
 }
 
+function assertViewFile(file: string): string {
+  const name = file.trim()
+  if (!name || name.includes('/') || name.includes('\\') || name.includes('..')) throw new Error('Invalid view file')
+  return name
+}
+
+/**
+ * Create or replace one saved view and keep `.stride/views-order.json` aligned
+ * with the sidebar: a new view is appended, a rename keeps its slot.
+ * `file` empty creates; a slug updates that view and follows a name change.
+ */
+export async function saveVaultView(
+  fs: FileSystemBackend,
+  input: { file?: string; view: SavedView },
+): Promise<LoadedView> {
+  const view = sanitizeView(input.view)
+  if (!view) throw new Error('View needs a name')
+  const editing = input.file?.trim() ? assertViewFile(input.file) : ''
+  const existing = await listViews(fs)
+  if (editing && !existing.some((item) => item.file === editing)) throw new Error('View not found')
+  const taken = new Set(existing.map((item) => item.file).filter((item) => item !== editing))
+  const file = dedupeViewSlug(viewSlug(view.name), taken)
+  await writeViewFile(fs, file, view)
+  if (editing && editing !== file) await removeViewFile(fs, editing)
+  const ordered = applyViewsOrder(existing, await readViewsOrder(fs)).map((item) => (item.file === editing ? file : item.file))
+  if (!editing) ordered.push(file)
+  await writeViewsOrder(fs, ordered)
+  return { file, view }
+}
+
+/** Remove one saved view and drop its slug from the sidebar order. */
+export async function deleteVaultView(fs: FileSystemBackend, file: string): Promise<void> {
+  const name = assertViewFile(file)
+  const existing = await listViews(fs)
+  if (!existing.some((item) => item.file === name)) throw new Error('View not found')
+  await removeViewFile(fs, name)
+  const ordered = applyViewsOrder(existing, await readViewsOrder(fs))
+    .map((item) => item.file)
+    .filter((item) => item !== name)
+  await writeViewsOrder(fs, ordered)
+}
+
 // ---------- sidebar order (`.stride/views-order.json`) ----------
 
 function sanitizeOrder(raw: unknown): string[] {

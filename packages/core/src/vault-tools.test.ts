@@ -2,7 +2,8 @@ import { MemoryFileSystem } from '@stride/platform'
 import { describe, expect, it } from 'vitest'
 import type { AgentTool } from '@earendil-works/pi-agent-core'
 import { createVaultNote, loadNotes, notePath, readNoteFile, saveNote } from './vault.ts'
-import { plainText, type StrideNote, type TipTapNode } from './note.ts'
+import { noteForSave, plainText, type StrideNote, type TipTapNode } from './note.ts'
+import { applyViewsOrder, deleteVaultView, listViews, readViewsOrder, saveVaultView } from './views.ts'
 import { toolsForAgentMode, vaultTools, WRITE_VAULT_TOOLS, type VaultToolHost } from './vault-tools.ts'
 
 function text(value: string): TipTapNode {
@@ -62,9 +63,13 @@ function memoryHost(fs: MemoryFileSystem, extra: Partial<VaultToolHost> = {}): V
     readNote: (id) => readNoteFile(fs, notePath(id), id),
     writeSerialized: (id, serialized) => fs.writeText(notePath(id), serialized),
     searchVault: async () => [],
-    listNotes: async () => (await loadNotes(fs)).map((note) => ({ id: note.id, title: note.title })),
     createNote: (title) => createVaultNote(fs, title),
     loadNotes: () => loadNotes(fs),
+    views: {
+      list: async () => applyViewsOrder(await listViews(fs), await readViewsOrder(fs)),
+      save: (input) => saveVaultView(fs, input),
+      remove: (file) => deleteVaultView(fs, file),
+    },
     ...extra,
   }
 }
@@ -168,7 +173,72 @@ describe('vault tools', () => {
     const names = safe.map((tool) => tool.name)
     expect(names).toContain('search_vault')
     expect(names).toContain('read_note')
+    expect(names).toContain('list_types')
+    expect(names).toContain('list_views')
+    expect(names).toContain('get_relations')
     for (const name of WRITE_VAULT_TOOLS) expect(names).not.toContain(name)
     expect(toolsForAgentMode(tools, 'power')).toBe(tools)
+  })
+
+  it('sets properties, links notes, and edits blocks without flattening the document', async () => {
+    const fs = new MemoryFileSystem('/tmp/stride-vault-manage')
+    await saveNote(fs, noteForSave({ id: 'page', title: 'Page', type: 'note', properties: { status: 'open' }, doc: richDoc() }))
+    await saveNote(fs, { id: 'target', title: 'Target', type: 'note', properties: {}, doc: { type: 'doc', content: [paragraph('body')] } })
+    const tools = vaultTools(memoryHost(fs))
+    const untouched = ((await readNoteFile(fs, notePath('page'), 'page')).doc.content ?? []).map((node) => JSON.stringify(node))
+
+    await call(tools, 'set_property', { id: 'page', key: 'rating', kind: 'number', value: '4' })
+    await call(tools, 'rename_property', { id: 'page', from: 'status', to: 'state' })
+    await call(tools, 'link_relation', { id: 'page', kind: 'belongs_to', target: 'target' })
+    await call(tools, 'insert_block', { id: 'page', index: 1, node: paragraph('MID') })
+    const edited = await readNoteFile(fs, notePath('page'), 'page')
+    expect(edited.properties.rating).toBe(4)
+    expect(edited.properties.state).toBe('open')
+    expect(edited.properties.status).toBeUndefined()
+    expect(edited.properties.belongs_to).toEqual(['[[Target]]'])
+    const content = edited.doc.content ?? []
+    expect(plainText(content[1] ?? { type: 'doc' })).toBe('MID')
+    expect(content.filter((_, index) => index !== 1).map((node) => JSON.stringify(node))).toEqual(untouched)
+
+    await call(tools, 'remove_block', { id: 'page', path: [1] })
+    await call(tools, 'unlink_relation', { id: 'page', kind: 'belongs_to', target: 'Target' })
+    await call(tools, 'remove_property', { id: 'page', key: 'rating' })
+    const restored = await readNoteFile(fs, notePath('page'), 'page')
+    expect(restored.properties.belongs_to).toBeUndefined()
+    expect(restored.properties.rating).toBeUndefined()
+    expect((restored.doc.content ?? []).map((node) => JSON.stringify(node))).toEqual(untouched)
+    await expect(call(tools, 'set_property', { id: 'page', key: 'belongs_to', kind: 'string', value: '[[Target]]' })).rejects.toThrow('link_relation')
+    const relations = await call(tools, 'get_relations', { id: 'target' })
+    expect(relations).toContain('"backlinks"')
+  })
+
+  it('creates a type, retypes a note, and renames the type through instances and views', async () => {
+    const fs = new MemoryFileSystem('/tmp/stride-vault-types')
+    const tools = vaultTools(memoryHost(fs))
+    const created = JSON.parse(await call(tools, 'create_type', { title: 'Project', color: 'blue', icon: 'briefcase' })) as { id: string }
+    expect(created.id).toBeTruthy()
+    const note = JSON.parse(await call(tools, 'create_note', { title: 'Bridge', type: 'Project' })) as { id: string; type: string }
+    expect(note.type).toBe('Project')
+    await call(tools, 'save_view', { name: 'Projects', type: 'Project', propertyFilters: [{ key: 'status', op: 'exists' }] })
+    await call(tools, 'set_note', { id: note.id, archived: true })
+    const archived = await readNoteFile(fs, notePath(note.id), note.id)
+    expect(archived.properties.archived).toBe(true)
+    expect(archived.id).toBe(note.id)
+
+    await call(tools, 'update_type', { id: created.id, title: 'Effort', visible: false })
+    const effort = await readNoteFile(fs, notePath(note.id), note.id)
+    expect(effort.type).toBe('Effort')
+    const typeDoc = await readNoteFile(fs, notePath(created.id), created.id)
+    expect(typeDoc.title).toBe('Effort')
+    expect(typeDoc.type).toBe('Type')
+    expect(typeDoc.properties.visible).toBe('false')
+    const views = JSON.parse(await call(tools, 'list_views', {})) as { file: string; view: { type?: string } }[]
+    expect(views.map((item) => item.view.type)).toEqual(['Effort'])
+    await call(tools, 'delete_view', { file: views[0]!.file })
+    expect(await call(tools, 'list_views', {})).toBe('[]')
+    const types = await call(tools, 'list_types', {})
+    expect(types).toContain('Effort')
+    await call(tools, 'undo_note', { id: note.id })
+    expect((await readNoteFile(fs, notePath(note.id), note.id)).type).toBe('Project')
   })
 })

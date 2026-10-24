@@ -1,5 +1,17 @@
-import { buildAgentContext, plainText, type VaultToolHost } from '@stride/core'
+import { has, resolve } from '@rabjs/react'
+import {
+  applyViewsOrder,
+  buildAgentContext,
+  deleteVaultView,
+  listViews,
+  plainText,
+  readViewsOrder,
+  saveVaultView,
+  VAULT_ASSISTANT_PROMPT,
+  type VaultToolHost,
+} from '@stride/core'
 import { VaultService } from '../vault/vault.service'
+import { ViewsService } from '../views/views.service'
 
 export function chatSystemPrompt(vault: VaultService): string {
   const active = vault.active
@@ -20,7 +32,11 @@ export function chatSystemPrompt(vault: VaultService): string {
       titles: vault.notes.map((note) => note.title),
     },
   })
-  return `${snapshot}\nYou are Stride, a local vault assistant.`
+  return `${snapshot}\n${VAULT_ASSISTANT_PROMPT}`
+}
+
+function liveViews(vault: VaultService): boolean {
+  return has(VaultService) && resolve(VaultService) === vault && has(ViewsService) && Boolean(vault.fs)
 }
 
 export function chatVaultHost(vault: VaultService): VaultToolHost {
@@ -44,9 +60,6 @@ export function chatVaultHost(vault: VaultService): VaultToolHost {
         snippet: hit.snippet,
       }))
     },
-    listNotes() {
-      return vault.notes.map((note) => ({ id: note.id, title: note.title }))
-    },
     loadNotes() {
       return vault.notes
     },
@@ -59,6 +72,32 @@ export function chatVaultHost(vault: VaultService): VaultToolHost {
       const created = vault.notes.find((note) => !before.has(note.id))
       if (!created) throw new Error('Could not create the note')
       return created
+    },
+    views: {
+      async list() {
+        if (liveViews(vault)) return resolve(ViewsService).views
+        if (!vault.fs) throw new Error('Open a vault first')
+        return applyViewsOrder(await listViews(vault.fs), await readViewsOrder(vault.fs))
+      },
+      async save(input) {
+        if (liveViews(vault)) {
+          const saved = await resolve(ViewsService).saveView(input)
+          if (!saved) throw new Error('Open a vault first')
+          return saved
+        }
+        if (!vault.fs) throw new Error('Open a vault first')
+        return saveVaultView(vault.fs, input)
+      },
+      async remove(file) {
+        if (liveViews(vault)) {
+          const views = resolve(ViewsService)
+          if (!views.byFile(file)) throw new Error('View not found')
+          await views.deleteView(file)
+          return
+        }
+        if (!vault.fs) throw new Error('Open a vault first')
+        await deleteVaultView(vault.fs, file)
+      },
     },
   }
 }
