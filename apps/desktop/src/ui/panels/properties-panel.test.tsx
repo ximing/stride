@@ -637,4 +637,119 @@ describe('PropertiesPanel', () => {
       host.remove()
     }
   })
+
+  it('keeps one add-property button and closes the form when the active note changes', async () => {
+    useMemoryFixture()
+    register(VaultService)
+    const vault = resolve(VaultService)
+    await vault.openFromDraft()
+    await vault.createNote()
+    const first = vault.activeId
+    vault.updateTitle('Alpha')
+    await vault.createNote()
+    const second = vault.activeId
+    vault.updateTitle('Beta')
+    await vault.createNote()
+    vault.updateTitle('Gamma')
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    const addButtons = () => host.querySelectorAll('[data-testid="add-property-open"]')
+    try {
+      await act(async () => {
+        root.render(<PropertiesPanel />)
+      })
+      expect(addButtons()).toHaveLength(1)
+      expect(host.querySelectorAll('.properties-panel')).toHaveLength(1)
+
+      await openAddPropertyForm(host)
+      expect(host.querySelector('[data-testid="property-name"]')).not.toBeNull()
+
+      await act(async () => {
+        vault.select(first)
+      })
+      expect(addButtons()).toHaveLength(1)
+      expect(host.querySelector('[data-testid="property-name"]')).toBeNull()
+
+      await act(async () => {
+        vault.select(second)
+      })
+      await act(async () => {
+        vault.select(first)
+      })
+      await act(async () => {
+        vault.select(second)
+      })
+      expect(addButtons()).toHaveLength(1)
+      expect(host.querySelectorAll('.properties-panel')).toHaveLength(1)
+    } finally {
+      vault.cancelPending()
+      await act(async () => {
+        root.unmount()
+      })
+      host.remove()
+    }
+  })
+
+  it('shows the current title in the other note after a filename rename', async () => {
+    useMemoryFixture()
+    register(VaultService)
+    register(FolderService)
+    const vault = resolve(VaultService)
+    await vault.openFromDraft()
+    await vault.createNote()
+    vault.updateTitle('Alpha')
+    await vault.commitHeadingRename()
+    const alphaId = vault.activeId
+
+    await vault.createNote()
+    vault.updateTitle('Beta')
+    await vault.commitHeadingRename()
+    vault.linkRelation('related_to', alphaId)
+    vault.updateDoc({
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'wikilink', attrs: { target: 'Alpha' } }],
+        },
+      ],
+    })
+    await vault.flush()
+    const betaId = vault.activeId
+
+    vault.activeId = alphaId
+    vault.updateTitle('Alpha Renamed')
+    await vault.commitHeadingRename()
+    const renamed = vault.notes.find((note) => note.title === 'Alpha Renamed')
+    expect(renamed?.id).not.toBe(alphaId)
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    try {
+      await act(async () => {
+        vault.activeId = betaId
+        root.render(<PropertiesPanel />)
+      })
+      const links = [...host.querySelectorAll<HTMLElement>('[data-testid="relation-link"]')]
+      expect(links.map((link) => link.textContent)).toEqual(['Alpha Renamed', 'Alpha Renamed'])
+      expect(links.map((link) => link.dataset.target)).toEqual([renamed?.id, renamed?.id])
+      expect(host.querySelector('[data-testid="relation-group-related_to"]')?.textContent).not.toContain('[[Alpha]]')
+
+      await act(async () => {
+        vault.activeId = renamed?.id ?? ''
+      })
+      const backlink = host.querySelector<HTMLElement>('[data-testid="backlink"]')
+      expect(backlink?.textContent).toBe('Beta')
+      expect(backlink?.dataset.source).toBe(betaId)
+    } finally {
+      vault.cancelPending()
+      await act(async () => {
+        root.unmount()
+      })
+      host.remove()
+    }
+  })
 })

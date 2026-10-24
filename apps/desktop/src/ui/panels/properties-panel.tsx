@@ -429,7 +429,13 @@ const PropertyFields = observer(function PropertyFields({ fields }: { fields: st
 const AddPropertyForm = observer(function AddPropertyForm() {
   const { t } = useTranslation()
   const vault = useService(VaultService)
+  const noteId = vault.active?.id ?? ''
+  const [openFor, setOpenFor] = useState(noteId)
   const [open, setOpen] = useState(false)
+  if (openFor !== noteId) {
+    setOpenFor(noteId)
+    setOpen(false)
+  }
   const propertyTypeOptions = PROPERTY_KINDS.map((kind) => ({ value: kind, label: t(KIND_LABEL_KEYS[kind]) }))
   if (!open) {
     return (
@@ -528,6 +534,7 @@ export const PropertiesPanel = observer(function PropertiesPanel() {
   const fields = Object.keys(note.properties).filter((field) => (
     !isHiddenProperty(field) && !isManagedRelation(field, note.properties[field])
   ))
+  const titleById = new Map(vault.notes.map((item) => [item.id, item.title]))
   const groupLabels: { key: RelationGroup; label: string }[] = [
     { key: 'belongs_to', label: t('panels.belongsTo') },
     { key: 'related_to', label: t('panels.relatedTo') },
@@ -580,7 +587,7 @@ export const PropertiesPanel = observer(function PropertiesPanel() {
       </Modal>
       <Input label={t('panels.type')} value={note.type} onChange={(event) => vault.updateType(event.target.value)} />
       <PropertyFields fields={fields} />
-      <AddPropertyForm key={note.id} />
+      <AddPropertyForm />
       <h2 className="panel-heading">{t('panels.relationships')}</h2>
       <RelationEditor key={note.id} noteId={note.id} />
       {relations.shown.length === 0 && unresolved.length === 0 && (
@@ -598,7 +605,7 @@ export const PropertiesPanel = observer(function PropertiesPanel() {
             {shown.map((link) => (
               <RelationLine
                 key={`${link.field}-${link.targetId}-${link.derived}`}
-                label={link.label}
+                label={titleById.get(link.targetId) || link.label}
                 field={link.field}
                 names={[link.label, link.targetId].filter(Boolean)}
                 targetId={link.targetId || undefined}
@@ -638,7 +645,7 @@ export const PropertiesPanel = observer(function PropertiesPanel() {
                   if (link.sourceId) tabs.openNote(link.sourceId)
                 }}
               >
-                {graph.byId.get(link.sourceId)?.title}
+                {titleById.get(link.sourceId) || graph.byId.get(link.sourceId)?.title}
               </button>
             ))}
           </section>
