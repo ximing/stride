@@ -138,6 +138,16 @@ export function hasOutgoingRelationship(note: StrideNote): boolean {
   return relationshipFields(note).length > 0
 }
 
+/**
+ * Inbox triage flag: the hidden `_processed` property. Any truthy value
+ * (boolean true, non-empty string/array) marks the note as handled.
+ */
+export function isProcessed(note: StrideNote): boolean {
+  const value = note.properties._processed
+  if (Array.isArray(value)) return value.some((item) => Boolean(item))
+  return Boolean(value)
+}
+
 /** Title, exact id, or id after the link's whitespace is folded to `-`. Title wins on the same note. */
 export function matchNoteLink(
   ref: string,
@@ -252,7 +262,7 @@ export function buildGraph(notes: StrideNote[]): VaultGraph {
     notes,
     byId,
     relations,
-    inbox: notes.filter((note) => !hasOutgoingRelationship(note)),
+    inbox: notes.filter((note) => !hasOutgoingRelationship(note) && !isProcessed(note)),
     byType: groupByType(notes),
   }
 }

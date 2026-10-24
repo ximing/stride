@@ -5,6 +5,7 @@ import {
   buildGraph,
   groupByType,
   isManagedRelation,
+  isProcessed,
   relationStorageKey,
   relationsOf,
   removeRelationTarget,
@@ -102,6 +103,27 @@ describe('relationships and inbox', () => {
     expect(groups.get('project')?.map((note) => note.id)).toEqual(['parent'])
     expect(groups.get('note')?.map((note) => note.id)).toEqual(['child'])
     expect([...groups.keys()]).not.toContain('stride-graph-folder')
+  })
+
+  it('excludes notes flagged _processed from the inbox', () => {
+    const plain = createNote('plain', 'Plain')
+    const processed = createNote('done', 'Done')
+    processed.properties = { _processed: true }
+    const processedText = createNote('done-text', 'Done text')
+    processedText.properties = { _processed: 'yes' }
+    const falsy = createNote('falsy', 'Falsy')
+    falsy.properties = { _processed: false }
+    const linked = createNote('linked', 'Linked')
+    linked.properties = { belongs_to: ['[[Plain]]'], _processed: true }
+
+    const graph = buildGraph([plain, processed, processedText, falsy, linked])
+    expect(graph.inbox.map((note) => note.id).sort()).toEqual(['falsy', 'plain'])
+    expect(isProcessed(processed)).toBe(true)
+    expect(isProcessed(processedText)).toBe(true)
+    expect(isProcessed(falsy)).toBe(false)
+    expect(isProcessed(plain)).toBe(false)
+    // Processed and linked: relationships already exclude it either way.
+    expect(isProcessed(linked)).toBe(true)
   })
 
   it('lists a body wikilink on the source and leaves inbox based on properties', () => {

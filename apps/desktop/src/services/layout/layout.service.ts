@@ -6,6 +6,8 @@ import {
   writeLayoutState,
   type LayoutState,
   type LayoutStorage,
+  type RailCollapsed,
+  type RailSection,
   type ResizableColumn,
   type RightPanelTab,
 } from './layout'
@@ -25,6 +27,8 @@ export class LayoutService extends Service {
   sidebarCollapsed = DEFAULT_LAYOUT_STATE.sidebarCollapsed
   rightPanelCollapsed = DEFAULT_LAYOUT_STATE.rightPanelCollapsed
   rightPanelTab: RightPanelTab = DEFAULT_LAYOUT_STATE.rightPanelTab
+  railCollapsed: RailCollapsed = { ...DEFAULT_LAYOUT_STATE.railCollapsed }
+  foldersCollapsed: Record<string, boolean> = {}
 
   constructor() {
     super()
@@ -35,6 +39,8 @@ export class LayoutService extends Service {
     this.sidebarCollapsed = stored.sidebarCollapsed
     this.rightPanelCollapsed = stored.rightPanelCollapsed
     this.rightPanelTab = stored.rightPanelTab
+    this.railCollapsed = stored.railCollapsed
+    this.foldersCollapsed = stored.foldersCollapsed
   }
 
   setColumnWidth(column: ResizableColumn, width: number) {
@@ -70,6 +76,34 @@ export class LayoutService extends Service {
     this.persist()
   }
 
+  /** Rail group collapse (views / types / notes). UI state, kept out of the vault. */
+  setRailSectionCollapsed(section: RailSection, collapsed: boolean) {
+    this.railCollapsed = { ...this.railCollapsed, [section]: collapsed }
+    this.persist()
+  }
+
+  toggleRailSection(section: RailSection) {
+    this.setRailSectionCollapsed(section, !this.railCollapsed[section])
+  }
+
+  /** Folder collapse in the notes tree. UI state, kept out of the vault. */
+  isFolderCollapsed(path: string) {
+    return this.foldersCollapsed[path] === true
+  }
+
+  /** Expanded folders are pruned from the record, so storage stays clean. */
+  setFolderCollapsed(path: string, collapsed: boolean) {
+    const next = { ...this.foldersCollapsed }
+    if (collapsed) next[path] = true
+    else delete next[path]
+    this.foldersCollapsed = next
+    this.persist()
+  }
+
+  toggleFolder(path: string) {
+    this.setFolderCollapsed(path, !this.isFolderCollapsed(path))
+  }
+
   private snapshot(): LayoutState {
     return {
       sidebarWidth: this.sidebarWidth,
@@ -78,6 +112,8 @@ export class LayoutService extends Service {
       sidebarCollapsed: this.sidebarCollapsed,
       rightPanelCollapsed: this.rightPanelCollapsed,
       rightPanelTab: this.rightPanelTab,
+      railCollapsed: this.railCollapsed,
+      foldersCollapsed: this.foldersCollapsed,
     }
   }
 

@@ -5,9 +5,9 @@
 
 import type { StrideNote } from '@stride/core/note'
 
-/** Fixed row height in px. Must match `.note-list-item { height }` in styles.css. */
-export const NOTE_ROW_HEIGHT = 66
-/** Compact view mode row height. Must match `.note-list.is-compact .note-list-item { height }`. */
+/** Fixed row height in px. Must match `.note-list-row { height }` in note-list.css. */
+export const NOTE_ROW_HEIGHT = 102
+/** Compact view mode row height. Must match `.note-list.is-compact .note-list-row { height }`. */
 export const NOTE_ROW_HEIGHT_COMPACT = 48
 /** Extra rows rendered above and below the viewport to absorb fast scrolls. */
 export const NOTE_ROW_OVERSCAN = 6

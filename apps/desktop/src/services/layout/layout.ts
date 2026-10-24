@@ -5,6 +5,13 @@
 // overlay. Stored layouts that still name it sanitize back to the default tab.
 export type RightPanelTab = 'properties' | 'toc' | 'git' | 'chat'
 
+/** Collapsible rail groups: views, types, and the notes folder tree. */
+export type RailSection = 'views' | 'types' | 'notes'
+
+export const RAIL_SECTIONS: readonly RailSection[] = ['views', 'types', 'notes']
+
+export type RailCollapsed = Record<RailSection, boolean>
+
 export interface LayoutState {
   sidebarWidth: number
   noteListWidth: number
@@ -12,6 +19,9 @@ export interface LayoutState {
   sidebarCollapsed: boolean
   rightPanelCollapsed: boolean
   rightPanelTab: RightPanelTab
+  railCollapsed: RailCollapsed
+  /** Collapsed folder paths in the notes tree; only `true` entries are kept. */
+  foldersCollapsed: Record<string, boolean>
 }
 
 export const LAYOUT_STORAGE_KEY = 'stride:layout'
@@ -33,6 +43,8 @@ export const DEFAULT_LAYOUT_STATE: LayoutState = {
   sidebarCollapsed: false,
   rightPanelCollapsed: false,
   rightPanelTab: 'properties',
+  railCollapsed: { views: false, types: false, notes: false },
+  foldersCollapsed: {},
 }
 
 export function clampColumnWidth(column: ResizableColumn, width: number): number {
@@ -49,9 +61,34 @@ function widthOr(column: ResizableColumn, value: unknown): number {
   return typeof value === 'number' ? clampColumnWidth(column, value) : DEFAULT_LAYOUT_STATE[`${column}Width`]
 }
 
+function sanitizeRailCollapsed(value: unknown): RailCollapsed {
+  const raw = value && typeof value === 'object' ? (value as Record<string, unknown>) : {}
+  return {
+    views: raw.views === true,
+    types: raw.types === true,
+    notes: raw.notes === true,
+  }
+}
+
+/** Keep only string keys mapped to true; expanded folders leave no trace. */
+function sanitizeFoldersCollapsed(value: unknown): Record<string, boolean> {
+  if (!value || typeof value !== 'object') return {}
+  const out: Record<string, boolean> = {}
+  for (const [key, flag] of Object.entries(value as Record<string, unknown>)) {
+    if (flag === true) out[key] = true
+  }
+  return out
+}
+
 /** Merge arbitrary stored JSON onto the defaults. Unknown/garbage fields fall back. */
 export function sanitizeLayoutState(value: unknown): LayoutState {
-  if (!value || typeof value !== 'object') return { ...DEFAULT_LAYOUT_STATE }
+  if (!value || typeof value !== 'object') {
+    return {
+      ...DEFAULT_LAYOUT_STATE,
+      railCollapsed: { ...DEFAULT_LAYOUT_STATE.railCollapsed },
+      foldersCollapsed: {},
+    }
+  }
   const raw = value as Record<string, unknown>
   return {
     sidebarWidth: widthOr('sidebar', raw.sidebarWidth),
@@ -60,6 +97,8 @@ export function sanitizeLayoutState(value: unknown): LayoutState {
     sidebarCollapsed: raw.sidebarCollapsed === true,
     rightPanelCollapsed: raw.rightPanelCollapsed === true,
     rightPanelTab: isRightPanelTab(raw.rightPanelTab) ? raw.rightPanelTab : DEFAULT_LAYOUT_STATE.rightPanelTab,
+    railCollapsed: sanitizeRailCollapsed(raw.railCollapsed),
+    foldersCollapsed: sanitizeFoldersCollapsed(raw.foldersCollapsed),
   }
 }
 

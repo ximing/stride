@@ -18,24 +18,23 @@
   border-radius: var(--sd-radius);
 }
 
-/* Hover highlight stays on the folder's own line — children have their own. */
+/* Hover highlight stays on the folder's own line — children have their own.
+   Same fg-tint as the rail nav rows, not a jump to the elevated surface. */
 .folder-row > .folder-row-main:hover {
-  background: var(--sd-bg-elevated);
+  background: color-mix(in srgb, var(--sd-fg) 5%, transparent);
   border-radius: var(--sd-radius);
+}
+
+/* The generic `.rail button:hover` paints an elevated fill on the label
+   button, which stacks with the row tint into a raised white card. The row
+   hover lives on .folder-row-main only; the button itself stays clear. */
+.rail .folder-row-main .folder-label:hover:not(:disabled) {
+  border-color: transparent;
+  background: transparent;
 }
 
 .rail .folder-row-main button {
   width: auto;
-}
-
-.folder-row-main button {
-  color: var(--sd-muted);
-  font-size: 0.78rem;
-  padding: 0.2rem 0.4rem;
-}
-
-.folder-row-main button:hover:not(:disabled) {
-  color: var(--sd-fg);
 }
 
 /* ---------- folder tree ---------- */
@@ -45,34 +44,8 @@
   font-size: 13px;
 }
 
-/* Section header: the "Notes" label with the new-folder icon pinned right. */
-.folder-tree-head {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin: 16px 0 4px;
-  padding: 0 4px 0 8px;
-}
-
-.folder-tree-head .group-label {
-  flex: 1 1 auto;
-  min-width: 0;
-  margin: 0;
-  padding: 0;
-}
-
-.folder-tree-head .sd-icon-button {
-  flex: none;
-  width: 24px;
-  height: 24px;
-  min-height: 24px;
-  padding: 0;
-  color: var(--sd-muted);
-}
-
-.folder-tree-head .sd-icon-button:hover:not(:disabled) {
-  color: var(--sd-fg);
-}
+/* Section header: the collapsible "Notes" group reuses the shared
+   .rail-group-head chrome from ui/shell/rail.css. */
 
 .folder-row {
   min-width: 0;
@@ -80,19 +53,20 @@
 }
 
 .folder-row-main {
-  gap: 4px;
+  gap: 0;
   min-width: 0;
   min-height: 32px;
 }
 
+/* Folder names are content, not chrome: same foreground and 13px as the
+   note links and rail nav rows; only the icon stays muted. */
 .folder-label {
   display: flex;
   flex: 1 1 auto;
   align-items: center;
-  gap: 6px;
   min-width: 0;
-  padding: 6px 4px;
-  color: inherit;
+  padding: 6px 8px;
+  color: var(--sd-fg);
   font: inherit;
   line-height: 20px;
   text-align: left;
@@ -101,15 +75,60 @@
   border-radius: var(--sd-radius);
 }
 
-/* Focus rings hug the row instead of protruding over its neighbors. */
-.folder-tree .folder-label:focus-visible,
-.folder-tree .note-link:focus-visible {
-  outline-offset: -2px;
+/* Collapse toggle: sits exactly where the folder icon used to be (8px left
+   pad + 14px glyph), so rows don't shift. Folder glyph at rest; chevron on
+   hover/focus, or always while the folder is collapsed. */
+.rail .folder-toggle {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: flex-start;
+  width: 22px;
+  height: 32px;
+  min-height: 32px;
+  padding: 0 0 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--sd-radius);
+  background: transparent;
+  color: var(--sd-muted);
 }
 
-.folder-label > svg {
-  flex: none;
-  color: var(--sd-muted);
+.rail .folder-toggle:hover:not(:disabled) {
+  border-color: transparent;
+  background: transparent;
+  color: var(--sd-fg);
+}
+
+.folder-toggle-icon,
+.folder-toggle-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+}
+
+.folder-toggle-chevron {
+  display: none;
+}
+
+.folder-toggle:hover .folder-toggle-icon,
+.folder-toggle:focus-visible .folder-toggle-icon,
+.folder-toggle[data-collapsed] .folder-toggle-icon {
+  display: none;
+}
+
+.folder-toggle:hover .folder-toggle-chevron,
+.folder-toggle:focus-visible .folder-toggle-chevron,
+.folder-toggle[data-collapsed] .folder-toggle-chevron {
+  display: inline-flex;
+}
+
+/* Focus rings hug the row instead of protruding over its neighbors. */
+.folder-tree .folder-label:focus-visible,
+.folder-tree .folder-toggle:focus-visible,
+.folder-tree .note-link:focus-visible {
+  outline-offset: -2px;
 }
 
 .folder-label-text {
@@ -129,18 +148,39 @@
   color: var(--sd-fg);
 }
 
-.folder-row.is-active > .folder-row-main .folder-label > svg {
+.folder-row.is-active > .folder-row-main .folder-toggle {
   color: var(--sd-accent);
 }
 
 /* Hover affordance: a single "new note here" action; the rest lives in the
-   right-click menu. Hidden until hover/focus so the tree stays quiet. */
+   right-click menu. Hidden until hover/focus so the tree stays quiet. Same
+   28px / 14px-icon / muted spec as the rail's other row-trailing actions. */
 .folder-row-actions {
   display: flex;
   flex: none;
   gap: 2px;
   opacity: 0;
   transition: opacity 120ms ease;
+}
+
+.rail .folder-row-actions .sd-icon-button {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  color: var(--sd-muted);
+}
+
+.rail .folder-row-actions .sd-icon-button:hover:not(:disabled) {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--sd-fg) 6%, transparent);
+  color: var(--sd-fg);
+}
+
+.rail .folder-row-actions .sd-icon-button svg {
+  width: 14px;
+  height: 14px;
 }
 
 .folder-row:hover .folder-row-actions,
@@ -159,16 +199,16 @@
    button. The accent border is the editing indicator, so the global offset
    focus ring is dropped (it bled over adjacent rows). */
 .folder-label-edit {
-  padding: 3px 4px;
+  padding: 3px 8px;
 }
 
 .folder-ghost-row {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
   min-height: 32px;
-  padding: 3px 4px;
+  padding: 3px 8px;
 }
 
 .folder-ghost-row > svg {
@@ -215,7 +255,7 @@
   margin: 1px 0;
   padding: 6px 8px;
   overflow: hidden;
-  color: var(--sd-muted);
+  color: var(--sd-fg);
   font-size: 13px;
   line-height: 20px;
   text-align: left;
@@ -224,8 +264,10 @@
   border-radius: var(--sd-radius);
 }
 
+/* The title carries the row; the glyph stays quiet like the folder icons. */
 .folder-tree .note-link > svg {
   flex: none;
+  color: var(--sd-muted);
 }
 
 .folder-note-label {

@@ -5,6 +5,7 @@ import { typeSidebarLabel, VIEW_FILTER_OPS, type ViewFilterOp, type ViewSortDir,
 import { VaultService } from '../../services/vault/vault.service'
 import { ViewsService } from '../../services/views/views.service'
 import { Button, IconButton } from '../primitives/button'
+import { ColorSwatches } from '../primitives/color-swatches'
 import { Input } from '../primitives/input'
 import { Modal, ModalClose, ModalContent } from '../primitives/modal'
 import { Select } from '../primitives/select'
@@ -63,6 +64,25 @@ export const ViewEditorModal = observer(function ViewEditorModal() {
               value={draft.icon}
               onChange={(event) => views.updateDraft({ icon: event.target.value })}
             />
+            <div className="view-color-field" data-testid="view-color-field">
+              <span className="sd-field-label">{t('views.color')}</span>
+              <ColorSwatches
+                value={draft.color}
+                onChange={(color) => views.updateDraft({ color })}
+                labels={{
+                  gray: t('colors.gray'),
+                  blue: t('colors.blue'),
+                  teal: t('colors.teal'),
+                  green: t('colors.green'),
+                  orange: t('colors.orange'),
+                  purple: t('colors.purple'),
+                  red: t('colors.red'),
+                  pink: t('colors.pink'),
+                  yellow: t('colors.yellow'),
+                }}
+                testId="view-color"
+              />
+            </div>
             <Select
               label={t('views.type')}
               data-testid="view-type"

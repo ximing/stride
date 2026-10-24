@@ -14,6 +14,7 @@ function draft(partial: Partial<ViewDraft>): ViewDraft {
     file: '',
     name: '',
     icon: '',
+    color: '',
     type: '',
     sortKey: '',
     sortDir: 'desc',

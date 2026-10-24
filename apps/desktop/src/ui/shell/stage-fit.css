@@ -4,8 +4,8 @@
   min-width: 320px;
   display: flex;
   flex-direction: column;
-  /* The stage sits on the desk tone so the active tab (--sd-bg) merges into
-     the document below it. */
+  /* The stage sits on the desk tone; the active tab lifts to --sd-bg-elevated
+     with an accent bar so it stands out from the document below it. */
   background: var(--sd-bg);
   padding: 0;
   overflow: hidden;

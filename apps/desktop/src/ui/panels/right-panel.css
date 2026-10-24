@@ -28,6 +28,26 @@
   white-space: nowrap;
 }
 
+/* Note-level actions ride on the title row's right edge. */
+.panel-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: 2px;
+  margin-left: auto;
+}
+
+.panel-actions .sd-icon-button.sd-btn-sm {
+  width: 26px;
+  height: 26px;
+  min-height: 26px;
+  color: var(--sd-muted);
+}
+
+.panel-actions .sd-icon-button.sd-btn-sm:hover:not(:disabled) {
+  color: var(--sd-fg);
+}
+
 .panel-tabs {
   display: flex;
   align-items: center;
@@ -59,6 +79,12 @@
   background: var(--sd-accent-soft);
   box-shadow: none;
   color: var(--sd-accent);
+}
+
+/* The rail is vertical, so the active tab gets a 2px accent bar on its
+   leading edge — a small cue next to the accent-soft fill. */
+.panel-rail .panel-tab.sd-icon-button[aria-selected="true"] {
+  box-shadow: inset 2px 0 0 var(--sd-accent);
 }
 
 .panel-rail {

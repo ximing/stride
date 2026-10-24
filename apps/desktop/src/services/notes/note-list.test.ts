@@ -64,8 +64,8 @@ describe('virtualWindow', () => {
     const win = virtualWindow(100, NOTE_ROW_HEIGHT * 1000, 660)
     expect(win.end).toBe(100)
     expect(win.bottomPad).toBe(0)
-    // Max scrollTop is (100*66 - 660); first visible row 90, minus 6 overscan.
-    expect(win.start).toBe(84)
+    // Max scrollTop is (100*H - 660); first visible row minus 6 overscan.
+    expect(win.start).toBe(100 - Math.ceil(660 / NOTE_ROW_HEIGHT) - 6)
   })
 
   it('handles empty lists and garbage inputs', () => {

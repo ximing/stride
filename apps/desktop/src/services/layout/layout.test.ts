@@ -164,4 +164,14 @@ describe('LayoutService', () => {
     layout.toggleSidebar()
     expect(layout.sidebarCollapsed).toBe(false)
   })
+
+  it('toggles and persists rail group collapse', () => {
+    const layout = new LayoutService()
+    expect(layout.railCollapsed).toEqual({ views: false, types: false, notes: false })
+    layout.toggleRailSection('types')
+    expect(layout.railCollapsed.types).toBe(true)
+    expect(readLayoutState(localStorage).railCollapsed).toEqual({ views: false, types: true, notes: false })
+    layout.setRailSectionCollapsed('types', false)
+    expect(layout.railCollapsed.types).toBe(false)
+  })
 })

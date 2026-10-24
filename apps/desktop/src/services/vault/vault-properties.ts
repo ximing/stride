@@ -7,6 +7,7 @@ import {
   type StructuralRelation,
 } from '@stride/core/graph'
 import {
+  DATE_VALUE,
   formatProperty,
   parseFiniteNumber,
   parseListInput,
@@ -30,7 +31,7 @@ export function setPropertyName(vault: VaultService, value: string) {
 }
 
 export function setPropertyType(vault: VaultService, value: string) {
-  if (value === 'string' || value === 'number' || value === 'boolean' || value === 'list') {
+  if (value === 'string' || value === 'number' || value === 'boolean' || value === 'list' || value === 'date') {
     vault.propertyType = value
   }
 }
@@ -69,7 +70,12 @@ export function addProperty(vault: VaultService) {
   let next: NoteProperty | undefined
   if (vault.propertyType === 'boolean') next = vault.propertyChecked
   else if (vault.propertyType === 'number') next = parseFiniteNumber(vault.propertyValue)
-  else if (vault.propertyType === 'list') {
+  else if (vault.propertyType === 'date') {
+    // A date property is stored as a plain YYYY-MM-DD string; the panel
+    // renders matching strings with the calendar control.
+    const text = vault.propertyValue.trim()
+    if (DATE_VALUE.test(text)) next = text
+  } else if (vault.propertyType === 'list') {
     const items = parseListInput(vault.propertyValue)
     if (items.length > 0) next = items
   } else {

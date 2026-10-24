@@ -100,7 +100,7 @@
 }
 
 .editor .ProseMirror .task-list-block {
-  margin: 0.2rem 0 0.45rem;
+  margin: 0.15rem 0 0.3rem;
 }
 
 .editor .ProseMirror .task-progress {
@@ -130,7 +130,7 @@
 .editor .ProseMirror ul[data-type='taskList'] > li > label {
   display: flex;
   flex: none;
-  margin-top: 0.35rem;
+  margin-top: 0.3rem;
 }
 
 .editor .ProseMirror ul[data-type='taskList'] > li > label > input[type='checkbox'] {
@@ -695,7 +695,7 @@
 }
 
 .editor .ProseMirror .doc-mermaid-block {
-  margin: 0.6rem 0;
+  margin: 0.45rem 0;
   border: 1px solid var(--sd-border);
   border-radius: var(--sd-radius-lg);
   background: var(--sd-bg);
@@ -791,7 +791,7 @@
 
 .editor-toolbar {
   gap: 4px;
-  margin-bottom: 10px;
+  margin-bottom: 8px;
   padding: 0;
   border: 0;
   border-radius: 0;

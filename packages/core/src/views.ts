@@ -29,6 +29,7 @@
 
 import type { FileSystemBackend } from '@stride/platform'
 import { isArchived, type NoteProperty, type StrideNote } from './note.ts'
+import { TYPE_COLOR_KEYS } from './types.ts'
 
 export const VIEWS_DIR = 'views'
 export const VIEWS_ORDER_PATH = '.stride/views-order.json'
@@ -60,6 +61,8 @@ export interface SavedView {
   version: number
   name: string
   icon?: string
+  /** Optional icon tint; one of the nine TYPE_COLOR_KEYS. */
+  color?: string
   type?: string
   propertyFilters?: ViewPropertyFilter[]
   sort?: ViewSort
@@ -117,6 +120,8 @@ export function sanitizeView(raw: unknown): SavedView | null {
   const view: SavedView = { version: VIEW_FILE_VERSION, name }
   const icon = cleanText(raw.icon)
   if (icon) view.icon = icon
+  const color = cleanText(raw.color)
+  if (color && (TYPE_COLOR_KEYS as readonly string[]).includes(color)) view.color = color
   const type = cleanText(raw.type)
   if (type) view.type = type
   if (Array.isArray(raw.propertyFilters)) {
@@ -144,6 +149,7 @@ export function parseViewFile(text: string): SavedView | null {
 export function serializeView(view: SavedView): string {
   const out: Record<string, unknown> = { version: VIEW_FILE_VERSION, name: view.name }
   if (view.icon) out.icon = view.icon
+  if (view.color && (TYPE_COLOR_KEYS as readonly string[]).includes(view.color)) out.color = view.color
   if (view.type) out.type = view.type
   if (view.propertyFilters && view.propertyFilters.length > 0) {
     out.propertyFilters = view.propertyFilters.map((filter) =>

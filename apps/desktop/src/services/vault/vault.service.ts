@@ -36,18 +36,21 @@ import {
   noteIdFromPath,
   notePath,
   readNoteFile,
+  resolveEntityColor,
   rewriteVaultLinks,
   sanitizeGitSetupPreference,
   sanitizeViewMode,
   sanitizeZoom,
   saveNote,
   templateBody,
+  TYPE_COLOR_KEYS,
   VIEW_FILTER_PREFIX,
   writeAdvanceInbox,
   writeAgentMode,
   writeGitSetupPreference,
   writeRenameFromHeading,
   writeSampleNotes,
+  writeTagColors,
   writeViewMode,
   writeZoom,
   type CacheNote,
@@ -58,6 +61,8 @@ import {
   type SavedView,
   type SearchDiskCache,
   type SearchHit,
+  type TagColors,
+  type TypeColor,
   type ViewMode,
 } from '@stride/core'
 import type { EmbeddingRuntime, IndexSignature } from '../settings/settings.service'
@@ -84,8 +89,6 @@ import * as searchSession from './vault-search-session'
 
 export { FOLDER_FILTER_PREFIX }
 export { embeddingClient, searchSlot } from './vault-search-session'
-
-const COLLAPSED_TYPES_KEY = 'stride:collapsed-types'
 
 const UNCONFIGURED_EMBEDDING: EmbeddingRuntime = {
   endpoint: '',
@@ -161,28 +164,6 @@ function isTypeDocument(note: StrideNote): boolean {
   return note.type === 'Type'
 }
 
-function readCollapsedTypes(): string[] {
-  try {
-    if (typeof localStorage === 'undefined') return []
-    const raw = localStorage.getItem(COLLAPSED_TYPES_KEY)
-    if (!raw) return []
-    const parsed: unknown = JSON.parse(raw)
-    if (!Array.isArray(parsed)) return []
-    return parsed.filter((item): item is string => typeof item === 'string')
-  } catch {
-    return []
-  }
-}
-
-function writeCollapsedTypes(titles: string[]) {
-  try {
-    if (typeof localStorage === 'undefined') return
-    localStorage.setItem(COLLAPSED_TYPES_KEY, JSON.stringify(titles))
-  } catch {
-    return
-  }
-}
-
 // Cross-render derivation caches, keyed by the raw notes array. VaultService
 // replaces `notes` immutably on every mutation, so array identity is a
 // complete change signal and WeakMap entries die with the array. Computing
@@ -247,11 +228,13 @@ export class VaultService extends Service {
   zoom = 1
   viewMode: ViewMode = 'comfortable'
   gitSetupPreference: GitSetupPreference = 'undecided'
+  // User-chosen tag chip colors (tag → color key); missing tags hash their name.
+  tagColors: TagColors = {}
   propertyName = ''
-  propertyType: PropertyKind = 'string'
+  // 'date' is a form-level pseudo kind: it stores a YYYY-MM-DD string.
+  propertyType: PropertyKind | 'date' = 'string'
   propertyValue = ''
   propertyChecked = false
-  collapsedTypes: string[] = readCollapsedTypes()
   fs: FileSystemBackend | null = null
   vaults: VaultRecord[] = []
   activeVaultId = ''
@@ -339,14 +322,6 @@ export class VaultService extends Service {
     const active = this.active
     if (!active || !isTypeDocument(active)) return []
     return this.notes.filter((note) => note.id !== active.id && note.type === active.title && !isArchived(note))
-  }
-
-  toggleTypeCollapsed(title: string) {
-    const next = this.collapsedTypes.includes(title)
-      ? this.collapsedTypes.filter((item) => item !== title)
-      : [...this.collapsedTypes, title]
-    this.collapsedTypes = next
-    writeCollapsedTypes(next)
   }
 
   get inboxCount(): number {
@@ -759,6 +734,45 @@ export class VaultService extends Service {
     } catch (error) {
       this.error = errorText(error)
     }
+  }
+
+  /**
+   * Display color for a `#tag` chip: the user's explicit choice wins, gray or
+   * a missing entry hashes the tag name into the eight non-gray colors.
+   */
+  tagColorFor(tag: string): TypeColor {
+    return resolveEntityColor(tag, this.tagColors[tag.trim()])
+  }
+
+  /** Per-vault tag color override (null/gray clears it back to the hash). */
+  async setTagColor(tag: string, color: string | null) {
+    const name = tag.trim()
+    if (!name) return
+    const key = (color ?? '').trim().toLowerCase()
+    const explicit = key !== 'gray' && (TYPE_COLOR_KEYS as readonly string[]).includes(key) ? key : null
+    const current = this.tagColors[name] ?? null
+    if (current === explicit) return
+    const next = { ...this.tagColors }
+    if (explicit) next[name] = explicit
+    else delete next[name]
+    this.tagColors = next
+    if (!this.fs) return
+    try {
+      await writeTagColors(this.fs, next)
+    } catch (error) {
+      this.error = errorText(error)
+    }
+  }
+
+  /**
+   * Inbox triage: flag the note `_processed` so the graph's inbox filter drops
+   * it. Uses the same replace + debounced-save path as property edits.
+   */
+  markProcessed(id: string) {
+    const note = this.notes.find((item) => item.id === id)
+    if (!note) return
+    this.replace({ ...note, properties: { ...note.properties, _processed: true } })
+    this.schedule(id)
   }
 
   retargetTitleBaseline(fromId: string, toId: string) {
@@ -1466,6 +1480,14 @@ export class VaultService extends Service {
     const nextType = type.trim()
     if (!nextType) return
     await this.mutateNotes(ids, (note) => ({ ...note, type: nextType }))
+  }
+
+  /** Type rail customization: rewrite `_icon` / `_color` on a type document. */
+  async updateTypeAppearance(id: string, icon: string, color: string) {
+    await this.mutateNotes([id], (note) => ({
+      ...note,
+      properties: { ...note.properties, _icon: icon, _color: color },
+    }))
   }
 
   /**

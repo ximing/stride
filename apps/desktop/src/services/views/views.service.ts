@@ -40,6 +40,8 @@ export interface ViewDraft {
   file: string
   name: string
   icon: string
+  /** One of the nine type-color keys, or '' for no tint. */
+  color: string
   type: string
   sortKey: '' | ViewSortKey
   sortDir: ViewSortDir
@@ -52,6 +54,7 @@ function draftFromView(file: string, view: SavedView): ViewDraft {
     file,
     name: view.name,
     icon: view.icon ?? '',
+    color: view.color ?? '',
     type: view.type ?? '',
     sortKey: view.sort?.key ?? '',
     sortDir: view.sort?.dir ?? 'desc',
@@ -71,6 +74,8 @@ export function buildViewFromDraft(draft: ViewDraft): SavedView | null {
   const view: SavedView = { version: VIEW_FILE_VERSION, name }
   const icon = draft.icon.trim()
   if (icon) view.icon = icon
+  const color = draft.color.trim()
+  if (color) view.color = color
   const type = draft.type.trim()
   if (type) view.type = type
   const filters: SavedView['propertyFilters'] = []
@@ -180,6 +185,7 @@ export class ViewsService extends Service {
         file: '',
         name: capturesType ? filter : '',
         icon: '',
+        color: '',
         type: capturesType ? filter : '',
         sortKey: sort?.key ?? '',
         sortDir: sort?.dir ?? 'desc',

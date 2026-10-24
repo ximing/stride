@@ -4,9 +4,13 @@ import {
   compareTypeDocuments,
   isTypeVisible,
   nextTypeOrder,
+  resolveEntityColor,
+  resolveTypeColor,
   templateBody,
+  typeColorKey,
   typeSidebarLabel,
   typeSortOrder,
+  TYPE_COLOR_KEYS,
 } from './types.ts'
 
 function typeNote(title: string, properties: StrideNote['properties'] = {}): StrideNote {
@@ -74,5 +78,58 @@ describe('type documents', () => {
       type: 'doc',
       content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Bring a pencil.' }] }],
     })
+  })
+
+  it('resolves type color: eight explicit colors win, gray/missing/unknown hash the title', () => {
+    // The eight real colors win, case- and whitespace-insensitively.
+    for (const color of TYPE_COLOR_KEYS) {
+      if (color === 'gray') continue
+      expect(resolveTypeColor('Project', color)).toBe(color)
+    }
+    expect(resolveTypeColor('Project', ' Blue ')).toBe('blue')
+
+    // gray means "auto": it hashes like a missing or unknown value.
+    const fallback = resolveTypeColor('Project')
+    expect(fallback).not.toBe('gray')
+    expect(TYPE_COLOR_KEYS).toContain(fallback)
+    expect(resolveTypeColor('Project')).toBe(fallback)
+    expect(resolveTypeColor('Project', 'gray')).toBe(fallback)
+    expect(resolveTypeColor('Project', ' Gray ')).toBe(fallback)
+    expect(resolveTypeColor('Project', 'lime')).toBe(fallback)
+    expect(resolveTypeColor('Project', '  ')).toBe(fallback)
+
+    // Case-insensitive titles hash to the same color.
+    expect(resolveTypeColor('note')).toBe(resolveTypeColor('Note'))
+    expect(resolveTypeColor('  Note  ')).toBe(resolveTypeColor('Note'))
+
+    // Different titles spread across the palette (all non-gray).
+    const colors = new Set(['Project', 'Person', 'Note', 'Journal', 'Book', 'Idea'].map((title) => resolveTypeColor(title)))
+    expect(colors.has('gray')).toBe(false)
+    expect(colors.size).toBeGreaterThan(1)
+  })
+
+  it('resolveEntityColor generalizes: explicit wins, gray/missing hash the name', () => {
+    // Explicit real colors win; gray/auto and unknown values hash the name.
+    expect(resolveEntityColor('alpha', 'blue')).toBe('blue')
+    expect(resolveEntityColor('alpha', ' Teal ')).toBe('teal')
+    const fallback = resolveEntityColor('alpha')
+    expect(fallback).not.toBe('gray')
+    expect(TYPE_COLOR_KEYS).toContain(fallback)
+    expect(resolveEntityColor('alpha', 'gray')).toBe(fallback)
+    expect(resolveEntityColor('alpha', 'auto')).toBe(fallback)
+    expect(resolveEntityColor('alpha', 'lime')).toBe(fallback)
+
+    // Same hash for tags and types: resolveTypeColor is a thin wrapper.
+    expect(resolveEntityColor('Project')).toBe(resolveTypeColor('Project'))
+    // Deterministic and case-insensitive for tag names.
+    expect(resolveEntityColor('  Alpha ')).toBe(resolveEntityColor('alpha'))
+  })
+
+  it('reads the type color from the _color property of a document', () => {
+    expect(typeColorKey(typeNote('Project', { _color: 'blue' }))).toBe('blue')
+    expect(typeColorKey(typeNote('Project', { _color: ['Teal'] }))).toBe('teal')
+    expect(typeColorKey(typeNote('Project'))).toBe(resolveTypeColor('Project'))
+    expect(typeColorKey(typeNote('Project', { _color: 'lime' }))).toBe(resolveTypeColor('Project'))
+    expect(typeColorKey(typeNote('Project', { _color: 'gray' }))).toBe(resolveTypeColor('Project'))
   })
 })

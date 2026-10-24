@@ -11,7 +11,7 @@ import { DEFAULT_LIST_SORT, LIST_STORAGE_KEY, NOTE_ROW_HEIGHT } from '../../serv
 import { NoteListService } from '../../services/notes/note-list.service'
 import { FolderService } from '../../services/vault/folder.service'
 import { VaultService } from '../../services/vault/vault.service'
-import { NoteList, noteListTitle, noteSnippet, relativeDay } from './note-list'
+import { NoteList, noteListTitle, noteSnippet, noteTags, relativeDay } from './note-list'
 
 let root: Root | undefined
 let host: HTMLElement | undefined
@@ -84,6 +84,19 @@ describe('noteSnippet', () => {
 
   it('returns an empty string for empty notes', () => {
     expect(noteSnippet(createNote('c', 'Empty'))).toBe('')
+  })
+})
+
+describe('noteTags', () => {
+  it('reads arrays and comma-separated strings, trimming blanks', () => {
+    const note = createNote('t', 'T')
+    expect(noteTags(note)).toEqual([])
+    note.properties = { tags: [' alpha ', '', 'beta'] }
+    expect(noteTags(note)).toEqual(['alpha', 'beta'])
+    note.properties = { tags: 'one, two，three' }
+    expect(noteTags(note)).toEqual(['one', 'two', 'three'])
+    note.properties = { tags: 'solo' }
+    expect(noteTags(note)).toEqual(['solo'])
   })
 })
 
@@ -329,6 +342,128 @@ describe('NoteList', () => {
     expect(host!.querySelector('[data-note-id="p1"] [data-testid="note-chip-status"]')?.textContent).toBe('Open')
     expect(host!.querySelector('[data-note-id="n1"] [data-testid="note-chip-type"]')).toBeNull()
     expect(host!.querySelector('[data-note-id="n1"] [data-testid="note-chip-status"]')).toBeNull()
+  })
+
+  it('renders every tag chip (no truncation) and tones the status chip', async () => {
+    const { vault } = await mountNoteList()
+    const tagged = noteWithBody('t1', 'Tagged', 'body')
+    tagged.properties = { tags: ['alpha', 'beta', 'gamma'], status: 'draft' }
+    const csv = noteWithBody('t2', 'Csv tags', 'body')
+    csv.properties = { tags: 'x, y' }
+    await act(async () => {
+      vault.listFilter = 'all'
+      vault.searchQuery = ''
+      vault.searchHits = []
+      vault.notes = [tagged, csv]
+    })
+    const tagTexts = (id: string) =>
+      [...host!.querySelectorAll(`[data-note-id="${id}"] [data-testid="note-chip-tag"]`)].map((n) => n.textContent)
+    expect(tagTexts('t1')).toEqual(['#alpha', '#beta', '#gamma'])
+    expect(tagTexts('t2')).toEqual(['#x', '#y'])
+    expect(host!.querySelector('[data-note-id="t1"] [data-testid="note-chip-status"]')?.className).toContain('is-draft')
+  })
+
+  it('lays out three rows: title, a collapsible snippet line, then the meta row', async () => {
+    const { vault } = await mountNoteList()
+    const withBody = noteWithBody('wb', 'Has body', 'A snippet worth reading.')
+    const empty = createNote('eb', 'Empty note')
+    await act(async () => {
+      vault.listFilter = 'all'
+      vault.searchQuery = ''
+      vault.searchHits = []
+      vault.notes = [withBody, empty]
+    })
+    const fullRow = host!.querySelector('[data-note-id="wb"]')!
+    // Title, snippet, meta are three sibling lines inside the row.
+    const lines = [...fullRow.children].map((node) => (node as HTMLElement).className)
+    expect(lines[0]).toContain('note-list-item-title')
+    expect(lines[1]).toContain('note-list-item-snippet')
+    expect(lines[2]).toContain('note-list-item-meta')
+    expect(fullRow.querySelector('[data-testid="note-list-item-snippet"]')?.textContent).toBe('A snippet worth reading.')
+    // The snippet sits on its own line, outside the meta row.
+    expect(fullRow.querySelector('.note-list-item-meta [data-testid="note-list-item-snippet"]')).toBeNull()
+    // No body → the snippet line collapses instead of rendering an empty span.
+    const emptyRow = host!.querySelector('[data-note-id="eb"]')!
+    expect(emptyRow.querySelector('[data-testid="note-list-item-snippet"]')).toBeNull()
+  })
+
+  it('tints tag chips by name hash and recolors them from the chip context menu', async () => {
+    const { vault } = await mountNoteList()
+    const tagged = noteWithBody('t1', 'Tagged', 'body')
+    tagged.properties = { tags: ['alpha'] }
+    await act(async () => {
+      vault.listFilter = 'all'
+      vault.searchQuery = ''
+      vault.searchHits = []
+      vault.notes = [tagged]
+    })
+    const chip = () => host!.querySelector<HTMLElement>('[data-note-id="t1"] [data-testid="note-chip-tag"]')!
+    // Default: deterministic name hash (never gray).
+    expect(chip().style.getPropertyValue('--chip-hue')).toBe(`var(--sd-dot-${vault.tagColorFor('alpha')})`)
+
+    // Right-click the chip: 8 colors + auto, no row menu, no selection change.
+    await act(async () => {
+      chip().dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 10, clientY: 10 }))
+    })
+    expect(document.querySelector('[data-testid="context-menu-item-tag-color-blue"]')).not.toBeNull()
+    expect(document.querySelector('[data-testid="context-menu-item-tag-color-auto"]')).not.toBeNull()
+    await act(async () => {
+      document.querySelector<HTMLElement>('[data-testid="context-menu-item-tag-color-pink"]')!.click()
+    })
+    expect(vault.tagColors.alpha).toBe('pink')
+    expect(chip().style.getPropertyValue('--chip-hue')).toBe('var(--sd-dot-pink)')
+
+    // Back to auto: the explicit entry is dropped and the hash color returns.
+    await act(async () => {
+      chip().dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 10, clientY: 10 }))
+    })
+    await act(async () => {
+      document.querySelector<HTMLElement>('[data-testid="context-menu-item-tag-color-auto"]')!.click()
+    })
+    expect(vault.tagColors.alpha).toBeUndefined()
+    expect(chip().style.getPropertyValue('--chip-hue')).toBe(`var(--sd-dot-${vault.tagColorFor('alpha')})`)
+  })
+
+  it('shows a process button only in the inbox and marking hides the row', async () => {
+    const { vault } = await mountNoteList()
+    const loose = noteWithBody('loose', 'Loose', 'body')
+    const linked = noteWithBody('linked', 'Linked', 'body')
+    linked.properties = { belongs_to: ['[[Loose]]'] }
+    await act(async () => {
+      vault.searchQuery = ''
+      vault.searchHits = []
+      vault.notes = [loose, linked]
+      vault.listFilter = 'all'
+    })
+    // The "all" view never shows the process button.
+    expect(host!.querySelector('[data-note-id="loose"] [data-testid="note-process"]')).toBeNull()
+    // jsdom has no layout; query from the row wrapper instead of the row button.
+    expect(host!.querySelector('[data-note-id="loose"]')?.parentElement?.querySelector('[data-testid="note-process"]')).toBeNull()
+
+    await act(async () => {
+      vault.listFilter = 'inbox'
+    })
+    // Only the unlinked note is in the inbox, and its row has the button.
+    expect(renderedItems().map((row) => row.dataset.noteId)).toEqual(['loose'])
+    const button = host!.querySelector('[data-note-id="loose"]')!.parentElement!
+      .querySelector<HTMLButtonElement>('[data-testid="note-process"]')!
+    expect(button.getAttribute('aria-label')).toBe('Mark processed')
+
+    await act(async () => {
+      button.click()
+    })
+    // _processed flag set, inbox re-derived → the row leaves the list.
+    expect(vault.notes.find((note) => note.id === 'loose')?.properties._processed).toBe(true)
+    expect(renderedItems().length).toBe(0)
+    // The click did not select or open the note.
+    expect(vault.activeId).not.toBe('loose')
+
+    // Back in "all" the processed note is still listed, without a badge.
+    await act(async () => {
+      vault.listFilter = 'all'
+    })
+    expect(renderedItems().map((row) => row.dataset.noteId).sort()).toEqual(['linked', 'loose'])
+    expect(host!.querySelector('[data-note-id="loose"]')?.parentElement?.querySelector('[data-testid="note-process"]')).toBeNull()
   })
 
   it('multi-selects with Mod+click and Shift+click, clears with Esc', async () => {

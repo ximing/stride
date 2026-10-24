@@ -59,15 +59,6 @@
   order: 0;
 }
 
-.rail .type-row .type-collapse {
-  order: -1;
-  flex: none;
-  width: 1.6rem;
-  padding: 0.2rem 0;
-  text-align: center;
-  color: var(--sd-muted);
-}
-
 .rail .type-row .type-add {
   order: 1;
   flex: none;
@@ -75,10 +66,6 @@
   padding: 0.2rem 0;
   text-align: center;
   color: var(--sd-muted);
-}
-
-.rail .type-row .type-collapse:hover {
-  color: var(--sd-fg);
 }
 
 .rail .type-row .type-add:hover {
@@ -93,6 +80,43 @@
 
 .type-icon {
   color: var(--sd-muted);
+}
+
+/* The type color rides on the icon itself — there is no separate dot. */
+.type-icon-gray {
+  color: var(--sd-dot-gray);
+}
+
+.type-icon-blue {
+  color: var(--sd-dot-blue);
+}
+
+.type-icon-teal {
+  color: var(--sd-dot-teal);
+}
+
+.type-icon-green {
+  color: var(--sd-dot-green);
+}
+
+.type-icon-orange {
+  color: var(--sd-dot-orange);
+}
+
+.type-icon-purple {
+  color: var(--sd-dot-purple);
+}
+
+.type-icon-red {
+  color: var(--sd-dot-red);
+}
+
+.type-icon-pink {
+  color: var(--sd-dot-pink);
+}
+
+.type-icon-yellow {
+  color: var(--sd-dot-yellow);
 }
 
 .type-dot {
@@ -190,19 +214,146 @@
   font-size: 13px;
 }
 
-.rail .rail-inner > .group-label:first-child {
+/* Pinned destinations (All / Inbox) sit right under the search block. */
+.rail-pinned {
   margin-top: 8px;
 }
 
+/* Collapsible group header: a peer of the pinned nav rows, not a child of
+   them — same 32px row box and 8px padding, chevron in the 16px icon slot so
+   the label lands on the same x as the All/Inbox labels. Section-ness comes
+   from weight + tracking (tracking carries "uppercase" semantics for CJK),
+   never from indentation or faintness. */
+.rail-group-head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin: 16px 0 2px;
+  padding: 0;
+  border-radius: var(--sd-radius);
+}
+
+/* The hover fill spans the whole header row — toggle and trailing action
+   alike — so the revealed + doesn't sit on bare background. */
+.rail-group-head:hover,
+.rail-group-head:focus-within {
+  background: color-mix(in srgb, var(--sd-fg) 5%, transparent);
+}
+
+.rail .rail-group-head .group-label {
+  margin: 0;
+  padding: 0;
+  /* Identical type to the pinned nav rows (13px / regular / --sd-fg) — the
+     header differs only by the chevron, not by font, size or color. */
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: normal;
+  text-transform: none;
+  color: var(--sd-fg);
+}
+
+/* Group contents nest one level under the header row, so the rail reads as
+   L0 destinations/sections with L1 entries beneath them. */
+.rail-group-body {
+  padding-left: 16px;
+}
+
+.rail .rail-group-toggle {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: center;
+  gap: 8px;
+  width: auto;
+  min-width: 0;
+  height: 32px;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid transparent;
+  border-radius: var(--sd-radius);
+  color: var(--sd-muted);
+  text-align: left;
+}
+
+/* Text deepens on hover; the fill itself is painted once by the head row. */
+.rail .rail-group-toggle:hover:not(:disabled) {
+  border-color: transparent;
+  background: transparent;
+  color: var(--sd-fg);
+}
+
+.rail .rail-group-toggle:hover:not(:disabled) .group-label,
+.rail .rail-group-toggle:hover:not(:disabled) .rail-group-chevron {
+  color: var(--sd-fg);
+}
+
+/* The chevron fills the whole 16px icon slot, so its optical box matches
+   the 16px nav-row icons exactly instead of sitting inset. */
+.rail-group-chevron {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--sd-muted);
+}
+
+/* Lucide chevron ink sits in the middle of the viewBox; nudge it left so it
+   optically aligns with the 16px nav icons instead of reading as inset. */
+.rail-group-chevron svg {
+  transform: translateX(-2px);
+}
+
+.rail-group-action {
+  display: inline-flex;
+  flex: none;
+  opacity: 0;
+  transition: opacity var(--sd-motion-hover) var(--sd-ease-standard);
+}
+
+.rail-group-head:hover .rail-group-action,
+.rail-group-head:focus-within .rail-group-action,
+.rail-group-action:focus-within {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rail-group-action {
+    transition: none;
+  }
+}
+
+.rail-group-action .sd-icon-button {
+  width: 28px;
+  height: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  color: var(--sd-muted);
+}
+
+.rail-group-action .sd-icon-button:hover:not(:disabled) {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--sd-fg) 6%, transparent);
+  color: var(--sd-fg);
+}
+
 .rail .group-label {
-  margin: 16px 0 4px;
+  margin: 22px 0 6px;
   padding: 0 8px;
   color: var(--sd-muted);
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 600;
   line-height: 16px;
-  letter-spacing: 0;
-  text-transform: none;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* Rail empty states hug the left edge like the rows around them. */
+.rail .sd-empty-state {
+  align-items: flex-start;
+  padding: 8px;
+  text-align: left;
 }
 
 .rail .rail-nav-item,
@@ -226,7 +377,6 @@
 
 .rail .rail-nav-item:hover:not(:disabled),
 .rail .view-row button[data-testid="view-link"]:hover:not(:disabled),
-.rail .type-row button[data-testid="type-link"]:hover:not(:disabled),
 .rail .folder-tree button[data-testid="note-link"]:hover:not(:disabled) {
   border-color: transparent;
   background: color-mix(in srgb, var(--sd-fg) 5%, transparent);
@@ -234,7 +384,6 @@
 
 .rail .rail-nav-item.active,
 .rail .view-row button[data-testid="view-link"].active,
-.rail .type-row button[data-testid="type-link"].active,
 .rail .folder-tree button[data-testid="note-link"].active {
   border-color: transparent;
   background: color-mix(in srgb, var(--sd-accent) 11%, transparent);
@@ -244,9 +393,65 @@
 
 .rail .rail-nav-item.active:hover:not(:disabled),
 .rail .view-row button[data-testid="view-link"].active:hover:not(:disabled),
-.rail .type-row button[data-testid="type-link"].active:hover:not(:disabled),
 .rail .folder-tree button[data-testid="note-link"].active:hover:not(:disabled) {
   background: color-mix(in srgb, var(--sd-accent) 15%, transparent);
+}
+
+/* Emoji type icons render as tinted text; lucide icons use Mark as before. */
+.type-icon-emoji {
+  font-size: 14px;
+  line-height: 1;
+}
+
+/* Saved-view emoji tint (optional view.color, one of the nine dot colors). */
+.view-icon-gray {
+  color: var(--sd-dot-gray);
+}
+
+.view-icon-blue {
+  color: var(--sd-dot-blue);
+}
+
+.view-icon-teal {
+  color: var(--sd-dot-teal);
+}
+
+.view-icon-green {
+  color: var(--sd-dot-green);
+}
+
+.view-icon-orange {
+  color: var(--sd-dot-orange);
+}
+
+.view-icon-purple {
+  color: var(--sd-dot-purple);
+}
+
+.view-icon-red {
+  color: var(--sd-dot-red);
+}
+
+.view-icon-pink {
+  color: var(--sd-dot-pink);
+}
+
+.view-icon-yellow {
+  color: var(--sd-dot-yellow);
+}
+
+/* Type rows: selection reads as a tinted surface with a left accent bar. */
+.rail .type-row button[data-testid="type-link"]:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--sd-surface-hover);
+}
+
+.rail .type-row button[data-testid="type-link"].active,
+.rail .type-row button[data-testid="type-link"].active:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--sd-surface-selected);
+  box-shadow: inset 2px 0 0 var(--sd-accent);
+  color: var(--sd-fg);
 }
 
 .rail-nav-icon {
@@ -259,34 +464,17 @@
   color: var(--sd-muted);
 }
 
-.rail .active .rail-nav-icon,
-.rail .active .type-icon {
+/* Pinned-right muted count (Inbox); the label keeps full weight/width. */
+.rail-nav-count {
+  margin-left: auto;
+  flex: none;
+  color: var(--sd-muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.rail .active .rail-nav-icon {
   color: var(--sd-accent);
-}
-
-.rail .rail-quiet-action.sd-btn {
-  width: 100%;
-  min-height: 32px;
-  height: 32px;
-  justify-content: flex-start;
-  gap: 8px;
-  margin-top: 2px;
-  padding: 0 8px;
-  border: 1px solid transparent;
-  color: var(--sd-muted);
-  font-size: 13px;
-  font-weight: 400;
-}
-
-.rail .rail-quiet-action.sd-btn:hover:not(:disabled),
-.rail .folder-tree > button[data-testid="new-folder"]:hover:not(:disabled) {
-  border-color: transparent;
-  background: color-mix(in srgb, var(--sd-fg) 5%, transparent);
-  color: var(--sd-fg);
-}
-
-.rail .folder-tree > button[data-testid="new-folder"] {
-  color: var(--sd-muted);
 }
 
 .type-row,
@@ -297,10 +485,10 @@
 
 .rail .type-row button[data-testid="type-link"] {
   flex: 1;
-  gap: 6px;
+  gap: 8px;
   min-width: 0;
   padding-right: 4px;
-  padding-left: 4px;
+  padding-left: 8px;
 }
 
 .rail .view-row button[data-testid="view-link"] {
@@ -308,7 +496,6 @@
   min-width: 0;
 }
 
-.rail .type-row .type-collapse.sd-icon-button,
 .rail .type-row .type-add.sd-icon-button,
 .rail .view-row .view-edit.sd-icon-button {
   width: 28px;
@@ -324,6 +511,7 @@
 .rail .type-row .type-add.sd-icon-button,
 .rail .view-row .view-edit.sd-icon-button {
   opacity: 0;
+  transition: opacity var(--sd-motion-hover) var(--sd-ease-standard);
 }
 
 .rail .type-row:hover .type-add.sd-icon-button,
@@ -333,15 +521,10 @@
   opacity: 1;
 }
 
-.rail .type-row .type-collapse.sd-icon-button {
-  order: -1;
-}
-
 .rail .type-row .type-add.sd-icon-button {
   order: 1;
 }
 
-.rail .type-row .type-collapse.sd-icon-button:hover:not(:disabled),
 .rail .type-row .type-add.sd-icon-button:hover:not(:disabled),
 .rail .view-row .view-edit.sd-icon-button:hover:not(:disabled) {
   border-color: transparent;
@@ -367,11 +550,6 @@
 
 .view-icon {
   font-size: 14px;
-}
-
-.type-dot {
-  width: 6px;
-  height: 6px;
 }
 
 .advance-inbox {

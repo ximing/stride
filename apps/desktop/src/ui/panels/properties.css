@@ -29,33 +29,39 @@
 
 /* ---------- properties, relationships and outline ---------- */
 
-.properties-panel-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  min-width: 0;
-  margin-bottom: 16px;
+/* Section titles between the property list, relationships and backlinks:
+   same voice as the sidebar group labels. Scoped to the panel so the legacy
+   `.panel h2` serif rule doesn't clobber them. 16px inset aligns the text
+   with the property label column (14px grip + 2px gap). */
+.properties-panel .properties-section-label {
+  margin: 20px 0 6px;
+  padding: 0 16px;
+  color: var(--sd-muted);
+  font-family: var(--sd-font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 16px;
+  letter-spacing: 0.02em;
 }
 
-.properties-panel-head .panel-heading {
-  margin: 0;
-}
-
-.properties-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  min-width: 0;
-}
-
+/* The note type reads as the first property row: label column aligns with the
+   rows below (14px grip + 2px gap), value column takes the rest. */
 .properties-panel > .sd-field {
-  margin-bottom: 12px;
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-height: 32px;
+  margin-bottom: 2px;
+  padding-right: 4px;
+  padding-left: 16px;
+  border-radius: var(--sd-radius);
+  transition: background-color var(--sd-motion-hover) var(--sd-ease-standard);
 }
 
-.properties-panel > .panel-heading {
-  margin: 20px 0 8px;
+.properties-panel > .sd-field:hover,
+.properties-panel > .sd-field:focus-within {
+  background: var(--sd-surface-hover);
 }
 
 .property-row {
@@ -63,15 +69,20 @@
   gap: 2px;
   align-items: start;
   min-width: 0;
-  margin-bottom: 12px;
+  margin-bottom: 2px;
+  border-radius: var(--sd-radius);
+  transition: background-color var(--sd-motion-hover) var(--sd-ease-standard);
+}
+
+.property-row:hover,
+.property-row:focus-within {
+  background: var(--sd-surface-hover);
 }
 
 .property-row > .property-grip {
   display: flex;
   align-items: center;
-  min-height: 20px;
-  margin-top: 1px;
-  margin-bottom: 0;
+  min-height: 32px;
   color: var(--sd-muted);
   cursor: grab;
   opacity: 0;
@@ -91,25 +102,98 @@
   box-shadow: 0 2px 0 var(--sd-accent);
 }
 
+/* Two quiet columns: 76px label + fluid value, like a Notion property row. */
 .property-body {
-  display: flex;
-  flex-direction: column;
-  gap: var(--sd-space-1);
+  display: grid;
+  grid-template-columns: 76px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
   min-width: 0;
 }
 
-.property-body .sd-field {
-  width: 100%;
+.property-value {
+  display: flex;
+  align-items: center;
+  gap: 2px;
   min-width: 0;
+  min-height: 32px;
+}
+
+.property-value > .sd-field,
+.property-value > .sd-field-input,
+.property-value > .sd-chips,
+.property-value > .sd-checkbox {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+
+.property-value > .sd-checkbox {
+  align-items: center;
+  min-height: 32px;
+}
+
+.property-value .property-check {
+  margin: 0;
+}
+
+/* Borderless value controls: whisper-quiet until hovered or focused. */
+.properties-panel > .sd-field > .sd-field-input,
+.property-value .sd-field-input {
+  min-height: 32px;
+  padding: var(--sd-space-1) var(--sd-space-2);
+  background: transparent;
+  border-color: transparent;
+}
+
+.properties-panel > .sd-field > .sd-field-input:hover:not(:disabled),
+.property-value .sd-field-input:hover:not(:disabled) {
+  background: var(--sd-inset);
+}
+
+.properties-panel > .sd-field > .sd-field-input:focus,
+.property-value .sd-field-input:focus {
+  background: transparent;
+  border-color: transparent;
+}
+
+.properties-panel > .sd-field > .sd-field-input:focus-visible,
+.property-value .sd-field-input:focus-visible {
+  outline: 2px solid var(--sd-focus-ring);
+  outline-offset: -2px;
+}
+
+.properties-panel > .sd-field > .sd-field-input::placeholder,
+.property-value .sd-field-input::placeholder {
+  color: var(--sd-muted);
+  opacity: 0.5;
+}
+
+/* Typed field controls: status tint on the closed combobox trigger. */
+.properties-panel .sd-combobox-trigger.is-draft .sd-combobox-value {
+  color: var(--sd-warning);
+}
+
+.properties-panel .sd-combobox-trigger.is-doing .sd-combobox-value {
+  color: var(--sd-dot-blue);
+}
+
+.properties-panel .sd-combobox-trigger.is-done .sd-combobox-value {
+  color: var(--sd-accent);
+}
+
+/* Inside the chips row the combobox wrapper dissolves so the inline input
+   stays a direct flex child. */
+.sd-chips > .sd-combobox-field {
+  display: contents;
 }
 
 .property-head {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 4px;
   min-width: 0;
-  min-height: 20px;
+  min-height: 32px;
 }
 
 .property-name {
@@ -135,28 +219,37 @@
   outline-offset: 2px;
 }
 
+.property-head .sd-field {
+  width: 100%;
+  min-width: 0;
+}
+
 .property-rename {
-  min-height: 22px;
+  min-height: 24px;
   padding: 1px var(--sd-space-1);
   font-size: var(--sd-text-xs);
 }
 
+/* Row actions ride at the right edge of the value column, revealed on hover
+   or keyboard focus so the quiet rows stay quiet. */
 .property-tools {
   display: flex;
   flex: none;
-  gap: 2px;
+  gap: 0;
   opacity: 0;
   transition: opacity var(--sd-motion-hover) var(--sd-ease-standard);
+}
+
+.property-tools .sd-icon-button.sd-btn-sm {
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
 }
 
 .property-row:hover .property-tools,
 .property-row:focus-within .property-tools,
 .property-tools:has([data-state='open']) {
   opacity: 1;
-}
-
-.property-remove {
-  margin-bottom: 2px;
 }
 
 /* list values as chips */
@@ -168,8 +261,8 @@
   width: 100%;
   min-width: 0;
   min-height: var(--sd-control-md);
-  padding: 3px var(--sd-space-2);
-  background: var(--sd-inset);
+  padding: 3px 6px;
+  background: transparent;
   border: 1px solid transparent;
   border-radius: var(--sd-radius);
   transition:
@@ -178,12 +271,14 @@
 }
 
 .sd-chips:hover {
-  background: var(--sd-inset-hover);
+  background: var(--sd-inset);
 }
 
 .sd-chips:focus-within {
-  background: var(--sd-surface);
-  border-color: var(--sd-accent);
+  background: transparent;
+  border-color: transparent;
+  outline: 2px solid var(--sd-focus-ring);
+  outline-offset: -2px;
 }
 
 .sd-chip {
@@ -192,14 +287,14 @@
   gap: 2px;
   min-width: 0;
   max-width: 100%;
-  padding: 1px 2px 1px 6px;
+  padding: 1px 3px 1px 8px;
   color: var(--sd-fg);
   font-family: var(--sd-font-sans);
   font-size: var(--sd-text-xs);
   line-height: 1.4;
-  background: var(--sd-bg-elevated);
-  border: 1px solid var(--sd-border);
-  border-radius: var(--sd-radius);
+  background: var(--sd-accent-soft);
+  border: none;
+  border-radius: var(--sd-radius-pill);
 }
 
 .sd-chip-text {
@@ -208,10 +303,22 @@
   white-space: nowrap;
 }
 
-.sd-chip-remove {
-  min-width: 18px;
-  min-height: 18px;
-  padding: 1px;
+.sd-chip-remove.sd-icon-button {
+  width: 16px;
+  min-width: 16px;
+  height: 16px;
+  min-height: 16px;
+  padding: 0;
+  color: var(--sd-muted);
+  opacity: 0.6;
+  border: none;
+  transition: opacity var(--sd-motion-hover) var(--sd-ease-standard);
+}
+
+.sd-chip-remove.sd-icon-button:hover:not(:disabled) {
+  background: transparent;
+  color: var(--sd-fg);
+  opacity: 1;
 }
 
 .sd-chips-input {
@@ -232,7 +339,7 @@
 
 .sd-chips-input::placeholder {
   color: var(--sd-muted);
-  opacity: 0.85;
+  opacity: 0.5;
 }
 
 .property-add-actions {
@@ -240,23 +347,50 @@
   gap: 8px;
 }
 
-/* relationship groups */
-.relation-group-label {
-  margin: 10px 0 2px;
-  padding: 0 8px;
+/* Structural-relation kind prefix on relation/backlink rows; body links stay
+   untagged so the common case reads as a plain title list. */
+.relation-kind {
+  display: inline-flex;
+  align-items: center;
+  margin-right: 6px;
+  padding: 0 6px;
   color: var(--sd-muted);
   font-family: var(--sd-font-sans);
-  font-size: var(--sd-text-xs);
-  font-weight: 500;
-  line-height: 1.35;
+  font-size: 11px;
+  line-height: 16px;
+  vertical-align: 1px;
+  background: var(--sd-bg-elevated);
+  border-radius: var(--sd-radius-pill);
 }
 
 @media (prefers-reduced-motion: reduce) {
   .property-grip,
   .property-tools,
-  .sd-chips {
+  .property-row,
+  .properties-panel > .sd-field,
+  .sd-chips,
+  .sd-chip-remove,
+  .property-add-open,
+  .relation-line .sd-icon-button {
     transition: none;
   }
+}
+
+/* The collapsed add-property affordance stays a muted text button until
+   hover sketches a dashed drop target around it. */
+.property-add-open.sd-btn {
+  margin: 4px 0 0 8px;
+  border: 1px dashed transparent;
+  color: var(--sd-muted);
+  transition:
+    color var(--sd-motion-hover) var(--sd-ease-standard),
+    border-color var(--sd-motion-hover) var(--sd-ease-standard);
+}
+
+.property-add-open.sd-btn:hover:not(:disabled) {
+  background: transparent;
+  border-color: var(--sd-border);
+  color: var(--sd-fg);
 }
 
 .property-add-form {
@@ -265,6 +399,7 @@
   gap: 12px;
   min-width: 0;
   margin-top: 16px;
+  padding: 0 16px;
 }
 
 .property-add-form .panel-subheading {
@@ -278,36 +413,59 @@
 .relation-add-form {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 6px;
   min-width: 0;
   margin-bottom: 12px;
+  padding: 0 8px;
 }
 
-.relation-matches {
+/* Kind picker + note search share one quiet row; both are borderless until
+   hovered, matching the property rows above. */
+.relation-add-row {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 4px;
   min-width: 0;
 }
 
-.relation-match {
-  min-width: 0;
+.relation-add-row .sd-select-field {
+  flex: none;
+  width: auto;
+}
+
+.relation-add-row .relation-kind-select {
+  width: auto;
   min-height: 32px;
-  padding: 6px 8px;
-  overflow-wrap: anywhere;
-  color: var(--sd-fg);
-  font-family: var(--sd-font-sans);
-  font-size: 13px;
-  line-height: 18px;
-  text-align: left;
+  padding: var(--sd-space-1) var(--sd-space-2);
+  font-size: var(--sd-text-sm);
   background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--sd-radius);
+  border-color: transparent;
 }
 
-.relation-match:hover,
-.relation-match.is-active {
-  background: color-mix(in srgb, var(--sd-fg) 4%, transparent);
+.relation-add-row .relation-kind-select:hover:not(:disabled) {
+  background: var(--sd-inset);
+}
+
+.relation-add-row > .sd-field:not(.sd-select-field) {
+  flex: 1;
+  min-width: 0;
+}
+
+.relation-add-row > .sd-field:not(.sd-select-field) > .sd-field-input {
+  min-height: 32px;
+  padding: var(--sd-space-1) var(--sd-space-2);
+  font-size: var(--sd-text-sm);
+  background: transparent;
+  border-color: transparent;
+}
+
+.relation-add-row > .sd-field:not(.sd-select-field) > .sd-field-input:hover:not(:disabled) {
+  background: var(--sd-inset);
+}
+
+.relation-add-row > .sd-field:not(.sd-select-field) > .sd-field-input:focus {
+  background: transparent;
+  border-color: transparent;
 }
 
 .relation-line {
@@ -316,36 +474,55 @@
   gap: 4px;
   align-items: center;
   min-width: 0;
+  border-radius: var(--sd-radius);
+}
+
+/* Relation actions surface on hover/focus so quiet lists stay scannable. */
+.relation-line .sd-icon-button {
+  opacity: 0;
+  transition: opacity var(--sd-motion-hover) var(--sd-ease-standard);
+}
+
+.relation-line:hover .sd-icon-button,
+.relation-line:focus-within .sd-icon-button {
+  opacity: 1;
 }
 
 .properties-panel .relation-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   min-width: 0;
   min-height: 32px;
   margin: 0 0 2px;
-  padding: 6px 8px;
-  overflow-wrap: anywhere;
+  padding: 6px 8px 6px 16px;
   color: var(--sd-fg);
   font-family: var(--sd-font-sans);
   font-size: 13px;
   line-height: 18px;
-  white-space: normal;
+  text-align: left;
   background: transparent;
   border: 1px solid transparent;
 }
 
-.properties-panel .relation-row:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--sd-fg) 4%, transparent);
-  border-color: transparent;
+.properties-panel .relation-row .sd-mark {
+  flex: none;
+  color: var(--sd-muted);
 }
 
-.properties-panel .relation-meta,
-.properties-panel > .meta {
-  margin: 0 0 6px;
-  padding: 0 8px;
+.properties-panel .relation-row .relation-title {
+  min-width: 0;
   overflow-wrap: anywhere;
-  font-family: var(--sd-font-sans);
-  font-size: 12px;
-  white-space: normal;
+}
+
+/* A named-but-uncreated note reads quieter than resolved links. */
+.properties-panel .relation-row.is-missing {
+  color: var(--sd-muted);
+}
+
+.properties-panel .relation-row:hover:not(:disabled) {
+  background: var(--sd-surface-hover);
+  border-color: transparent;
 }
 
 .toc-list {
@@ -395,6 +572,14 @@
   min-width: 0;
   padding: 16px 8px;
   overflow-wrap: anywhere;
+}
+
+/* Inside the properties panel the empty hints join the left-aligned rhythm
+   instead of floating centered between the sections. */
+.properties-panel .sd-empty-state {
+  align-items: flex-start;
+  padding: 4px 16px 12px;
+  text-align: left;
 }
 
 .sd-empty-state-title,

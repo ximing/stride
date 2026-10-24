@@ -6,15 +6,18 @@ import {
   readAgentMode,
   readGitSetupPreference,
   readRenameFromHeading,
+  readTagColors,
   readViewMode,
   readZoom,
   sanitizeGitSetupPreference,
+  sanitizeTagColors,
   sanitizeViewMode,
   sanitizeZoom,
   writeAdvanceInbox,
   writeAgentMode,
   writeGitSetupPreference,
   writeRenameFromHeading,
+  writeTagColors,
   writeViewMode,
   writeZoom,
 } from './vault-config.ts'
@@ -231,5 +234,48 @@ describe('gitSetupPreference vault setting (T7.3)', () => {
     expect(sanitizeGitSetupPreference('enabled')).toBe('enabled')
     expect(sanitizeGitSetupPreference('maybe')).toBe('undecided')
     expect(sanitizeGitSetupPreference(null)).toBe('undecided')
+  })
+})
+
+describe('tagColors vault setting', () => {
+  it('defaults to {} when the marker is missing, broken, or not an object', async () => {
+    expect(await readTagColors(new MemoryFileSystem('tc-missing'))).toEqual({})
+
+    const broken = new MemoryFileSystem('tc-broken')
+    await broken.writeText('.stride/vault.json', '{')
+    expect(await readTagColors(broken)).toEqual({})
+    await writeTagColors(broken, { alpha: 'blue' })
+    expect(await broken.readText('.stride/vault.json')).toBe('{')
+
+    const illegal = new MemoryFileSystem('tc-illegal')
+    await illegal.writeText('.stride/vault.json', '{"tagColors": ["blue"]}')
+    expect(await readTagColors(illegal)).toEqual({})
+  })
+
+  it('round-trips colors and preserves other marker fields', async () => {
+    const fs = new MemoryFileSystem('tc-round')
+    await markDedicatedVault(fs)
+    await writeViewMode(fs, 'compact')
+
+    await writeTagColors(fs, { alpha: 'blue', beta: 'gray' })
+    expect(await readTagColors(fs)).toEqual({ alpha: 'blue', beta: 'gray' })
+
+    await writeTagColors(fs, { alpha: 'pink' })
+    expect(await readTagColors(fs)).toEqual({ alpha: 'pink' })
+
+    const marker = JSON.parse(await fs.readText('.stride/vault.json')) as Record<string, unknown>
+    expect(marker.kind).toBe('stride-vault')
+    expect(marker.viewMode).toBe('compact')
+    expect(marker.tagColors).toEqual({ alpha: 'pink' })
+  })
+
+  it('sanitizeTagColors keeps known colors, trims tags, and drops the rest', () => {
+    expect(sanitizeTagColors({ alpha: 'BLUE', ' beta ': ' teal ' })).toEqual({ alpha: 'blue', beta: 'teal' })
+    // gray is stored as the explicit "auto" marker.
+    expect(sanitizeTagColors({ alpha: 'gray' })).toEqual({ alpha: 'gray' })
+    expect(sanitizeTagColors({ alpha: 'lime', '': 'blue', beta: 7 })).toEqual({})
+    expect(sanitizeTagColors(null)).toEqual({})
+    expect(sanitizeTagColors('blue')).toEqual({})
+    expect(sanitizeTagColors(undefined)).toEqual({})
   })
 })

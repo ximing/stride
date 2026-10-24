@@ -1,5 +1,6 @@
 import { register, resolve } from '@rabjs/react'
 import { plainText } from '@stride/core/note'
+import { resolveTypeColor } from '@stride/core'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -45,9 +46,7 @@ async function mountRail(): Promise<{ host: HTMLElement; vault: VaultService }> 
   register(VaultService)
   register(FolderService)
   const vault = resolve(VaultService)
-  vault.collapsedTypes = []
   vault.cancelPending()
-  localStorage.removeItem('stride:collapsed-types')
   const host = document.createElement('div')
   document.body.appendChild(host)
   root = createRoot(host)
@@ -68,13 +67,12 @@ describe('type rail', () => {
     try {
       const vault = resolve(VaultService)
       vault.cancelPending()
-      vault.collapsedTypes = []
     } catch {
       // The service is registered by the cases that render the rail.
     }
   })
 
-  it('orders visible types, hides visible=false, and collapses row actions only', async () => {
+  it('orders visible types, hides visible=false, and always renders the new-instance action', async () => {
     const { host, vault } = await mountRail()
     await act(async () => {
       await vault.createNewVault()
@@ -82,10 +80,11 @@ describe('type rail', () => {
     expect(typeNames(host)).toEqual(['Note', 'Project', 'Person'])
     expect(typeLabels(host)).toEqual(['Notes', 'Projects', 'People'])
     expect(typeLinks(host).map((node) => node.dataset.icon)).toEqual(['note', 'briefcase', 'user'])
-    expect(typeLinks(host).map((node) => node.querySelector('.type-dot')?.className)).toEqual([
-      'type-dot type-dot-gray',
-      'type-dot type-dot-blue',
-      'type-dot type-dot-teal',
+    expect(typeLinks(host).map((node) => node.querySelector('.type-icon')?.className)).toEqual([
+      // Seed _color gray means "auto": the title hash picks a non-gray color.
+      `type-icon type-icon-${resolveTypeColor('Note', 'gray')}`,
+      'type-icon type-icon-blue',
+      'type-icon type-icon-teal',
     ])
 
     await act(async () => {
@@ -97,7 +96,10 @@ describe('type rail', () => {
     expect(typeNames(host)).toEqual(['Project', 'Person', 'Note'])
     const noteLink = typeLinks(host).find((node) => node.dataset.type === 'Note')
     expect(noteLink?.dataset.icon).toBe('note')
-    expect(noteLink?.querySelector('.type-dot')?.className).toContain('type-dot-gray')
+    // An unknown _color hashes the title into a deterministic non-gray color.
+    const hashed = resolveTypeColor('Note', 'lime')
+    expect(hashed).not.toBe('gray')
+    expect(noteLink?.querySelector('.type-icon')?.className).toContain(`type-icon-${hashed}`)
 
     await act(async () => {
       vault.select('person')
@@ -113,18 +115,13 @@ describe('type rail', () => {
     })
     expect(noteTitles(host)).toEqual(['Untitled'])
 
-    await click(host, '[data-testid="type-collapse"][data-type="Project"]')
+    // No collapse toggle: the new-instance action stays in the DOM and is
+    // revealed by row hover/focus styling instead.
     expect(host.querySelector('[data-testid="type-link"][data-type="Project"]')).not.toBeNull()
-    expect(host.querySelector('[data-testid="type-new-instance"][data-type="Project"]')).toBeNull()
+    expect(host.querySelector('[data-testid="type-new-instance"][data-type="Project"]')).not.toBeNull()
+    expect(host.querySelector('[data-testid="type-collapse"]')).toBeNull()
     expect(noteTitles(host)).toEqual(['Untitled'])
     expect(vault.listFilter).toBe('Project')
-    expect(vault.collapsedTypes).toEqual(['Project'])
-    expect(JSON.parse(localStorage.getItem('stride:collapsed-types') ?? '[]')).toEqual(['Project'])
-
-    await click(host, '[data-testid="type-collapse"][data-type="Project"]')
-    expect(host.querySelector('[data-testid="type-new-instance"][data-type="Project"]')).not.toBeNull()
-    expect(vault.collapsedTypes).toEqual([])
-    expect(noteTitles(host)).toEqual(['Untitled'])
   })
 
   it('creates a Type document, applies a template paragraph, and lists instances', async () => {

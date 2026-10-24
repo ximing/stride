@@ -1,4 +1,5 @@
 import type { FileSystemBackend } from '@stride/platform'
+import { TYPE_COLOR_KEYS } from './types.ts'
 import { VAULT_MARKER } from './vault.ts'
 
 export async function readRenameFromHeading(fs: FileSystemBackend): Promise<boolean> {
@@ -148,4 +149,31 @@ export async function readGitSetupPreference(fs: FileSystemBackend): Promise<Git
 
 export async function writeGitSetupPreference(fs: FileSystemBackend, preference: GitSetupPreference): Promise<void> {
   await patchMarker(fs, { gitSetupPreference: sanitizeGitSetupPreference(preference) })
+}
+
+// ---------- tag colors ----------
+// User-chosen colors for `#tag` chips, keyed by the trimmed tag name. Values
+// are the eight real colors; `gray` means "auto" (hash the name), matching
+// resolveEntityColor. Unknown tags/colors are dropped on sanitize.
+
+export type TagColors = Record<string, string>
+
+export function sanitizeTagColors(value: unknown): TagColors {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  const colors: TagColors = {}
+  for (const [tag, color] of Object.entries(value as Record<string, unknown>)) {
+    const name = tag.trim()
+    const key = typeof color === 'string' ? color.trim().toLowerCase() : ''
+    if (!name || !(TYPE_COLOR_KEYS as readonly string[]).includes(key)) continue
+    colors[name] = key
+  }
+  return colors
+}
+
+export async function readTagColors(fs: FileSystemBackend): Promise<TagColors> {
+  return sanitizeTagColors((await readMarker(fs))?.tagColors)
+}
+
+export async function writeTagColors(fs: FileSystemBackend, colors: TagColors): Promise<void> {
+  await patchMarker(fs, { tagColors: sanitizeTagColors(colors) })
 }

@@ -9,6 +9,7 @@ import {
   readAgentMode,
   readGitSetupPreference,
   readRenameFromHeading,
+  readTagColors,
   readViewMode,
   readZoom,
   recoverRename,
@@ -42,6 +43,7 @@ export async function openBackendBody(vault: VaultService, backend: FileSystemBa
   const zoom = await readZoom(backend)
   const viewMode = await readViewMode(backend)
   const gitSetupPreference = await readGitSetupPreference(backend)
+  const tagColors = await readTagColors(backend)
   const cacheIdentity = runtime.active
     ? { endpoint: runtime.endpoint, model: runtime.model, dim: runtime.dim }
     : { endpoint: '', model: '', dim: 0 }
@@ -103,6 +105,7 @@ export async function openBackendBody(vault: VaultService, backend: FileSystemBa
   vault.zoom = zoom
   vault.viewMode = viewMode
   vault.gitSetupPreference = gitSetupPreference
+  vault.tagColors = tagColors
   applyStageZoom(zoom)
   resetPropertyEditor(vault)
   const snapshot = opened.notes.map((note) => ({ id: note.id, text: indexText(note) }))

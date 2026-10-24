@@ -1,0 +1,131 @@
+/* Date picker: a quiet field trigger that opens a small locale-aware
+   calendar. Storage stays a YYYY-MM-DD string; only the presentation is
+   custom. */
+
+.sd-date-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--sd-fg);
+  text-align: left;
+  cursor: pointer;
+}
+
+.sd-date-trigger .sd-mark {
+  flex: none;
+  color: var(--sd-muted);
+}
+
+.sd-date-trigger .sd-date-value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sd-date-trigger[data-empty='true'] .sd-date-value {
+  color: var(--sd-muted);
+  opacity: 0.6;
+}
+
+.sd-popover.sd-date-popover {
+  width: 236px;
+  padding: 8px;
+  user-select: none;
+}
+
+.sd-date-head {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-bottom: 4px;
+}
+
+.sd-date-month {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--sd-fg);
+  font-family: var(--sd-font-sans);
+  font-size: var(--sd-text-sm);
+  font-weight: 600;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sd-date-head .sd-icon-button.sd-btn-sm {
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+}
+
+.sd-date-weekdays,
+.sd-date-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+}
+
+.sd-date-weekday {
+  color: var(--sd-muted);
+  font-family: var(--sd-font-sans);
+  font-size: 11px;
+  line-height: 22px;
+  text-align: center;
+}
+
+.sd-date-day {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 0;
+  height: 28px;
+  padding: 0;
+  color: var(--sd-fg);
+  font-family: var(--sd-font-sans);
+  font-size: var(--sd-text-xs);
+  background: transparent;
+  border: none;
+  border-radius: var(--sd-radius);
+  cursor: pointer;
+  transition: background-color var(--sd-motion-hover) var(--sd-ease-standard);
+}
+
+.sd-date-day:hover {
+  background: var(--sd-surface-hover);
+}
+
+.sd-date-day:focus-visible {
+  outline: 2px solid var(--sd-focus-ring);
+  outline-offset: -2px;
+}
+
+.sd-date-day[data-today='true'] {
+  color: var(--sd-accent);
+  font-weight: 600;
+}
+
+.sd-date-day[aria-pressed='true'] {
+  color: var(--sd-accent-fg);
+  background: var(--sd-accent);
+}
+
+.sd-date-day[aria-pressed='true']:hover {
+  background: var(--sd-accent);
+}
+
+.sd-date-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 4px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--sd-border);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sd-date-day {
+    transition: none;
+  }
+}

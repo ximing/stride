@@ -75,6 +75,45 @@ async function openRowMenu(host: HTMLElement, name: string) {
   })
 }
 
+/** Note-level actions sit inline in the panel head — no ⋯ menu to open. */
+async function clickNoteAction(testId: string) {
+  await act(async () => {
+    document.querySelector<HTMLElement>(`[data-testid="${testId}"]`)!.click()
+  })
+}
+
+/** Radix popover triggers toggle on pointerdown, which element.click() skips. */
+async function openCombobox(host: HTMLElement, testId: string) {
+  const trigger = host.querySelector<HTMLButtonElement>(`[data-testid="${testId}"]`)!
+  await act(async () => {
+    trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, cancelable: true }))
+    trigger.click()
+  })
+}
+
+function comboboxOptions(): HTMLElement[] {
+  return [...document.querySelectorAll<HTMLElement>('[role="option"]')]
+}
+
+/** The relation form is collapsed behind an "Add relationship" button. */
+async function openRelationForm(host: HTMLElement) {
+  await act(async () => {
+    host.querySelector<HTMLButtonElement>('[data-testid="add-relation-open"]')!.click()
+  })
+}
+
+/** Opens a Radix popover trigger the way a real pointer would: pointerdown
+ * focuses the trigger first, otherwise Radix sees focus-in on the trigger
+ * *after* the popover mounts and dismisses it as "focus outside". */
+async function openPopoverTrigger(trigger: HTMLButtonElement) {
+  await act(async () => {
+    trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, cancelable: true }))
+  })
+  await act(async () => {
+    trigger.click()
+  })
+}
+
 describe('PropertiesPanel', () => {
   beforeEach(() => {
     window.HTMLElement.prototype.scrollIntoView = vi.fn()
@@ -243,7 +282,8 @@ describe('PropertiesPanel', () => {
       const backToB = host.querySelector<HTMLButtonElement>('[data-testid="backlink"][data-source="note-b"]')
       expect(toB).not.toBeNull()
       expect(toB?.textContent).toContain('Note B')
-      expect(host.querySelector('[data-testid="relation-group-body"]')?.textContent).toContain('Body links')
+      // body links carry no kind tag
+      expect(toB?.querySelector('.relation-kind')).toBeNull()
       expect(backToB).not.toBeNull()
       await act(async () => {
         toB!.click()
@@ -253,7 +293,8 @@ describe('PropertiesPanel', () => {
       const toA = host.querySelector<HTMLButtonElement>('[data-testid="relation-link"][data-target="note-a"]')
       const backToA = host.querySelector<HTMLButtonElement>('[data-testid="backlink"][data-source="note-a"]')
       expect(toA).not.toBeNull()
-      expect(host.querySelector('[data-testid="relation-group-related_to"]')?.textContent).toContain('Related to')
+      // structural relations show their kind as an inline tag
+      expect(toA?.querySelector('.relation-kind')?.textContent).toBe('Related to')
       expect(backToA).not.toBeNull()
       await act(async () => {
         backToA!.click()
@@ -293,17 +334,27 @@ describe('PropertiesPanel', () => {
       await act(async () => {
         root.render(<PropertiesPanel />)
       })
-      await act(async () => {
-        setControlValue(host.querySelector<HTMLInputElement>('[data-testid="relation-query"]')!, 'note b')
+      await openRelationForm(host)
+      // the target picker lists every note up front and filters as you type
+      await openPopoverTrigger(host.querySelector<HTMLButtonElement>('[data-testid="relation-target"]')!)
+      await vi.waitFor(() => {
+        expect(document.querySelectorAll('[data-testid="relation-match"]').length).toBeGreaterThan(0)
       })
       await act(async () => {
-        host.querySelector<HTMLButtonElement>('[data-testid="relation-match"][data-target="note-b"]')!.click()
+        setControlValue(document.querySelector<HTMLInputElement>('.sd-combobox-search')!, 'note b')
+      })
+      await act(async () => {
+        ;[...document.querySelectorAll<HTMLElement>('[data-testid="relation-match"]')]
+          .find((option) => option.textContent === 'Note B')!
+          .click()
       })
       expect(vault.notes.find((note) => note.id === 'note-a')?.properties.belongs_to).toEqual(['[[Note B]]'])
       expect(host.querySelector('[data-testid="property-field"][data-name="belongs_to"]')).toBeNull()
       expect(host.textContent).toContain('Belongs to')
       expect(vault.notes.find((note) => note.id === 'note-b')?.properties.has).toBeUndefined()
 
+      // the form collapses after each add; reopen it for the next kind
+      await openRelationForm(host)
       const kind = host.querySelector<HTMLButtonElement>('[data-testid="relation-kind"]')!
       await act(async () => {
         kind.click()
@@ -313,11 +364,17 @@ describe('PropertiesPanel', () => {
       await act(async () => {
         ;(related as HTMLElement).click()
       })
-      await act(async () => {
-        setControlValue(host.querySelector<HTMLInputElement>('[data-testid="relation-query"]')!, 'note b')
+      await openPopoverTrigger(host.querySelector<HTMLButtonElement>('[data-testid="relation-target"]')!)
+      await vi.waitFor(() => {
+        expect(document.querySelectorAll('[data-testid="relation-match"]').length).toBeGreaterThan(0)
       })
       await act(async () => {
-        host.querySelector<HTMLButtonElement>('[data-testid="relation-match"][data-target="note-b"]')!.click()
+        setControlValue(document.querySelector<HTMLInputElement>('.sd-combobox-search')!, 'note b')
+      })
+      await act(async () => {
+        ;[...document.querySelectorAll<HTMLElement>('[data-testid="relation-match"]')]
+          .find((option) => option.textContent === 'Note B')!
+          .click()
       })
       expect(vault.notes.find((note) => note.id === 'note-a')?.properties.related_to).toEqual(['[[Note B]]'])
 
@@ -392,26 +449,20 @@ describe('PropertiesPanel', () => {
       expect(linkText()).toContain('Archived note')
       expect(host.querySelector<HTMLInputElement>('[data-testid="note-title"]')?.value).toBe('Archived note')
 
-      await act(async () => {
-        host.querySelector<HTMLButtonElement>('[data-testid="archive-note"]')!.click()
-      })
+      await clickNoteAction('archive-note')
       expect(linkText()).not.toContain('Archived note')
       expect(linkText()).toContain('Kept note')
       expect(host.querySelector<HTMLInputElement>('[data-testid="note-title"]')?.value).toBe('Archived note')
       vault.cancelPending()
 
-      await act(async () => {
-        host.querySelector<HTMLButtonElement>('[data-testid="delete-note"]')!.click()
-      })
+      await clickNoteAction('delete-note')
       await act(async () => {
         document.querySelector<HTMLButtonElement>('[data-testid="cancel-delete"]')!.click()
       })
       expect(await vault.fs!.stat(notePath(id))).not.toBeNull()
       expect(await vault.fs!.stat(notePath(keptId))).not.toBeNull()
 
-      await act(async () => {
-        host.querySelector<HTMLButtonElement>('[data-testid="delete-note"]')!.click()
-      })
+      await clickNoteAction('delete-note')
       await act(async () => {
         document.querySelector<HTMLButtonElement>('[data-testid="confirm-delete"]')!.click()
         await new Promise((resolvePromise) => setTimeout(resolvePromise, 0))
@@ -567,6 +618,99 @@ describe('PropertiesPanel', () => {
     }
   })
 
+  it('types status, date, tags and the type row with searchable controls', async () => {
+    useMemoryFixture()
+    register(VaultService)
+    const vault = resolve(VaultService)
+    await vault.openFromDraft()
+    await vault.createNote()
+    vault.updateProperty('status', 'draft')
+    vault.updateProperty('date', '2026-10-24')
+    vault.updateListProperty('tags', 'alpha')
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    try {
+      await act(async () => {
+        root.render(<PropertiesPanel />)
+      })
+
+      // status: preset labels on the trigger, tinted by tone
+      const statusTrigger = host.querySelector<HTMLButtonElement>('[data-testid="status-combobox"]')!
+      expect(statusTrigger.textContent).toContain('Draft')
+      expect(statusTrigger.className).toContain('is-draft')
+      await openCombobox(host, 'status-combobox')
+      const done = comboboxOptions().find((option) => option.textContent === 'Done')!
+      await act(async () => {
+        done.click()
+      })
+      expect(vault.active?.properties.status).toBe('done')
+      expect(statusTrigger.className).toContain('is-done')
+
+      // date: the custom picker's trigger shows the stored day, and picking a
+      // day from the calendar rewrites it
+      const dateTrigger = host.querySelector<HTMLButtonElement>('[data-testid="date-input"]')!
+      expect(dateTrigger.textContent).toContain('2026')
+      await openPopoverTrigger(dateTrigger)
+      // The popover portal mounts a beat after the trigger fires.
+      await vi.waitFor(() => {
+        expect(document.querySelector('[data-testid="date-input-day"][data-date="2026-10-15"]')).not.toBeNull()
+      })
+      await act(async () => {
+        document.querySelector<HTMLElement>('[data-testid="date-input-day"][data-date="2026-10-15"]')!.click()
+      })
+      expect(vault.active?.properties.date).toBe('2026-10-15')
+      // Today lives in the calendar footer now
+      await openPopoverTrigger(dateTrigger)
+      await vi.waitFor(() => {
+        expect(document.querySelector('[data-testid="date-input-today"]')).not.toBeNull()
+      })
+      await act(async () => {
+        document.querySelector<HTMLButtonElement>('[data-testid="date-input-today"]')!.click()
+      })
+      const now = new Date()
+      const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+      expect(vault.active?.properties.date).toBe(today)
+
+      // tags: vault candidates plus free creation through the combobox input
+      const tagInput = host.querySelector<HTMLInputElement>(
+        '[data-testid="property-field"][data-name="tags"] [data-testid="list-item-input"]',
+      )!
+      await act(async () => {
+        tagInput.focus()
+      })
+      // alpha is already picked, so it is excluded from the candidates.
+      expect(comboboxOptions().map((option) => option.textContent)).toEqual([])
+      await act(async () => {
+        setControlValue(tagInput, 'beta')
+      })
+      await act(async () => {
+        tagInput.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true }))
+      })
+      expect(vault.active?.properties.tags).toEqual(['alpha', 'beta'])
+
+      // type row: combobox can create a new type name
+      const typeTrigger = host.querySelector<HTMLButtonElement>('[data-testid="type-combobox"]')!
+      expect(typeTrigger.textContent).toContain('note')
+      await openCombobox(host, 'type-combobox')
+      const search = document.querySelector<HTMLInputElement>('.sd-combobox-search')!
+      await act(async () => {
+        setControlValue(search, 'Project')
+      })
+      await act(async () => {
+        document.querySelector<HTMLElement>('[data-testid="type-combobox-create"]')!.click()
+      })
+      expect(vault.active?.type).toBe('Project')
+    } finally {
+      vault.cancelPending()
+      await act(async () => {
+        root.unmount()
+      })
+      host.remove()
+    }
+  })
+
   it('creates a note from an unresolved relation link', async () => {
     useMemoryFixture()
     register(VaultService)
@@ -629,6 +773,65 @@ describe('PropertiesPanel', () => {
         setControlValue(host.querySelector<HTMLInputElement>('[data-testid="property-name"]')!, 'fresh')
       })
       expect(host.querySelector<HTMLButtonElement>('[data-testid="add-property"]')?.disabled).toBe(false)
+    } finally {
+      vault.cancelPending()
+      await act(async () => {
+        root.unmount()
+      })
+      host.remove()
+    }
+  })
+
+  it('adds a date property through the calendar picker', async () => {
+    useMemoryFixture()
+    register(VaultService)
+    const vault = resolve(VaultService)
+    await vault.openFromDraft()
+    await vault.createNote()
+
+    const host = document.createElement('div')
+    document.body.appendChild(host)
+    const root = createRoot(host)
+    try {
+      await act(async () => {
+        root.render(<PropertiesPanel />)
+      })
+      await openAddPropertyForm(host)
+      await act(async () => {
+        setControlValue(host.querySelector<HTMLInputElement>('[data-testid="property-name"]')!, 'deadline')
+      })
+      await act(async () => {
+        host.querySelector<HTMLButtonElement>('[data-testid="property-type"]')!.click()
+      })
+      const dateOption = [...document.querySelectorAll<HTMLElement>('[role="option"]')].find(
+        (option) => option.textContent === 'date',
+      )!
+      await act(async () => {
+        dateOption.click()
+      })
+      // the date type swaps the free-text value for the calendar picker and
+      // requires a picked day before submitting
+      expect(host.querySelector('input[data-testid="property-value"]')).toBeNull()
+      expect(host.querySelector<HTMLButtonElement>('[data-testid="add-property"]')?.disabled).toBe(true)
+
+      const now = new Date()
+      const picked = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-15`
+      await openPopoverTrigger(host.querySelector<HTMLButtonElement>('[data-testid="property-value"]')!)
+      await vi.waitFor(() => {
+        expect(document.querySelector(`[data-testid="property-value-day"][data-date="${picked}"]`)).not.toBeNull()
+      })
+      await act(async () => {
+        document.querySelector<HTMLElement>(`[data-testid="property-value-day"][data-date="${picked}"]`)!.click()
+      })
+      expect(host.querySelector<HTMLButtonElement>('[data-testid="add-property"]')?.disabled).toBe(false)
+      await act(async () => {
+        host.querySelector<HTMLButtonElement>('[data-testid="add-property"]')!.click()
+      })
+      expect(vault.active?.properties.deadline).toBe(picked)
+      // the new row renders the calendar control, not a text input
+      expect(
+        host.querySelector('[data-testid="property-field"][data-name="deadline"] [data-testid="date-input"]'),
+      ).not.toBeNull()
     } finally {
       vault.cancelPending()
       await act(async () => {
@@ -734,15 +937,17 @@ describe('PropertiesPanel', () => {
         root.render(<PropertiesPanel />)
       })
       const links = [...host.querySelectorAll<HTMLElement>('[data-testid="relation-link"]')]
-      expect(links.map((link) => link.textContent)).toEqual(['Alpha Renamed', 'Alpha Renamed'])
-      expect(links.map((link) => link.dataset.target)).toEqual([renamed?.id, renamed?.id])
-      expect(host.querySelector('[data-testid="relation-group-related_to"]')?.textContent).not.toContain('[[Alpha]]')
+      // property link and body link to the same target merge into one row,
+      // tagged with the structural kind
+      expect(links.map((link) => link.textContent)).toEqual(['Related toAlpha Renamed'])
+      expect(links.map((link) => link.dataset.target)).toEqual([renamed?.id])
+      expect(links[0].textContent).not.toContain('[[Alpha]]')
 
       await act(async () => {
         vault.activeId = renamed?.id ?? ''
       })
       const backlink = host.querySelector<HTMLElement>('[data-testid="backlink"]')
-      expect(backlink?.textContent).toBe('Beta')
+      expect(backlink?.textContent).toContain('Beta')
       expect(backlink?.dataset.source).toBe(betaId)
     } finally {
       vault.cancelPending()

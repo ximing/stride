@@ -300,6 +300,11 @@ export function propertyKind(value: NoteProperty | undefined): PropertyKind {
   return 'string'
 }
 
+/** Storage shape of a date property: a plain string in ISO day form. The
+ * editor refines matching strings into a calendar control; on disk it stays
+ * a string. */
+export const DATE_VALUE = /^\d{4}-\d{2}-\d{2}$/
+
 function asNoteProperty(value: unknown): NoteProperty | undefined {
   if (typeof value === 'string' || typeof value === 'boolean') return value
   if (typeof value === 'number') return Number.isFinite(value) ? value : undefined

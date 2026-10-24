@@ -1184,11 +1184,11 @@ describe('VaultService', () => {
     await act(async () => {
       host.querySelector<HTMLButtonElement>('[data-testid="vault-switcher"]')!.click()
     })
-    const options = [...host.querySelectorAll<HTMLButtonElement>('[data-testid="vault-option"]')]
+    const options = [...document.querySelectorAll<HTMLButtonElement>('[data-testid="vault-option"]')]
     expect(options.map((node) => node.dataset.vaultId)).toEqual(vault.vaults.map((entry) => entry.id))
     const firstId = vault.vaults[0]?.id ?? ''
     await act(async () => {
-      host.querySelector<HTMLButtonElement>(`[data-vault-id="${firstId}"]`)!.click()
+      document.querySelector<HTMLButtonElement>(`[data-testid="vault-option"][data-vault-id="${firstId}"]`)!.click()
     })
     await vi.waitFor(() => {
       expect(vault.activeVaultId).toBe(firstId)
@@ -1232,7 +1232,7 @@ describe('VaultService', () => {
       host.querySelector<HTMLButtonElement>('[data-testid="vault-switcher"]')!.click()
     })
     await act(async () => {
-      host.querySelector<HTMLButtonElement>('[data-testid="vault-add"]')!.click()
+      document.querySelector<HTMLButtonElement>('[data-testid="vault-add"]')!.click()
       await new Promise((resolvePromise) => setTimeout(resolvePromise, 0))
     })
     expect(vault.phase).toBe('chooser')
@@ -1446,6 +1446,56 @@ describe('VaultService', () => {
     root.unmount()
     host.remove()
     vault.advanceInbox = true
+  })
+
+  it('markProcessed flags _processed, persists it, and drops the note from the inbox', async () => {
+    useMemoryFixture()
+    vi.stubGlobal('showDirectoryPicker', vi.fn())
+    register(VaultService)
+    const vault = resolve(VaultService)
+    await vault.openFromDraft()
+    vault.notes = [sample('loose', 'Loose'), sample('other', 'Other')]
+    expect(vault.graph.inbox.map((note) => note.id).sort()).toEqual(['loose', 'other'])
+
+    vault.markProcessed('loose')
+    expect(vault.notes.find((note) => note.id === 'loose')?.properties._processed).toBe(true)
+    expect(vault.graph.inbox.map((note) => note.id)).toEqual(['other'])
+
+    // Unknown ids are a no-op.
+    vault.markProcessed('ghost')
+    expect(vault.notes.map((note) => note.id).sort()).toEqual(['loose', 'other'])
+
+    // The flag survives the debounced save round-trip to disk.
+    await vault.flush()
+    const disk = await readNoteFile(vault.fs!, notePath('loose'))
+    expect(disk.properties._processed).toBe(true)
+    vault.setFilter('all')
+  })
+
+  it('setTagColor writes vault.json and tagColorFor prefers the explicit color', async () => {
+    useMemoryFixture()
+    vi.stubGlobal('showDirectoryPicker', vi.fn())
+    register(VaultService)
+    const vault = resolve(VaultService)
+    await vault.openFromDraft()
+
+    // Default: deterministic hash, never gray.
+    const hashed = vault.tagColorFor('alpha')
+    expect(hashed).not.toBe('gray')
+    expect(vault.tagColorFor('alpha')).toBe(hashed)
+
+    await vault.setTagColor('alpha', 'pink')
+    expect(vault.tagColorFor('alpha')).toBe('pink')
+    const marker = JSON.parse(await vault.fs!.readText('.stride/vault.json')) as { tagColors?: Record<string, string> }
+    expect(marker.tagColors).toEqual({ alpha: 'pink' })
+
+    // Setting the same color again is a no-op; null/gray clears back to the hash.
+    await vault.setTagColor('alpha', 'pink')
+    await vault.setTagColor('alpha', null)
+    expect(vault.tagColors).toEqual({})
+    expect(vault.tagColorFor('alpha')).toBe(hashed)
+    const cleared = JSON.parse(await vault.fs!.readText('.stride/vault.json')) as { tagColors?: Record<string, string> }
+    expect(cleared.tagColors).toEqual({})
   })
 
   it('hides an archived note from visible lists without clearing the selection', async () => {

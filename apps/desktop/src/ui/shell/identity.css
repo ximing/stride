@@ -1,4 +1,4 @@
-/* Vault switcher. The status bar hosts it, in the path slot. */
+/* Vault switcher. The rail header opens it downward; the status bar opens it upward. */
 
 .vault-switcher {
   position: relative;
@@ -43,16 +43,13 @@
   transform: rotate(180deg);
 }
 
-.vault-switcher-menu {
-  position: absolute;
-  top: calc(100% + 4px);
-  left: 0;
-  z-index: 30;
+.vault-switcher-menu.sd-popover {
+  z-index: var(--sd-z-popover);
   display: flex;
   flex-direction: column;
   gap: 2px;
-  min-width: 208px;
-  max-width: 320px;
+  width: 280px;
+  max-width: min(320px, calc(100vw - 16px));
   padding: 4px;
   border: 1px solid var(--sd-border);
   border-radius: 8px;
@@ -83,19 +80,18 @@
 
 .vault-switcher-path {
   margin: 0;
+  padding: 0 4px 2px;
+  overflow: hidden;
   color: var(--sd-muted);
   font-size: 11px;
-  line-height: 1.4;
-  word-break: break-all;
+  line-height: 1.45;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .vault-switcher-add {
   border-top: 1px solid var(--sd-border);
   padding-top: 2px;
-}
-
-.vault-switcher-add .sd-btn {
-  justify-content: flex-start;
 }
 
 .vault-switcher-menu .sd-btn {
@@ -130,4 +126,9 @@
 .vault-switcher-list .sd-btn > svg {
   flex: none;
   color: var(--sd-accent);
+}
+
+.vault-switcher-menu .vault-switcher-add .sd-btn {
+  justify-content: flex-start;
+  gap: 6px;
 }

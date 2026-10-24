@@ -1,0 +1,166 @@
+/* Searchable select: compact trigger + popover listbox (12-13px scale). */
+.sd-combobox-field {
+  width: 100%;
+}
+
+.sd-combobox-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  min-height: var(--sd-control-md);
+  padding: var(--sd-space-1) var(--sd-space-2);
+  color: var(--sd-fg);
+  font-family: var(--sd-font-sans);
+  font-size: var(--sd-text-sm);
+  line-height: 1.35;
+  text-align: left;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--sd-radius);
+  cursor: pointer;
+  transition: background-color var(--sd-motion-hover) var(--sd-ease-standard);
+}
+
+.sd-combobox-trigger:hover:not(:disabled) {
+  background: var(--sd-inset);
+}
+
+.sd-combobox-trigger:focus-visible {
+  outline: 2px solid var(--sd-focus-ring);
+  outline-offset: -2px;
+}
+
+.sd-combobox-trigger:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.sd-combobox-value {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sd-combobox-value.is-placeholder {
+  color: var(--sd-muted);
+}
+
+.sd-combobox-chevron {
+  display: inline-flex;
+  flex: none;
+  color: var(--sd-muted);
+}
+
+.sd-combobox-dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--sd-muted);
+}
+
+/* Popover surface: reuse .sd-popover chrome, retune padding and width. */
+.sd-popover.sd-combobox-content {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: var(--radix-popover-trigger-width, 220px);
+  min-width: 200px;
+  max-height: 280px;
+  padding: var(--sd-space-1);
+}
+
+.sd-combobox-search {
+  flex: none;
+  width: 100%;
+  min-height: 26px;
+  padding: 3px 6px;
+  color: var(--sd-fg);
+  font-family: var(--sd-font-sans);
+  font-size: var(--sd-text-xs);
+  background: var(--sd-inset);
+  border: 1px solid transparent;
+  border-radius: var(--sd-radius);
+}
+
+.sd-combobox-search:focus {
+  background: var(--sd-inset-hover);
+  outline: none;
+}
+
+.sd-combobox-search::placeholder {
+  color: var(--sd-muted);
+  opacity: 0.7;
+}
+
+.sd-combobox-list {
+  flex: 1;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.sd-combobox-option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  padding: 3px 6px;
+  overflow: hidden;
+  color: var(--sd-fg);
+  font-family: var(--sd-font-sans);
+  font-size: var(--sd-text-xs);
+  line-height: 1.35;
+  border-radius: var(--sd-radius);
+  cursor: pointer;
+  user-select: none;
+}
+
+.sd-combobox-option.is-active {
+  background: var(--sd-surface-hover);
+}
+
+.sd-combobox-option[aria-selected='true'] {
+  color: var(--sd-accent);
+}
+
+.sd-combobox-option-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sd-combobox-check {
+  display: inline-flex;
+  flex: none;
+  color: var(--sd-accent);
+}
+
+.sd-combobox-create {
+  color: var(--sd-muted);
+}
+
+.sd-combobox-create-icon {
+  display: inline-flex;
+  flex: none;
+}
+
+.sd-combobox-empty {
+  padding: 6px;
+  color: var(--sd-muted);
+  font-size: var(--sd-text-xs);
+  list-style: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sd-combobox-trigger {
+    transition: none;
+  }
+}

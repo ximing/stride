@@ -19,6 +19,7 @@ function draft(partial: Partial<ViewDraft>): ViewDraft {
     file: '',
     name: '',
     icon: '',
+    color: '',
     type: '',
     sortKey: '',
     sortDir: 'desc',
@@ -76,7 +77,6 @@ async function mountRail(): Promise<{ host: HTMLElement; vault: VaultService; vi
   register(FolderService)
   const vault = resolve(VaultService)
   const views = resolve(ViewsService)
-  vault.collapsedTypes = []
   vault.cancelPending()
   const host = document.createElement('div')
   document.body.appendChild(host)

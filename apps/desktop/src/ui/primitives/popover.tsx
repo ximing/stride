@@ -8,6 +8,8 @@ export function Popover(props: ComponentPropsWithoutRef<typeof PopoverPrimitive.
 
 export const PopoverTrigger = PopoverPrimitive.Trigger
 
+export const PopoverAnchor = PopoverPrimitive.Anchor
+
 export const PopoverContent = forwardRef<HTMLDivElement, ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>>(
   function PopoverContent({ className, sideOffset = 6, align = 'start', ...props }, ref) {
     const layer = useLayer()

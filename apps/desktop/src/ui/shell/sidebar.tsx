@@ -1,72 +1,32 @@
 import { observer, useService } from '@rabjs/react'
 import type { StrideNote } from '@stride/core/note'
-import {
-  Bookmark,
-  Briefcase,
-  Calendar,
-  ChevronDown,
-  ChevronRight,
-  FileText,
-  Files,
-  Folder,
-  Inbox,
-  Pencil,
-  Plus,
-  Star,
-  Tag,
-  User,
-  type LucideIcon,
-} from 'lucide-react'
+import { FileText, Files, Inbox, Pencil, Plus } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { typeSidebarLabel } from '@stride/core'
+import { typeColorKey, typeSidebarLabel } from '@stride/core'
 import type { ContextMenuEntry } from '../../services/commands/context-menu'
+import { LayoutService } from '../../services/layout/layout.service'
 import { TabsService } from '../../services/notes/tabs.service'
 import { VaultService } from '../../services/vault/vault.service'
 import { ViewsService } from '../../services/views/views.service'
 import { FolderTree } from '../folders/folder-tree'
 import { ContextMenu } from '../overlays/context-menu'
-import { Button, IconButton } from '../primitives/button'
+import { IconButton } from '../primitives/button'
 import { EmptyState } from '../primitives/empty-state'
 import { Mark } from '../primitives/icon'
 import { ViewEditorModal } from '../views/view-editor'
+import { RailGroupHeader } from './rail-group'
+import { TypeCustomizeModal } from './type-customize'
+import { TYPE_ICONS, typeIconView } from './type-icons'
 
 /** dataTransfer mime for view-row drags (dataTransfer.types lowercases types). */
 const VIEW_DRAG_MIME = 'application/x-stride-view'
 
-const TYPE_ICONS: Record<string, LucideIcon> = {
-  note: FileText,
-  briefcase: Briefcase,
-  user: User,
-  folder: Folder,
-  star: Star,
-  tag: Tag,
-  calendar: Calendar,
-  bookmark: Bookmark,
-}
-
-const TYPE_COLORS = new Set(['gray', 'blue', 'teal', 'green', 'orange', 'purple', 'red', 'pink', 'yellow'])
-
-function propertyText(value: StrideNote['properties'][string] | undefined): string {
-  if (typeof value === 'string') return value
-  if (Array.isArray(value)) return value[0] ?? ''
-  return ''
-}
-
-function typeIconKey(note: StrideNote): string {
-  const key = propertyText(note.properties._icon).trim().toLowerCase()
-  return key in TYPE_ICONS ? key : 'note'
-}
-
-function typeColorKey(note: StrideNote): string {
-  const key = propertyText(note.properties._color).trim().toLowerCase()
-  return TYPE_COLORS.has(key) ? key : 'gray'
-}
-
 /**
  * Saved views (`views/*.json`): click activates the view (listFilter becomes
  * `view:<slug>`), the pencil opens the editor modal, and HTML5 drag reorders
- * rows (persisted to `.stride/views-order.json` by ViewsService).
+ * rows (persisted to `.stride/views-order.json` by ViewsService). The New view
+ * entry point is the + on the group header (Rail), not a row here.
  */
 const SavedViews = observer(function SavedViews() {
   const { t } = useTranslation()
@@ -111,7 +71,11 @@ const SavedViews = observer(function SavedViews() {
             aria-current={views.isActive(item.file) ? 'page' : undefined}
             onClick={() => views.activate(item.file)}
           >
-            {item.view.icon ? <span className="view-icon">{item.view.icon}</span> : null}
+            {item.view.icon ? (
+              <span className={item.view.color ? `view-icon view-icon-${item.view.color}` : 'view-icon'}>
+                {item.view.icon}
+              </span>
+            ) : null}
             <span className="type-label">{item.view.name}</span>
           </button>
           <IconButton
@@ -124,26 +88,74 @@ const SavedViews = observer(function SavedViews() {
           />
         </div>
       ))}
-      <Button
-        tone="quiet"
-        size="sm"
-        className="rail-quiet-action"
-        data-testid="new-view"
-        icon={<Mark icon={Plus} size={14} />}
-        onClick={() => views.openNewEditor()}
-      >
-        {t('sidebar.newView')}
-      </Button>
-      <ViewEditorModal />
     </>
   )
 })
 
-export const Rail = observer(function Rail() {
+/** One type row: filter link + hover-revealed new-instance + context menu. */
+function TypeRow({
+  note,
+  onMenu,
+}: {
+  note: StrideNote
+  onMenu: (note: StrideNote, x: number, y: number) => void
+}) {
   const { t } = useTranslation()
   const vault = useService(VaultService)
   const tabs = useService(TabsService)
+  const icon = typeIconView(note)
+  const color = typeColorKey(note)
+  const active = vault.listFilter === note.title
+  return (
+    <div
+      className="type-row"
+      onContextMenu={(event) => {
+        event.preventDefault()
+        onMenu(note, event.clientX, event.clientY)
+      }}
+    >
+      <button
+        type="button"
+        data-testid="type-link"
+        data-type={note.title}
+        data-icon={icon.kind === 'emoji' ? 'emoji' : icon.key}
+        className={active ? 'active' : ''}
+        aria-current={active ? 'page' : undefined}
+        onClick={() => {
+          vault.setFilter(note.title)
+          tabs.openNote(note.id)
+        }}
+      >
+        <span className={`type-icon type-icon-${color}`}>
+          {icon.kind === 'emoji' ? (
+            <span className="type-icon-emoji">{icon.value}</span>
+          ) : (
+            <Mark icon={TYPE_ICONS[icon.key] ?? FileText} size={16} />
+          )}
+        </span>
+        <span className="type-label">{typeSidebarLabel(note)}</span>
+      </button>
+      <IconButton
+        icon={Plus}
+        label={t('sidebar.newOfType', { title: note.title })}
+        className="type-add"
+        data-testid="type-new-instance"
+        data-type={note.title}
+        onClick={() => vault.createInstance(note.title)}
+      />
+    </div>
+  )
+}
+
+export const Rail = observer(function Rail() {
+  const { t } = useTranslation()
+  const vault = useService(VaultService)
+  const views = useService(ViewsService)
+  const tabs = useService(TabsService)
+  const layout = useService(LayoutService)
   const [inboxMenu, setInboxMenu] = useState<{ x: number; y: number } | null>(null)
+  const [typeMenu, setTypeMenu] = useState<{ x: number; y: number; note: StrideNote } | null>(null)
+  const [customizing, setCustomizing] = useState<StrideNote | null>(null)
   const typeDocs = vault.sidebarTypes
   const fallbackTypes = vault.typeDocuments.length === 0 ? [...vault.graph.byType.keys()] : []
   const showInstances = vault.active?.type === 'Type'
@@ -158,32 +170,45 @@ export const Rail = observer(function Rail() {
       },
     },
   ]
+  const typeMenuItems: ContextMenuEntry[] = typeMenu
+    ? [
+        {
+          kind: 'item',
+          id: 'customize-type',
+          label: t('sidebar.customizeType'),
+          onSelect: () => setCustomizing(typeMenu.note),
+        },
+      ]
+    : []
   return (
     <div className="rail-inner">
-      <div className="group-label">{t('sidebar.views')}</div>
-      <button
-        type="button"
-        className={vault.listFilter === 'all' ? 'rail-nav-item active' : 'rail-nav-item'}
-        aria-current={vault.listFilter === 'all' ? 'page' : undefined}
-        onClick={() => vault.setFilter('all')}
-      >
-        <span className="rail-nav-icon"><Mark icon={Files} size={16} /></span>
-        <span className="type-label">{t('sidebar.all')}</span>
-      </button>
-      <button
-        type="button"
-        className={vault.listFilter === 'inbox' ? 'rail-nav-item active' : 'rail-nav-item'}
-        data-testid="rail-inbox"
-        aria-current={vault.listFilter === 'inbox' ? 'page' : undefined}
-        onClick={() => vault.setFilter('inbox')}
-        onContextMenu={(event) => {
-          event.preventDefault()
-          setInboxMenu({ x: event.clientX, y: event.clientY })
-        }}
-      >
-        <span className="rail-nav-icon"><Mark icon={Inbox} size={16} /></span>
-        <span className="type-label">{t('sidebar.inboxCount', { n: vault.inboxCount })}</span>
-      </button>
+      {/* Pinned destinations: no group label, never collapsible. */}
+      <div className="rail-pinned">
+        <button
+          type="button"
+          className={vault.listFilter === 'all' ? 'rail-nav-item active' : 'rail-nav-item'}
+          aria-current={vault.listFilter === 'all' ? 'page' : undefined}
+          onClick={() => vault.setFilter('all')}
+        >
+          <span className="rail-nav-icon"><Mark icon={Files} size={16} /></span>
+          <span className="type-label">{t('sidebar.all')}</span>
+        </button>
+        <button
+          type="button"
+          className={vault.listFilter === 'inbox' ? 'rail-nav-item active' : 'rail-nav-item'}
+          data-testid="rail-inbox"
+          aria-current={vault.listFilter === 'inbox' ? 'page' : undefined}
+          onClick={() => vault.setFilter('inbox')}
+          onContextMenu={(event) => {
+            event.preventDefault()
+            setInboxMenu({ x: event.clientX, y: event.clientY })
+          }}
+        >
+          <span className="rail-nav-icon"><Mark icon={Inbox} size={16} /></span>
+          <span className="type-label">{t('sidebar.inbox')}</span>
+          <span className="rail-nav-count">{vault.inboxCount}</span>
+        </button>
+      </div>
       {inboxMenu && (
         <ContextMenu
           x={inboxMenu.x}
@@ -192,98 +217,101 @@ export const Rail = observer(function Rail() {
           onClose={() => setInboxMenu(null)}
         />
       )}
-      <SavedViews />
-      <div className="group-label">{t('sidebar.types')}</div>
-      {typeDocs.length === 0 && fallbackTypes.length === 0 && (
-        <EmptyState compact title={t('sidebar.noTypes')} testId="types-empty" />
+      {typeMenu && (
+        <ContextMenu
+          x={typeMenu.x}
+          y={typeMenu.y}
+          items={typeMenuItems}
+          onClose={() => setTypeMenu(null)}
+        />
       )}
-      {typeDocs.map((note) => {
-        const icon = typeIconKey(note)
-        const color = typeColorKey(note)
-        const collapsed = vault.collapsedTypes.includes(note.title)
-        const active = vault.listFilter === note.title
-        return (
-          <div className="type-row" key={note.id}>
-            <button
-              type="button"
-              data-testid="type-link"
-              data-type={note.title}
-              data-icon={icon}
-              className={active ? 'active' : ''}
-              aria-current={active ? 'page' : undefined}
-              onClick={() => {
-                vault.setFilter(note.title)
-                tabs.openNote(note.id)
-              }}
-            >
-              <span className={`type-dot type-dot-${color}`} />
-              <span className="type-icon"><Mark icon={TYPE_ICONS[icon] ?? FileText} size={16} /></span>
-              <span className="type-label">{typeSidebarLabel(note)}</span>
-            </button>
-            {collapsed ? null : (
-              <IconButton
-                icon={Plus}
-                label={t('sidebar.newOfType', { title: note.title })}
-                className="type-add"
-                data-testid="type-new-instance"
-                data-type={note.title}
-                onClick={() => vault.createInstance(note.title)}
-              />
-            )}
+      <section className="rail-group" data-testid="rail-group-views" data-collapsed={layout.railCollapsed.views || undefined}>
+        <RailGroupHeader
+          title={t('sidebar.views')}
+          collapsed={layout.railCollapsed.views}
+          onToggle={() => layout.toggleRailSection('views')}
+          action={
             <IconButton
-              icon={collapsed ? ChevronRight : ChevronDown}
-              label={collapsed ? t('sidebar.expand', { title: note.title }) : t('sidebar.collapse', { title: note.title })}
-              className="type-collapse"
-              data-testid="type-collapse"
-              data-type={note.title}
-              aria-expanded={!collapsed}
-              onClick={() => vault.toggleTypeCollapsed(note.title)}
+              icon={Plus}
+              iconSize={14}
+              size="sm"
+              label={t('sidebar.newView')}
+              data-testid="new-view"
+              onClick={() => views.openNewEditor()}
             />
+          }
+        />
+        {!layout.railCollapsed.views && (
+          <div className="rail-group-body">
+            <SavedViews />
           </div>
-        )
-      })}
-      <Button
-        tone="quiet"
-        size="sm"
-        className="rail-quiet-action"
-        data-testid="new-type"
-        icon={<Mark icon={Plus} size={14} />}
-        onClick={() => vault.createType()}
-      >
-        {t('sidebar.newType')}
-      </Button>
-      {showInstances && (
-        <div className="type-instances" data-testid="type-instances">
-          <div className="group-label">{t('sidebar.instances')}</div>
-          {vault.typeInstances.length === 0 && <EmptyState compact title={t('sidebar.noInstances')} testId="instances-empty" />}
-          {vault.typeInstances.map((note) => (
-            <button
-              key={note.id}
-              type="button"
-              data-testid="instance-link"
-              className={vault.activeId === note.id ? 'rail-nav-item active' : 'rail-nav-item'}
-              aria-current={vault.activeId === note.id ? 'page' : undefined}
-              onClick={() => tabs.openNote(note.id)}
-            >
-              <span className="rail-nav-icon"><Mark icon={FileText} size={16} /></span>
-              <span className="type-label">{note.title}</span>
-            </button>
-          ))}
-        </div>
-      )}
-      {fallbackTypes.map((type) => (
-        <button
-          key={type}
-          type="button"
-          className={vault.listFilter === type ? 'rail-nav-item active' : 'rail-nav-item'}
-          aria-current={vault.listFilter === type ? 'page' : undefined}
-          onClick={() => vault.setFilter(type)}
-        >
-          <span className="rail-nav-icon"><Mark icon={FileText} size={16} /></span>
-          <span className="type-label">{type}</span>
-        </button>
-      ))}
+        )}
+      </section>
+      <section className="rail-group" data-testid="rail-group-types" data-collapsed={layout.railCollapsed.types || undefined}>
+        <RailGroupHeader
+          title={t('sidebar.types')}
+          collapsed={layout.railCollapsed.types}
+          onToggle={() => layout.toggleRailSection('types')}
+          action={
+            <IconButton
+              icon={Plus}
+              iconSize={14}
+              size="sm"
+              label={t('sidebar.newType')}
+              data-testid="new-type"
+              onClick={() => vault.createType()}
+            />
+          }
+        />
+        {!layout.railCollapsed.types && (
+          <div className="rail-group-body">
+            {typeDocs.length === 0 && fallbackTypes.length === 0 && (
+              <EmptyState compact title={t('sidebar.noTypes')} testId="types-empty" />
+            )}
+            {typeDocs.map((note) => (
+              <TypeRow
+                key={note.id}
+                note={note}
+                onMenu={(target, x, y) => setTypeMenu({ x, y, note: target })}
+              />
+            ))}
+            {showInstances && (
+              <div className="type-instances" data-testid="type-instances">
+                <div className="group-label">{t('sidebar.instances')}</div>
+                {vault.typeInstances.length === 0 && <EmptyState compact title={t('sidebar.noInstances')} testId="instances-empty" />}
+                {vault.typeInstances.map((note) => (
+                  <button
+                    key={note.id}
+                    type="button"
+                    data-testid="instance-link"
+                    className={vault.activeId === note.id ? 'rail-nav-item active' : 'rail-nav-item'}
+                    aria-current={vault.activeId === note.id ? 'page' : undefined}
+                    onClick={() => tabs.openNote(note.id)}
+                  >
+                    <span className="rail-nav-icon"><Mark icon={FileText} size={16} /></span>
+                    <span className="type-label">{note.title}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+            {fallbackTypes.map((type) => (
+              <button
+                key={type}
+                type="button"
+                className={vault.listFilter === type ? 'rail-nav-item active' : 'rail-nav-item'}
+                aria-current={vault.listFilter === type ? 'page' : undefined}
+                onClick={() => vault.setFilter(type)}
+              >
+                <span className="rail-nav-icon"><Mark icon={FileText} size={16} /></span>
+                <span className="type-label">{type}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </section>
       <FolderTree />
+      <ViewEditorModal />
+      <TypeCustomizeModal note={customizing} onClose={() => setCustomizing(null)} />
     </div>
   )
 })

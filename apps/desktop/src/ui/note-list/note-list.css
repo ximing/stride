@@ -55,16 +55,6 @@
   text-align: left;
 }
 
-.note-list-item[aria-current="true"] {
-  background: var(--sd-accent-soft);
-  border-color: transparent;
-}
-
-.note-list-item[data-selected="true"] {
-  background: var(--sd-surface-selected);
-  border-color: transparent;
-}
-
 .note-list-item-title {
   font-family: var(--sd-font-serif);
   overflow: hidden;
@@ -80,9 +70,13 @@
 }
 
 .note-list-item-snippet {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  color: var(--sd-muted);
+  font-size: 12px;
+  line-height: 18px;
 }
 
 .note-list.is-compact .note-list-item-snippet {
@@ -100,10 +94,6 @@
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-.note-chip-status {
-  color: var(--sd-fg);
 }
 
 .note-list-sort,
@@ -193,8 +183,11 @@
 
 .note-list-count {
   flex: none;
+  padding: 0 6px;
   font-size: var(--sd-text-xs);
-  line-height: 20px;
+  line-height: 18px;
+  background: var(--sd-inset);
+  border-radius: 999px;
 }
 
 .note-list-head .note-list-filter-toggle {
@@ -347,14 +340,21 @@
   padding: 4px 8px 16px;
 }
 
+/* The wrapper owns the fixed virtual height (rows are spaced by padding, not
+   divider lines) and anchors the hover-revealed process button. */
+.note-list-row {
+  position: relative;
+  height: 102px;
+}
+
 .note-list-item {
   position: relative;
   gap: 4px;
   width: 100%;
   min-width: 0;
-  height: 66px;
+  height: 100%;
   margin: 0;
-  padding: 12px 10px;
+  padding: 10px 12px;
   box-sizing: border-box;
   color: var(--sd-fg);
   background: transparent;
@@ -364,22 +364,30 @@
 }
 
 .note-list-item:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--sd-fg) 4%, transparent);
+  background: var(--sd-surface-hover);
   border-color: transparent;
 }
 
+/* Active row: selected tint plus a 2px accent bar on the leading edge. */
 .note-list-item.is-active {
-  background: color-mix(in srgb, var(--sd-accent) 7%, transparent);
+  background: var(--sd-surface-selected);
   border-color: transparent;
+  box-shadow: inset 2px 0 0 var(--sd-accent);
 }
 
+.note-list-item.is-active:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--sd-accent) 16%, var(--sd-surface));
+}
+
+/* Multi-select uses a neutral tint so it reads differently from the active row;
+   a row that is both keeps the accent bar from .is-active. */
 .note-list-item.is-selected {
-  background: color-mix(in srgb, var(--sd-accent) 11%, transparent);
+  background: var(--sd-surface-active);
   border-color: transparent;
 }
 
 .note-list-item.is-selected:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--sd-accent) 14%, transparent);
+  background: color-mix(in srgb, var(--sd-fg) 11%, var(--sd-surface));
 }
 
 .note-list-item:focus-visible {
@@ -417,27 +425,62 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+  color: var(--sd-muted);
+  font-size: 12px;
 }
 
+/* Chips never shrink — the snippet absorbs leftover space instead, so short
+   type/status names always render in full (up to each chip's max-width). */
 .note-chip {
-  flex: 0 1 auto;
+  flex: none;
   gap: 4px;
   min-width: 0;
   max-width: 88px;
   height: 18px;
-  padding: 0 5px;
+  padding: 0 6px;
   box-sizing: border-box;
   font-size: 12px;
   line-height: 16px;
-  border: 1px solid color-mix(in srgb, var(--sd-border) 72%, transparent);
+  border: 0;
   border-radius: 999px;
 }
 
+/* Type chip tints itself with the type's dot color via --chip-hue (set inline
+   from the row's typeColor), so chip and snippet no longer blur together. */
+.note-chip-type {
+  background: color-mix(in srgb, var(--chip-hue, var(--sd-dot-gray)) 14%, transparent);
+  color: color-mix(in srgb, var(--chip-hue, var(--sd-dot-gray)) 60%, var(--sd-fg));
+}
+
 .note-chip-status {
-  flex: 0 1 auto;
   max-width: 72px;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  background: var(--sd-inset);
+  color: var(--sd-muted);
+}
+
+.note-chip-status.is-draft {
+  background: color-mix(in srgb, var(--sd-warning) 14%, transparent);
+  color: var(--sd-warning);
+}
+
+.note-chip-status.is-doing {
+  background: color-mix(in srgb, var(--sd-dot-blue) 16%, transparent);
+  color: color-mix(in srgb, var(--sd-dot-blue) 58%, var(--sd-fg));
+}
+
+.note-chip-status.is-done {
+  background: color-mix(in srgb, var(--sd-accent) 14%, transparent);
+  color: var(--sd-accent);
+}
+
+/* Tag chips tint softly with their resolved color via --chip-hue (set inline
+   from vault.tagColorFor), same visual family as the type chip. */
+.note-chip-tag {
+  max-width: 96px;
+  padding: 0 6px;
+  background: color-mix(in srgb, var(--chip-hue, var(--sd-dot-gray)) 12%, transparent);
+  color: color-mix(in srgb, var(--chip-hue, var(--sd-dot-gray)) 62%, var(--sd-fg));
+  font-size: 11px;
 }
 
 .note-chip .type-dot {
@@ -446,18 +489,46 @@
   height: 6px;
 }
 
-.note-list-item-snippet {
-  flex: 1 1 auto;
-  min-width: 0;
-  font-size: 12px;
-  line-height: 18px;
+/* Inbox triage: revealed on row hover/focus, never shifts the row layout. */
+.note-list-item-process {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  width: 24px;
+  height: 24px;
+  min-height: 24px;
+  padding: 0;
+  border-color: transparent;
+  background: var(--sd-bg-elevated);
+  color: var(--sd-muted);
+  opacity: 0;
+  transition: opacity 120ms ease;
+}
+
+.note-list-row:hover .note-list-item-process,
+.note-list-row:focus-within .note-list-item-process {
+  opacity: 1;
+}
+
+.note-list-item-process:hover:not(:disabled) {
+  color: var(--sd-accent);
+  background: var(--sd-bg-elevated);
+}
+
+/* Compact rows keep their previous density: date + type/status only. */
+.note-list.is-compact .note-chip-tag {
+  display: none;
 }
 
 /* These two heights include padding and borders. Do not add row margins:
-   virtualWindow() positions every row at exactly 66px or 48px. */
+   virtualWindow() positions every row at exactly 102px or 48px. */
+.note-list.is-compact .note-list-row {
+  height: 48px;
+}
+
 .note-list.is-compact .note-list-item {
   gap: 0;
-  height: 48px;
   padding: 5px 10px;
 }
 

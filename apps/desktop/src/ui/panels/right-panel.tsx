@@ -1,15 +1,22 @@
 import { observer, useService } from '@rabjs/react'
 import { useTranslation } from 'react-i18next'
 import {
+  Archive,
+  ArchiveRestore,
   GitBranch,
   List,
   MessageCircle,
   SlidersHorizontal,
+  Trash2,
   type LucideIcon,
 } from 'lucide-react'
+import { useState } from 'react'
+import { isArchived } from '@stride/core/note'
 import { LayoutService } from '../../services/layout/layout.service'
 import { RIGHT_PANEL_TABS, type RightPanelTab } from '../../services/layout/layout'
-import { IconButton } from '../primitives/button'
+import { VaultService } from '../../services/vault/vault.service'
+import { Button, IconButton } from '../primitives/button'
+import { Modal, ModalClose, ModalContent } from '../primitives/modal'
 import { ChatPanel } from '../chat/chat-panel'
 import { GitPanel } from '../git/git-panel-host'
 import { PropertiesPanel } from './properties-panel'
@@ -73,6 +80,56 @@ export const InspectorRail = observer(function InspectorRail() {
   )
 })
 
+/** Note-level actions for the properties tab: two operations, so they sit
+ * inline beside the panel title instead of hiding behind a ⋯ menu. */
+const NoteActions = observer(function NoteActions() {
+  const { t } = useTranslation()
+  const vault = useService(VaultService)
+  const [deleteOpen, setDeleteOpen] = useState(false)
+  const note = vault.active
+  if (!note) return null
+  const archived = isArchived(note)
+  return (
+    <span className="panel-actions">
+      <IconButton
+        data-testid="archive-note"
+        icon={archived ? ArchiveRestore : Archive}
+        iconSize={15}
+        label={archived ? t('panels.unarchive') : t('notes.archive')}
+        size="sm"
+        onClick={() => vault.updateBooleanProperty('archived', !archived)}
+      />
+      <IconButton
+        data-testid="delete-note"
+        icon={Trash2}
+        iconSize={15}
+        label={t('common.delete')}
+        size="sm"
+        onClick={() => setDeleteOpen(true)}
+      />
+      <Modal open={deleteOpen} onOpenChange={setDeleteOpen}>
+        <ModalContent title={t('panels.deleteNote')} description={t('panels.deleteNoteBody')}>
+          <div className="sd-modal-actions">
+            <ModalClose asChild>
+              <Button tone="secondary" data-testid="cancel-delete">{t('common.cancel')}</Button>
+            </ModalClose>
+            <Button
+              tone="danger"
+              data-testid="confirm-delete"
+              onClick={() => {
+                void vault.deleteActiveNote()
+                setDeleteOpen(false)
+              }}
+            >
+              {t('common.delete')}
+            </Button>
+          </div>
+        </ModalContent>
+      </Modal>
+    </span>
+  )
+})
+
 export const RightPanel = observer(function RightPanel() {
   const { t } = useTranslation()
   const layout = useService(LayoutService)
@@ -80,6 +137,7 @@ export const RightPanel = observer(function RightPanel() {
     <div className="panel-wrap" data-testid="right-panel">
       <div className="panel-head" data-tauri-drag-region="deep">
         <span className="panel-title">{t(TAB_CHROME[layout.rightPanelTab].labelKey)}</span>
+        {layout.rightPanelTab === 'properties' && <NoteActions />}
       </div>
       <div className="panel-body">
         {layout.rightPanelTab === 'properties' && <PropertiesPanel />}

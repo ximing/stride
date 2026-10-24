@@ -53,6 +53,12 @@
   font-size: var(--sd-text-sm);
 }
 
+.view-color-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .view-editor-actions {
   display: flex;
   justify-content: flex-end;

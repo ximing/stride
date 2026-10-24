@@ -141,7 +141,7 @@ export const StatusBar = observer(function StatusBar() {
   const updateCheck = useService(UpdateCheckService)
   return (
     <footer className="statusbar" data-testid="statusbar" data-tauri-drag-region="deep">
-      <VaultSwitcher />
+      <VaultSwitcher side="top" />
       {git.branch ? (
         <span className="statusbar-item" data-testid="statusbar-branch">
           <span className="statusbar-icon statusbar-icon-git"><Mark icon={GitBranch} size={14} /></span>
@@ -163,7 +163,10 @@ export const StatusBar = observer(function StatusBar() {
           <span data-testid="index-retry">{translate('common.retry')}</span>
         </Button>
       ) : (
-        <span className="statusbar-item" data-testid="index-status">
+        <span
+          className={`statusbar-item statusbar-index${vault.indexPhase === 'rebuilding' ? ' is-busy' : ''}`}
+          data-testid="index-status"
+        >
           <Mark icon={Search} size={14} />
           {indexStatusLabel(vault.indexPhase, vault.indexWork, vault.indexDone, vault.indexTotal)}
         </span>

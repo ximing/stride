@@ -1,0 +1,83 @@
+/* Nine-dot color picker (type customize modal, view editor). Colors only
+   ever come from the --sd-dot-* tokens. */
+.sd-swatches {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sd-swatch {
+  width: 22px;
+  height: 22px;
+  flex: none;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--sd-fg) 18%, transparent);
+  border-radius: 99px;
+  cursor: pointer;
+  transition: transform var(--sd-motion-hover) var(--sd-ease-standard);
+}
+
+.sd-swatch:hover:not(:disabled) {
+  transform: scale(1.12);
+}
+
+.sd-swatch[data-selected='true'] {
+  box-shadow:
+    0 0 0 2px var(--sd-bg),
+    0 0 0 4px var(--sd-accent);
+}
+
+.sd-swatch-gray {
+  background: var(--sd-dot-gray);
+}
+
+.sd-swatch-blue {
+  background: var(--sd-dot-blue);
+}
+
+.sd-swatch-teal {
+  background: var(--sd-dot-teal);
+}
+
+.sd-swatch-green {
+  background: var(--sd-dot-green);
+}
+
+.sd-swatch-orange {
+  background: var(--sd-dot-orange);
+}
+
+.sd-swatch-purple {
+  background: var(--sd-dot-purple);
+}
+
+.sd-swatch-red {
+  background: var(--sd-dot-red);
+}
+
+.sd-swatch-pink {
+  background: var(--sd-dot-pink);
+}
+
+.sd-swatch-yellow {
+  background: var(--sd-dot-yellow);
+}
+
+/* Auto = the title-hash palette: hinted with a sweep of the real colors. */
+.sd-swatch-auto {
+  background: conic-gradient(
+    var(--sd-dot-blue),
+    var(--sd-dot-teal),
+    var(--sd-dot-green),
+    var(--sd-dot-orange),
+    var(--sd-dot-purple),
+    var(--sd-dot-pink),
+    var(--sd-dot-blue)
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sd-swatch {
+    transition: none;
+  }
+}

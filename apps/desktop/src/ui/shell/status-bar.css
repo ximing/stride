@@ -36,6 +36,12 @@
   color: var(--sd-danger);
 }
 
+/* Indexing in progress reads in accent so the busy state stands out from the
+   idle muted items; ready/idle stays muted. */
+.statusbar .statusbar-index.is-busy {
+  color: var(--sd-accent);
+}
+
 .statusbar-index-error:hover:not(:disabled) {
   color: var(--sd-danger);
 }
@@ -216,10 +222,5 @@
   padding: 0 4px;
   color: var(--sd-muted);
   font-size: 12px;
-}
-
-.statusbar .vault-switcher-menu {
-  top: auto;
-  bottom: calc(100% + 4px);
 }
 

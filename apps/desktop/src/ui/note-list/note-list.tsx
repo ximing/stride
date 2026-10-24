@@ -1,10 +1,10 @@
 import { ArrowUpDown, Bookmark, Check, FileText, Inbox, ListFilter, Plus, Search, X } from 'lucide-react'
 import { has, observer, raw, resolve, useService } from '@rabjs/react'
 import { plainText, type StrideNote } from '@stride/core/note'
-import { memo, useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react'
+import { memo, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react'
 import { useTranslation } from 'react-i18next'
 import { i18n, t } from '../../i18n'
-import { typeSidebarLabel } from '@stride/core'
+import { resolveTypeColor, typeColorKey, typeSidebarLabel, TYPE_COLOR_KEYS, type TypeColor } from '@stride/core'
 import { CommandService } from '../../services/commands/command.service'
 import { buildNoteListMenu, type ContextMenuEntry } from '../../services/commands/context-menu'
 import { ListFilterService } from '../../services/search/list-filter.service'
@@ -67,18 +67,46 @@ export function noteListTitle(vault: VaultService): string {
   return vault.listFilter
 }
 
-const TYPE_COLORS = new Set(['gray', 'blue', 'teal', 'green', 'orange', 'purple', 'red', 'pink', 'yellow'])
-
 function propertyText(value: StrideNote['properties'][string] | undefined): string {
   if (typeof value === 'string') return value
   if (Array.isArray(value)) return value[0] ?? ''
   return ''
 }
 
-function typeDocColor(doc: StrideNote): string {
-  const key = propertyText(doc.properties._color).trim().toLowerCase()
-  return TYPE_COLORS.has(key) ? key : 'gray'
+/**
+ * Tags from `properties.tags`: an array, or a comma-separated string. Kept
+ * local (no cross-layer helper): the list only needs trimmed display strings.
+ */
+export function noteTags(note: StrideNote): string[] {
+  const value = note.properties.tags
+  const items = Array.isArray(value) ? value : typeof value === 'string' ? value.split(/[,，]/) : []
+  return items.map((tag) => tag.trim()).filter((tag) => tag !== '')
 }
+
+type StatusTone = 'draft' | 'doing' | 'done' | 'muted'
+
+/** Lowercased status label → tone. Unknown values fall back to the muted default. */
+const STATUS_TONES: Record<string, StatusTone> = {
+  draft: 'draft',
+  草稿: 'draft',
+  todo: 'doing',
+  doing: 'doing',
+  'in progress': 'doing',
+  待办: 'doing',
+  进行中: 'doing',
+  done: 'done',
+  published: 'done',
+  完成: 'done',
+  已完成: 'done',
+  已发布: 'done',
+}
+
+function statusTone(status: string): StatusTone {
+  return STATUS_TONES[status.trim().toLowerCase()] ?? 'muted'
+}
+
+/** The eight pickable tag colors; gray is the implicit "auto" menu entry. */
+const TAG_COLOR_CHOICES = TYPE_COLOR_KEYS.filter((color): color is TypeColor => color !== 'gray')
 
 interface TypeChipInfo {
   color: string
@@ -93,7 +121,7 @@ function buildTypeInfo(vault: VaultService): Map<string, TypeChipInfo> {
   const map = new Map<string, TypeChipInfo>()
   for (const doc of vault.typeDocuments) {
     // The chip label mirrors the sidebar: `_sidebar_label` when set.
-    map.set(doc.title, { color: typeDocColor(doc), label: typeSidebarLabel(doc) })
+    map.set(doc.title, { color: typeColorKey(doc), label: typeSidebarLabel(doc) })
   }
   return map
 }
@@ -289,10 +317,19 @@ interface NoteRowProps {
   typeColor: string
   typeLabel: string
   status: string
+  /** Newline-joined tags (arrays break memo; a string keeps row props primitive). */
+  tagsText: string
+  /** Resolved color per tag, parallel to tagsText (same newline joining). */
+  tagColorsText: string
   active: boolean
   selected: boolean
+  /** Inbox rows get a hover/focus-revealed "mark processed" button. */
+  processable: boolean
+  processLabel: string
   onRowClick: (id: string, mods: { shift: boolean; mod: boolean }) => void
   onRowMenu: (id: string, x: number, y: number) => void
+  onProcess: (id: string) => void
+  onTagMenu: (tag: string, x: number, y: number) => void
 }
 
 // memo keeps scroll re-renders cheap: rows whose props did not change bail out.
@@ -304,41 +341,98 @@ const NoteRow = memo(function NoteRow({
   typeColor,
   typeLabel,
   status,
+  tagsText,
+  tagColorsText,
   active,
   selected,
+  processable,
+  processLabel,
   onRowClick,
   onRowMenu,
+  onProcess,
+  onTagMenu,
 }: NoteRowProps) {
+  const tags = tagsText === '' ? [] : tagsText.split('\n')
+  const tagColors = tagColorsText === '' ? [] : tagColorsText.split('\n')
+  const tone = status !== '' ? statusTone(status) : 'muted'
+  const snippet = noteSnippet(note)
+  // The card is three rows: title / snippet (clamped to 2 lines, collapsed when
+  // empty) / meta. The wrapper owns the fixed virtual height and anchors the
+  // process button, which must stay outside the row's <button>.
   return (
-    <button
-      type="button"
-      className={['note-list-item', active ? 'is-active' : '', selected ? 'is-selected' : ''].filter(Boolean).join(' ')}
-      data-testid="note-list-item"
-      data-note-id={note.id}
-      aria-current={active ? 'true' : undefined}
-      data-selected={selected ? 'true' : undefined}
-      onClick={(event) => onRowClick(note.id, { shift: event.shiftKey, mod: event.metaKey || event.ctrlKey })}
-      onContextMenu={(event) => {
-        event.preventDefault()
-        event.stopPropagation()
-        onRowMenu(note.id, event.clientX, event.clientY)
-      }}
-    >
-      <span className="note-list-item-title">{title}</span>
-      <span className="note-list-item-meta">
-        <span className="note-list-item-date">{dateLabel}</span>
-        {typeTitle !== '' && (
-          <span className="note-chip" data-testid="note-chip-type" data-type={typeTitle}>
-            <span className={`type-dot type-dot-${typeColor}`} />
-            <span className="note-chip-label">{typeLabel}</span>
-          </span>
+    <div className="note-list-row">
+      <button
+        type="button"
+        className={['note-list-item', active ? 'is-active' : '', selected ? 'is-selected' : ''].filter(Boolean).join(' ')}
+        data-testid="note-list-item"
+        data-note-id={note.id}
+        aria-current={active ? 'true' : undefined}
+        data-selected={selected ? 'true' : undefined}
+        onClick={(event) => onRowClick(note.id, { shift: event.shiftKey, mod: event.metaKey || event.ctrlKey })}
+        onContextMenu={(event) => {
+          event.preventDefault()
+          event.stopPropagation()
+          onRowMenu(note.id, event.clientX, event.clientY)
+        }}
+      >
+        <span className="note-list-item-title" data-testid="note-list-item-title">{title}</span>
+        {snippet !== '' && (
+          <span className="note-list-item-snippet" data-testid="note-list-item-snippet">{snippet}</span>
         )}
-        {status !== '' && (
-          <span className="note-chip note-chip-status" data-testid="note-chip-status">{status}</span>
-        )}
-        <span className="note-list-item-snippet">{noteSnippet(note)}</span>
-      </span>
-    </button>
+        <span className="note-list-item-meta">
+          <span className="note-list-item-date">{dateLabel}</span>
+          {typeTitle !== '' && (
+            <span
+              className="note-chip note-chip-type"
+              data-testid="note-chip-type"
+              data-type={typeTitle}
+              style={{ '--chip-hue': `var(--sd-dot-${typeColor})` } as CSSProperties}
+            >
+              <span className={`type-dot type-dot-${typeColor}`} />
+              <span className="note-chip-label">{typeLabel}</span>
+            </span>
+          )}
+          {status !== '' && (
+            <span
+              className={['note-chip', 'note-chip-status', tone !== 'muted' ? `is-${tone}` : ''].filter(Boolean).join(' ')}
+              data-testid="note-chip-status"
+            >
+              {status}
+            </span>
+          )}
+          {tags.map((tag, index) => (
+            <span
+              key={tag}
+              className="note-chip note-chip-tag"
+              data-testid="note-chip-tag"
+              data-tag={tag}
+              style={{ '--chip-hue': `var(--sd-dot-${tagColors[index] ?? 'gray'})` } as CSSProperties}
+              onContextMenu={(event) => {
+                event.preventDefault()
+                event.stopPropagation()
+                onTagMenu(tag, event.clientX, event.clientY)
+              }}
+            >
+              #{tag}
+            </span>
+          ))}
+        </span>
+      </button>
+      {processable && (
+        <IconButton
+          className="note-list-item-process"
+          data-testid="note-process"
+          icon={Check}
+          iconSize={14}
+          label={processLabel}
+          size="sm"
+          onClick={(event) => {
+            event.stopPropagation()
+            onProcess(note.id)
+          }}
+        />
+      )}
+    </div>
   )
 })
 
@@ -544,6 +638,29 @@ export const NoteList = observer(function NoteList() {
     setRowMenu({ x, y, items })
   }
 
+  // Right-click on a tag chip: pick its chip color (or back to the name hash).
+  function openTagMenu(tag: string, x: number, y: number) {
+    const explicit = vault.tagColors[tag] ?? null
+    const items: ContextMenuEntry[] = [
+      ...TAG_COLOR_CHOICES.map((color): ContextMenuEntry => ({
+        kind: 'item',
+        id: `tag-color-${color}`,
+        label: translate(`notes.tagColors.${color}`),
+        checked: explicit === color,
+        onSelect: () => { void vault.setTagColor(tag, color) },
+      })),
+      { kind: 'separator', id: 'tag-color-auto-sep' },
+      {
+        kind: 'item',
+        id: 'tag-color-auto',
+        label: translate('notes.tagColors.auto'),
+        checked: explicit === null,
+        onSelect: () => { void vault.setTagColor(tag, null) },
+      },
+    ]
+    setRowMenu({ x, y, items })
+  }
+
   return (
     <div
       className={compact ? 'note-list is-compact' : 'note-list'}
@@ -594,6 +711,7 @@ export const NoteList = observer(function NoteList() {
         {rows.map((note) => {
           const chipType = chipTypeOf(note)
           const chip = chipType !== '' ? typeInfo.get(chipType) : undefined
+          const tags = noteTags(note)
           return (
             <NoteRow
               key={note.id}
@@ -601,13 +719,19 @@ export const NoteList = observer(function NoteList() {
               title={note.title || translate('notes.untitled')}
               dateLabel={relativeDay(vault.noteMtimes[note.id] ?? 0, Date.now())}
               typeTitle={chipType}
-              typeColor={chip?.color ?? 'gray'}
+              typeColor={chip?.color ?? resolveTypeColor(chipType)}
               typeLabel={chip?.label ?? chipType}
               status={propertyText(note.properties.status).trim()}
+              tagsText={tags.join('\n')}
+              tagColorsText={tags.map((tag) => vault.tagColorFor(tag)).join('\n')}
               active={vault.activeId === note.id}
               selected={list.isSelected(note.id)}
+              processable={vault.listFilter === 'inbox'}
+              processLabel={translate('notes.markProcessed')}
               onRowClick={(id, mods) => list.clickNote(id, mods, orderedIds)}
               onRowMenu={openRowMenu}
+              onProcess={(id) => vault.markProcessed(id)}
+              onTagMenu={openTagMenu}
             />
           )
         })}

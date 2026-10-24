@@ -1,4 +1,4 @@
-import { FilePlus, FileText, Folder, FolderPlus } from 'lucide-react'
+import { ChevronDown, ChevronRight, FilePlus, FileText, Folder, FolderPlus } from 'lucide-react'
 import { observer, useService } from '@rabjs/react'
 import { useEffect, useMemo, useState, type DragEvent } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -11,6 +11,7 @@ import {
 } from '../../services/commands/context-menu'
 import { FolderService } from '../../services/vault/folder.service'
 import { FOLDER_FILTER_PREFIX, VaultService } from '../../services/vault/vault.service'
+import { LayoutService } from '../../services/layout/layout.service'
 import { ListFilterService } from '../../services/search/list-filter.service'
 import { NoteListService } from '../../services/notes/note-list.service'
 import { TabsService } from '../../services/notes/tabs.service'
@@ -21,6 +22,7 @@ import { EmptyState } from '../primitives/empty-state'
 import { Mark } from '../primitives/icon'
 import { Input } from '../primitives/input'
 import { Modal, ModalClose, ModalContent } from '../primitives/modal'
+import { RailGroupHeader } from '../shell/rail-group'
 
 // A vault-scale folder can hold thousands of notes; the tree renders at most
 // this many links per folder and summarizes the rest. Keeps sidebar DOM size
@@ -220,6 +222,7 @@ interface FolderBlockProps {
   draft: string
   creatingIn: string
   createDraft: string
+  foldersCollapsed: Record<string, boolean>
   onSelect: (id: string) => void
   onSelectFolder: (path: string) => void
   onNewNote: (path: string) => void
@@ -233,6 +236,7 @@ interface FolderBlockProps {
   onCreateDraft: (value: string) => void
   onCreateIn: (path: string) => void
   onCancelCreateIn: () => void
+  onToggleFolder: (path: string) => void
 }
 
 function FolderBlock({
@@ -245,6 +249,7 @@ function FolderBlock({
   draft,
   creatingIn,
   createDraft,
+  foldersCollapsed,
   onSelect,
   onSelectFolder,
   onNewNote,
@@ -258,17 +263,20 @@ function FolderBlock({
   onCreateDraft,
   onCreateIn,
   onCancelCreateIn,
+  onToggleFolder,
 }: FolderBlockProps) {
   const { t } = useTranslation()
   const label = path.split('/').pop() ?? path
   const renameLabel = `${t('folders.rename')} ${label}`
   const insideLabel = t('folders.newInside', { name: label })
   const selected = selectedFolder === path
+  const collapsed = foldersCollapsed[path] === true
   return (
     <div
       className={selected ? 'folder-row is-active' : 'folder-row'}
       data-testid="folder-row"
       data-path={path}
+      data-collapsed={collapsed || undefined}
       onDragOver={allowDrop}
       onDrop={(event) => onDrop(event, path)}
       onContextMenu={(event) => {
@@ -278,9 +286,27 @@ function FolderBlock({
       }}
     >
       <div className="folder-row-main">
+        {/* The toggle borrows the folder icon's slot: it shows the folder
+            glyph at rest, a chevron on hover/focus, and a chevron at all
+            times while collapsed — no layout shift, no extra indent. */}
+        <button
+          type="button"
+          className="folder-toggle"
+          data-testid="folder-toggle"
+          data-path={path}
+          data-collapsed={collapsed || undefined}
+          aria-expanded={!collapsed}
+          aria-label={t('folders.toggleFolder', { name: label })}
+          onClick={(event) => {
+            event.stopPropagation()
+            onToggleFolder(path)
+          }}
+        >
+          <span className="folder-toggle-icon"><Mark icon={Folder} size={14} /></span>
+          <span className="folder-toggle-chevron"><Mark icon={collapsed ? ChevronRight : ChevronDown} size={14} /></span>
+        </button>
         {renaming === path ? (
           <span className="folder-label folder-label-edit">
-            <Mark icon={Folder} size={14} />
             <InlineNameInput
               label={renameLabel}
               className="folder-rename-input"
@@ -300,7 +326,6 @@ function FolderBlock({
             onClick={() => onSelectFolder(path)}
             onDoubleClick={() => onStartRename(path)}
           >
-            <Mark icon={Folder} size={14} />
             <span className="folder-label-text">{label}</span>
           </button>
         )}
@@ -316,46 +341,50 @@ function FolderBlock({
           </div>
         )}
       </div>
-      <div className="folder-children">
-        {creatingIn === path && (
-          <GhostRow
-            label={insideLabel}
-            testId="folder-child-name"
-            value={createDraft}
-            onChange={onCreateDraft}
-            onCommit={() => onCreateIn(path)}
-            onCancel={onCancelCreateIn}
-          />
-        )}
-        {childFolders(paths, path).map((child) => (
-          <FolderBlock
-            key={child}
-            path={child}
-            paths={paths}
-            notes={notes}
-            activeId={activeId}
-            selectedFolder={selectedFolder}
-            renaming={renaming}
-            draft={draft}
-            creatingIn={creatingIn}
-            createDraft={createDraft}
-            onSelect={onSelect}
-            onSelectFolder={onSelectFolder}
-            onNewNote={onNewNote}
-            onDrop={onDrop}
-            onStartRename={onStartRename}
-            onDraft={onDraft}
-            onRename={onRename}
-            onCancelRename={onCancelRename}
-            onFolderMenu={onFolderMenu}
-            onNoteMenu={onNoteMenu}
-            onCreateDraft={onCreateDraft}
-            onCreateIn={onCreateIn}
-            onCancelCreateIn={onCancelCreateIn}
-          />
-        ))}
-        <FolderNotes notes={notes} parent={path} activeId={activeId} onSelect={onSelect} onMenu={onNoteMenu} />
-      </div>
+      {!collapsed && (
+        <div className="folder-children">
+          {creatingIn === path && (
+            <GhostRow
+              label={insideLabel}
+              testId="folder-child-name"
+              value={createDraft}
+              onChange={onCreateDraft}
+              onCommit={() => onCreateIn(path)}
+              onCancel={onCancelCreateIn}
+            />
+          )}
+          {childFolders(paths, path).map((child) => (
+            <FolderBlock
+              key={child}
+              path={child}
+              paths={paths}
+              notes={notes}
+              activeId={activeId}
+              selectedFolder={selectedFolder}
+              renaming={renaming}
+              draft={draft}
+              creatingIn={creatingIn}
+              createDraft={createDraft}
+              foldersCollapsed={foldersCollapsed}
+              onSelect={onSelect}
+              onSelectFolder={onSelectFolder}
+              onNewNote={onNewNote}
+              onDrop={onDrop}
+              onStartRename={onStartRename}
+              onDraft={onDraft}
+              onRename={onRename}
+              onCancelRename={onCancelRename}
+              onFolderMenu={onFolderMenu}
+              onNoteMenu={onNoteMenu}
+              onCreateDraft={onCreateDraft}
+              onCreateIn={onCreateIn}
+              onCancelCreateIn={onCancelCreateIn}
+              onToggleFolder={onToggleFolder}
+            />
+          ))}
+          <FolderNotes notes={notes} parent={path} activeId={activeId} onSelect={onSelect} onMenu={onNoteMenu} />
+        </div>
+      )}
     </div>
   )
 }
@@ -367,6 +396,7 @@ export const FolderTree = observer(function FolderTree() {
   const listFilter = useService(ListFilterService)
   const tabs = useService(TabsService)
   const noteList = useService(NoteListService)
+  const layout = useService(LayoutService)
   const [creating, setCreating] = useState(false)
   const [name, setName] = useState('')
   const [renaming, setRenaming] = useState('')
@@ -453,8 +483,13 @@ export const FolderTree = observer(function FolderTree() {
     const items = buildFolderMenu(
       { path },
       {
-        newNoteHere: (folder) => void folderService.createNoteInFolder(folder),
+        newNoteHere: (folder) => {
+          // Creating inside a collapsed folder must surface the new note.
+          layout.setFolderCollapsed(folder, false)
+          void folderService.createNoteInFolder(folder)
+        },
         newFolderInside: (folder) => {
+          layout.setFolderCollapsed(folder, false)
           setCreatingIn(folder)
           setCreateDraft('')
         },
@@ -519,64 +554,81 @@ export const FolderTree = observer(function FolderTree() {
         openRootMenu(event.clientX, event.clientY)
       }}
     >
-      <div className="folder-tree-head">
-        <span className="group-label folder-tree-title">{t('shell.notes')}</span>
-        <IconButton
-          icon={FolderPlus}
-          label={t('folders.newFolder')}
-          size="sm"
-          data-testid="new-folder"
-          onClick={() => {
-            setName('')
-            setCreating(true)
-          }}
-        />
-      </div>
-      {treeEmpty && !creating && (
-        <EmptyState
-          compact
-          title={listFilter.query.trim() !== '' || vault.searchQuery.trim() !== '' ? t('folders.emptyFilter') : t('folders.empty')}
-          testId="folder-tree-empty"
-        />
+      <RailGroupHeader
+        title={t('shell.notes')}
+        collapsed={layout.railCollapsed.notes}
+        onToggle={() => layout.toggleRailSection('notes')}
+        testId="rail-group-notes"
+        action={
+          <IconButton
+            icon={FolderPlus}
+            label={t('folders.newFolder')}
+            size="sm"
+            iconSize={14}
+            data-testid="new-folder"
+            onClick={() => {
+              // The ghost row renders in the group body; expand so it is visible.
+              layout.setRailSectionCollapsed('notes', false)
+              setName('')
+              setCreating(true)
+            }}
+          />
+        }
+      />
+      {!layout.railCollapsed.notes && (
+        <div className="rail-group-body">
+          {treeEmpty && !creating && (
+            <EmptyState
+              compact
+              title={listFilter.query.trim() !== '' || vault.searchQuery.trim() !== '' ? t('folders.emptyFilter') : t('folders.empty')}
+              testId="folder-tree-empty"
+            />
+          )}
+          {creating && (
+            <GhostRow
+              label={t('folders.name')}
+              testId="folder-name"
+              value={name}
+              onChange={setName}
+              onCommit={() => void submitCreate()}
+              onCancel={() => setCreating(false)}
+            />
+          )}
+          {childFolders(paths, '').map((path) => (
+            <FolderBlock
+              key={path}
+              path={path}
+              paths={paths}
+              notes={notes}
+              activeId={vault.activeId}
+              selectedFolder={vault.listFilter.startsWith(FOLDER_FILTER_PREFIX) ? vault.listFilter.slice(FOLDER_FILTER_PREFIX.length) : ''}
+              renaming={renaming}
+              draft={draft}
+              creatingIn={creatingIn}
+              createDraft={createDraft}
+              foldersCollapsed={layout.foldersCollapsed}
+              onSelect={(id) => tabs.openNote(id)}
+              onSelectFolder={selectFolder}
+              onNewNote={(folder) => {
+                layout.setFolderCollapsed(folder, false)
+                void folderService.createNoteInFolder(folder)
+              }}
+              onDrop={drop}
+              onStartRename={startRename}
+              onDraft={setDraft}
+              onRename={(path) => void commitRename(path)}
+              onCancelRename={() => setRenaming('')}
+              onFolderMenu={openFolderMenu}
+              onNoteMenu={openNoteMenu}
+              onCreateDraft={setCreateDraft}
+              onCreateIn={(path) => void submitCreateIn(path)}
+              onCancelCreateIn={() => setCreatingIn('')}
+              onToggleFolder={(path) => layout.toggleFolder(path)}
+            />
+          ))}
+          <FolderNotes notes={notes} parent="" activeId={vault.activeId} onSelect={(id) => tabs.openNote(id)} onMenu={openNoteMenu} />
+        </div>
       )}
-      {creating && (
-        <GhostRow
-          label={t('folders.name')}
-          testId="folder-name"
-          value={name}
-          onChange={setName}
-          onCommit={() => void submitCreate()}
-          onCancel={() => setCreating(false)}
-        />
-      )}
-      {childFolders(paths, '').map((path) => (
-        <FolderBlock
-          key={path}
-          path={path}
-          paths={paths}
-          notes={notes}
-          activeId={vault.activeId}
-          selectedFolder={vault.listFilter.startsWith(FOLDER_FILTER_PREFIX) ? vault.listFilter.slice(FOLDER_FILTER_PREFIX.length) : ''}
-          renaming={renaming}
-          draft={draft}
-          creatingIn={creatingIn}
-          createDraft={createDraft}
-          onSelect={(id) => tabs.openNote(id)}
-          onSelectFolder={selectFolder}
-          onNewNote={(folder) => void folderService.createNoteInFolder(folder)}
-          onDrop={drop}
-          onStartRename={startRename}
-          onDraft={setDraft}
-          onRename={(path) => void commitRename(path)}
-          onCancelRename={() => setRenaming('')}
-          onFolderMenu={openFolderMenu}
-          onNoteMenu={openNoteMenu}
-          onCreateDraft={setCreateDraft}
-          onCreateIn={(path) => void submitCreateIn(path)}
-          onCancelCreateIn={() => setCreatingIn('')}
-        />
-      ))}
-      <FolderNotes notes={notes} parent="" activeId={vault.activeId} onSelect={(id) => tabs.openNote(id)} onMenu={openNoteMenu} />
       <Modal open={deleting !== ''} onOpenChange={(open) => { if (!open) setDeleting('') }}>
         <ModalContent
           title={t('folders.deleteTitle')}

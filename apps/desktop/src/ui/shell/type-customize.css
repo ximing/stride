@@ -1,0 +1,60 @@
+/* "Customize icon and color" modal for type documents (ui/shell/type-customize). */
+.type-customize {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.type-customize-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius);
+  background: var(--sd-inset);
+  color: var(--sd-fg);
+}
+
+.type-customize-preview-emoji {
+  font-size: 22px;
+  line-height: 1;
+}
+
+.type-customize-icons,
+.type-customize-colors {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.type-customize-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 4px;
+}
+
+.type-customize-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: var(--sd-radius-sm);
+  background: transparent;
+  color: var(--sd-muted);
+}
+
+.type-customize-icon:hover:not(:disabled) {
+  border-color: transparent;
+  background: color-mix(in srgb, var(--sd-fg) 6%, transparent);
+  color: var(--sd-fg);
+}
+
+.type-customize-icon[data-selected='true'] {
+  border-color: var(--sd-accent);
+  color: var(--sd-accent);
+}
