@@ -59,6 +59,7 @@ describe('browser panels', () => {
       git.stopAutoGit()
       git.lastActivityAt = 0
       git.lastBlurAt = 0
+      git.lastPublishAt = 0
       Object.assign(git, { idleCheckpointAt: 0, blurCheckpointAt: 0 })
       git.abortSuggest()
       git.cloneUrl = ''
@@ -428,6 +429,144 @@ describe('browser panels', () => {
     expect(git.output).toBe('Commit local changes before pulling')
   })
 
+  it('commits a quiet dirty vault on the sync interval, then pulls and pushes', async () => {
+    const events: string[] = []
+    const backend = recordingGit(events)
+    backend.remoteUrl = () => Promise.resolve('https://example.test/notes.git')
+    backend.status = () => Promise.resolve({ repo: true, porcelain: ' M a.md\n', clean: false })
+    backend.commit = (_repo, message) => {
+      events.push(`commit ${message}`)
+      backend.status = () => Promise.resolve({ repo: true, porcelain: '', clean: true })
+      return Promise.resolve(message)
+    }
+    backend.pull = () => {
+      events.push('pull')
+      return Promise.resolve({ conflict: false, files: [], output: 'Already up to date.' })
+    }
+    backend.push = () => {
+      events.push('push')
+      return Promise.resolve('ok')
+    }
+    setGitBackendForTests(backend)
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const files = new MemoryFileSystem('/tmp/vault-autosync-commit')
+    await files.mkdir('.git')
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.phase = 'ready'
+    vault.broad = false
+    const settings = resolve(SettingsService)
+    settings.setGitEnabled(true)
+    settings.setAutoSyncMinutes(5)
+    settings.setAutoGitEnabled(true)
+    settings.setAutoGitIdleSeconds(60)
+    settings.setAutoGitBlurSeconds(0)
+    const git = resolve(GitService)
+    git.surface = 'ready'
+    await git.autoSyncTick()
+    expect(events).toEqual(['commit Checkpoint', 'pull', 'push'])
+    expect(git.output).toBe('')
+  })
+
+  it('does not commit or pull while an edit is still in progress', async () => {
+    const events: string[] = []
+    const backend = recordingGit(events)
+    backend.status = () => Promise.resolve({ repo: true, porcelain: ' M a.md\n', clean: false })
+    backend.remoteUrl = () => Promise.resolve('https://example.test/notes.git')
+    setGitBackendForTests(backend)
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const files = new MemoryFileSystem('/tmp/vault-autosync-typing')
+    await files.mkdir('.git')
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.phase = 'ready'
+    vault.broad = false
+    const settings = resolve(SettingsService)
+    settings.setGitEnabled(true)
+    settings.setAutoSyncMinutes(5)
+    settings.setAutoGitEnabled(true)
+    settings.setAutoGitIdleSeconds(60)
+    const git = resolve(GitService)
+    git.surface = 'ready'
+    git.noteActivity()
+    await git.autoSyncTick()
+    expect(events).toEqual([])
+    expect(git.output).toBe('')
+  })
+
+  it('pushes after a clean auto pull when origin exists', async () => {
+    const events: string[] = []
+    const backend = recordingGit(events)
+    backend.remoteUrl = () => Promise.resolve('https://example.test/notes.git')
+    backend.pull = () => {
+      events.push('pull')
+      return Promise.resolve({ conflict: false, files: [], output: 'Already up to date.' })
+    }
+    backend.push = () => {
+      events.push('push')
+      return Promise.resolve('ok')
+    }
+    setGitBackendForTests(backend)
+    register(VaultService)
+    register(SettingsService)
+    register(GitService)
+    const files = new MemoryFileSystem('/tmp/vault-autosync-push')
+    await files.mkdir('.git')
+    const vault = resolve(VaultService)
+    vault.fs = files
+    vault.phase = 'ready'
+    vault.broad = false
+    resolve(SettingsService).setGitEnabled(true)
+    resolve(SettingsService).setAutoSyncMinutes(5)
+    const git = resolve(GitService)
+    git.surface = 'ready'
+    await git.autoSyncTick()
+    expect(events).toEqual(['pull', 'push'])
+  })
+
+  it('pulls shortly after auto sync is armed, and stop cancels the wait', async () => {
+    vi.useFakeTimers()
+    try {
+      const pulls: string[] = []
+      const backend = recordingGit([])
+      backend.pull = () => {
+        pulls.push('pull')
+        return Promise.resolve({ conflict: false, files: [], output: 'Already up to date.' })
+      }
+      setGitBackendForTests(backend)
+      register(VaultService)
+      register(SettingsService)
+      register(GitService)
+      const files = new MemoryFileSystem('/tmp/vault-autosync-kick')
+      await files.mkdir('.git')
+      const vault = resolve(VaultService)
+      vault.fs = files
+      vault.phase = 'ready'
+      vault.broad = false
+      resolve(SettingsService).setGitEnabled(true)
+      resolve(SettingsService).setAutoSyncMinutes(5)
+      const git = resolve(GitService)
+      git.surface = 'ready'
+      git.ensureAutoSync()
+      await vi.advanceTimersByTimeAsync(1_999)
+      expect(pulls).toEqual([])
+      git.stopAutoSync()
+      await vi.advanceTimersByTimeAsync(5 * 60_000)
+      expect(pulls).toEqual([])
+      git.ensureAutoSync()
+      await vi.advanceTimersByTimeAsync(2_000)
+      expect(pulls).toEqual(['pull'])
+      await vi.advanceTimersByTimeAsync(5 * 60_000)
+      expect(pulls).toEqual(['pull', 'pull'])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('reloads after a fast-forward and skips reload when already up to date or in conflict', async () => {
     const pulls: string[] = []
     let output = 'Fast-forward\n notes/a.stride.json'
@@ -531,6 +670,111 @@ describe('browser panels', () => {
     expect(commits).toEqual([{ message: 'Checkpoint', paths: undefined }])
     await git.autoGitTick(61_000)
     expect(commits).toEqual([{ message: 'Checkpoint', paths: undefined }])
+  })
+
+  it('pulls and pushes after an idle checkpoint when origin exists', async () => {
+    const events: string[] = []
+    let reopened = 0
+    const backend = recordingGit(events)
+    backend.remoteUrl = () => Promise.resolve('https://example.test/notes.git')
+    backend.commit = (_repo, message) => {
+      events.push(`commit ${message}`)
+      return Promise.resolve(message)
+    }
+    backend.pull = () => {
+      events.push('pull')
+      return Promise.resolve({ conflict: false, files: [], output: 'Fast-forward\n notes/a.stride.json' })
+    }
+    backend.push = () => {
+      events.push('push')
+      return Promise.resolve('ok')
+    }
+    setGitBackendForTests(backend)
+    const { vault, git } = await openAutoGitVault('/tmp/vault-autogit-publish')
+    vault.reopenForSettings = () => {
+      reopened += 1
+      return Promise.resolve()
+    }
+    await git.autoGitTick(61_000)
+    expect(events).toEqual(['commit Checkpoint', 'pull', 'push'])
+    expect(reopened).toBe(1)
+    expect(git.output).toBe('')
+    expect(git.idleCheckpointAt).toBe(1_000)
+  })
+
+  it('does not push when an automatic pull conflicts', async () => {
+    const events: string[] = []
+    let conflicted = false
+    const backend = recordingGit(events)
+    backend.remoteUrl = () => Promise.resolve('https://example.test/notes.git')
+    backend.status = () => Promise.resolve({
+      repo: true,
+      porcelain: conflicted ? 'UU notes/a.stride.json\n' : '',
+      clean: !conflicted,
+    })
+    backend.commit = () => Promise.reject(new GitError(1, 'nothing to commit, working tree clean'))
+    backend.pull = () => {
+      events.push('pull')
+      conflicted = true
+      return Promise.resolve({
+        conflict: true,
+        files: ['notes/a.stride.json'],
+        output: 'CONFLICT (content): Merge conflict in notes/a.stride.json',
+      })
+    }
+    backend.push = () => {
+      events.push('push')
+      return Promise.resolve('ok')
+    }
+    setGitBackendForTests(backend)
+    const { git } = await openAutoGitVault('/tmp/vault-autogit-conflict')
+    await git.autoGitTick(61_000)
+    expect(events).toEqual(['pull'])
+    expect(git.conflicts).toEqual(['notes/a.stride.json'])
+    expect(git.idleCheckpointAt).toBe(0)
+  })
+
+  it('retries a failed push without asking for another commit message', async () => {
+    const events: string[] = []
+    let failPush = true
+    const backend = recordingGit(events)
+    backend.remoteUrl = () => Promise.resolve('https://example.test/notes.git')
+    backend.status = () => Promise.resolve({ repo: true, porcelain: ' M a.md\n', clean: false })
+    backend.commit = (_repo, message) => {
+      events.push(`commit ${message}`)
+      backend.status = () => Promise.resolve({ repo: true, porcelain: '', clean: true })
+      return Promise.resolve(message)
+    }
+    backend.pull = () => {
+      events.push('pull')
+      return Promise.resolve({ conflict: false, files: [], output: 'Already up to date.' })
+    }
+    backend.push = () => {
+      events.push('push')
+      if (failPush) return Promise.reject(new Error('network down'))
+      return Promise.resolve('ok')
+    }
+    backend.aheadBehind = () => Promise.resolve({ ahead: failPush ? 1 : 0, behind: 0 })
+    let suggests = 0
+    setCommitMessageSuggestForTests(() => {
+      suggests += 1
+      return Promise.resolve({ message: 'Save notes', aborted: false })
+    })
+    setGitBackendForTests(backend)
+    const { git } = await openAutoGitVault('/tmp/vault-autogit-push-retry')
+    await git.autoGitTick(61_000)
+    expect(events).toEqual(['commit Save notes', 'pull', 'push'])
+    expect(suggests).toBe(1)
+    expect(git.output).toBe('network down')
+    expect(git.idleCheckpointAt).toBe(1_000)
+    await git.autoGitTick(62_000)
+    expect(suggests).toBe(1)
+    expect(events).toEqual(['commit Save notes', 'pull', 'push'])
+    failPush = false
+    await git.autoGitTick(61_000 + 30_000)
+    expect(suggests).toBe(1)
+    expect(events).toEqual(['commit Save notes', 'pull', 'push', 'pull', 'push'])
+    expect(git.output).toBe('')
   })
 
   it('does not checkpoint while files are unmerged', async () => {

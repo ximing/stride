@@ -139,6 +139,8 @@ export class GitService extends Service {
   busyCount = 0
   lastActivityAt = 0
   lastBlurAt = 0
+  /** Last automatic pull/push attempt. Retries wait so a failed push does not run every second. */
+  lastPublishAt = 0
   idleCheckpointAt = 0
   blurCheckpointAt = 0
   private diffPath = ''
