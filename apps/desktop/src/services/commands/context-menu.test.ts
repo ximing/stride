@@ -39,6 +39,7 @@ function noteListActions(): NoteListMenuActions & { calls: string[] } {
     calls,
     open: (id) => calls.push(`open:${id}`),
     rename: (id) => calls.push(`rename:${id}`),
+    showInFolder: (id) => calls.push(`show:${id}`),
     copyWikilink: (id) => calls.push(`copy:${id}`),
     archive: (id) => calls.push(`archive:${id}`),
     deleteNote: (id) => calls.push(`delete:${id}`),
@@ -71,7 +72,7 @@ describe('buildNoteListMenu', () => {
       { noteId: 'a', multi: false, clipboard: true, commands: COMMANDS },
       actions,
     )
-    expect(itemIds(entries)).toEqual(['open', 'rename', '|', 'copy-wikilink', '|', 'archive', 'delete'])
+    expect(itemIds(entries)).toEqual(['open', 'rename', 'show-in-folder', '|', 'copy-wikilink', '|', 'archive', 'delete'])
     expect(item(entries, 'delete').danger).toBe(true)
     expect(item(entries, 'copy-wikilink').disabled).toBeFalsy()
   })
@@ -92,12 +93,14 @@ describe('buildNoteListMenu', () => {
     )
     item(entries, 'open').onSelect?.()
     item(entries, 'rename').onSelect?.()
+    item(entries, 'show-in-folder').onSelect?.()
     item(entries, 'copy-wikilink').onSelect?.()
     item(entries, 'archive').onSelect?.()
     item(entries, 'delete').onSelect?.()
     expect(actions.calls).toEqual([
       'open:note-1',
       'rename:note-1',
+      'show:note-1',
       'copy:note-1',
       'archive:note-1',
       'delete:note-1',
@@ -294,18 +297,20 @@ describe('buildFolderMenu', () => {
   it('builds the folder menu and routes the path', () => {
     const calls: string[] = []
     const actions: FolderMenuActions = {
+      showInFolder: (path) => calls.push(`show:${path}`),
       newNoteHere: (path) => calls.push(`note:${path}`),
       newFolderInside: (path) => calls.push(`folder:${path}`),
       renameFolder: (path) => calls.push(`rename:${path}`),
       deleteFolder: (path) => calls.push(`delete:${path}`),
     }
     const entries = buildFolderMenu({ path: 'box/inner' }, actions)
-    expect(itemIds(entries)).toEqual(['new-note-here', 'new-folder-inside', '|', 'rename-folder', 'delete-folder'])
+    expect(itemIds(entries)).toEqual(['show-in-folder', '|', 'new-note-here', 'new-folder-inside', '|', 'rename-folder', 'delete-folder'])
+    expect(item(entries, 'show-in-folder').label).toBe('Show in Folder')
     expect(item(entries, 'delete-folder').danger).toBe(true)
-    for (const id of ['new-note-here', 'new-folder-inside', 'rename-folder', 'delete-folder']) {
+    for (const id of ['show-in-folder', 'new-note-here', 'new-folder-inside', 'rename-folder', 'delete-folder']) {
       item(entries, id).onSelect?.()
     }
-    expect(calls).toEqual(['note:box/inner', 'folder:box/inner', 'rename:box/inner', 'delete:box/inner'])
+    expect(calls).toEqual(['show:box/inner', 'note:box/inner', 'folder:box/inner', 'rename:box/inner', 'delete:box/inner'])
   })
 })
 
@@ -315,14 +320,15 @@ describe('buildFolderNoteMenu', () => {
     const actions: FolderNoteMenuActions = {
       open: (id) => calls.push(`open:${id}`),
       rename: (id) => calls.push(`rename:${id}`),
+      showInFolder: (id) => calls.push(`show:${id}`),
       copyWikilink: (id) => calls.push(`copy:${id}`),
       archive: (id) => calls.push(`archive:${id}`),
       deleteNote: (id) => calls.push(`delete:${id}`),
     }
     const entries = buildFolderNoteMenu({ noteId: 'n1', clipboard: true }, actions)
-    expect(itemIds(entries)).toEqual(['open', 'rename', '|', 'copy-wikilink', '|', 'archive', 'delete'])
-    for (const id of ['open', 'rename', 'copy-wikilink', 'archive', 'delete']) item(entries, id).onSelect?.()
-    expect(calls).toEqual(['open:n1', 'rename:n1', 'copy:n1', 'archive:n1', 'delete:n1'])
+    expect(itemIds(entries)).toEqual(['open', 'rename', 'show-in-folder', '|', 'copy-wikilink', '|', 'archive', 'delete'])
+    for (const id of ['open', 'rename', 'show-in-folder', 'copy-wikilink', 'archive', 'delete']) item(entries, id).onSelect?.()
+    expect(calls).toEqual(['open:n1', 'rename:n1', 'show:n1', 'copy:n1', 'archive:n1', 'delete:n1'])
 
     const noClipboard = buildFolderNoteMenu({ noteId: 'n1', clipboard: false }, actions)
     expect(item(noClipboard, 'copy-wikilink').disabled).toBe(true)

@@ -22,6 +22,7 @@ import { TabsService } from '../../services/notes/tabs.service'
 import { VaultService } from '../../services/vault/vault.service'
 import { EmptyState } from '../primitives/empty-state'
 import { Button, IconButton } from '../primitives/button'
+import { Tip } from '../primitives/tooltip'
 import { Checkbox } from '../primitives/checkbox'
 import { Combobox, type ComboboxOption } from '../primitives/combobox'
 import { DatePicker } from '../primitives/date-picker'
@@ -265,12 +266,12 @@ function PropertyName({ field }: { field: string }) {
     )
   }
   return (
+    <Tip content={t('panels.renameProperty', { name: field })}>
     <button
       type="button"
       className="property-name"
       data-testid="property-rename-open"
       aria-label={t('panels.renameProperty', { name: field })}
-      title={t('panels.renameProperty', { name: field })}
       onClick={() => {
         setDraft(field)
         setEditing(true)
@@ -278,6 +279,7 @@ function PropertyName({ field }: { field: string }) {
     >
       {field}
     </button>
+    </Tip>
   )
 }
 
@@ -483,12 +485,12 @@ const PropertyFields = observer(function PropertyFields({ fields, catalogs }: { 
               finish()
             }}
           >
+            <Tip content={t('panels.dragProperty', { name: field })}>
             <span
               className="property-grip"
               data-testid="property-grip"
               draggable
               aria-hidden
-              title={t('panels.dragProperty', { name: field })}
               onDragStart={(event) => {
                 event.dataTransfer.effectAllowed = 'move'
                 event.dataTransfer.setData('text/plain', field)
@@ -498,6 +500,7 @@ const PropertyFields = observer(function PropertyFields({ fields, catalogs }: { 
             >
               <Mark icon={GripVertical} size={14} />
             </span>
+            </Tip>
             <PropertyRow field={field} catalogs={catalogs} />
           </div>
         )

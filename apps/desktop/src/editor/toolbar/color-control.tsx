@@ -2,6 +2,7 @@ import type { LucideIcon } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { createPortal } from 'react-dom'
+import { Tip } from '../../ui/primitives/tooltip'
 import { colorLabel, type EditorColor } from '../colors'
 
 export function EditorIcon({ icon: Glyph }: { icon: LucideIcon }) {
@@ -93,6 +94,7 @@ export function ColorControl({
 
   return (
     <>
+      <Tip content={label}>
       <button
         ref={buttonRef}
         type="button"
@@ -112,6 +114,7 @@ export function ColorControl({
           <span className={value ? 'editor-color-bar' : 'editor-color-bar is-empty'} style={value ? { background: value } : undefined} />
         </span>
       </button>
+      </Tip>
       {open
         ? createPortal(
             <div
@@ -129,8 +132,8 @@ export function ColorControl({
                 {colors.map((color) => {
                   const selected = value.toLowerCase() === color.value
                   return (
+                    <Tip key={color.id} content={colorLabel(t, color)}>
                     <button
-                      key={color.id}
                       type="button"
                       className={`editor-color-swatch${selected ? ' is-on' : ''}`}
                       style={{ background: color.value }}
@@ -141,6 +144,7 @@ export function ColorControl({
                         onOpenChange(false)
                       }}
                     />
+                    </Tip>
                   )
                 })}
               </div>

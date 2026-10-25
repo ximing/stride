@@ -39,6 +39,9 @@ export class NoteListService extends Service {
   sort: ListSort = { ...DEFAULT_LIST_SORT }
   /** Bumped when the list should scroll back to top (vault open). */
   scrollEpoch = 0
+  /** Note to scroll into view. `scrollRequest` bumps so the same id repeats. */
+  scrollRequestId = ''
+  scrollRequest = 0
   confirmingDelete = false
   retypeOpen = false
   /** Vault the currently loaded sort belongs to; '' before the first open. */
@@ -135,6 +138,11 @@ export class NoteListService extends Service {
     if (selectedIds.every((id, index) => id === this.selectedIds[index]) && anchorId === this.anchorId) return
     this.selectedIds = selectedIds
     this.anchorId = anchorId
+  }
+
+  requestScrollTo(id: string) {
+    this.scrollRequestId = id
+    this.scrollRequest += 1
   }
 
   setSort(sort: ListSort) {

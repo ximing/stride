@@ -97,6 +97,9 @@
 .editor a {
   color: var(--sd-accent);
   text-decoration: underline;
+  /* Lift the underline off CJK glyph bodies and Latin descenders. */
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.22em;
 }
 
 .editor .ProseMirror .task-list-block {
@@ -130,7 +133,8 @@
 .editor .ProseMirror ul[data-type='taskList'] > li > label {
   display: flex;
   flex: none;
-  margin-top: 0.3rem;
+  /* Center the checkbox against the taller CJK line box. */
+  margin-top: 0.4rem;
 }
 
 .editor .ProseMirror ul[data-type='taskList'] > li > label > input[type='checkbox'] {

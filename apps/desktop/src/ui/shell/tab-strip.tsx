@@ -8,6 +8,7 @@ import { LayoutService } from '../../services/layout/layout.service'
 import { TabsService } from '../../services/notes/tabs.service'
 import { VaultService } from '../../services/vault/vault.service'
 import { IconButton } from '../primitives/button'
+import { Tip } from '../primitives/tooltip'
 
 /**
  * Editor tab strip: one tab per open note (title derived live from vault.notes,
@@ -47,10 +48,10 @@ export const TabStrip = observer(function TabStrip() {
               role="tab"
               aria-selected={active}
             >
+              <Tip content={title}>
               <button
                 type="button"
                 className="tab-main"
-                title={title}
                 onClick={() => tabs.activateTab(tab.id)}
                 onAuxClick={(event) => {
                   if (event.button !== 1) return
@@ -60,13 +61,13 @@ export const TabStrip = observer(function TabStrip() {
               >
                 <span className="tab-title">{title}</span>
               </button>
+              </Tip>
               {dirty ? <span className="dirty-dot" aria-hidden="true" /> : null}
               <IconButton
                 icon={X}
                 label={closeLabel}
                 className="tab-close"
                 data-testid="tab-close"
-                title={closeLabel}
                 onClick={() => tabs.closeTab(tab.id)}
               />
             </div>

@@ -9,6 +9,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { VaultService } from '../../services/vault/vault.service'
 import { Button } from '../primitives/button'
+import { Tip } from '../primitives/tooltip'
 import { ColorSwatches } from '../primitives/color-swatches'
 import { Mark } from '../primitives/icon'
 import { Input } from '../primitives/input'
@@ -79,19 +80,19 @@ function TypeCustomizeForm({ note, onClose }: { note: StrideNote; onClose: () =>
             const Glyph = TYPE_ICONS[key]
             if (!Glyph) return null
             return (
+              <Tip key={key} content={key}>
               <button
-                key={key}
                 type="button"
                 className="type-customize-icon"
                 data-testid={`type-customize-icon-${key}`}
                 data-selected={!emoji && lucideKey === key ? 'true' : undefined}
                 aria-label={key}
                 aria-pressed={!emoji && lucideKey === key}
-                title={key}
                 onClick={() => setIcon(key)}
               >
                 <Mark icon={Glyph} size={16} />
               </button>
+              </Tip>
             )
           })}
         </div>

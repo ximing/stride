@@ -10,6 +10,7 @@ import { SettingsService } from './services/settings/settings.service'
 import { VaultService } from './services/vault/vault.service'
 import { vaultDisplayName } from './services/vault/vault-registry'
 import { Button } from './ui/primitives/button'
+import { Tip } from './ui/primitives/tooltip'
 import { CommandPalette } from './ui/overlays/command-palette'
 import { EmptyState } from './ui/primitives/empty-state'
 import { Mark } from './ui/primitives/icon'
@@ -73,13 +74,13 @@ const Chooser = observer(function Chooser() {
                   const opened = relativeDay(Date.parse(entry.lastOpened), Date.now())
                   return (
                     <div key={entry.id} role="listitem">
+                      <Tip content={entry.label}>
                       <Button
                         tone="quiet"
                         size="md"
                         className="chooser-recent-item"
                         data-testid="recent-vault"
                         data-vault-id={entry.id}
-                        title={entry.label}
                         icon={<Mark icon={Book} size={16} />}
                         onClick={() => void vault.switchVault(entry.id)}
                       >
@@ -89,6 +90,7 @@ const Chooser = observer(function Chooser() {
                         </span>
                         {opened ? <span className="chooser-recent-time">{opened}</span> : null}
                       </Button>
+                      </Tip>
                     </div>
                   )
                 })}

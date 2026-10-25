@@ -385,6 +385,9 @@ describe('NoteList', () => {
     // No body → the snippet line collapses instead of rendering an empty span.
     const emptyRow = host!.querySelector('[data-note-id="eb"]')!
     expect(emptyRow.querySelector('[data-testid="note-list-item-snippet"]')).toBeNull()
+    expect(emptyRow.parentElement?.className).toContain('is-title')
+    expect(emptyRow.querySelector('.note-list-item-meta')).toBeNull()
+    expect(fullRow.parentElement?.className).not.toContain('is-empty')
   })
 
   it('tints tag chips by name hash and recolors them from the chip context menu', async () => {
@@ -484,6 +487,10 @@ describe('NoteList', () => {
     await act(async () => { clickRow('c', { metaKey: true }) })
     expect(list.selectedIds).toEqual(['a', 'c'])
     expect(host!.querySelector('[data-testid="note-list-batch-count"]')?.textContent).toBe('2 selected')
+    const batch = host!.querySelector('[data-testid="note-list-batch"]')!
+    expect(batch.querySelector('.note-list-batch-head [data-testid="batch-clear"]')).not.toBeNull()
+    expect(batch.querySelector('.note-list-batch-actions [data-testid="batch-archive"]')).not.toBeNull()
+    expect(batch.querySelector('.note-list-batch-actions [data-testid="batch-delete"]')).not.toBeNull()
     expect(host!.querySelector('[data-note-id="a"]')?.getAttribute('data-selected')).toBe('true')
     expect(host!.querySelector('[data-note-id="b"]')?.getAttribute('data-selected')).toBeNull()
 

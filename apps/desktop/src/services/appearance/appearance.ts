@@ -4,13 +4,30 @@
 // unit-testable and safe to run at module scope before the first paint (the
 // pre-paint call site lives in theme.service.ts, which main.tsx imports).
 
-import { normalizeFontSize, normalizeNoteWidth, type AppearanceSettings, type NoteWidth } from '@stride/core'
+import {
+  defaultAppearanceSettings,
+  normalizeFontFamily,
+  normalizeFontSize,
+  normalizeNoteWidth,
+  type AppearanceSettings,
+  type NoteWidth,
+} from '@stride/core'
 
 export type AppearancePrefs = AppearanceSettings
 
 export const APPEARANCE_STORAGE_KEY = 'stride:appearance'
 
-export const DEFAULT_APPEARANCE: AppearancePrefs = { noteWidth: 'standard', fontSize: 15 }
+export const DEFAULT_APPEARANCE: AppearancePrefs = defaultAppearanceSettings()
+
+/** Select value for the built-in serif stack. Not a family name (the colon is rejected). */
+export const NOTE_FONT_DEFAULT_CHOICE = 'stride:font-default'
+
+/** CSS font-family for the note title and body. Empty keeps the serif token. */
+export function noteFontFamilyCss(family: string): string {
+  const safe = normalizeFontFamily(family)
+  if (!safe) return 'var(--sd-font-serif)'
+  return `"${safe}", var(--sd-font-serif)`
+}
 
 export const NOTE_WIDTHS: readonly NoteWidth[] = ['narrow', 'standard', 'wide']
 
@@ -30,11 +47,12 @@ export function isValidNoteFontSize(value: number): boolean {
 
 export function sanitizeAppearance(value: unknown): AppearancePrefs {
   const record = typeof value === 'object' && value !== null
-    ? (value as { noteWidth?: unknown; fontSize?: unknown })
+    ? (value as { noteWidth?: unknown; fontSize?: unknown; fontFamily?: unknown })
     : {}
   return {
     noteWidth: normalizeNoteWidth(record.noteWidth),
     fontSize: normalizeFontSize(record.fontSize),
+    fontFamily: normalizeFontFamily(record.fontFamily),
   }
 }
 
@@ -82,6 +100,7 @@ export function applyAppearance(prefs: AppearancePrefs, root?: HTMLElement | nul
   const next = sanitizeAppearance(prefs)
   target.style.setProperty('--sd-note-max-width', NOTE_WIDTH_CSS[next.noteWidth])
   target.style.setProperty('--sd-note-font-size', `${next.fontSize}px`)
+  target.style.setProperty('--sd-note-font-family', noteFontFamilyCss(next.fontFamily))
 }
 
 /**

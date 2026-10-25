@@ -3,6 +3,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createVaultNote } from '../../../../../packages/core/src/vault'
+import { LayoutService } from '../../services/layout/layout.service'
 import { ListFilterService } from '../../services/search/list-filter.service'
 import { DEFAULT_LIST_SORT } from '../../services/notes/note-list'
 import { NoteListService } from '../../services/notes/note-list.service'
@@ -104,7 +105,7 @@ describe('note list context menu', () => {
     await act(async () => rightClickRow(a))
     expect(list.selectedIds).toEqual([a])
     expect(menu()).not.toBeNull()
-    expect(menuItemIds()).toEqual(['open', 'rename', 'copy-wikilink', 'archive', 'delete'])
+    expect(menuItemIds()).toEqual(['open', 'rename', 'show-in-folder', 'copy-wikilink', 'archive', 'delete'])
     // The untouched row stays unselected; no batch bar appears.
     expect(list.selectedIds).not.toContain(b)
     expect(host!.querySelector('[data-testid="note-list-batch"]')).toBeNull()
@@ -170,6 +171,33 @@ describe('note list context menu', () => {
     await act(async () => rightClickRow(b))
     expect(list.selectedIds).toEqual([b])
     expect(menu()).not.toBeNull()
-    expect(menuItemIds()).toEqual(['open', 'rename', 'copy-wikilink', 'archive', 'delete'])
+    expect(menuItemIds()).toEqual(['open', 'rename', 'show-in-folder', 'copy-wikilink', 'archive', 'delete'])
+  })
+
+  it('shows a nested note in its folder from the row menu', async () => {
+    const { vault, list } = await mountNoteList()
+    const created = await addNote(vault, 'Alpha')
+    const layout = resolve(LayoutService)
+    await act(async () => {
+      vault.notes = vault.notes.map((note) => (note.id === created ? { ...note, id: 'box/inner/alpha' } : note))
+      vault.searchQuery = 'alpha'
+      resolve(ListFilterService).setQuery('Alpha')
+      layout.setSidebarCollapsed(true)
+      layout.setRailSectionCollapsed('notes', true)
+      layout.setFolderCollapsed('box', true)
+      layout.setFolderCollapsed('box/inner', true)
+    })
+    await act(async () => rightClickRow('box/inner/alpha'))
+    await act(async () => clickMenuItem('show-in-folder'))
+    expect(menu()).toBeNull()
+    expect(vault.listFilter).toBe('folder:box/inner')
+    expect(vault.searchQuery).toBe('')
+    expect(resolve(ListFilterService).query).toBe('')
+    expect(layout.sidebarCollapsed).toBe(false)
+    expect(layout.railCollapsed.notes).toBe(false)
+    expect(layout.isFolderCollapsed('box')).toBe(false)
+    expect(layout.isFolderCollapsed('box/inner')).toBe(false)
+    expect(layout.revealedNoteId).toBe('box/inner/alpha')
+    expect(list.scrollRequestId).toBe('box/inner/alpha')
   })
 })

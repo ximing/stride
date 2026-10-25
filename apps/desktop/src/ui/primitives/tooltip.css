@@ -1,7 +1,7 @@
 /* Tooltip */
 .sd-tooltip {
   z-index: var(--sd-z-tooltip);
-  max-width: 256px;
+  max-width: 280px;
   padding: var(--sd-space-1) var(--sd-space-2);
   border-radius: var(--sd-radius);
   background: var(--sd-tooltip-bg);
@@ -10,6 +10,31 @@
   font-family: var(--sd-font-sans);
   font-size: var(--sd-text-xs);
   line-height: 1.4;
+  overflow-wrap: anywhere;
+  pointer-events: none;
   transform-origin: var(--radix-tooltip-content-transform-origin);
+}
+
+.sd-tooltip[data-state='delayed-open'],
+.sd-tooltip[data-state='instant-open'] {
+  animation: sd-tip-in var(--sd-motion-hover) var(--sd-ease-standard);
+}
+
+@keyframes sd-tip-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Editor widgets that are not React nodes share this bubble. */
+.sd-tooltip-floating {
+  position: fixed;
+  margin: 0;
+}
+
+/* Disabled controls do not emit pointer events, so the tip listens on this shell. */
+.sd-tip-disabled {
+  display: inline-flex;
+  max-width: 100%;
+  vertical-align: bottom;
 }
 

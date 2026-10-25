@@ -2,6 +2,7 @@ import { Minus, Plus, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { isTauriRuntime } from '../../services/platform/deep-link'
 import { Mark } from '../primitives/icon'
+import { Tip } from '../primitives/tooltip'
 
 type WindowAction = 'close' | 'minimize' | 'zoom'
 
@@ -57,16 +58,17 @@ export function WindowControls() {
   return (
     <div className="window-controls" role="group" aria-label={t('window.controls')} data-testid="window-controls">
       {CONTROLS.map((control) => (
-        <button
-          key={control.action}
-          type="button"
-          className={`window-control window-control-${control.action}`}
-          data-testid={control.testId}
-          aria-label={t(control.label)}
-          onClick={() => runWindow(control.action)}
-        >
-          <Mark icon={control.icon} size={8} />
-        </button>
+        <Tip key={control.action} content={t(control.label)}>
+          <button
+            type="button"
+            className={`window-control window-control-${control.action}`}
+            data-testid={control.testId}
+            aria-label={t(control.label)}
+            onClick={() => runWindow(control.action)}
+          >
+            <Mark icon={control.icon} size={8} />
+          </button>
+        </Tip>
       ))}
     </div>
   )

@@ -117,16 +117,32 @@
 
 .note-list-batch {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   border-top: 1px solid var(--sd-border);
   border-bottom: 1px solid var(--sd-border);
   font-size: 0.8rem;
   color: var(--sd-muted);
 }
 
+.note-list-batch-head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+
 .note-list-batch-count {
-  margin-right: auto;
+  flex: 1;
+  min-width: 0;
   font-variant-numeric: tabular-nums;
+}
+
+.note-list-batch-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
 }
 
 .note-list-batch button {
@@ -303,7 +319,6 @@
 }
 
 .note-list-batch {
-  flex-wrap: wrap;
   gap: 4px;
   min-width: 0;
   margin: 0 12px 8px;
@@ -314,8 +329,6 @@
 }
 
 .note-list-batch-count {
-  flex: 1 1 72px;
-  min-width: 64px;
   font-size: 12px;
   line-height: 20px;
 }
@@ -325,6 +338,12 @@
   min-height: 28px;
   padding: 3px 7px;
   font-size: 12px;
+}
+
+.note-list-batch-actions .sd-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  padding-inline: 4px;
 }
 
 .note-list-batch .note-list-batch-clear {
@@ -340,11 +359,20 @@
   padding: 4px 8px 16px;
 }
 
-/* The wrapper owns the fixed virtual height (rows are spaced by padding, not
-   divider lines) and anchors the hover-revealed process button. */
+/* The wrapper owns the virtual height (rows are spaced by padding, not
+   divider lines) and anchors the hover-revealed process button.
+   Empty notes drop the snippet band: 10 + 20 + 4 + 18 + 10 = 62. */
 .note-list-row {
   position: relative;
   height: 102px;
+}
+
+.note-list-row.is-empty {
+  height: 62px;
+}
+
+.note-list-row.is-title {
+  height: 40px;
 }
 
 .note-list-item {
@@ -521,9 +549,11 @@
   display: none;
 }
 
-/* These two heights include padding and borders. Do not add row margins:
-   virtualWindow() positions every row at exactly 102px or 48px. */
-.note-list.is-compact .note-list-row {
+/* Compact mode hides the snippet, so every row is 48px, empty or not.
+   Do not add row margins: virtualWindowOffsets positions from these heights. */
+.note-list.is-compact .note-list-row,
+.note-list.is-compact .note-list-row.is-empty,
+.note-list.is-compact .note-list-row.is-title {
   height: 48px;
 }
 

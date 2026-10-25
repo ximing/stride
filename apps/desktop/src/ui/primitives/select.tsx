@@ -8,6 +8,8 @@ export type SelectOption = {
   label: string
   disabled?: boolean
   testId?: string
+  /** CSS font-family for this row, so a font picker can preview the face. */
+  fontFamily?: string
 }
 
 export type SelectProps = Omit<SelectPrimitive.SelectTriggerProps, 'children' | 'value'> & {
@@ -17,10 +19,11 @@ export type SelectProps = Omit<SelectPrimitive.SelectTriggerProps, 'children' | 
   options: readonly SelectOption[]
   placeholder?: string
   disabled?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select(
-  { label, value, onValueChange, options, placeholder, disabled, id, className, ...triggerProps },
+  { label, value, onValueChange, options, placeholder, disabled, id, className, onOpenChange, ...triggerProps },
   ref,
 ) {
   const autoId = useId()
@@ -30,7 +33,7 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
   return (
     <div className="sd-field sd-select-field">
       {label ? <label className="sd-field-label" htmlFor={fieldId}>{label}</label> : null}
-      <SelectPrimitive.Root value={value} onValueChange={onValueChange} disabled={disabled}>
+      <SelectPrimitive.Root value={value} onValueChange={onValueChange} disabled={disabled} onOpenChange={onOpenChange}>
         <SelectPrimitive.Trigger
           ref={ref}
           id={fieldId}
@@ -58,6 +61,7 @@ export const Select = forwardRef<HTMLButtonElement, SelectProps>(function Select
                   disabled={option.disabled}
                   className="sd-select-item"
                   data-testid={option.testId}
+                  style={option.fontFamily ? { fontFamily: option.fontFamily } : undefined}
                 >
                   <SelectPrimitive.ItemText>{option.label}</SelectPrimitive.ItemText>
                   <SelectPrimitive.ItemIndicator className="sd-select-item-indicator">

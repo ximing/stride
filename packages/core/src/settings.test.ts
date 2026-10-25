@@ -11,7 +11,7 @@ import {
 describe('settings page sections schema (T7.1)', () => {
   it('ships defaults for appearance, editor, updates, and privacy', () => {
     const defaults = defaultSettings()
-    expect(defaults.appearance).toEqual({ noteWidth: 'standard', fontSize: 15 })
+    expect(defaults.appearance).toEqual({ noteWidth: 'standard', fontSize: 16, fontFamily: '' })
     expect(defaults.editor).toEqual({ autosaveDebounceMs: 350 })
     expect(defaults.updates).toEqual({ channel: 'stable', autoCheck: true })
     expect(defaults.privacy).toEqual({ telemetryEnabled: false })
@@ -37,13 +37,13 @@ describe('settings page sections schema (T7.1)', () => {
     const files = new MemoryFileSystem('/virtual/settings')
     const secrets = new MemorySecretsStore()
     const settings = defaultSettings()
-    settings.appearance = { noteWidth: 'wide', fontSize: 18 }
+    settings.appearance = { noteWidth: 'wide', fontSize: 18, fontFamily: 'Songti SC' }
     settings.editor = { autosaveDebounceMs: 800 }
     settings.updates = { channel: 'beta', autoCheck: false }
     settings.privacy = { telemetryEnabled: true }
     await writeSettings(files, 'roundtrip.json', settings, secrets)
     const raw = JSON.parse(await files.readText('roundtrip.json'))
-    expect(raw.appearance).toEqual({ noteWidth: 'wide', fontSize: 18 })
+    expect(raw.appearance).toEqual({ noteWidth: 'wide', fontSize: 18, fontFamily: 'Songti SC' })
     expect(raw.editor).toEqual({ autosaveDebounceMs: 800 })
     expect(raw.updates).toEqual({ channel: 'beta', autoCheck: false })
     expect(raw.privacy).toEqual({ telemetryEnabled: true })
@@ -64,13 +64,13 @@ describe('settings page sections schema (T7.1)', () => {
     const files = new MemoryFileSystem('/virtual/settings')
     const secrets = new MemorySecretsStore()
     await files.writeText('bad.json', JSON.stringify({
-      appearance: { noteWidth: 'huge', fontSize: -3 },
+      appearance: { noteWidth: 'huge', fontSize: -3, fontFamily: 'Bad;Font' },
       editor: { autosaveDebounceMs: 'fast' },
       updates: { channel: 'nightly', autoCheck: 'yes' },
       privacy: { telemetryEnabled: 'no' },
     }))
     const loaded = await readSettings(files, 'bad.json', secrets)
-    expect(loaded.appearance).toEqual({ noteWidth: 'standard', fontSize: 15 })
+    expect(loaded.appearance).toEqual({ noteWidth: 'standard', fontSize: 16, fontFamily: '' })
     expect(loaded.editor).toEqual({ autosaveDebounceMs: 350 })
     expect(loaded.updates).toEqual({ channel: 'stable', autoCheck: true })
     expect(loaded.privacy).toEqual({ telemetryEnabled: false })

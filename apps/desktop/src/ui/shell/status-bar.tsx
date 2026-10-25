@@ -12,6 +12,7 @@ import { UpdateCheckService } from '../../services/update/update-check'
 import { VaultService } from '../../services/vault/vault.service'
 import { APP_VERSION } from '../../version'
 import { Button } from '../primitives/button'
+import { Tip } from '../primitives/tooltip'
 import { Mark } from '../primitives/icon'
 import { VaultSwitcher } from './rail-chrome'
 import { Popover, PopoverContent, PopoverTrigger } from '../primitives/popover'
@@ -150,18 +151,19 @@ export const StatusBar = observer(function StatusBar() {
       ) : null}
       <GitStatusBadge />
       {vault.indexPhase === 'error' || (vault.indexPhase === 'ready' && vault.indexWork === 'embedding') ? (
+        <Tip content={vault.indexPhase === 'error' ? translate('shell.indexFailedTitle') : translate('shell.indexEmbeddingTitle')}>
         <Button
           tone="quiet"
           size="sm"
           className="statusbar-item statusbar-action statusbar-index-error"
           data-testid="index-status"
-          title={vault.indexPhase === 'error' ? translate('shell.indexFailedTitle') : translate('shell.indexEmbeddingTitle')}
           icon={<Mark icon={Search} size={14} />}
           onClick={() => (vault.indexPhase === 'error' ? vault.retryIndex() : vault.retryMisses())}
         >
           {indexStatusLabel(vault.indexPhase, vault.indexWork, vault.indexDone, vault.indexTotal)}
           <span data-testid="index-retry">{translate('common.retry')}</span>
         </Button>
+        </Tip>
       ) : (
         <span
           className={`statusbar-item statusbar-index${vault.indexPhase === 'rebuilding' ? ' is-busy' : ''}`}
@@ -173,18 +175,19 @@ export const StatusBar = observer(function StatusBar() {
       )}
       <span className="statusbar-spacer" data-tauri-drag-region />
       {updateCheck.supported ? (
+        <Tip content={translate('shell.checkUpdates')}>
         <Button
           tone="quiet"
           size="sm"
           className="statusbar-item statusbar-action"
           data-testid="statusbar-update-check"
           disabled={updateCheck.feedback === 'checking'}
-          title={translate('shell.checkUpdates')}
           icon={<span className="statusbar-icon statusbar-icon-update"><Mark icon={RefreshCw} size={14} /></span>}
           onClick={() => void updateCheck.manualCheck()}
         >
           {updateCheck.feedback === 'checking' ? translate('shell.checking') : translate('shell.checkUpdates')}
         </Button>
+        </Tip>
       ) : null}
       {updateCheck.feedbackText ? (
         <span className="statusbar-item" data-testid="statusbar-update-feedback">
@@ -208,7 +211,6 @@ export const StatusBar = observer(function StatusBar() {
         className="statusbar-item statusbar-action"
         data-testid="statusbar-settings"
         aria-label={translate('shell.settings')}
-        title={translate('shell.settings')}
         icon={<Mark icon={Settings} size={14} />}
         onClick={() => settingsPage.show()}
       >

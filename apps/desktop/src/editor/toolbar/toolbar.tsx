@@ -34,6 +34,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { useTranslation } from 'react-i18next'
 import { t } from '../../i18n'
 import { formatShortcut } from '../../services/commands/commands'
+import { Tip } from '../../ui/primitives/tooltip'
 import { applyLink, clearFormatting, runFormat, setMathPromptOpener, unsetLink, type FormatName } from '../extensions'
 import { editorFindOpen, openEditorFind, subscribeEditorFind } from '../find/find-bar'
 import { findSeedFromSelection } from '../find/find-hits'
@@ -122,19 +123,20 @@ function ToolButton({
   onClick: () => void
 }) {
   return (
+    <Tip content={label}>
     <button
       type="button"
       className={pressed ? 'editor-tool is-active' : 'editor-tool'}
       data-testid={testId}
       aria-pressed={pressed || undefined}
       aria-label={label}
-      title={label}
       disabled={disabled}
       onMouseDown={keepSelection}
       onClick={onClick}
     >
       <EditorIcon icon={icon} />
     </button>
+    </Tip>
   )
 }
 

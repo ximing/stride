@@ -2,7 +2,8 @@ import { Extension } from '@tiptap/core';
 import type { Node as ProseMirrorNode } from '@tiptap/pm/model';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
 import { Decoration, DecorationSet } from '@tiptap/pm/view';
-import { t, watchLocale } from '../../i18n';
+import { t } from '../../i18n';
+import { bindElementTip } from '../../ui/primitives/tooltip';
 import {
   externalLinkOpenHref,
   externalOpenUrl,
@@ -30,11 +31,7 @@ function openExternalUrl(url: string): void {
 function createJumpIcon(href: string): HTMLElement {
   const icon = document.createElement('span');
   icon.className = JUMP_ICON_CLASS;
-  const applyTitle = () => {
-    icon.title = t('editor.openLink');
-  };
-  applyTitle();
-  jumpUnwatch.set(icon, watchLocale(applyTitle));
+  jumpUnwatch.set(icon, bindElementTip(icon, () => t('editor.openLink')));
   icon.dataset.href = href;
   icon.innerHTML = JUMP_ICON_SVG;
   const open = (event: Event) => {

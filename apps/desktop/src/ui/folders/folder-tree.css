@@ -289,6 +289,10 @@
   border-color: transparent;
 }
 
+.folder-tree button.note-link.is-revealed {
+  background: color-mix(in srgb, var(--sd-accent) 16%, transparent);
+}
+
 .folder-overflow {
   margin: 4px 8px 8px;
   font-size: 12px;

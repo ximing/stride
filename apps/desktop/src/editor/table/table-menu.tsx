@@ -5,6 +5,7 @@ import { Check } from 'lucide-react';
 import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
+import { Tip } from '../../ui/primitives/tooltip';
 import { colorLabel } from '../colors';
 import {
   TABLE_CELL_COLORS,
@@ -202,8 +203,8 @@ export function TableContextMenu({ editor }: { editor: Editor }) {
       <div className="editor-table-menu-colors" role="group" aria-label={t('editor.table.background')}>
         <span>{t('editor.table.backgroundShort')}</span>
         {TABLE_CELL_COLORS.map((color) => (
+          <Tip key={color.value} content={colorLabel(t, color)}>
           <button
-            key={color.value}
             type="button"
             className={`editor-color-swatch is-square${state.background === color.value ? ' is-on' : ''}`}
             style={{ background: color.value }}
@@ -215,6 +216,7 @@ export function TableContextMenu({ editor }: { editor: Editor }) {
               setMenu(null);
             }}
           />
+          </Tip>
         ))}
         <button
           type="button"

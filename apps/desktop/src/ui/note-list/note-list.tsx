@@ -9,8 +9,9 @@ import { CommandService } from '../../services/commands/command.service'
 import { buildNoteListMenu, type ContextMenuEntry } from '../../services/commands/context-menu'
 import { ListFilterService } from '../../services/search/list-filter.service'
 import { FolderService } from '../../services/vault/folder.service'
+import { showNoteInFolder } from '../../services/vault/reveal-note'
 import { FOLDER_FILTER_PREFIX } from '../../services/vault/vault.service'
-import { NOTE_ROW_HEIGHT, NOTE_ROW_HEIGHT_COMPACT, NOTE_ROW_OVERSCAN, sortNotes, virtualWindow, type ListSort, type ListSortKey } from '../../services/notes/note-list'
+import { NOTE_ROW_OVERSCAN, noteRowHeight, rowOffsets, sortNotes, virtualWindowOffsets, type ListSort, type ListSortKey } from '../../services/notes/note-list'
 import { NoteListService } from '../../services/notes/note-list.service'
 import { TabsService } from '../../services/notes/tabs.service'
 import { VaultService } from '../../services/vault/vault.service'
@@ -237,48 +238,52 @@ const BatchBar = observer(function BatchBar() {
   const types = vault.sidebarTypes
   return (
     <div className="note-list-batch" data-testid="note-list-batch">
-      <span className="note-list-batch-count" data-testid="note-list-batch-count">
-        {translate('notes.selected', { n: list.selectionCount })}
-      </span>
-      <Button size="sm" tone="quiet" data-testid="batch-archive" onClick={() => void list.archiveSelected()}>
-        {translate('notes.archive')}
-      </Button>
-      <Menu open={list.retypeOpen} onOpenChange={(open) => { list.retypeOpen = open }}>
-        <MenuTrigger asChild>
-          <Button className="note-list-batch-retype" size="sm" tone="quiet" data-testid="batch-retype">
-            {translate('notes.type')}
-          </Button>
-        </MenuTrigger>
-        <MenuContent>
-          {types.length === 0 && <MenuItem disabled>{translate('notes.noTypes')}</MenuItem>}
-          {types.map((type) => (
-            <MenuItem
-              key={type.id}
-              data-testid={`batch-retype-${type.title}`}
-              onSelect={() => void list.retypeSelected(type.title)}
-            >
-              {typeSidebarLabel(type)}
-            </MenuItem>
-          ))}
-        </MenuContent>
-      </Menu>
-      <Button
-        className="note-list-batch-delete"
-        size="sm"
-        tone="danger"
-        data-testid="batch-delete"
-        onClick={() => { list.confirmingDelete = true }}
-      >
-        {translate('notes.delete')}
-      </Button>
-      <IconButton
-        className="note-list-batch-clear"
-        data-testid="batch-clear"
-        icon={X}
-        label={translate('notes.clearSelection')}
-        size="sm"
-        onClick={() => list.clearSelection()}
-      />
+      <div className="note-list-batch-head">
+        <span className="note-list-batch-count" data-testid="note-list-batch-count">
+          {translate('notes.selected', { n: list.selectionCount })}
+        </span>
+        <IconButton
+          className="note-list-batch-clear"
+          data-testid="batch-clear"
+          icon={X}
+          label={translate('notes.clearSelection')}
+          size="sm"
+          onClick={() => list.clearSelection()}
+        />
+      </div>
+      <div className="note-list-batch-actions">
+        <Button size="sm" tone="quiet" data-testid="batch-archive" onClick={() => void list.archiveSelected()}>
+          {translate('notes.archive')}
+        </Button>
+        <Menu open={list.retypeOpen} onOpenChange={(open) => { list.retypeOpen = open }}>
+          <MenuTrigger asChild>
+            <Button className="note-list-batch-retype" size="sm" tone="quiet" data-testid="batch-retype">
+              {translate('notes.type')}
+            </Button>
+          </MenuTrigger>
+          <MenuContent>
+            {types.length === 0 && <MenuItem disabled>{translate('notes.noTypes')}</MenuItem>}
+            {types.map((type) => (
+              <MenuItem
+                key={type.id}
+                data-testid={`batch-retype-${type.title}`}
+                onSelect={() => void list.retypeSelected(type.title)}
+              >
+                {typeSidebarLabel(type)}
+              </MenuItem>
+            ))}
+          </MenuContent>
+        </Menu>
+        <Button
+          className="note-list-batch-delete"
+          size="sm"
+          tone="danger"
+          data-testid="batch-delete"
+          onClick={() => { list.confirmingDelete = true }}
+        >
+          {translate('notes.delete')}
+        </Button>
+      </div>
     </div>
   )
 })
@@ -356,11 +361,15 @@ const NoteRow = memo(function NoteRow({
   const tagColors = tagColorsText === '' ? [] : tagColorsText.split('\n')
   const tone = status !== '' ? statusTone(status) : 'muted'
   const snippet = noteSnippet(note)
-  // The card is three rows: title / snippet (clamped to 2 lines, collapsed when
-  // empty) / meta. The wrapper owns the fixed virtual height and anchors the
-  // process button, which must stay outside the row's <button>.
+  const hasMeta = dateLabel !== '' || typeTitle !== '' || status !== '' || tags.length > 0
+  // A body keeps the three-line card (title, snippet, meta). An empty note
+  // drops the snippet, and drops the meta line too when there is no date or
+  // chip, so the row can shrink to the title. The process button stays
+  // outside the row's <button>.
+  const showMeta = snippet !== '' || hasMeta
+  const rowClass = snippet !== '' ? 'note-list-row' : hasMeta ? 'note-list-row is-empty' : 'note-list-row is-title'
   return (
-    <div className="note-list-row">
+    <div className={rowClass}>
       <button
         type="button"
         className={['note-list-item', active ? 'is-active' : '', selected ? 'is-selected' : ''].filter(Boolean).join(' ')}
@@ -379,44 +388,46 @@ const NoteRow = memo(function NoteRow({
         {snippet !== '' && (
           <span className="note-list-item-snippet" data-testid="note-list-item-snippet">{snippet}</span>
         )}
-        <span className="note-list-item-meta">
-          <span className="note-list-item-date">{dateLabel}</span>
-          {typeTitle !== '' && (
-            <span
-              className="note-chip note-chip-type"
-              data-testid="note-chip-type"
-              data-type={typeTitle}
-              style={{ '--chip-hue': `var(--sd-dot-${typeColor})` } as CSSProperties}
-            >
-              <span className={`type-dot type-dot-${typeColor}`} />
-              <span className="note-chip-label">{typeLabel}</span>
-            </span>
-          )}
-          {status !== '' && (
-            <span
-              className={['note-chip', 'note-chip-status', tone !== 'muted' ? `is-${tone}` : ''].filter(Boolean).join(' ')}
-              data-testid="note-chip-status"
-            >
-              {status}
-            </span>
-          )}
-          {tags.map((tag, index) => (
-            <span
-              key={tag}
-              className="note-chip note-chip-tag"
-              data-testid="note-chip-tag"
-              data-tag={tag}
-              style={{ '--chip-hue': `var(--sd-dot-${tagColors[index] ?? 'gray'})` } as CSSProperties}
-              onContextMenu={(event) => {
-                event.preventDefault()
-                event.stopPropagation()
-                onTagMenu(tag, event.clientX, event.clientY)
-              }}
-            >
-              #{tag}
-            </span>
-          ))}
-        </span>
+        {showMeta && (
+          <span className="note-list-item-meta">
+            <span className="note-list-item-date">{dateLabel}</span>
+            {typeTitle !== '' && (
+              <span
+                className="note-chip note-chip-type"
+                data-testid="note-chip-type"
+                data-type={typeTitle}
+                style={{ '--chip-hue': `var(--sd-dot-${typeColor})` } as CSSProperties}
+              >
+                <span className={`type-dot type-dot-${typeColor}`} />
+                <span className="note-chip-label">{typeLabel}</span>
+              </span>
+            )}
+            {status !== '' && (
+              <span
+                className={['note-chip', 'note-chip-status', tone !== 'muted' ? `is-${tone}` : ''].filter(Boolean).join(' ')}
+                data-testid="note-chip-status"
+              >
+                {status}
+              </span>
+            )}
+            {tags.map((tag, index) => (
+              <span
+                key={tag}
+                className="note-chip note-chip-tag"
+                data-testid="note-chip-tag"
+                data-tag={tag}
+                style={{ '--chip-hue': `var(--sd-dot-${tagColors[index] ?? 'gray'})` } as CSSProperties}
+                onContextMenu={(event) => {
+                  event.preventDefault()
+                  event.stopPropagation()
+                  onTagMenu(tag, event.clientX, event.clientY)
+                }}
+              >
+                #{tag}
+              </span>
+            ))}
+          </span>
+        )}
       </button>
       {processable && (
         <IconButton
@@ -440,6 +451,13 @@ const NoteRow = memo(function NoteRow({
 function chipTypeOf(note: StrideNote): string {
   const type = note.type.trim()
   return type !== '' && type.toLowerCase() !== 'note' ? type : ''
+}
+
+function noteHasListMeta(note: StrideNote, mtime: number): boolean {
+  if (mtime > 0) return true
+  if (chipTypeOf(note) !== '') return true
+  if (propertyText(note.properties.status).trim() !== '') return true
+  return noteTags(note).length > 0
 }
 
 /** Right-click rename: open the note, then focus/select the stage title input. */
@@ -470,6 +488,7 @@ export const NoteList = observer(function NoteList() {
   const tabs = useService(TabsService)
   const commands = useService(CommandService)
   const scrollRef = useRef<HTMLDivElement>(null)
+  const handledScroll = useRef(0)
   const filterInputRef = useRef<HTMLInputElement>(null)
   const [filterOpen, setFilterOpen] = useState(false)
   const [scrollTop, setScrollTop] = useState(0)
@@ -477,7 +496,6 @@ export const NoteList = observer(function NoteList() {
   const [rowMenu, setRowMenu] = useState<RowMenuState | null>(null)
   // Per-vault density (T7.3): compact shrinks rows and drops the snippet line.
   const compact = vault.viewMode === 'compact'
-  const rowHeight = compact ? NOTE_ROW_HEIGHT_COMPACT : NOTE_ROW_HEIGHT
 
   // Measure the scroll viewport. jsdom has no ResizeObserver/layout, so fall
   // back to a nominal viewport that renders a full window in tests.
@@ -494,6 +512,7 @@ export const NoteList = observer(function NoteList() {
   }, [])
 
   // Switching filter dimension, sort, or density resets the scroll position (never persisted).
+  // A reveal scrolls after this reset, in the effect below.
   useEffect(() => {
     const element = scrollRef.current
     if (element) element.scrollTop = 0
@@ -518,8 +537,33 @@ export const NoteList = observer(function NoteList() {
     [activeView, vault.searchQuery, vault.searchHits, vault.listFilter, typeInfo, views.views, i18n.language],
   )
   const orderedIds = useMemo(() => notes.map((note) => note.id), [notes])
-  const win = virtualWindow(notes.length, scrollTop, viewport, NOTE_ROW_OVERSCAN, rowHeight)
+  // Empty notes drop the snippet band, and a note with no date or chips
+  // drops the meta line too, so row heights are not uniform.
+  const offsets = useMemo(
+    () => rowOffsets(notes.map((note) => noteRowHeight(
+      noteSnippet(note) !== '',
+      noteHasListMeta(note, vault.noteMtimes[note.id] ?? 0),
+      compact,
+    ))),
+    [notes, compact, vault.noteMtimes],
+  )
+  const win = virtualWindowOffsets(offsets, scrollTop, viewport, NOTE_ROW_OVERSCAN)
   const rows = notes.slice(win.start, win.end)
+  const scrollRequest = list.scrollRequest
+  const scrollRequestId = list.scrollRequestId
+
+  // Runs after the filter reset above. One scroll per request: later edits
+  // replace `notes` but must not yank the list back to the revealed row.
+  useEffect(() => {
+    if (scrollRequest === 0 || !scrollRequestId || scrollRequest === handledScroll.current) return
+    const index = notes.findIndex((note) => note.id === scrollRequestId)
+    if (index < 0) return
+    handledScroll.current = scrollRequest
+    const top = offsets[index] ?? 0
+    const element = scrollRef.current
+    if (element) element.scrollTop = top
+    setScrollTop(top)
+  }, [scrollRequest, scrollRequestId, notes, offsets])
 
   // The header icon opens the field. A non-empty query keeps it visible so a
   // filter cannot hide while it is still applied.
@@ -628,6 +672,7 @@ export const NoteList = observer(function NoteList() {
           const title = vault.notes.find((note) => note.id === noteId)?.title ?? ''
           if (title) void navigator.clipboard?.writeText(`[[${title}]]`)
         },
+        showInFolder: (noteId) => showNoteInFolder(vault, noteId),
         archive: (noteId) => void vault.archiveNotes([noteId]),
         deleteNote: () => { list.confirmingDelete = true },
         archiveSelected: () => commands.execute('list.archiveSelected'),

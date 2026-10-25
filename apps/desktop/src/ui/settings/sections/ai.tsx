@@ -11,6 +11,7 @@ import { useTranslation } from 'react-i18next'
 import { t } from '../../../i18n'
 import { SettingsService } from '../../../services/settings/settings.service'
 import { Button } from '../../primitives/button'
+import { Tip } from '../../primitives/tooltip'
 import { Mark } from '../../primitives/icon'
 import { Input } from '../../primitives/input'
 import { Select } from '../../primitives/select'
@@ -94,15 +95,19 @@ export const AiSection = observer(function AiSection() {
                 <span className="settings-ai-row-name">{config.name || config.id}</span>
                 <span className="settings-ai-row-provider">{llmProviderInfo(config.provider)?.label ?? config.provider}</span>
                 {invalid ? (
-                  <span className="settings-ai-row-warning" title={t('settings.ai.invalidTitle')}>
-                    <Mark icon={CircleAlert} size={14} />
-                  </span>
+                  <Tip content={t('settings.ai.invalidTitle')}>
+                    <span className="settings-ai-row-warning">
+                      <Mark icon={CircleAlert} size={14} />
+                    </span>
+                  </Tip>
                 ) : null}
                 {config.isDefault ? (
-                  <span className="settings-ai-row-default" title={t('settings.ai.defaultTitle')}>
-                    <Mark icon={Star} size={14} />
-                    {t('settings.ai.defaultTitle')}
-                  </span>
+                  <Tip content={t('settings.ai.defaultTitle')}>
+                    <span className="settings-ai-row-default">
+                      <Mark icon={Star} size={14} />
+                      {t('settings.ai.defaultTitle')}
+                    </span>
+                  </Tip>
                 ) : null}
               </button>
             )

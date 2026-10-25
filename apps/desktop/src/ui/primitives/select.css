@@ -54,6 +54,7 @@
   position: relative;
   display: flex;
   align-items: center;
+  min-width: 0;
   min-height: var(--sd-control-md);
   padding: var(--sd-space-1) var(--sd-space-8) var(--sd-space-1) var(--sd-space-2);
   border-radius: var(--sd-radius);
@@ -64,6 +65,13 @@
   outline: none;
   cursor: pointer;
   user-select: none;
+}
+
+.sd-select-item > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .sd-select-item[data-highlighted] {

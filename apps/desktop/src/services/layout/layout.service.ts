@@ -29,6 +29,12 @@ export class LayoutService extends Service {
   rightPanelTab: RightPanelTab = DEFAULT_LAYOUT_STATE.rightPanelTab
   railCollapsed: RailCollapsed = { ...DEFAULT_LAYOUT_STATE.railCollapsed }
   foldersCollapsed: Record<string, boolean> = {}
+  /** Note the folder tree should scroll to. Transient; not persisted. */
+  revealedNoteId = ''
+  /** Folder row the tree should scroll to when no note is targeted. */
+  revealedFolderPath = ''
+  /** Bumped on every reveal so repeating the same target still scrolls. */
+  revealSeq = 0
 
   constructor() {
     super()
@@ -102,6 +108,39 @@ export class LayoutService extends Service {
 
   toggleFolder(path: string) {
     this.setFolderCollapsed(path, !this.isFolderCollapsed(path))
+  }
+
+  /**
+   * Open the sidebar, the notes group, and each folder in `folders` so a
+   * context-menu reveal can scroll the target into view. One persist.
+   */
+  showInTree(folders: readonly string[], target: { noteId: string } | { folderPath: string }) {
+    const next = { ...this.foldersCollapsed }
+    let folderChanged = false
+    for (const path of folders) {
+      if (!next[path]) continue
+      delete next[path]
+      folderChanged = true
+    }
+    if (folderChanged) this.foldersCollapsed = next
+    let changed = folderChanged
+    if (this.sidebarCollapsed) {
+      this.sidebarCollapsed = false
+      changed = true
+    }
+    if (this.railCollapsed.notes) {
+      this.railCollapsed = { ...this.railCollapsed, notes: false }
+      changed = true
+    }
+    if ('noteId' in target) {
+      this.revealedNoteId = target.noteId
+      this.revealedFolderPath = ''
+    } else {
+      this.revealedNoteId = ''
+      this.revealedFolderPath = target.folderPath
+    }
+    this.revealSeq += 1
+    if (changed) this.persist()
   }
 
   private snapshot(): LayoutState {

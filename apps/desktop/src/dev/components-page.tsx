@@ -27,7 +27,7 @@ import { Select } from '../ui/primitives/select'
 import { Shell } from '../ui/shell/shell'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/primitives/tabs'
 import { Notice, Toaster } from '../ui/primitives/toast'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/primitives/tooltip'
+import { Tip, TooltipProvider } from '../ui/primitives/tooltip'
 import '../ui/tokens.css'
 import './components-page.css'
 
@@ -239,12 +239,9 @@ const ComponentsPreview = observer(function ComponentsPreview() {
                   <p className="sd-component-section-copy">Tooltips explain controls; toasts confirm completed actions.</p>
                 </div>
                 <div className="sd-demo-actions">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button tone="secondary" icon={<Info {...iconProps} />}>About</Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Still a draft from this morning.</TooltipContent>
-                  </Tooltip>
+                  <Tip content="Still a draft from this morning.">
+                    <Button tone="secondary" icon={<Info {...iconProps} />}>About</Button>
+                  </Tip>
                   <Button
                     tone="secondary"
                     icon={<Check {...iconProps} />}

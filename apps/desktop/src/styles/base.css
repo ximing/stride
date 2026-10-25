@@ -34,7 +34,8 @@ body {
    AppearanceSettings defaults in core; services/appearance/appearance.ts overrides them
    as inline properties on <html>, so changes apply instantly with no restart. */
 :root {
-  --sd-note-font-size: 15px;
+  --sd-note-font-size: 16px;
+  --sd-note-font-family: var(--sd-font-serif);
   --sd-note-max-width: 44rem;
 }
 

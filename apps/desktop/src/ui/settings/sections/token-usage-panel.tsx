@@ -9,6 +9,7 @@ import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { SettingsService } from '../../../services/settings/settings.service'
 import { Tabs, TabsList, TabsTrigger } from '../../primitives/tabs'
+import { Tip } from '../../primitives/tooltip'
 import './token-usage.css'
 
 type UsageGrain = 'model' | 'week' | 'month'
@@ -91,7 +92,9 @@ export const TokenUsagePanel = observer(function TokenUsagePanel() {
             <tbody>
               {rows.map((row) => (
                 <tr key={row.model} data-testid="token-usage-row" data-model={row.model}>
-                  <th scope="row" title={row.model}>{row.model}</th>
+                  <Tip content={row.model}>
+                    <th scope="row">{row.model}</th>
+                  </Tip>
                   <td>{formatTokens(row.input, i18n.language)}</td>
                   <td>{formatTokens(row.output, i18n.language)}</td>
                   <td>{formatTokens(row.total, i18n.language)}</td>

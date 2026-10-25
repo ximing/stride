@@ -3,7 +3,9 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { Rail } from '../../app'
+import { LayoutService } from '../../services/layout/layout.service'
 import { FolderService } from '../../services/vault/folder.service'
+import { showNoteInFolder } from '../../services/vault/reveal-note'
 import { ListFilterService } from '../../services/search/list-filter.service'
 import { NoteListService } from '../../services/notes/note-list.service'
 import { VaultService } from '../../services/vault/vault.service'
@@ -84,7 +86,7 @@ describe('folder tree context menu', () => {
       await folders.createFolder('box')
     })
     await act(async () => rightClick(host.querySelector('[data-testid="folder-row"][data-path="box"]')))
-    expect(menuItemIds()).toEqual(['new-note-here', 'new-folder-inside', 'rename-folder', 'delete-folder'])
+    expect(menuItemIds()).toEqual(['show-in-folder', 'new-note-here', 'new-folder-inside', 'rename-folder', 'delete-folder'])
     await act(async () => clickMenuItem('rename-folder'))
     expect(host.querySelector('input.folder-rename-input')).not.toBeNull()
   })
@@ -145,11 +147,55 @@ describe('folder tree context menu', () => {
     const link = host.querySelector<HTMLElement>(`[data-testid="note-link"][data-note-id="${id}"]`)
     expect(link).not.toBeNull()
     await act(async () => rightClick(link))
-    expect(menuItemIds()).toEqual(['open', 'rename', 'copy-wikilink', 'archive', 'delete'])
+    expect(menuItemIds()).toEqual(['open', 'rename', 'show-in-folder', 'copy-wikilink', 'archive', 'delete'])
     await act(async () => clickMenuItem('delete'))
     const noteList = resolve(NoteListService)
     expect(noteList.selectedIds).toEqual([id])
     expect(noteList.confirmingDelete).toBe(true)
+  })
+
+  it('show in folder scopes the list and expands the folder', async () => {
+    const { host, vault, folders } = await mountRail()
+    await act(async () => {
+      await folders.createFolder('box')
+      await folders.createNoteInFolder('box')
+    })
+    const id = vault.activeId
+    const layout = resolve(LayoutService)
+    await act(async () => {
+      layout.setFolderCollapsed('box', true)
+    })
+    expect(host.querySelector(`[data-testid="note-link"][data-note-id="${id}"]`)).toBeNull()
+    await act(async () => rightClick(host.querySelector('[data-testid="folder-row"][data-path="box"]')))
+    await act(async () => clickMenuItem('show-in-folder'))
+    expect(vault.listFilter).toBe('folder:box')
+    expect(layout.isFolderCollapsed('box')).toBe(false)
+    expect(layout.revealedFolderPath).toBe('box')
+    expect(host.querySelector(`[data-testid="note-link"][data-note-id="${id}"]`)).not.toBeNull()
+  })
+
+  it('reveals a note nested under a collapsed folder', async () => {
+    const { host, vault, folders } = await mountRail()
+    await act(async () => {
+      await folders.createFolder('box')
+      await folders.createFolder('box/inner')
+      await folders.createNoteInFolder('box/inner')
+    })
+    const id = vault.activeId
+    const layout = resolve(LayoutService)
+    await act(async () => {
+      layout.setFolderCollapsed('box', true)
+    })
+    expect(host.querySelector(`[data-testid="note-link"][data-note-id="${id}"]`)).toBeNull()
+    await act(async () => {
+      showNoteInFolder(vault, id)
+    })
+    expect(vault.listFilter).toBe('folder:box/inner')
+    expect(layout.isFolderCollapsed('box')).toBe(false)
+    expect(layout.isFolderCollapsed('box/inner')).toBe(false)
+    const link = host.querySelector(`[data-testid="note-link"][data-note-id="${id}"]`)
+    expect(link).not.toBeNull()
+    expect(link!.className).toContain('is-revealed')
   })
 
   it('right-click on empty tree space offers New Folder at the root', async () => {

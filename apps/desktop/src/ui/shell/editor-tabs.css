@@ -1,6 +1,6 @@
 /* Surviving rules moved from src/styles so each class has one source. */
 .note-title {
-  font-family: var(--sd-font-serif);
+  font-family: var(--sd-note-font-family);
   font-weight: 500;
 }
 
@@ -25,8 +25,14 @@
   border: none;
   background: transparent;
   font-size: var(--sd-text-note-title);
-  line-height: 1.2;
+  line-height: 1.25;
   letter-spacing: -0.015em;
+}
+
+/* Negative tracking tightens Latin display type but crams CJK glyphs
+   together; Chinese headings want a breath of positive tracking instead. */
+:lang(zh) .note-title {
+  letter-spacing: 0.01em;
 }
 
 .note-title:hover:not(:disabled),
@@ -48,41 +54,49 @@
   outline: none;
   color: var(--sd-fg);
   caret-color: var(--sd-accent);
-  font-family: var(--sd-font-serif);
+  font-family: var(--sd-note-font-family);
   font-size: var(--sd-note-font-size);
-  line-height: 1.62;
+  /* CJK needs more air between lines than Latin: 1.75 keeps long Chinese
+     paragraphs readable without feeling loose in English. */
+  line-height: 1.75;
+  overflow-wrap: break-word;
+  /* Let CJK punctuation hang at line edges where supported (progressive). */
+  hanging-punctuation: first allow-end;
   text-wrap: pretty;
 }
 
 .editor .ProseMirror p {
-  margin: 0 0 0.55em;
+  /* Paragraph gaps must clear the taller line box, or adjacent paragraphs
+     visually merge into one block. */
+  margin: 0 0 0.75em;
+}
+
+.editor .ProseMirror h1,
+.editor .ProseMirror h2,
+.editor .ProseMirror h3 {
+  color: var(--sd-fg);
+  font-family: var(--sd-note-font-family);
+  font-weight: 600;
+  line-height: 1.35;
+  letter-spacing: -0.01em;
+}
+
+:lang(zh) .editor .ProseMirror h1,
+:lang(zh) .editor .ProseMirror h2,
+:lang(zh) .editor .ProseMirror h3 {
+  letter-spacing: 0.01em;
 }
 
 .editor .ProseMirror h1 {
-  margin: 1.4em 0 0.5em;
-  color: var(--sd-fg);
-  font-family: var(--sd-font-serif);
-  font-weight: 600;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
+  margin: 1.4em 0 0.55em;
 }
 
 .editor .ProseMirror h2 {
-  margin: 1.25em 0 0.45em;
-  color: var(--sd-fg);
-  font-family: var(--sd-font-serif);
-  font-weight: 600;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
+  margin: 1.5em 0 0.5em;
 }
 
 .editor .ProseMirror h3 {
-  margin: 1.1em 0 0.4em;
-  color: var(--sd-fg);
-  font-family: var(--sd-font-serif);
-  font-weight: 600;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
+  margin: 1.3em 0 0.45em;
 }
 
 .editor .ProseMirror h1 {
@@ -114,7 +128,7 @@
 /* TipTap wraps list item content in <p>; cancel the paragraph margin so
    bullets pack tightly, and keep the gap on the li instead. */
 .editor .ProseMirror li {
-  margin: 0.15em 0;
+  margin: 0.25em 0;
 }
 
 .editor .ProseMirror li > p {
@@ -123,12 +137,12 @@
 
 .editor .ProseMirror li > ul,
 .editor .ProseMirror li > ol {
-  margin: 0.15em 0;
+  margin: 0.2em 0;
 }
 
 .editor .ProseMirror blockquote {
-  margin: 0.6em 0;
-  padding: var(--sd-space-1) var(--sd-space-4);
+  margin: 0.8em 0;
+  padding: var(--sd-space-1) var(--sd-space-5);
   border-left: 2px solid var(--sd-accent);
   color: var(--sd-muted);
 }
@@ -158,6 +172,8 @@
   border: 1px solid var(--sd-border);
   border-radius: var(--sd-radius-panel);
   background: var(--sd-bg);
+  /* Code reads tighter than prose; the body line-height is tuned for CJK. */
+  line-height: 1.6;
   overflow: auto;
 }
 

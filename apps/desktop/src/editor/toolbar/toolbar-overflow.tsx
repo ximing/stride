@@ -10,6 +10,7 @@ import {
 import { useTranslation } from 'react-i18next';
 import { createPortal } from 'react-dom';
 import { Ellipsis } from 'lucide-react';
+import { Tip } from '../../ui/primitives/tooltip';
 import { toolbarFitCount, toolbarOverflowRange, type ToolbarItemMeasure } from './toolbar-fit';
 
 export type OverflowMeasure = 'icon' | 'select' | { className: string; text: string };
@@ -132,6 +133,7 @@ function MoreButton({
 }) {
   const { t } = useTranslation();
   return (
+    <Tip content={t('editor.more')}>
     <button
       ref={buttonRef}
       type="button"
@@ -148,6 +150,7 @@ function MoreButton({
     >
       <Ellipsis aria-hidden="true" size={16} strokeWidth={1.75} />
     </button>
+    </Tip>
   );
 }
 

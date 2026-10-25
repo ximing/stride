@@ -63,7 +63,7 @@ describe('TabStrip close hint', () => {
     await renderStrip()
     const name = commandTitle('tab.close', 'Close tab')
     expect(closeLabel()).toBe(`${name} (${formatShortcut('Mod+W')})`)
-    expect(host?.querySelector('[data-testid="tab-close"]')?.getAttribute('title')).toBe(closeLabel())
+    expect(host?.querySelector('[data-testid="tab-close"]')?.getAttribute('title')).toBeNull()
   })
 
   it('omits the close chord on the desktop runtime', async () => {
@@ -72,6 +72,6 @@ describe('TabStrip close hint', () => {
     const name = commandTitle('tab.close', 'Close tab')
     expect(closeLabel()).toBe(name)
     expect(closeLabel()).not.toContain(formatShortcut('Mod+W'))
-    expect(host?.querySelector('[data-testid="tab-close"]')?.getAttribute('title')).toBe(name)
+    expect(host?.querySelector('[data-testid="tab-close"]')?.getAttribute('title')).toBeNull()
   })
 })

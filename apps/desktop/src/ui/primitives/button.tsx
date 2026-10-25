@@ -1,6 +1,7 @@
 import { forwardRef, type ButtonHTMLAttributes, type ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
 import { Mark } from './icon'
+import { Tip } from './tooltip'
 
 export type ButtonTone = 'primary' | 'secondary' | 'quiet' | 'danger'
 export type ButtonSize = 'sm' | 'md' | 'lg'
@@ -28,9 +29,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
   )
 })
 
-export type IconButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children'> & {
+export type IconButtonProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, 'children' | 'title'> & {
   icon: LucideIcon
   label: string
+  /** Tip text. Defaults to `label`. This is not the native `title` attribute. */
+  title?: string
   active?: boolean
   tone?: ButtonTone
   size?: ButtonSize
@@ -52,17 +55,19 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
   },
   ref,
 ) {
+  const tip = title?.trim() ? title : label
   return (
-    <Button
-      ref={ref}
-      tone={tone}
-      size={size}
-      icon={<Mark icon={icon} size={iconSize} />}
-      className={['sd-icon-button', active ? 'is-active' : undefined, className].filter(Boolean).join(' ')}
-      aria-label={label}
-      aria-pressed={active ?? ariaPressed}
-      title={title ?? label}
-      {...props}
-    />
+    <Tip content={tip}>
+      <Button
+        ref={ref}
+        tone={tone}
+        size={size}
+        icon={<Mark icon={icon} size={iconSize} />}
+        className={['sd-icon-button', active ? 'is-active' : undefined, className].filter(Boolean).join(' ')}
+        aria-label={label}
+        aria-pressed={active ?? ariaPressed}
+        {...props}
+      />
+    </Tip>
   )
 })

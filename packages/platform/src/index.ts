@@ -1,4 +1,5 @@
 export * from './error.ts'
+export * from './fonts.ts'
 export * from './fs.ts'
 export * from './git.ts'
 export * from './host.ts'

@@ -3,6 +3,7 @@ import { bindServices, observer, useService } from '@rabjs/react'
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronUp, X } from 'lucide-react'
+import { Tip } from '../../ui/primitives/tooltip'
 import { CommandService } from '../../services/commands/command.service'
 import { registerOverlayKeys } from '../../services/platform/overlay-keys'
 import { findKeywordHits, findSeedFromSelection, nextHitIndex } from './find-hits'
@@ -232,6 +233,7 @@ const FindBar = observer(function FindBar({ editor }: { editor: Editor }) {
         value={service.query}
         onChange={(event) => revealQuery(event.target.value)}
       />
+      <Tip content={t('editor.find.case')}>
       <button
         type="button"
         className="find-case"
@@ -243,7 +245,9 @@ const FindBar = observer(function FindBar({ editor }: { editor: Editor }) {
       >
         Aa
       </button>
+      </Tip>
       <span className="find-count" data-testid="find-count">{countLabel(matches.length, service.index)}</span>
+      <Tip content={t('editor.find.previous')}>
       <button
         type="button"
         className="find-icon-button"
@@ -254,6 +258,8 @@ const FindBar = observer(function FindBar({ editor }: { editor: Editor }) {
       >
         <ChevronUp aria-hidden="true" size={14} strokeWidth={1.75} />
       </button>
+      </Tip>
+      <Tip content={t('editor.find.next')}>
       <button
         type="button"
         className="find-icon-button"
@@ -264,6 +270,7 @@ const FindBar = observer(function FindBar({ editor }: { editor: Editor }) {
       >
         <ChevronDown aria-hidden="true" size={14} strokeWidth={1.75} />
       </button>
+      </Tip>
       <input
         className="replace-input"
         data-testid="replace-input"
@@ -280,9 +287,11 @@ const FindBar = observer(function FindBar({ editor }: { editor: Editor }) {
       <button type="button" className="find-action" data-testid="replace-all" aria-label={t('editor.find.replaceAll')} onMouseDown={(event) => event.preventDefault()} onClick={replaceEvery}>
         {t('editor.find.replaceAll')}
       </button>
+      <Tip content={t('editor.find.close')}>
       <button type="button" className="find-icon-button" aria-label={t('editor.find.close')} onMouseDown={(event) => event.preventDefault()} onClick={() => service.close()}>
         <X aria-hidden="true" size={14} strokeWidth={1.75} />
       </button>
+      </Tip>
     </div>
   )
 })

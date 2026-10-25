@@ -1,4 +1,4 @@
-import type { FileSystemBackend, SecretsStore } from '@stride/platform'
+import { isListableFontFamily, type FileSystemBackend, type SecretsStore } from '@stride/platform'
 import { effectiveBaseUrl, type LlmConfig } from './llm.ts'
 import { isLlmProvider } from './llm-catalog.ts'
 
@@ -21,6 +21,8 @@ export type NoteWidth = 'narrow' | 'standard' | 'wide'
 export interface AppearanceSettings {
   noteWidth: NoteWidth
   fontSize: number
+  /** Empty keeps the built-in serif stack. Otherwise one installed family name. */
+  fontFamily: string
 }
 
 export interface EditorSettings {
@@ -100,7 +102,7 @@ interface ParsedSettings {
   autoGitEnabled?: unknown
   autoGitIdleSeconds?: unknown
   autoGitBlurSeconds?: unknown
-  appearance?: { noteWidth?: unknown; fontSize?: unknown }
+  appearance?: { noteWidth?: unknown; fontSize?: unknown; fontFamily?: unknown }
   editor?: { autosaveDebounceMs?: unknown }
   updates?: { channel?: unknown; autoCheck?: unknown }
   privacy?: { telemetryEnabled?: unknown }
@@ -130,7 +132,8 @@ const NOTE_WIDTHS: readonly NoteWidth[] = ['narrow', 'standard', 'wide']
 const UPDATE_CHANNELS: readonly UpdateChannel[] = ['stable', 'beta']
 
 export function defaultAppearanceSettings(): AppearanceSettings {
-  return { noteWidth: 'standard', fontSize: 15 }
+  // 16px: 15px reads fine for Latin but cramps CJK glyph strokes.
+  return { noteWidth: 'standard', fontSize: 16, fontFamily: '' }
 }
 
 export function defaultEditorSettings(): EditorSettings {
@@ -152,8 +155,17 @@ export function normalizeNoteWidth(value: unknown): NoteWidth {
 }
 
 export function normalizeFontSize(value: unknown): number {
-  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) return 15
+  if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+    return defaultAppearanceSettings().fontSize
+  }
   return value
+}
+
+/** Empty string is the built-in serif stack. Anything unsafe falls back to that. */
+export function normalizeFontFamily(value: unknown): string {
+  if (typeof value !== 'string') return ''
+  const trimmed = value.trim()
+  return isListableFontFamily(trimmed) ? trimmed : ''
 }
 
 export function normalizeAutosaveDebounceMs(value: unknown): number {
@@ -171,6 +183,7 @@ function readAppearance(parsed: ParsedSettings['appearance']): AppearanceSetting
   return {
     noteWidth: normalizeNoteWidth(parsed?.noteWidth),
     fontSize: normalizeFontSize(parsed?.fontSize),
+    fontFamily: normalizeFontFamily(parsed?.fontFamily),
   }
 }
 
@@ -305,6 +318,7 @@ async function sealAll(secrets: SecretsStore, settings: AppSettings): Promise<Se
     appearance: {
       noteWidth: normalizeNoteWidth(settings.appearance?.noteWidth),
       fontSize: normalizeFontSize(settings.appearance?.fontSize),
+      fontFamily: normalizeFontFamily(settings.appearance?.fontFamily),
     },
     editor: { autosaveDebounceMs: normalizeAutosaveDebounceMs(settings.editor?.autosaveDebounceMs) },
     updates: {
@@ -354,6 +368,7 @@ export function publicSettings(settings: AppSettings): {
     appearance: {
       noteWidth: normalizeNoteWidth(settings.appearance?.noteWidth),
       fontSize: normalizeFontSize(settings.appearance?.fontSize),
+      fontFamily: normalizeFontFamily(settings.appearance?.fontFamily),
     },
     editor: { autosaveDebounceMs: normalizeAutosaveDebounceMs(settings.editor?.autosaveDebounceMs) },
     updates: {

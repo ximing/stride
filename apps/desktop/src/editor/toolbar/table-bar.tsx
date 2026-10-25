@@ -13,6 +13,7 @@ import {
   type TableCommand,
   type TableShortcut,
 } from '../table/table-actions'
+import { Tip } from '../../ui/primitives/tooltip'
 import { ColorControl } from './color-control'
 import { keepSelection } from './state'
 import { OverflowToolbar, type OverflowSlot } from './toolbar-overflow'
@@ -50,12 +51,12 @@ export function TableActionBar({ editor }: { editor: Editor }) {
       active: extra?.pressed,
       measure: { className: 'editor-tool is-wide', text: label },
       node: (
+        <Tip content={hint ? `${label}（${hint}）` : label}>
         <button
           type="button"
           className={`editor-tool is-wide${extra?.pressed ? ' is-active' : ''}`}
           data-testid={`table-${command}`}
           aria-label={label}
-          title={hint ? `${label}（${hint}）` : label}
           aria-pressed={extra?.pressed}
           disabled={extra?.disabled}
           onMouseDown={keepSelection}
@@ -63,6 +64,7 @@ export function TableActionBar({ editor }: { editor: Editor }) {
         >
           {label}
         </button>
+        </Tip>
       ),
     } satisfies OverflowSlot
   }

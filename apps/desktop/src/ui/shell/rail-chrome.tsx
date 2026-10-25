@@ -9,6 +9,7 @@ import { isTauriRuntime } from '../../services/platform/deep-link'
 import { VaultService } from '../../services/vault/vault.service'
 import { vaultDisplayName } from '../../services/vault/vault-registry'
 import { Button, IconButton } from '../primitives/button'
+import { Tip } from '../primitives/tooltip'
 import { Input } from '../primitives/input'
 import { Mark } from '../primitives/icon'
 import { Popover, PopoverContent, PopoverTrigger } from '../primitives/popover'
@@ -36,6 +37,7 @@ export const VaultSwitcher = observer(function VaultSwitcher({ side = 'bottom' }
       }}
     >
       <div className="vault-switcher">
+        <Tip content={activePath || undefined}>
         <PopoverTrigger asChild>
           <Button
             tone="quiet"
@@ -44,12 +46,12 @@ export const VaultSwitcher = observer(function VaultSwitcher({ side = 'bottom' }
             data-testid="vault-switcher"
             aria-haspopup="listbox"
             aria-controls="vault-switcher-options"
-            title={activePath || undefined}
           >
             <span className="vault-switcher-label">{vault.currentVaultLabel}</span>
             <Mark icon={ChevronDown} size={14} />
           </Button>
         </PopoverTrigger>
+        </Tip>
       </div>
       <PopoverContent
         side={side}
@@ -64,8 +66,8 @@ export const VaultSwitcher = observer(function VaultSwitcher({ side = 'bottom' }
           {vault.vaults.map((entry) => {
             const selected = entry.id === vault.activeVaultId
             return (
+              <Tip key={entry.id} content={entry.label}>
               <Button
-                key={entry.id}
                 tone="quiet"
                 size="sm"
                 role="option"
@@ -73,7 +75,6 @@ export const VaultSwitcher = observer(function VaultSwitcher({ side = 'bottom' }
                 data-vault-id={entry.id}
                 aria-selected={selected}
                 className={selected ? 'active' : ''}
-                title={entry.label}
                 onClick={() => {
                   setOpen(false)
                   void vault.switchVault(entry.id)
@@ -82,6 +83,7 @@ export const VaultSwitcher = observer(function VaultSwitcher({ side = 'bottom' }
                 <span className="vault-option-label">{vaultDisplayName(entry)}</span>
                 {selected ? <Mark icon={Check} size={14} /> : null}
               </Button>
+              </Tip>
             )
           })}
         </div>
@@ -102,7 +104,9 @@ export const VaultSwitcher = observer(function VaultSwitcher({ side = 'bottom' }
               }}
             />
             {activePath && activePath !== vaultDisplayName(active) ? (
-              <p className="vault-switcher-path" title={activePath}>{activePath}</p>
+              <Tip content={activePath}>
+                <p className="vault-switcher-path">{activePath}</p>
+              </Tip>
             ) : null}
           </div>
         ) : null}
@@ -157,17 +161,18 @@ export const RailSearchField = observer(function RailSearchField() {
   const { commands, searchKeys, degraded, title, t } = useSearchHint()
   return (
     <div className="rail-search-block">
+      <Tip content={title}>
       <button
         type="button"
         className="rail-search-field"
         data-testid="vault-search"
-        title={title}
         onClick={() => commands.execute('search.global')}
       >
         <Mark icon={Search} size={14} />
         <span className="rail-search-placeholder">{t('search.allNotes')}</span>
         {searchKeys ? <kbd className="rail-search-kbd">{searchKeys}</kbd> : null}
       </button>
+      </Tip>
       {degraded ? (
         <span className="rail-search-degraded" data-testid="search-degraded">{degraded}</span>
       ) : null}

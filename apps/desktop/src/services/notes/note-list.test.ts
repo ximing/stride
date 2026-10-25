@@ -6,14 +6,19 @@ import {
   LIST_STORAGE_KEY,
   NOTE_ROW_HEIGHT,
   NOTE_ROW_HEIGHT_COMPACT,
+  NOTE_ROW_HEIGHT_EMPTY,
+  NOTE_ROW_HEIGHT_TITLE,
   NOTE_ROW_OVERSCAN,
   noteCreatedMs,
+  noteRowHeight,
   rangeSelection,
   readVaultSort,
+  rowOffsets,
   sanitizeListSort,
   sortNotes,
   toggleInSelection,
   virtualWindow,
+  virtualWindowOffsets,
   writeVaultSort,
   type ListStorage,
 } from './note-list'
@@ -86,6 +91,35 @@ describe('virtualWindow', () => {
     const compact = virtualWindow(10000, NOTE_ROW_HEIGHT * 100, 660, NOTE_ROW_OVERSCAN, NOTE_ROW_HEIGHT_COMPACT)
     expect(compact.start).toBeGreaterThan(comfortable.start)
     expect(compact.topPad).toBe(compact.start * NOTE_ROW_HEIGHT_COMPACT)
+  })
+})
+
+describe('virtualWindowOffsets', () => {
+  it('matches the uniform window when every row is the same height', () => {
+    const heights = Array.from({ length: 100 }, () => NOTE_ROW_HEIGHT)
+    const offsets = rowOffsets(heights)
+    const uniform = virtualWindow(100, NOTE_ROW_HEIGHT * 40, 660)
+    const mixed = virtualWindowOffsets(offsets, NOTE_ROW_HEIGHT * 40, 660)
+    expect(mixed).toEqual(uniform)
+  })
+
+  it('shrinks empty rows and still windows from their real offsets', () => {
+    expect(noteRowHeight(false, true, false)).toBe(NOTE_ROW_HEIGHT_EMPTY)
+    expect(noteRowHeight(false, false, false)).toBe(NOTE_ROW_HEIGHT_TITLE)
+    expect(noteRowHeight(true, false, false)).toBe(NOTE_ROW_HEIGHT)
+    expect(noteRowHeight(false, false, true)).toBe(NOTE_ROW_HEIGHT_COMPACT)
+    const heights = [NOTE_ROW_HEIGHT_EMPTY, NOTE_ROW_HEIGHT, NOTE_ROW_HEIGHT_EMPTY]
+    const offsets = rowOffsets(heights)
+    expect(offsets).toEqual([
+      0,
+      NOTE_ROW_HEIGHT_EMPTY,
+      NOTE_ROW_HEIGHT_EMPTY + NOTE_ROW_HEIGHT,
+      NOTE_ROW_HEIGHT_EMPTY * 2 + NOTE_ROW_HEIGHT,
+    ])
+    const win = virtualWindowOffsets(offsets, NOTE_ROW_HEIGHT_EMPTY, 10, 0)
+    expect(win.start).toBe(1)
+    expect(win.end).toBe(2)
+    expect(win.topPad).toBe(NOTE_ROW_HEIGHT_EMPTY)
   })
 })
 

@@ -62,7 +62,7 @@ describe('VaultService', () => {
         autoGitEnabled: false,
         autoGitIdleSeconds: 0,
         autoGitBlurSeconds: 0,
-        appearance: { noteWidth: 'standard', fontSize: 15 },
+        appearance: { noteWidth: 'standard', fontSize: 15, fontFamily: '' },
         editor: { autosaveDebounceMs: 350 },
         updates: { channel: 'stable', autoCheck: true },
         privacy: { telemetryEnabled: false },

@@ -20,6 +20,7 @@ tauri-plugin-shell = "2"
 
 # Dock menu injection uses AppKit. Linux builds must not pull GTK through muda.
 [target.'cfg(target_os = "macos")'.dependencies]
+core-foundation = "0.10"
 muda = "0.20"
 objc2 = "0.6"
 

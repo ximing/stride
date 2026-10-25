@@ -18,6 +18,7 @@ import {
   Copy,
   ExternalLink,
   FilePlus,
+  FolderOpen,
   FolderPlus,
   Highlighter,
   Italic,
@@ -57,6 +58,16 @@ function separator(id: string): ContextMenuSeparator {
   return { kind: 'separator', id }
 }
 
+function showInFolderEntry(noteId: string, showInFolder: (noteId: string) => void): ContextMenuItem {
+  return {
+    kind: 'item',
+    id: 'show-in-folder',
+    label: t('folders.showInFolder'),
+    icon: FolderOpen,
+    onSelect: () => showInFolder(noteId),
+  }
+}
+
 /** Manifest label + formatted chord for a command id. Falls back to the raw id. */
 export function commandRef(
   commands: readonly AppCommand[],
@@ -85,6 +96,8 @@ export interface NoteListMenuActions {
   open(noteId: string): void
   rename(noteId: string): void
   copyWikilink(noteId: string): void
+  /** Expand the folder tree onto this note and scope the list to its folder. */
+  showInFolder(noteId: string): void
   archive(noteId: string): void
   deleteNote(noteId: string): void
   /** Batch paths — the mount point routes these through CommandService. */
@@ -146,6 +159,7 @@ export function buildNoteListMenu(
       icon: Pencil,
       onSelect: () => actions.rename(noteId),
     },
+    showInFolderEntry(noteId, actions.showInFolder),
     separator('note-actions'),
     {
       kind: 'item',
@@ -332,6 +346,7 @@ export interface FolderMenuInput {
 }
 
 export interface FolderMenuActions {
+  showInFolder(path: string): void
   newNoteHere(path: string): void
   newFolderInside(path: string): void
   renameFolder(path: string): void
@@ -344,6 +359,14 @@ export function buildFolderMenu(
 ): ContextMenuEntry[] {
   const { path } = input
   return [
+    {
+      kind: 'item',
+      id: 'show-in-folder',
+      label: t('folders.showInFolder'),
+      icon: FolderOpen,
+      onSelect: () => actions.showInFolder(path),
+    },
+    separator('folder-show'),
     {
       kind: 'item',
       id: 'new-note-here',
@@ -385,6 +408,7 @@ export interface FolderNoteMenuInput {
 export interface FolderNoteMenuActions {
   open(noteId: string): void
   rename(noteId: string): void
+  showInFolder(noteId: string): void
   copyWikilink(noteId: string): void
   archive(noteId: string): void
   deleteNote(noteId: string): void
@@ -410,6 +434,7 @@ export function buildFolderNoteMenu(
       icon: Pencil,
       onSelect: () => actions.rename(noteId),
     },
+    showInFolderEntry(noteId, actions.showInFolder),
     separator('note-actions'),
     {
       kind: 'item',

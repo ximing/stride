@@ -5,6 +5,7 @@ import {
   applyStoredAppearance,
   DEFAULT_APPEARANCE,
   isValidNoteFontSize,
+  noteFontFamilyCss,
   NOTE_WIDTH_CSS,
   readStoredAppearance,
   sanitizeAppearance,
@@ -27,13 +28,18 @@ describe('appearance prefs', () => {
   afterEach(() => {
     document.documentElement.style.removeProperty('--sd-note-max-width')
     document.documentElement.style.removeProperty('--sd-note-font-size')
+    document.documentElement.style.removeProperty('--sd-note-font-family')
   })
 
   it('sanitizes garbage to defaults', () => {
     expect(sanitizeAppearance(null)).toEqual(DEFAULT_APPEARANCE)
     expect(sanitizeAppearance('wide')).toEqual(DEFAULT_APPEARANCE)
-    expect(sanitizeAppearance({ noteWidth: 'huge', fontSize: -3 })).toEqual(DEFAULT_APPEARANCE)
-    expect(sanitizeAppearance({ noteWidth: 'narrow', fontSize: 18 })).toEqual({ noteWidth: 'narrow', fontSize: 18 })
+    expect(sanitizeAppearance({ noteWidth: 'huge', fontSize: -3, fontFamily: 'Bad;Font' })).toEqual(DEFAULT_APPEARANCE)
+    expect(sanitizeAppearance({ noteWidth: 'narrow', fontSize: 18, fontFamily: ' Songti SC ' })).toEqual({
+      noteWidth: 'narrow',
+      fontSize: 18,
+      fontFamily: 'Songti SC',
+    })
   })
 
   it('validates the font size range as whole numbers 12-20', () => {
@@ -47,8 +53,8 @@ describe('appearance prefs', () => {
 
   it('round-trips through storage and ignores corrupt JSON', () => {
     const storage = memoryStorage()
-    writeStoredAppearance(storage, { noteWidth: 'wide', fontSize: 18 })
-    expect(readStoredAppearance(storage)).toEqual({ noteWidth: 'wide', fontSize: 18 })
+    writeStoredAppearance(storage, { noteWidth: 'wide', fontSize: 18, fontFamily: 'Georgia' })
+    expect(readStoredAppearance(storage)).toEqual({ noteWidth: 'wide', fontSize: 18, fontFamily: 'Georgia' })
 
     const corrupt = memoryStorage({ [APPEARANCE_STORAGE_KEY]: '{not json' })
     expect(readStoredAppearance(corrupt)).toEqual(DEFAULT_APPEARANCE)
@@ -57,21 +63,25 @@ describe('appearance prefs', () => {
     expect(readStoredAppearance(null)).toEqual(DEFAULT_APPEARANCE)
   })
 
-  it('applies width and font size as inline CSS variables on the root', () => {
-    applyAppearance({ noteWidth: 'narrow', fontSize: 13 })
+  it('applies width, font size, and font family as inline CSS variables on the root', () => {
+    applyAppearance({ noteWidth: 'narrow', fontSize: 13, fontFamily: '' })
     expect(document.documentElement.style.getPropertyValue('--sd-note-max-width')).toBe(NOTE_WIDTH_CSS.narrow)
     expect(document.documentElement.style.getPropertyValue('--sd-note-font-size')).toBe('13px')
+    expect(document.documentElement.style.getPropertyValue('--sd-note-font-family')).toBe('var(--sd-font-serif)')
 
-    applyAppearance({ noteWidth: 'wide', fontSize: 20 })
+    applyAppearance({ noteWidth: 'wide', fontSize: 20, fontFamily: 'Songti SC' })
     expect(document.documentElement.style.getPropertyValue('--sd-note-max-width')).toBe('none')
     expect(document.documentElement.style.getPropertyValue('--sd-note-font-size')).toBe('20px')
+    expect(document.documentElement.style.getPropertyValue('--sd-note-font-family')).toBe(noteFontFamilyCss('Songti SC'))
+    expect(noteFontFamilyCss('Bad;Font')).toBe('var(--sd-font-serif)')
   })
 
   it('applyStoredAppearance restores persisted prefs (restart without flash)', () => {
     const storage = memoryStorage({ [APPEARANCE_STORAGE_KEY]: '{"noteWidth":"narrow","fontSize":12}' })
     const prefs = applyStoredAppearance(storage)
-    expect(prefs).toEqual({ noteWidth: 'narrow', fontSize: 12 })
+    expect(prefs).toEqual({ noteWidth: 'narrow', fontSize: 12, fontFamily: '' })
     expect(document.documentElement.style.getPropertyValue('--sd-note-max-width')).toBe(NOTE_WIDTH_CSS.narrow)
     expect(document.documentElement.style.getPropertyValue('--sd-note-font-size')).toBe('12px')
+    expect(document.documentElement.style.getPropertyValue('--sd-note-font-family')).toBe('var(--sd-font-serif)')
   })
 })

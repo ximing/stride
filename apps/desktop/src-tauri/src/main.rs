@@ -1,6 +1,8 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 #[cfg(desktop)]
+mod fonts;
+#[cfg(desktop)]
 mod menu;
 mod recent;
 #[cfg(desktop)]
@@ -60,6 +62,7 @@ fn main() {
             windows::menu_new_project,
             windows::menu_open_project,
             menu::sync_recent_projects,
+            fonts::list_font_families,
         ]);
     builder
         .build(tauri::generate_context!())

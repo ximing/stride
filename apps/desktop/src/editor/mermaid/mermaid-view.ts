@@ -1,5 +1,6 @@
 import type { MermaidConfig } from 'mermaid';
 import { t, watchLocale } from '../../i18n';
+import { bindElementTip } from '../../ui/primitives/tooltip';
 import { mermaidSvgLooksUnsafe } from './mermaid-svg';
 
 export type MermaidPaintState = 'off' | 'empty' | 'loading' | 'drawn' | 'error';
@@ -214,11 +215,22 @@ export function createMermaidFrame(onChange: () => void): MermaidFrame {
     paintState = next;
   };
 
+  let unbindDetail: (() => void) | null = null;
+  const clearDetailTip = (): void => {
+    unbindDetail?.();
+    unbindDetail = null;
+  };
+  const setDetailTip = (detail: string): void => {
+    clearDetailTip();
+    if (!detail) return;
+    unbindDetail = bindElementTip(status, () => detail);
+  };
+
   const hideFigure = (): void => {
     figure.hidden = true;
     status.hidden = true;
     status.textContent = '';
-    status.removeAttribute('title');
+    clearDetailTip();
     stage.replaceChildren();
   };
 
@@ -242,7 +254,7 @@ export function createMermaidFrame(onChange: () => void): MermaidFrame {
     setState('loading');
     status.hidden = false;
     applyStatus();
-    status.removeAttribute('title');
+    clearDetailTip();
     figure.hidden = false;
   };
 
@@ -251,8 +263,7 @@ export function createMermaidFrame(onChange: () => void): MermaidFrame {
     status.hidden = false;
     setState('error');
     applyStatus();
-    if (detail) status.title = detail;
-    else status.removeAttribute('title');
+    setDetailTip(detail);
     figure.hidden = false;
   };
 
@@ -260,7 +271,7 @@ export function createMermaidFrame(onChange: () => void): MermaidFrame {
     stage.replaceChildren(svg);
     status.hidden = true;
     status.textContent = '';
-    status.removeAttribute('title');
+    clearDetailTip();
     figure.hidden = false;
     setState('drawn');
   };
@@ -336,6 +347,7 @@ export function createMermaidFrame(onChange: () => void): MermaidFrame {
     destroy: () => {
       unwatch();
       cancel();
+      clearDetailTip();
       themeObserver.disconnect();
     },
   };

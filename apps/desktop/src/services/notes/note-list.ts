@@ -5,12 +5,33 @@
 
 import type { StrideNote } from '@stride/core/note'
 
-/** Fixed row height in px. Must match `.note-list-row { height }` in note-list.css. */
+/** Row with a snippet. Must match `.note-list-row { height }` in note-list.css. */
 export const NOTE_ROW_HEIGHT = 102
+/** Title and meta, no snippet. Must match `.note-list-row.is-empty { height }`. */
+export const NOTE_ROW_HEIGHT_EMPTY = 62
+/** Title only. Must match `.note-list-row.is-title { height }`. */
+export const NOTE_ROW_HEIGHT_TITLE = 40
 /** Compact view mode row height. Must match `.note-list.is-compact .note-list-row { height }`. */
 export const NOTE_ROW_HEIGHT_COMPACT = 48
 /** Extra rows rendered above and below the viewport to absorb fast scrolls. */
 export const NOTE_ROW_OVERSCAN = 6
+
+/** Comfortable rows shrink when the note has no body; compact rows stay uniform. */
+export function noteRowHeight(hasSnippet: boolean, hasMeta: boolean, compact: boolean): number {
+  if (compact) return NOTE_ROW_HEIGHT_COMPACT
+  if (hasSnippet) return NOTE_ROW_HEIGHT
+  return hasMeta ? NOTE_ROW_HEIGHT_EMPTY : NOTE_ROW_HEIGHT_TITLE
+}
+
+/** `offsets[i]` is the y of row i. The last entry is the list's total height. */
+export function rowOffsets(heights: readonly number[]): number[] {
+  const offsets = new Array<number>(heights.length + 1)
+  offsets[0] = 0
+  for (let index = 0; index < heights.length; index += 1) {
+    offsets[index + 1] = offsets[index]! + heights[index]!
+  }
+  return offsets
+}
 
 export interface VirtualWindow {
   /** First rendered row index (inclusive). */
@@ -49,6 +70,48 @@ export function virtualWindow(
     end,
     topPad: start * rowHeight,
     bottomPad: (total - end) * rowHeight,
+  }
+}
+
+/** Greatest index i with offsets[i] <= target. */
+function offsetIndex(offsets: readonly number[], target: number): number {
+  let lo = 0
+  let hi = offsets.length - 1
+  while (lo < hi) {
+    const mid = (lo + hi + 1) >> 1
+    if (offsets[mid]! <= target) lo = mid
+    else hi = mid - 1
+  }
+  return lo
+}
+
+/**
+ * Window for mixed row heights. `offsets` comes from `rowOffsets` and is one
+ * longer than the list. Uniform heights match `virtualWindow`.
+ */
+export function virtualWindowOffsets(
+  offsets: readonly number[],
+  scrollTop: number,
+  viewportHeight: number,
+  overscan: number = NOTE_ROW_OVERSCAN,
+): VirtualWindow {
+  const total = offsets.length - 1
+  if (total <= 0) return { start: 0, end: 0, topPad: 0, bottomPad: 0 }
+  const totalHeight = offsets[total] ?? 0
+  const rawTop = Number.isFinite(scrollTop) ? Math.max(0, scrollTop) : 0
+  const viewport = Number.isFinite(viewportHeight) ? Math.max(0, viewportHeight) : 0
+  const top = Math.min(rawTop, Math.max(0, totalHeight - viewport))
+  const bottom = top + viewport
+  const first = Math.min(total - 1, offsetIndex(offsets, top))
+  let lastExclusive = offsetIndex(offsets, bottom)
+  if ((offsets[lastExclusive] ?? 0) < bottom) lastExclusive += 1
+  const start = Math.max(0, first - overscan)
+  const end = Math.min(total, Math.max(lastExclusive + overscan, start))
+  return {
+    start,
+    end,
+    topPad: offsets[start] ?? 0,
+    bottomPad: totalHeight - (offsets[end] ?? totalHeight),
   }
 }
 

@@ -47,7 +47,6 @@ const TabButton = observer(function TabButton({ tab, collapsed }: { tab: (typeof
       data-panel={tab.id}
       role="tab"
       aria-selected={active}
-      title={label}
       onClick={() => {
         if (!collapsed && layout.rightPanelTab === tab.id) layout.setRightPanelCollapsed(true)
         else layout.setRightPanelTab(tab.id)

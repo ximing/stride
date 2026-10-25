@@ -10,6 +10,7 @@ import {
   type ContextMenuEntry,
 } from '../../services/commands/context-menu'
 import { FolderService } from '../../services/vault/folder.service'
+import { folderNotesToShow, parentFolder, showFolder, showNoteInFolder } from '../../services/vault/reveal-note'
 import { FOLDER_FILTER_PREFIX, VaultService } from '../../services/vault/vault.service'
 import { LayoutService } from '../../services/layout/layout.service'
 import { ListFilterService } from '../../services/search/list-filter.service'
@@ -18,6 +19,7 @@ import { TabsService } from '../../services/notes/tabs.service'
 import { focusNoteTitle } from '../note-list/note-list'
 import { ContextMenu } from '../overlays/context-menu'
 import { Button, IconButton } from '../primitives/button'
+import { Tip } from '../primitives/tooltip'
 import { EmptyState } from '../primitives/empty-state'
 import { Mark } from '../primitives/icon'
 import { Input } from '../primitives/input'
@@ -29,17 +31,13 @@ import { RailGroupHeader } from '../shell/rail-group'
 // bounded regardless of vault size (the note list column is the full browser).
 export const FOLDER_NOTE_RENDER_CAP = 200
 
-function parentOf(id: string): string {
-  const index = id.lastIndexOf('/')
-  return index === -1 ? '' : id.slice(0, index)
-}
-
 function childFolders(paths: string[], parent: string): string[] {
-  return paths.filter((path) => parentOf(path) === parent)
+  return paths.filter((path) => parentFolder(path) === parent)
 }
 
-function notesIn(notes: readonly StrideNote[], parent: string): StrideNote[] {
-  return notes.filter((note) => parentOf(note.id) === parent)
+function cssAttr(value: string): string {
+  if (typeof CSS !== 'undefined' && typeof CSS.escape === 'function') return CSS.escape(value)
+  return value.replace(/["\\]/g, '\\$&')
 }
 
 function allowDrop(event: DragEvent<HTMLElement>) {
@@ -60,21 +58,24 @@ interface TreeMenuState {
 function NoteLink({
   note,
   active,
+  revealed,
   onSelect,
   onMenu,
 }: {
   note: StrideNote
   active: boolean
+  revealed: boolean
   onSelect: () => void
   onMenu: (id: string, x: number, y: number) => void
 }) {
+  const className = ['note-link', active ? 'is-active' : '', revealed ? 'is-revealed' : ''].filter(Boolean).join(' ')
   return (
     <button
       type="button"
       data-testid="note-link"
       data-note-id={note.id}
       draggable
-      className={active ? 'note-link is-active' : 'note-link'}
+      className={className}
       onClick={onSelect}
       onContextMenu={(event) => {
         event.preventDefault()
@@ -97,18 +98,19 @@ function FolderNotes({
   notes,
   parent,
   activeId,
+  revealedNoteId,
   onSelect,
   onMenu,
 }: {
   notes: readonly StrideNote[]
   parent: string
   activeId: string
+  revealedNoteId: string
   onSelect: (id: string) => void
   onMenu: (id: string, x: number, y: number) => void
 }) {
   const { t } = useTranslation()
-  const inFolder = notesIn(notes, parent)
-  const shown = inFolder.length > FOLDER_NOTE_RENDER_CAP ? inFolder.slice(0, FOLDER_NOTE_RENDER_CAP) : inFolder
+  const { shown, hidden } = folderNotesToShow(notes, parent, FOLDER_NOTE_RENDER_CAP, revealedNoteId)
   return (
     <>
       {shown.map((note) => (
@@ -116,13 +118,14 @@ function FolderNotes({
           key={note.id}
           note={note}
           active={activeId === note.id}
+          revealed={revealedNoteId === note.id}
           onSelect={() => onSelect(note.id)}
           onMenu={onMenu}
         />
       ))}
-      {inFolder.length > shown.length && (
+      {hidden > 0 && (
         <p className="folder-overflow" data-testid="folder-overflow">
-          {t('folders.more', { count: inFolder.length - shown.length })}
+          {t('folders.more', { count: hidden })}
         </p>
       )}
     </>
@@ -217,6 +220,7 @@ interface FolderBlockProps {
   paths: string[]
   notes: readonly StrideNote[]
   activeId: string
+  revealedNoteId: string
   selectedFolder: string
   renaming: string
   draft: string
@@ -244,6 +248,7 @@ function FolderBlock({
   paths,
   notes,
   activeId,
+  revealedNoteId,
   selectedFolder,
   renaming,
   draft,
@@ -317,17 +322,18 @@ function FolderBlock({
             />
           </span>
         ) : (
+          <Tip content={t('folders.showNotes', { name: label })}>
           <button
             type="button"
             className="folder-label"
             data-testid="folder-label"
             aria-current={selected ? 'page' : undefined}
-            title={t('folders.showNotes', { name: label })}
             onClick={() => onSelectFolder(path)}
             onDoubleClick={() => onStartRename(path)}
           >
             <span className="folder-label-text">{label}</span>
           </button>
+          </Tip>
         )}
         {renaming !== path && (
           <div className="folder-row-actions">
@@ -360,6 +366,7 @@ function FolderBlock({
               paths={paths}
               notes={notes}
               activeId={activeId}
+              revealedNoteId={revealedNoteId}
               selectedFolder={selectedFolder}
               renaming={renaming}
               draft={draft}
@@ -382,7 +389,14 @@ function FolderBlock({
               onToggleFolder={onToggleFolder}
             />
           ))}
-          <FolderNotes notes={notes} parent={path} activeId={activeId} onSelect={onSelect} onMenu={onNoteMenu} />
+          <FolderNotes
+            notes={notes}
+            parent={path}
+            activeId={activeId}
+            revealedNoteId={revealedNoteId}
+            onSelect={onSelect}
+            onMenu={onNoteMenu}
+          />
         </div>
       )}
     </div>
@@ -463,7 +477,7 @@ export const FolderTree = observer(function FolderTree() {
       setRenaming('')
       return
     }
-    const parent = parentOf(path)
+    const parent = parentFolder(path)
     const to = parent ? `${parent}/${nextName}` : nextName
     await folderService.renameFolder(path, to)
     if (!vault.error) setRenaming('')
@@ -483,6 +497,7 @@ export const FolderTree = observer(function FolderTree() {
     const items = buildFolderMenu(
       { path },
       {
+        showInFolder: (folder) => showFolder(vault, folder),
         newNoteHere: (folder) => {
           // Creating inside a collapsed folder must surface the new note.
           layout.setFolderCollapsed(folder, false)
@@ -509,6 +524,7 @@ export const FolderTree = observer(function FolderTree() {
           tabs.openNote(noteId)
           focusNoteTitle()
         },
+        showInFolder: (noteId) => showNoteInFolder(vault, noteId),
         copyWikilink: (noteId) => {
           const title = vault.notes.find((note) => note.id === noteId)?.title ?? ''
           if (title) void navigator.clipboard?.writeText(`[[${title}]]`)
@@ -540,7 +556,22 @@ export const FolderTree = observer(function FolderTree() {
     [vault.notes, vault.searchHits, vault.searchQuery, vault.listFilter, listFilter.query],
   )
   const paths = folderService.folders
+  const revealedNoteId = layout.revealedNoteId
+  const revealedFolderPath = layout.revealedFolderPath
+  const revealSeq = layout.revealSeq
   const treeEmpty = paths.length === 0 && notes.length === 0
+
+  useEffect(() => {
+    if (revealSeq === 0) return
+    const selector = revealedNoteId
+      ? `[data-testid="note-link"][data-note-id="${cssAttr(revealedNoteId)}"]`
+      : revealedFolderPath
+        ? `[data-testid="folder-row"][data-path="${cssAttr(revealedFolderPath)}"]`
+        : ''
+    if (!selector) return
+    const node = document.querySelector<HTMLElement>(selector)
+    if (typeof node?.scrollIntoView === 'function') node.scrollIntoView({ block: 'nearest' })
+  }, [revealSeq, revealedNoteId, revealedFolderPath])
   const deletingLabel = deleting.split('/').pop() ?? deleting
 
   return (
@@ -601,6 +632,7 @@ export const FolderTree = observer(function FolderTree() {
               paths={paths}
               notes={notes}
               activeId={vault.activeId}
+              revealedNoteId={revealedNoteId}
               selectedFolder={vault.listFilter.startsWith(FOLDER_FILTER_PREFIX) ? vault.listFilter.slice(FOLDER_FILTER_PREFIX.length) : ''}
               renaming={renaming}
               draft={draft}
@@ -626,7 +658,14 @@ export const FolderTree = observer(function FolderTree() {
               onToggleFolder={(path) => layout.toggleFolder(path)}
             />
           ))}
-          <FolderNotes notes={notes} parent="" activeId={vault.activeId} onSelect={(id) => tabs.openNote(id)} onMenu={openNoteMenu} />
+          <FolderNotes
+            notes={notes}
+            parent=""
+            activeId={vault.activeId}
+            revealedNoteId={revealedNoteId}
+            onSelect={(id) => tabs.openNote(id)}
+            onMenu={openNoteMenu}
+          />
         </div>
       )}
       <Modal open={deleting !== ''} onOpenChange={(open) => { if (!open) setDeleting('') }}>

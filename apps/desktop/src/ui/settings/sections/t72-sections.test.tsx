@@ -7,6 +7,12 @@ import { MemorySecretsStore } from '@stride/platform'
 import { act, type ReactElement } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+
+const listSystemFontFamilies = vi.hoisted(() => vi.fn(async () => ['Georgia', 'Songti SC']))
+
+vi.mock('../../../services/platform/fonts', () => ({
+  listSystemFontFamilies,
+}))
 import { readNoteFile } from '../../../../../../packages/core/src/vault'
 import { APPEARANCE_STORAGE_KEY } from '../../../services/appearance/appearance'
 import { FolderService } from '../../../services/vault/folder.service'
@@ -18,6 +24,16 @@ import { VaultService } from '../../../services/vault/vault.service'
 import { AppearanceSection } from './appearance'
 import { EditorSection } from './editor'
 import { PrivacySection } from './privacy'
+
+for (const method of ['hasPointerCapture', 'setPointerCapture', 'releasePointerCapture'] as const) {
+  if (!(method in Element.prototype)) {
+    Object.defineProperty(Element.prototype, method, {
+      configurable: true,
+      value: () => (method === 'hasPointerCapture' ? false : undefined),
+    })
+  }
+}
+if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = () => {}
 
 function useMemoryFixture() {
   window.history.replaceState(null, '', '/?fixture=memory')
@@ -34,7 +50,7 @@ function resetSettingsForm() {
   const settings = resolve(SettingsService)
   settings.form = {
     ...settings.form,
-    appearance: { noteWidth: 'standard', fontSize: 15 },
+    appearance: { noteWidth: 'standard', fontSize: 15, fontFamily: '' },
     editor: { autosaveDebounceMs: 350 },
     privacy: { telemetryEnabled: false },
   }
@@ -71,6 +87,7 @@ describe('T7.2 settings sections', () => {
     document.documentElement.removeAttribute('data-theme')
     document.documentElement.style.removeProperty('--sd-note-max-width')
     document.documentElement.style.removeProperty('--sd-note-font-size')
+    document.documentElement.style.removeProperty('--sd-note-font-family')
     resolve(ThemeService).setTheme('system')
     if (has(VaultService)) resolve(VaultService).cancelPending()
   })
@@ -128,6 +145,28 @@ describe('T7.2 settings sections', () => {
     // Invalid input never touches applied or persisted state.
     expect(document.documentElement.style.getPropertyValue('--sd-note-font-size')).toBe('18px')
     expect(resolve(SettingsService).form.appearance.fontSize).toBe(18)
+  })
+
+  it('appearance: font family applies the chosen face and persists', async () => {
+    const mounted = await mount(<AppearanceSection />)
+    await act(async () => {
+      await listSystemFontFamilies.mock.results[0]?.value
+    })
+    const trigger = mounted.querySelector<HTMLButtonElement>('[data-testid="note-font-family"]')!
+    expect(trigger.textContent).toContain('Default')
+    await act(async () => {
+      trigger.dispatchEvent(new MouseEvent('pointerdown', { bubbles: true, cancelable: true, button: 0 }))
+      trigger.click()
+    })
+    const option = [...document.querySelectorAll('[role="option"]')].find((item) => item.textContent === 'Songti SC')
+    expect(option).not.toBeNull()
+    await act(async () => {
+      option?.dispatchEvent(new MouseEvent('pointerup', { bubbles: true, cancelable: true, button: 0 }))
+      ;(option as HTMLElement).click()
+    })
+    expect(document.documentElement.style.getPropertyValue('--sd-note-font-family')).toBe('"Songti SC", var(--sd-font-serif)')
+    expect(resolve(SettingsService).form.appearance.fontFamily).toBe('Songti SC')
+    expect(localStorage.getItem(APPEARANCE_STORAGE_KEY)).toContain('"fontFamily":"Songti SC"')
   })
 
   it('editor: debounce validates in place and pushes valid values into VaultService', async () => {

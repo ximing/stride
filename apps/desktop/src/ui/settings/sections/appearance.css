@@ -21,6 +21,15 @@
   line-height: 1.5;
 }
 
+.appearance-font-field {
+  width: min(100%, 320px);
+}
+
+.appearance-font-field .sd-field {
+  width: 100%;
+  min-width: 0;
+}
+
 .appearance-fontsize-field {
   width: 160px;
   max-width: 100%;
