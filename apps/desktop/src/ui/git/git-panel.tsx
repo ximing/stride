@@ -12,29 +12,21 @@ function RemoteFields(props: {
   remote: string
   onRemote: (value: string) => void
   onAddRemote: () => void
-  onPull?: () => void
-  onPush?: () => void
 }) {
   const { t } = useTranslation()
   return (
     <section className="git-section" aria-label={t('git.remoteSettings')}>
-      <Input
-        label={t('git.remote')}
-        type="text"
-        data-testid="git-remote"
-        placeholder="https://github.com/you/notes.git"
-        spellCheck={false}
-        value={props.remote}
-        onChange={(event) => props.onRemote(event.target.value)}
-      />
-      <div className="editor-tools git-actions">
+      <div className="git-remote-row">
+        <Input
+          label={t('git.remote')}
+          type="text"
+          data-testid="git-remote"
+          placeholder="https://github.com/you/notes.git"
+          spellCheck={false}
+          value={props.remote}
+          onChange={(event) => props.onRemote(event.target.value)}
+        />
         <Button size="sm" tone="secondary" data-testid="git-remote-add" onClick={() => props.onAddRemote()}>{t('git.addRemote')}</Button>
-        {props.onPull ? (
-          <Button size="sm" tone="secondary" data-testid="git-pull" onClick={() => props.onPull?.()}>{t('git.pull')}</Button>
-        ) : null}
-        {props.onPush ? (
-          <Button size="sm" tone="secondary" data-testid="git-push" onClick={() => props.onPush?.()}>{t('git.push')}</Button>
-        ) : null}
       </div>
     </section>
   )
@@ -139,7 +131,6 @@ export function GitPanelView(props: {
   const canConfirm = canOpen && props.message.trim().length > 0
   return (
     <div className="git-panel" data-testid="git-panel">
-      <h2 className="panel-heading">{t('git.heading')}</h2>
       {props.branch ? (
         <div className="git-branch-row">
           <Mark icon={GitBranch} size={14} />
@@ -185,17 +176,21 @@ export function GitPanelView(props: {
       )}
       {props.surface === 'ready' && (
         <>
-          <div className="git-sync-stats">
-            <p className="meta" data-testid="git-ahead"><Mark icon={ArrowUp} size={13} />{t('git.ahead', { count: props.ahead })}</p>
-            <p className="meta" data-testid="git-behind"><Mark icon={ArrowDown} size={13} />{t('git.behind', { count: props.behind })}</p>
+          <div className="git-sync-bar">
+            <div className="git-sync-stats">
+              <p className="meta" data-testid="git-ahead"><Mark icon={ArrowUp} size={13} />{t('git.ahead', { count: props.ahead })}</p>
+              <p className="meta" data-testid="git-behind"><Mark icon={ArrowDown} size={13} />{t('git.behind', { count: props.behind })}</p>
+            </div>
+            <div className="editor-tools git-sync-actions">
+              <Button size="sm" tone="secondary" data-testid="git-pull" onClick={() => props.onPull()}>{t('git.pull')}</Button>
+              <Button size="sm" tone="secondary" data-testid="git-push" onClick={() => props.onPush()}>{t('git.push')}</Button>
+            </div>
           </div>
           {props.notice ? <p className="meta git-notice" data-testid="git-notice">{statusCopy(props.notice)}</p> : null}
           <RemoteFields
             remote={props.remote}
             onRemote={props.onRemote}
             onAddRemote={props.onAddRemote}
-            onPull={props.onPull}
-            onPush={props.onPush}
           />
           <section className="git-section" aria-label={t('git.workingTree')}>
             <h3 className="panel-subheading">{t('git.changes')}</h3>
@@ -226,12 +221,29 @@ export function GitPanelView(props: {
                 })
               )}
             </div>
+            {props.diff ? (
+              <pre className="diff git-diff" data-testid="git-diff"><DiffLines diff={props.diff} /></pre>
+            ) : null}
+            <div className="editor-tools git-commit-action">
+              <Button
+                size="sm"
+                tone="primary"
+                className="git-commit-button"
+                data-testid="git-commit-open"
+                disabled={!canOpen}
+                onClick={() => {
+                  if (!canOpen) return
+                  setCommitOpen(true)
+                }}
+              >
+                {t('git.commit')}
+              </Button>
+            </div>
           </section>
-          <pre className="diff git-diff" data-testid="git-diff"><DiffLines diff={props.diff} /></pre>
           <section className="git-section" aria-label={t('git.history')}>
             <div className="git-section-head">
               <h3 className="panel-subheading">{t('git.history')}</h3>
-              <Button size="sm" tone="quiet" data-testid="git-history" onClick={() => props.onLoadHistory?.()}>{t('git.history')}</Button>
+              <Button size="sm" tone="quiet" data-testid="git-history" onClick={() => props.onLoadHistory?.()}>{t('git.loadHistory')}</Button>
             </div>
             <div className="git-history-list">
               {historyEntries.map((entry) => (
@@ -249,7 +261,9 @@ export function GitPanelView(props: {
               ))}
             </div>
             <pre className="history git-history-text" data-testid="git-history-text">{props.historyText ?? ''}</pre>
-            <Button size="sm" tone="secondary" data-testid="git-history-restore" onClick={() => setRestoreOpen(true)}>{t('git.restore')}</Button>
+            {props.historyText ? (
+              <Button size="sm" tone="secondary" data-testid="git-history-restore" onClick={() => setRestoreOpen(true)}>{t('git.restore')}</Button>
+            ) : null}
           </section>
           <Modal open={restoreOpen} onOpenChange={setRestoreOpen}>
             <ModalContent title={t('git.restoreTitle')} description={t('git.restoreBody')}>
@@ -270,20 +284,6 @@ export function GitPanelView(props: {
               </div>
             </ModalContent>
           </Modal>
-          <div className="editor-tools git-commit-action">
-            <Button
-              size="sm"
-              tone="primary"
-              data-testid="git-commit-open"
-              disabled={!canOpen}
-              onClick={() => {
-                if (!canOpen) return
-                setCommitOpen(true)
-              }}
-            >
-              {t('git.commit')}
-            </Button>
-          </div>
           <Modal
             open={commitOpen}
             onOpenChange={(open) => {

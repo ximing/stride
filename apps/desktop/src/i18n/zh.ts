@@ -393,6 +393,7 @@ export const zh: DeepString<Catalog> = {
     changes: '更改',
     clean: '工作区干净',
     history: '历史',
+    loadHistory: '加载历史',
     restore: '恢复',
     restoreTitle: '恢复版本',
     restoreBody: '用所示修订替换当前文件。不会产生提交。',
@@ -404,7 +405,6 @@ export const zh: DeepString<Catalog> = {
     conflictsBody: '为每个文件保留我方或对方。',
     keepOurs: '保留我方',
     keepTheirs: '保留对方',
-    heading: 'Git',
     broadFolder: '初始化 Git 前请选择专用仓库文件夹。这个路径看起来像宽泛的个人目录。',
     badge: {
       unavailable: 'Git 不可用',

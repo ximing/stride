@@ -387,6 +387,7 @@ export const en = {
     changes: 'Changes',
     clean: 'Working tree clean',
     history: 'History',
+    loadHistory: 'Load history',
     restore: 'Restore',
     restoreTitle: 'Restore version',
     restoreBody: 'Replace the current file with the shown revision. Nothing is committed.',
@@ -398,7 +399,6 @@ export const en = {
     conflictsBody: 'Keep ours or theirs for each file.',
     keepOurs: 'Keep ours',
     keepTheirs: 'Keep theirs',
-    heading: 'Git',
     broadFolder: 'Choose a dedicated vault folder before initializing Git. This path looks like a broad personal folder.',
     badge: {
       unavailable: 'Git unavailable',
