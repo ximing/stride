@@ -7,11 +7,14 @@
   /* Every stack names its CJK fallback explicitly: without it, Chinese text
      falls through to the generic family and each OS picks a different face,
      so mixed-script paragraphs lose a consistent texture. Latin faces stay
-     first so English keeps the intended voice. */
+     first so English keeps the intended voice. FangSong/KaiTi precede SimSun
+     on Windows: SimSun ships embedded bitmaps at 12–16px that render jagged,
+     while 仿宋/楷体 rasterize cleanly under ClearType. */
   --sd-font-sans: "Avenir Next", Avenir, "Segoe UI", system-ui, "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
   --sd-font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia,
-    "Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", "SimSun", serif;
+    "Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC",
+    "FangSong", "KaiTi", "SimSun", serif;
   --sd-font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo,
     "PingFang SC", "Microsoft YaHei", monospace;
 

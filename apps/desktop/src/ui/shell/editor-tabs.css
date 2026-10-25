@@ -14,8 +14,15 @@
   display: flex;
   gap: 0.75rem;
   flex-wrap: wrap;
+  /* .stage-scroll is a column flex container, so this head is a flex ITEM:
+     without width:100% an auto margin would shrink it to fit-content and
+     center the title even in wide mode. Stretch first, then cap and center. */
+  width: 100%;
   max-width: var(--sd-note-max-width);
   margin-bottom: 0.9rem;
+  /* Center the paper column: a left-hugged column leaves a lopsided void on
+     the right in wide windows; symmetric margins read as intentional. */
+  margin-inline: auto;
 }
 
 .note-title {
@@ -41,12 +48,13 @@
   background: transparent;
 }
 
-/* The .editor shell spans the full stage width so the toolbar row can use the
-   space right of the paper column; the paper constraint lives on the content
-   itself, keeping the same left edge as the title. */
+/* The .editor shell spans the full stage width; the paper constraint lives on
+   the content itself, centered, so the title, toolbar, and body share one
+   column axis. */
 .editor .ProseMirror,
 .editor .find-bar {
   max-width: var(--sd-note-max-width);
+  margin-inline: auto;
 }
 
 .editor .ProseMirror {

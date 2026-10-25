@@ -795,7 +795,10 @@
 
 .editor-toolbar {
   gap: 4px;
-  margin-bottom: 8px;
+  /* Share the paper column's axis: same max-width and centering as the
+     ProseMirror body, so the toolbar's left edge matches the text edge. */
+  max-width: var(--sd-note-max-width);
+  margin: 0 auto 8px;
   padding: 0;
   border: 0;
   border-radius: 0;

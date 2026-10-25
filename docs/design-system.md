@@ -33,7 +33,7 @@ Use semantic tokens (`--sd-bg`, `--sd-bg-elevated`, `--sd-fg`, `--sd-muted`, `--
 ## Type, spacing, shape, motion
 
 - UI font: `"Avenir Next", Avenir, "Segoe UI", system-ui, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif`.
-- Note font: `"Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", "SimSun", serif`.
+- Note font: `"Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC", "FangSong", "KaiTi", "SimSun", serif`.
 - Mono: `"SFMono-Regular", Consolas, "Liberation Mono", Menlo, "PingFang SC", "Microsoft YaHei", monospace`.
 - Every stack names its CJK fallback explicitly so mixed-script text keeps one consistent face per OS instead of falling through to each browser's generic default. Note body defaults to 16px / 1.75 line-height (15px cramps CJK glyph strokes); headings use positive letter-spacing under `:lang(zh)` where Latin uses slight negative tracking.
 - UI scale: 12px metadata, 13px dense controls, 14px default UI, 16px section title, 20px dialog title, 32–36px note title.
