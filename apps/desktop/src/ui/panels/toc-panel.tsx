@@ -66,7 +66,6 @@ export const TocPanel = observer(function TocPanel() {
   }
   return (
     <div className="toc-panel" data-testid="toc-panel">
-      <h2 className="panel-heading">{t('panels.outline')}</h2>
       <div className="toc-list">
         {items.map((item, index) => (
           <button
@@ -75,6 +74,7 @@ export const TocPanel = observer(function TocPanel() {
             className="toc-item"
             data-testid="toc-item"
             data-level={item.level}
+            title={item.text}
             onClick={() => openItem(item)}
           >
             {item.text}

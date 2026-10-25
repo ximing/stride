@@ -551,9 +551,13 @@
 }
 
 .toc-item[data-level='1'] {
+  margin-bottom: 4px;
+  padding-bottom: 9px;
   color: var(--sd-fg);
   font-size: 14px;
   font-weight: 600;
+  border-bottom: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius) var(--sd-radius) 0 0;
 }
 
 .toc-item[data-level='2'] {
@@ -563,6 +567,7 @@
 .toc-item[data-level='3'] {
   padding-left: 28px;
   color: var(--sd-muted);
+  font-size: 12px;
 }
 
 .properties-panel .sd-empty-state,
