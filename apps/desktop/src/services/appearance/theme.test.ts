@@ -1,9 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import {
+  applyFavicon,
   applyStoredTheme,
   applyTheme,
   DEFAULT_THEME,
+  FAVICON,
   readStoredTheme,
+  resolvedTheme,
   sanitizeTheme,
   THEME_STORAGE_KEY,
   writeStoredTheme,
@@ -104,6 +107,34 @@ describe('applyTheme', () => {
     applyTheme('dark', root)
     expect(root.getAttribute('data-theme')).toBe('dark')
     expect(document.documentElement.hasAttribute('data-theme')).toBe(false)
+  })
+})
+
+describe('resolvedTheme / applyFavicon', () => {
+  afterEach(() => {
+    document.getElementById('stride-favicon')?.remove()
+  })
+
+  it('keeps an explicit mode and lets system follow the OS flag', () => {
+    expect(resolvedTheme('light', true)).toBe('light')
+    expect(resolvedTheme('dark', false)).toBe('dark')
+    expect(resolvedTheme('system', true)).toBe('dark')
+    expect(resolvedTheme('system', false)).toBe('light')
+    expect(resolvedTheme('neon' as never, true)).toBe('dark')
+  })
+
+  it('swaps the tab icon and drops the media-query links', () => {
+    const light = document.createElement('link')
+    light.rel = 'icon'
+    light.href = '/favicon-light.png'
+    light.media = '(prefers-color-scheme: light)'
+    document.head.appendChild(light)
+    applyFavicon('dark')
+    expect(document.querySelectorAll('link[rel="icon"]')).toHaveLength(1)
+    const icon = document.getElementById('stride-favicon')
+    expect(icon?.getAttribute('href')).toBe(FAVICON.dark)
+    applyFavicon('system', false)
+    expect(icon?.getAttribute('href')).toBe(FAVICON.light)
   })
 })
 

@@ -62,6 +62,51 @@ export function applyTheme(mode: ThemeMode, root?: HTMLElement | null): void {
   else target.setAttribute('data-theme', next)
 }
 
+/** Tab icons. The in-app mark uses the same pair, switched from CSS. */
+export const FAVICON = {
+  light: '/favicon-light.png',
+  dark: '/favicon-dark.png',
+} as const
+
+export function prefersDark(): boolean {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return false
+  try {
+    return window.matchMedia('(prefers-color-scheme: dark)').matches
+  } catch {
+    return false
+  }
+}
+
+/** light/dark stay explicit. system follows the OS, defaulting to light. */
+export function resolvedTheme(mode: ThemeMode, dark = prefersDark()): 'light' | 'dark' {
+  const next = sanitizeTheme(mode)
+  if (next === 'light' || next === 'dark') return next
+  return dark ? 'dark' : 'light'
+}
+
+/**
+ * Point the tab icon at the resolved theme. Replaces the media-query links in
+ * index.html so an explicit light/dark choice wins over the OS scheme.
+ * System mode still has to be applied from JS: the favicon document cannot
+ * see the app's data-theme attribute.
+ */
+export function applyFavicon(mode: ThemeMode, dark?: boolean): void {
+  if (typeof document === 'undefined') return
+  const href = FAVICON[resolvedTheme(mode, dark ?? prefersDark())]
+  document.querySelectorAll('link[rel="icon"]').forEach((node) => {
+    if (node.id !== 'stride-favicon') node.remove()
+  })
+  let link = document.getElementById('stride-favicon')
+  if (!(link instanceof HTMLLinkElement)) {
+    link = document.createElement('link')
+    link.id = 'stride-favicon'
+    link.rel = 'icon'
+    link.type = 'image/png'
+    document.head.appendChild(link)
+  }
+  if (link.getAttribute('href') !== href) link.setAttribute('href', href)
+}
+
 /**
  * Synchronously re-apply the persisted mode. main.tsx calls this at module
  * scope so the attribute is set before the first paint (no theme flash).
@@ -69,5 +114,6 @@ export function applyTheme(mode: ThemeMode, root?: HTMLElement | null): void {
 export function applyStoredTheme(storage: ThemeStorage | null = defaultThemeStorage()): ThemeMode {
   const mode = readStoredTheme(storage)
   applyTheme(mode)
+  applyFavicon(mode)
   return mode
 }

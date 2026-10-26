@@ -56,16 +56,43 @@
 }
 
 .chooser-brand-mark {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 44px;
-  height: 44px;
+  display: block;
+  width: 48px;
+  height: 48px;
   flex: none;
-  border: 0;
-  border-radius: 99px;
-  background: color-mix(in srgb, var(--sd-accent) 12%, transparent);
-  color: var(--sd-accent);
+}
+
+.chooser-brand-mark img {
+  width: 48px;
+  height: 48px;
+}
+
+/* Same resolution as tokens.css: light unless dark is explicit or the OS is dark.
+   Display lives on these classes. The img rule only sets size. */
+.chooser-brand-mark-light {
+  display: block;
+}
+
+.chooser-brand-mark-dark {
+  display: none;
+}
+
+:root[data-theme="dark"] .chooser-brand-mark-light {
+  display: none;
+}
+
+:root[data-theme="dark"] .chooser-brand-mark-dark {
+  display: block;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .chooser-brand-mark-light {
+    display: none;
+  }
+
+  :root:not([data-theme="light"]):not([data-theme="dark"]) .chooser-brand-mark-dark {
+    display: block;
+  }
 }
 
 .chooser .chooser-brand h1 {

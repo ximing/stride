@@ -1,6 +1,7 @@
 import { has, register, Service } from '@rabjs/react'
 import { applyStoredAppearance } from './appearance'
 import {
+  applyFavicon,
   applyStoredTheme,
   applyTheme,
   DEFAULT_THEME,
@@ -17,6 +18,22 @@ export class ThemeService extends Service {
   constructor() {
     super()
     this.mode = readStoredTheme(defaultThemeStorage())
+    this.watchSystemTheme()
+  }
+
+  /** The palette follows the OS in CSS. The favicon is a document link, so it needs this. */
+  private watchSystemTheme() {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return
+    let media: MediaQueryList
+    try {
+      media = window.matchMedia('(prefers-color-scheme: dark)')
+    } catch {
+      return
+    }
+    if (typeof media.addEventListener !== 'function') return
+    media.addEventListener('change', () => {
+      if (this.mode === 'system') applyFavicon('system')
+    })
   }
 
   /** What is actually on screen, resolving 'system' through matchMedia. */
@@ -32,6 +49,7 @@ export class ThemeService extends Service {
     this.mode = sanitizeTheme(mode)
     writeStoredTheme(defaultThemeStorage(), this.mode)
     applyTheme(this.mode)
+    applyFavicon(this.mode)
   }
 
   /** Re-read storage and re-apply to the document root (idempotent). */

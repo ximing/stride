@@ -51,7 +51,8 @@ const Chooser = observer(function Chooser() {
         <div className="chooser-copy">
           <div className="chooser-brand">
             <span className="chooser-brand-mark" aria-hidden="true">
-              <Mark icon={Notebook} size={22} />
+              <img className="chooser-brand-mark-light" src="/logo-light.png" alt="" />
+              <img className="chooser-brand-mark-dark" src="/logo-dark.png" alt="" />
             </span>
             <h1>Stride</h1>
           </div>
