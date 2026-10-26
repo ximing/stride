@@ -23,6 +23,7 @@ tauri-plugin-shell = "2"
 core-foundation = "0.10"
 muda = "0.20"
 objc2 = "0.6"
+objc2-app-kit = { version = "0.3", default-features = false, features = ["std", "NSResponder", "NSWindow"] }
 
 # The updater is desktop-only (mobile has its own store-driven update flow).
 [target."cfg(not(any(target_os = \"android\", target_os = \"ios\")))".dependencies]

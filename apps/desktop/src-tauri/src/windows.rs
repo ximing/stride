@@ -322,6 +322,7 @@ fn create_window(app: &AppHandle, intent: WindowIntent) -> Result<(), String> {
             if let Some((x, y)) = position {
                 let _ = window.set_position(LogicalPosition::new(x, y));
             }
+            crate::frame::attach(&window);
             Ok(())
         }
         Err(error) => {

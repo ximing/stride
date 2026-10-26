@@ -3,6 +3,8 @@
 #[cfg(desktop)]
 mod fonts;
 #[cfg(desktop)]
+mod frame;
+#[cfg(desktop)]
 mod menu;
 mod recent;
 #[cfg(desktop)]
@@ -20,6 +22,17 @@ fn main() {
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_keyring::init())
         .enable_macos_default_menu(false)
+        .on_page_load(|webview, payload| {
+            #[cfg(target_os = "macos")]
+            if payload.event() == tauri::webview::PageLoadEvent::Finished {
+                let host = webview.window();
+                if let Some(window) = webview.get_webview_window(host.label()) {
+                    frame::kick(&window);
+                }
+            }
+            #[cfg(not(target_os = "macos"))]
+            let _ = (webview, payload);
+        })
         .setup(|app| {
             // Dev builds have no Info.plist, so register `stride://` with the
             // OS at runtime for `open 'stride://...'` testing. Bundled apps
@@ -35,6 +48,9 @@ fn main() {
             {
                 windows::install(app.handle())?;
                 menu::install(app.handle())?;
+                if let Some(window) = app.get_webview_window("main") {
+                    frame::attach(&window);
+                }
             }
             #[cfg(not(desktop))]
             {
@@ -47,7 +63,13 @@ fn main() {
             if matches!(event, tauri::WindowEvent::Destroyed) {
                 windows::forget_window(window.app_handle(), window.label());
             }
-            #[cfg(not(desktop))]
+            #[cfg(target_os = "macos")]
+            if matches!(event, tauri::WindowEvent::Resized(_)) {
+                if let Some(webview) = window.get_webview_window(window.label()) {
+                    frame::sync_after_resize(&webview);
+                }
+            }
+            #[cfg(not(any(desktop, target_os = "macos")))]
             {
                 let _ = (window, event);
             }

@@ -3397,6 +3397,7 @@ dependencies = [
  "core-foundation 0.10.1",
  "muda",
  "objc2",
+ "objc2-app-kit",
  "serde",
  "serde_json",
  "tauri",

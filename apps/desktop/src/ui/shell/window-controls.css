@@ -81,20 +81,42 @@
   min-height: 12px;
 }
 
-/* Undecorated Tauri windows are square. The webview is transparent, and the
-   shell paints the rounded rect. A filled window goes edge to edge. */
+/* Undecorated Tauri windows are square. The document paints the plate before
+   the app bundle: transparent page, 12px radius, and a hairline on #root.
+   index.html inlines the same plate so the first paint does not wait on JS.
+   A maximized or fullscreen window goes edge to edge. The shadow is the
+   native window shadow, rebuilt from Rust once this plate has pixels. */
 html[data-desktop='tauri'],
-html[data-desktop='tauri'] body,
-html[data-desktop='tauri'] #root {
+html[data-desktop='tauri'] body {
+  height: 100%;
+  margin: 0;
   background: transparent;
+}
+
+/* `body #root` beats the equal-specificity boot rule inlined in index.html,
+   so token colors take over as soon as this sheet loads. */
+html[data-desktop='tauri'] body #root {
+  box-sizing: border-box;
+  height: 100%;
+  margin: 0;
+  background: var(--sd-bg);
+  color: var(--sd-fg);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-lg);
+  overflow: hidden;
 }
 
 html[data-desktop='tauri'] .shell,
 html[data-desktop='tauri'] .chooser {
   height: 100%;
   min-height: 0;
-  border-radius: var(--sd-radius-lg);
+  border-radius: inherit;
   overflow: hidden;
+}
+
+html[data-desktop='tauri'][data-window-fill] body #root {
+  border-radius: 0;
+  border-width: 0;
 }
 
 html[data-desktop='tauri'][data-window-fill] .shell,

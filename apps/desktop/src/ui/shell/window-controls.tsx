@@ -21,6 +21,8 @@ function runWindow(action: WindowAction) {
 
 /**
  * Marks a Tauri window and drops the corner radius when it fills the screen.
+ * index.html sets `data-desktop` before the bundle so the plate is already
+ * rounded; this only keeps the filled-window override in step.
  * A maximized or fullscreen window must stay square, or the corners show the desktop.
  */
 export function bindDesktopWindowFrame(): void {

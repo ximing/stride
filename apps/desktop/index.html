@@ -4,6 +4,52 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Stride</title>
+    <!-- Runs before the app bundle. Colors match tokens.css --sd-bg / --sd-border.
+         The stylesheet that loads with the bundle replaces these with the variables. -->
+    <script>
+      (function () {
+        var root = document.documentElement
+        if (window.__TAURI_INTERNALS__) root.setAttribute('data-desktop', 'tauri')
+        try {
+          var mode = localStorage.getItem('stride:theme')
+          if (mode === 'light' || mode === 'dark') root.setAttribute('data-theme', mode)
+        } catch (e) {}
+      })()
+    </script>
+    <style>
+      html[data-desktop='tauri'],
+      html[data-desktop='tauri'] body {
+        height: 100%;
+        margin: 0;
+        background: transparent;
+      }
+      html[data-desktop='tauri'] #root {
+        box-sizing: border-box;
+        height: 100%;
+        margin: 0;
+        background: #ebede6;
+        color: #252a26;
+        border: 1px solid #d9ddd3;
+        border-radius: 12px;
+        overflow: hidden;
+      }
+      html[data-desktop='tauri'][data-theme='dark'] #root {
+        background: #171a18;
+        color: #edf0eb;
+        border-color: #353c36;
+      }
+      @media (prefers-color-scheme: dark) {
+        html[data-desktop='tauri']:not([data-theme='light']) #root {
+          background: #171a18;
+          color: #edf0eb;
+          border-color: #353c36;
+        }
+      }
+      html[data-desktop='tauri'][data-window-fill] #root {
+        border-radius: 0;
+        border-width: 0;
+      }
+    </style>
     <link rel="icon" type="image/png" href="/favicon-light.png" media="(prefers-color-scheme: light)" />
     <link rel="icon" type="image/png" href="/favicon-dark.png" media="(prefers-color-scheme: dark)" />
   </head>
