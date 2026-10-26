@@ -58,25 +58,33 @@ magick "$work/logo-light.png" -filter Lanczos -resize 64x64 -strip "PNG32:$publi
 magick "$work/logo-dark.png" -filter Lanczos -resize 64x64 -strip "PNG32:$public/favicon-dark.png"
 
 # Bundle sizes named the way tauri.conf.json expects them.
-magick "$work/dock.png" -filter Lanczos -resize 16x16 -strip "$icons/16x16.png"
-magick "$work/dock.png" -filter Lanczos -resize 32x32 -strip "$icons/32x32.png"
-magick "$work/dock.png" -filter Lanczos -resize 128x128 -strip "$icons/128x128.png"
-magick "$work/dock.png" -filter Lanczos -resize 256x256 -strip "$icons/128x128@2x.png"
-magick "$work/dock.png" -filter Lanczos -resize 256x256 -strip "$icons/256x256.png"
-magick "$work/dock.png" -strip "PNG32:$icons/icon.png"
+# Tauri rejects icons that are not RGBA. PNG32 alone still quantizes a flat
+# 16px tile down to a palette, so color type 6 forces truecolor alpha.
+dock_png() {
+  local size=$1 out=$2
+  magick "$work/dock.png" -filter Lanczos -resize "$size" -strip \
+    -define png:color-type=6 "PNG32:$out"
+}
+
+dock_png 16x16 "$icons/16x16.png"
+dock_png 32x32 "$icons/32x32.png"
+dock_png 128x128 "$icons/128x128.png"
+dock_png 256x256 "$icons/128x128@2x.png"
+dock_png 256x256 "$icons/256x256.png"
+dock_png 1024x1024 "$icons/icon.png"
 
 iconset=$work/icon.iconset
 mkdir -p "$iconset"
-magick "$work/dock.png" -filter Lanczos -resize 16x16 -strip "$iconset/icon_16x16.png"
-magick "$work/dock.png" -filter Lanczos -resize 32x32 -strip "$iconset/icon_16x16@2x.png"
-magick "$work/dock.png" -filter Lanczos -resize 32x32 -strip "$iconset/icon_32x32.png"
-magick "$work/dock.png" -filter Lanczos -resize 64x64 -strip "$iconset/icon_32x32@2x.png"
-magick "$work/dock.png" -filter Lanczos -resize 128x128 -strip "$iconset/icon_128x128.png"
-magick "$work/dock.png" -filter Lanczos -resize 256x256 -strip "$iconset/icon_128x128@2x.png"
-magick "$work/dock.png" -filter Lanczos -resize 256x256 -strip "$iconset/icon_256x256.png"
-magick "$work/dock.png" -filter Lanczos -resize 512x512 -strip "$iconset/icon_256x256@2x.png"
-magick "$work/dock.png" -filter Lanczos -resize 512x512 -strip "$iconset/icon_512x512.png"
-magick "$work/dock.png" -filter Lanczos -resize 1024x1024 -strip "$iconset/icon_512x512@2x.png"
+dock_png 16x16 "$iconset/icon_16x16.png"
+dock_png 32x32 "$iconset/icon_16x16@2x.png"
+dock_png 32x32 "$iconset/icon_32x32.png"
+dock_png 64x64 "$iconset/icon_32x32@2x.png"
+dock_png 128x128 "$iconset/icon_128x128.png"
+dock_png 256x256 "$iconset/icon_128x128@2x.png"
+dock_png 256x256 "$iconset/icon_256x256.png"
+dock_png 512x512 "$iconset/icon_256x256@2x.png"
+dock_png 512x512 "$iconset/icon_512x512.png"
+dock_png 1024x1024 "$iconset/icon_512x512@2x.png"
 iconutil -c icns "$iconset" -o "$icons/icon.icns"
 
 magick "$work/dock.png" -filter Lanczos \
