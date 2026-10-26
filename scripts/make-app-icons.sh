@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # Build Stride icons from the transparent logo at the repo root.
 #
-# Dock / bundle icon is a full-bleed white square. macOS and Windows 11 mask
-# that square into a rounded tile; transparent corners outside a pre-rounded
-# plate show up black in the Dock. The ribbon is 72% of the canvas height so
-# the mark stays clear of the squircle without looking lost in the padding.
+# Dock / bundle icon matches the macOS 15 Dock icons (Zoom, Notes, Messages):
+# an opaque rounded plate filling about 82% of the canvas, transparent corners
+# outside it. macOS shows an icon that already has an alpha channel as-is, so
+# a full-bleed square stays square and looks larger than the other apps.
+# The ribbon is 68% of the plate, leaving an opaque white margin around it.
 #
 # Web and in-app marks are rounded tiles: white for light, elevated dark for
 # dark. The ribbon there is 80% of the tile so a 16px favicon still reads.
@@ -28,12 +29,17 @@ mkdir -p "$icons" "$public"
 magick "$src" -alpha set -channel A -threshold 5% +channel -trim +repage -strip \
   "$work/mark.png"
 
-# Dock master: 1024 white, ribbon height = 72% of the canvas (738px).
-magick "$work/mark.png" -filter Lanczos -resize x738 \
+# 50/512 inset and 78/512 corner radius, measured from the Zoom dock icon.
+inset=100
+radius=156
+edge=$((1024 - inset - 1))
+glyph=$(( (1024 - inset * 2) * 68 / 100 ))
+magick "$work/mark.png" -filter Lanczos -resize "x${glyph}" \
   "$work/glyph.png"
-magick -size 1024x1024 xc:'#ffffff' \
+magick -size 1024x1024 xc:none \
+  -fill '#ffffff' -draw "roundrectangle ${inset},${inset} ${edge},${edge} ${radius},${radius}" \
   "$work/glyph.png" -gravity center -compose over -composite -strip \
-  "$work/dock.png"
+  -define png:color-type=6 "PNG32:$work/dock.png"
 
 # Theme tiles. Corner radius is 22% of the side, the same proportion as the
 # current macOS squircle. Ribbon height is 80% of the tile.
