@@ -15,6 +15,17 @@ import { Mark } from '../primitives/icon'
 import { Popover, PopoverContent, PopoverTrigger } from '../primitives/popover'
 import { WindowControls } from './window-controls'
 
+export const VaultSwitchStatus = observer(function VaultSwitchStatus() {
+  const { t } = useTranslation()
+  const vault = useService(VaultService)
+  if (!vault.switchingLabel) return null
+  return (
+    <p className="vault-switching" role="status" data-testid="vault-switching">
+      {t('shell.switchingVault', { name: vault.switchingLabel })}
+    </p>
+  )
+})
+
 export const VaultSwitcher = observer(function VaultSwitcher({ side = 'bottom' }: { side?: 'top' | 'bottom' }) {
   const { t } = useTranslation()
   const vault = useService(VaultService)
@@ -46,8 +57,13 @@ export const VaultSwitcher = observer(function VaultSwitcher({ side = 'bottom' }
             data-testid="vault-switcher"
             aria-haspopup="listbox"
             aria-controls="vault-switcher-options"
+            aria-busy={vault.switchingVaultId !== '' || undefined}
           >
-            <span className="vault-switcher-label">{vault.currentVaultLabel}</span>
+            <span className="vault-switcher-label">
+              {vault.switchingLabel
+                ? t('shell.switchingVault', { name: vault.switchingLabel })
+                : vault.currentVaultLabel}
+            </span>
             <Mark icon={ChevronDown} size={14} />
           </Button>
         </PopoverTrigger>

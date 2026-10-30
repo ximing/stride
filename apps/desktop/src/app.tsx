@@ -22,7 +22,7 @@ import { InspectorRail, RightPanel } from './ui/panels/right-panel'
 import { SearchPanel } from './ui/overlays/search-panel'
 import { SettingsPage } from './ui/settings/settings-page'
 import { Rail } from './ui/shell/sidebar'
-import { RailChrome, RailMini, RailSearchField } from './ui/shell/rail-chrome'
+import { RailChrome, RailMini, RailSearchField, VaultSwitchStatus } from './ui/shell/rail-chrome'
 import { StatusBar } from './ui/shell/status-bar'
 import { NoteTitleField } from './ui/shell/note-title'
 import { TabStrip } from './ui/shell/tab-strip'
@@ -195,6 +195,7 @@ const Workspace = observer(function Workspace() {
   return (
     <div className="shell" data-testid="vault-surface">
       <UpdateBanner />
+      <VaultSwitchStatus />
       <div className="workspace">
         {layout.sidebarCollapsed ? (
           <RailMini />

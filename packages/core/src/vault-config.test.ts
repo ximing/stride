@@ -7,6 +7,7 @@ import {
   readGitSetupPreference,
   readRenameFromHeading,
   readTagColors,
+  readVaultOpenState,
   readViewMode,
   readZoom,
   sanitizeGitSetupPreference,
@@ -277,5 +278,51 @@ describe('tagColors vault setting', () => {
     expect(sanitizeTagColors(null)).toEqual({})
     expect(sanitizeTagColors('blue')).toEqual({})
     expect(sanitizeTagColors(undefined)).toEqual({})
+  })
+})
+
+describe('readVaultOpenState', () => {
+  it('matches the seven readers for a missing marker, broken JSON, and a populated marker', async () => {
+    const missing = new MemoryFileSystem('state-missing')
+    expect(await readVaultOpenState(missing)).toEqual({
+      renameFromHeading: await readRenameFromHeading(missing),
+      advanceInbox: await readAdvanceInbox(missing),
+      agentMode: await readAgentMode(missing),
+      zoom: await readZoom(missing),
+      viewMode: await readViewMode(missing),
+      gitSetupPreference: await readGitSetupPreference(missing),
+      tagColors: await readTagColors(missing),
+    })
+
+    const broken = new MemoryFileSystem('state-broken')
+    await broken.writeText('.stride/vault.json', '{')
+    expect(await readVaultOpenState(broken)).toEqual({
+      renameFromHeading: await readRenameFromHeading(broken),
+      advanceInbox: await readAdvanceInbox(broken),
+      agentMode: await readAgentMode(broken),
+      zoom: await readZoom(broken),
+      viewMode: await readViewMode(broken),
+      gitSetupPreference: await readGitSetupPreference(broken),
+      tagColors: await readTagColors(broken),
+    })
+
+    const fs = new MemoryFileSystem('state-full')
+    await markDedicatedVault(fs)
+    await writeRenameFromHeading(fs, false)
+    await writeAdvanceInbox(fs, false)
+    await writeAgentMode(fs, 'power')
+    await writeZoom(fs, 1.2)
+    await writeViewMode(fs, 'compact')
+    await writeGitSetupPreference(fs, 'enabled')
+    await writeTagColors(fs, { alpha: 'blue' })
+    expect(await readVaultOpenState(fs)).toEqual({
+      renameFromHeading: await readRenameFromHeading(fs),
+      advanceInbox: await readAdvanceInbox(fs),
+      agentMode: await readAgentMode(fs),
+      zoom: await readZoom(fs),
+      viewMode: await readViewMode(fs),
+      gitSetupPreference: await readGitSetupPreference(fs),
+      tagColors: await readTagColors(fs),
+    })
   })
 })

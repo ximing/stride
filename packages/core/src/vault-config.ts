@@ -174,6 +174,31 @@ export async function readTagColors(fs: FileSystemBackend): Promise<TagColors> {
   return sanitizeTagColors((await readMarker(fs))?.tagColors)
 }
 
+export interface VaultOpenState {
+  renameFromHeading: boolean
+  advanceInbox: boolean
+  agentMode: AgentMode
+  zoom: number
+  viewMode: ViewMode
+  gitSetupPreference: GitSetupPreference
+  tagColors: TagColors
+}
+
+/** One marker read for the flags an open publishes together. Defaults match the individual readers. */
+export async function readVaultOpenState(fs: FileSystemBackend): Promise<VaultOpenState> {
+  const marker = await readMarker(fs)
+  const agentMode = marker?.agentMode === 'power' || marker?.agentMode === 'safe' ? marker.agentMode : 'safe'
+  return {
+    renameFromHeading: typeof marker?.renameFromHeading === 'boolean' ? marker.renameFromHeading : true,
+    advanceInbox: typeof marker?.advanceInbox === 'boolean' ? marker.advanceInbox : true,
+    agentMode,
+    zoom: sanitizeZoom(marker?.zoom),
+    viewMode: sanitizeViewMode(marker?.viewMode),
+    gitSetupPreference: sanitizeGitSetupPreference(marker?.gitSetupPreference),
+    tagColors: sanitizeTagColors(marker?.tagColors),
+  }
+}
+
 export async function writeTagColors(fs: FileSystemBackend, colors: TagColors): Promise<void> {
   await patchMarker(fs, { tagColors: sanitizeTagColors(colors) })
 }

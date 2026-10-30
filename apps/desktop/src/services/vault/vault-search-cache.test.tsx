@@ -72,6 +72,7 @@ describe('vault search cache', () => {
     await settings.save()
     await settle(vault)
     expect(vault.phase).toBe('ready')
+    expect(vault.indexPhase).toBe('ready')
     expect(vault.indexWork).toBe('idle')
     expect(embeddingClient.calls).toBeGreaterThan(0)
     expect(settings.form.embedding.endpoint).toBe('https://user:secret@example.com/v1/')

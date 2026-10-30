@@ -12,6 +12,7 @@ import {
   searchIndex,
   SNAPSHOT_FLUSH_MS,
   type CacheNote,
+  type NoteIndex,
   type SearchHit,
 } from '@stride/core'
 import type { EmbeddingRuntime } from '../settings/settings.service'
@@ -107,6 +108,8 @@ export async function queryRanked(vault: VaultService, text: string) {
 export function startRebuild(vault: VaultService, epoch: number, docs: { id: string; text: string }[]): Promise<void> {
   const rebuilder = vault.rebuilder
   if (!rebuilder) return Promise.resolve()
+  const disk = searchSlot(vault).disk
+  const capture = searchSlot(vault).session?.capture ?? null
   rebuilder.begin()
   const shouldContinue = () => epoch === vault.rebuildEpoch
   const noteCount = docs.length
@@ -128,6 +131,7 @@ export function startRebuild(vault: VaultService, epoch: number, docs: { id: str
     }).then(async (result) => {
       if (!shouldContinue() || result.aborted) return
       const runtime = await vault.currentEmbedding()
+      if (!shouldContinue()) return
       const openDim = vault.index?.dim ?? 0
       const gap = vectorGapFor(vault, runtime)
       vault.indexPhase = 'ready'
@@ -140,8 +144,10 @@ export function startRebuild(vault: VaultService, epoch: number, docs: { id: str
         vault.indexDone = noteCount
       }
       publishGap(vault, runtime, 'keep')
-      await flushDisk(vault, gap === 0)
-      searchSlot(vault).disk?.dropPackMap()
+      if (!shouldContinue()) return
+      await flushOwnedDisk(disk, capture, gap === 0)
+      if (!shouldContinue()) return
+      disk?.dropPackMap()
     }, () => {
       if (!shouldContinue()) return
       vault.indexPhase = 'error'
@@ -178,6 +184,7 @@ export async function openSearchSession(
   vaultKey: string,
   dim: number,
   useMemory = isMemoryFixture(),
+  disk?: SearchDiskCache | null,
 ): Promise<SearchSession> {
   if (useMemory) {
     const backend = await memorySearchOpener().open({ vaultKey, dim })
@@ -186,10 +193,8 @@ export async function openSearchSession(
   const { vaneWebSearchOpener, VANE_SNAPSHOT_RESTORE } = await import('@stride/search-web')
   const opener = vaneWebSearchOpener()
   let snapshot: Uint8Array | null = null
-  if (VANE_SNAPSHOT_RESTORE) {
-    const disk = searchSlot(vault).disk
-    if (disk && await disk.snapshotUsable(dim)) snapshot = await disk.readSnapshot()
-  }
+  const cache = disk !== undefined ? disk : searchSlot(vault).disk
+  if (VANE_SNAPSHOT_RESTORE && cache && await cache.snapshotUsable(dim)) snapshot = await cache.readSnapshot()
   const opened = await opener.open({ vaultKey, dim }, snapshot)
   return {
     backend: opened.backend,
@@ -239,10 +244,14 @@ export async function prepareIndexed(
   shouldContinue: () => boolean,
   mode: 'rebuild' | 'upsert',
 ): Promise<{ id: string; text: string; vector?: number[] }[] | null> {
-  const runtime = await vault.currentEmbedding()
-  const openDim = vault.index?.dim ?? 0
+  // Capture the index this call started with. A later open swaps these after the next await.
+  const rebuilder = vault.rebuilder
   const slot = searchSlot(vault)
   const disk = slot.disk
+  const openDim = vault.index?.dim ?? 0
+  const restoredFlag = slot.session?.restored === true
+  const runtime = await vault.currentEmbedding()
+  if (!shouldContinue()) return null
   const hashes = await hashIndexTexts(docs.map((doc) => doc.text))
   if (!shouldContinue()) return null
   const notes: CacheNote[] = docs.map((doc, index) => ({
@@ -250,12 +259,14 @@ export async function prepareIndexed(
     text: doc.text,
     contentHash: hashes[index] ?? '',
   }))
+  const stillOurs = () => searchSlot(vault).disk === disk
   if (!runtime.active || openDim !== runtime.dim || openDim === 0) {
-    if (disk && disk.dim === openDim) {
+    if (disk && disk.dim === openDim && stillOurs()) {
       if (mode === 'rebuild') retainNotes(vault, disk, notes)
       for (const note of notes) disk.setNote(note.id, note.contentHash)
-      scheduleFlush(vault, false)
+      if (shouldContinue() && stillOurs()) scheduleFlush(vault, false)
     }
+    if (!shouldContinue()) return null
     publishGap(vault, runtime, mode === 'rebuild' ? 'sync' : 'keep')
     return notes.map((note) => ({ id: note.id, text: note.text }))
   }
@@ -267,17 +278,22 @@ export async function prepareIndexed(
     }
   } catch {
     console.warn('stride search cache: read-failed')
-    slot.disk = null
+    if (stillOurs()) searchSlot(vault).disk = null
   }
-  const current = searchSlot(vault).disk
-  const restored = slot.session?.restored === true && current !== null && await current.snapshotUsable(openDim).catch(() => false)
+  if (!shouldContinue()) return null
+  const current = stillOurs() ? disk : null
+  const restored = restoredFlag && current !== null && await current.snapshotUsable(openDim).catch(() => false)
+  if (!shouldContinue()) return null
   const plan = current ? current.plan(notes, mode === 'rebuild' && restored) : null
   if (current && mode === 'upsert') current.recompute(current.liveNotes())
   if (current && mode === 'rebuild' && restored && plan && plan.remove.length > 0) {
-    await vault.rebuilder?.remove(plan.remove)
+    if (!shouldContinue()) return null
+    await rebuilder?.remove(plan.remove)
+    if (!shouldContinue()) return null
   }
   const embedNotes = plan ? plan.embed : notes
   if (mode === 'rebuild') {
+    if (!shouldContinue()) return null
     vault.indexTotal = notes.length
     vault.indexDone = notes.length - embedNotes.length
     publishGap(vault, runtime, 'sync')
@@ -292,18 +308,21 @@ export async function prepareIndexed(
     }
   }
   const embedded = await embedGroups(vault, embedNotes, runtime, shouldContinue, current)
-  if (!embedded) return null
+  if (!embedded || !shouldContinue()) return null
   for (const [id, vector] of embedded) vectors.set(id, vector)
-  if (current) {
+  if (current && stillOurs()) {
     current.recompute(current.liveNotes())
+    if (!shouldContinue()) return null
     if (current.vectorGap === 0) vault.indexWork = 'idle'
     publishGap(vault, runtime, vault.indexPhase === 'rebuilding' && mode === 'upsert' ? 'keep' : 'sync')
     if (mode === 'rebuild') vault.indexDone = Math.max(vault.indexDone, notes.length - current.vectorGap)
-  } else if (embedded.size < embedNotes.length && runtime.intended) {
+  } else if (!current && embedded.size < embedNotes.length && runtime.intended) {
+    if (!shouldContinue()) return null
     vault.searchDegraded = true
   }
+  if (!shouldContinue()) return null
   const base: { id: string; text: string; vector?: number[] }[] = current
-    ? docsForRebuild(restored, plan ?? {
+    ? docsForRebuild(Boolean(restored), plan ?? {
       restoreSnapshot: false,
       snapshotGeneration: null,
       remove: [],
@@ -320,16 +339,20 @@ export async function prepareIndexed(
     if (existing) existing.vector = vector
     else byId.set(note.id, { id: note.id, text: note.text, vector })
   }
-  if (mode === 'upsert') scheduleFlush(vault, false)
+  if (mode === 'upsert' && shouldContinue() && stillOurs()) scheduleFlush(vault, false)
+  if (!shouldContinue()) return null
   return [...byId.values()]
 }
 
 export async function embedMisses(vault: VaultService, epoch: number) {
   const disk = searchSlot(vault).disk
+  const rebuilder = vault.rebuilder
+  const capture = searchSlot(vault).session?.capture ?? null
   const runtime = await vault.currentEmbedding()
-  if (!disk || !vault.rebuilder || epoch !== vault.rebuildEpoch) return
+  if (!disk || !rebuilder || epoch !== vault.rebuildEpoch) return
   const docs = vault.notes.map((note) => ({ id: note.id, text: indexText(note) }))
   const hashes = await hashIndexTexts(docs.map((doc) => doc.text))
+  if (epoch !== vault.rebuildEpoch) return
   const notes: CacheNote[] = docs.map((doc, index) => ({
     id: doc.id,
     text: doc.text,
@@ -337,6 +360,7 @@ export async function embedMisses(vault: VaultService, epoch: number) {
   }))
   for (const note of notes) disk.setNote(note.id, note.contentHash)
   await disk.loadPackIfNeeded(notes.map((note) => note.contentHash))
+  if (epoch !== vault.rebuildEpoch) return
   const plan = disk.plan(notes, false)
   const embedded = await embedGroups(vault, plan.embed, runtime, () => epoch === vault.rebuildEpoch, disk)
   if (!embedded || epoch !== vault.rebuildEpoch) return
@@ -346,13 +370,15 @@ export async function embedMisses(vault: VaultService, epoch: number) {
     if (!vector) continue
     rows.push({ id: note.id, text: note.text, vector })
   }
-  if (rows.length > 0) await vault.rebuilder.upsert(rows)
+  if (rows.length > 0) await rebuilder.upsert(rows)
+  if (epoch !== vault.rebuildEpoch) return
   disk.recompute(disk.liveNotes())
   const gap = vectorGapFor(vault, runtime)
   vault.indexTotal = notes.length
   vault.indexDone = Math.max(0, notes.length - gap)
   publishGap(vault, runtime, 'sync')
-  await flushDisk(vault, gap === 0)
+  await flushOwnedDisk(disk, capture, gap === 0)
+  if (epoch !== vault.rebuildEpoch) return
   disk.dropPackMap()
 }
 
@@ -513,6 +539,50 @@ export function scheduleFlush(vault: VaultService, immediate: boolean) {
     slot.flushTimer = null
     void flushDisk(vault, vault.indexPhase === 'ready' && (searchSlot(vault).disk?.vectorGap ?? 1) === 0)
   }, SNAPSHOT_FLUSH_MS)
+}
+
+export interface RetiredSearch {
+  disk: SearchDiskCache | null
+  capture: (() => Promise<Uint8Array>) | null
+  commit: boolean
+  index: NoteIndex | null
+}
+
+/** Flush and close one vault's search resources. The caller captured them before publishing the next vault. */
+export function retireSearch(rebuild: Promise<void>, retired: RetiredSearch): void {
+  void rebuild.catch(() => undefined).then(async () => {
+    await flushOwnedDisk(retired.disk, retired.capture, retired.commit)
+    await retired.index?.close().catch(() => undefined)
+  })
+}
+
+export async function flushOwnedDisk(
+  disk: SearchDiskCache | null,
+  capture: (() => Promise<Uint8Array>) | null,
+  commit: boolean,
+): Promise<void> {
+  if (!disk) return
+  const before = disk.liveNotes()
+  let snapshot: Uint8Array | null = null
+  if (commit && disk.vectorGap === 0 && capture) {
+    try {
+      snapshot = await capture()
+    } catch {
+      console.warn('stride search cache: snapshot-capture')
+      snapshot = null
+    }
+  }
+  const live = disk.liveNotes()
+  const moved = !sameLiveNotes(before, live)
+  try {
+    await disk.flush({
+      live,
+      commit: commit && disk.vectorGap === 0 && !moved,
+      snapshot: moved ? null : snapshot,
+    })
+  } catch {
+    console.warn('stride search cache: flush-failed')
+  }
 }
 
 export async function flushDiskNow(vault: VaultService): Promise<void> {

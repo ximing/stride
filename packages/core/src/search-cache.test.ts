@@ -446,26 +446,23 @@ describe('search cache lock', () => {
 
   it('lets the second flush write only after the first holder releases', async () => {
     const fs = new GateFs()
-    const waits: Array<() => void> = []
-    const options = {
-      now: () => 50_000,
-      sleep: () => new Promise<void>((resolve) => {
-        waits.push(resolve)
-      }),
-    }
-    const first = await SearchDiskCache.open(fs, identity, options)
-    const second = await SearchDiskCache.open(fs, identity, options)
+    const first = await SearchDiskCache.open(fs, identity)
+    const second = await SearchDiskCache.open(fs, identity)
     const hashA = await hashIndexText('disk-a')
     const hashB = await hashIndexText('memory-b')
     expect(first.remember(hashA, [1, 0, 0, 0])).toBe(true)
     expect(second.remember(hashB, [0, 1, 0, 0])).toBe(true)
     const flushA = first.flush({ live: [{ id: 'a', contentHash: hashA }], commit: false })
     await waitUntil(async () => !!(await fs.stat(`${SEARCH_CACHE_DIR}/flush-lock/held/owner`)))
-    const flushB = second.flush({ live: [{ id: 'b', contentHash: hashB }], commit: false })
-    await waitUntil(() => waits.length > 0)
+    let flushBDone = false
+    const flushB = second.flush({ live: [{ id: 'b', contentHash: hashB }], commit: false }).then((ok) => {
+      flushBDone = true
+      return ok
+    })
+    await new Promise((resolve) => setTimeout(resolve, 30))
+    expect(flushBDone).toBe(false)
     fs.releaseBlock()
     expect(await flushA).toBe(true)
-    waits.shift()?.()
     expect(await flushB).toBe(true)
     const merged = await openCache(fs)
     expect(merged.haveVector(hashA)).toBe(true)

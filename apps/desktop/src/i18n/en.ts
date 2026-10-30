@@ -322,6 +322,7 @@ export const en = {
   },
   shell: {
     addVault: 'Add vault',
+    switchingVault: 'Switching to {{name}}…',
     vaultAlias: 'Alias',
     vaultAliasHint: 'Shown in the switcher and recent projects. Leave empty to use the folder name. The path stays unchanged.',
     resizeSidebar: 'Resize sidebar',

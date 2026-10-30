@@ -62,20 +62,50 @@ export async function markDedicatedVault(fs: FileSystemBackend): Promise<void> {
   await ensureGitignoreEntries(fs, VAULT_GITIGNORE_ENTRIES)
 }
 
+/** Overlaps per-file IPC without an unbounded fan-out. Directory walks share the same cap. */
+export const NOTE_READ_CONCURRENCY = 8
+
 export async function listNoteFiles(fs: FileSystemBackend): Promise<string[]> {
   const root = await fs.stat('')
   if (!root || root.kind !== 'directory') return []
   const found: string[] = []
-  const walk = async (dir: string): Promise<void> => {
-    const entries = await fs.list(dir)
-    for (const entry of entries) {
-      if (entry.name === '.git' || entry.name === '.stride' || entry.name === 'node_modules') continue
-      const full = dir ? `${dir}/${entry.name}` : entry.name
-      if (entry.kind === 'directory') await walk(full)
-      else if (isNoteFileName(entry.name)) found.push(full)
+  const queue: string[] = ['']
+  let active = 0
+  let settled = false
+  await new Promise<void>((resolve, reject) => {
+    const finish = (error?: unknown) => {
+      if (settled) return
+      settled = true
+      if (error) reject(error)
+      else resolve()
     }
-  }
-  await walk('')
+    const pump = () => {
+      if (settled) return
+      if (queue.length === 0 && active === 0) {
+        finish()
+        return
+      }
+      while (active < NOTE_READ_CONCURRENCY && queue.length > 0) {
+        const dir = queue.shift()!
+        active += 1
+        fs.list(dir).then((entries) => {
+          if (settled) return
+          for (const entry of entries) {
+            if (entry.name === '.git' || entry.name === '.stride' || entry.name === 'node_modules') continue
+            const full = dir ? `${dir}/${entry.name}` : entry.name
+            if (entry.kind === 'directory') queue.push(full)
+            else if (isNoteFileName(entry.name)) found.push(full)
+          }
+          active -= 1
+          pump()
+        }, (error) => {
+          active -= 1
+          finish(error)
+        })
+      }
+    }
+    pump()
+  })
   return found.sort()
 }
 
@@ -109,17 +139,53 @@ export function notePath(id: string): string {
 }
 
 export async function loadNotes(fs: FileSystemBackend): Promise<StrideNote[]> {
+  const notes = await loadNotesWhile(fs, () => true)
+  return notes ?? []
+}
+
+/**
+ * Read notes in sorted path order, at most NOTE_READ_CONCURRENCY at once.
+ * Returns null when `shouldContinue` becomes false: in-flight reads finish,
+ * and no further reads start. A read error after cancel is abandoned with the open.
+ */
+export async function loadNotesWhile(
+  fs: FileSystemBackend,
+  shouldContinue: () => boolean,
+): Promise<StrideNote[] | null> {
   const files = await listNoteFiles(fs)
-  const notes: StrideNote[] = []
-  for (const file of files) {
-    try {
-      notes.push(await readNoteFile(fs, file, noteIdFromPath(file)))
-    } catch (error) {
-      // A mid-merge note is not TipTap JSON. Leave the file untouched so Git can resolve it.
-      if (!isUnreadableNote(error)) throw error
+  if (!shouldContinue()) return null
+  if (files.length === 0) return []
+  const notes: (StrideNote | undefined)[] = new Array(files.length)
+  let cursor = 0
+  let aborted = false
+  let failure: unknown = null
+  const workers = Math.min(NOTE_READ_CONCURRENCY, files.length)
+  const worker = async () => {
+    while (!failure && !aborted) {
+      if (!shouldContinue()) {
+        aborted = true
+        return
+      }
+      const index = cursor
+      cursor += 1
+      const file = files[index]
+      if (!file) return
+      try {
+        notes[index] = await readNoteFile(fs, file, noteIdFromPath(file))
+      } catch (error) {
+        if (!shouldContinue()) {
+          aborted = true
+          return
+        }
+        // A mid-merge note is not TipTap JSON. Leave the file untouched so Git can resolve it.
+        if (!isUnreadableNote(error)) failure = error
+      }
     }
   }
-  return notes
+  await Promise.all(Array.from({ length: workers }, () => worker()))
+  if (aborted || !shouldContinue()) return null
+  if (failure) throw failure
+  return notes.filter((note): note is StrideNote => note !== undefined)
 }
 
 function isUnreadableNote(error: unknown): boolean {
@@ -129,7 +195,7 @@ function isUnreadableNote(error: unknown): boolean {
     || message.includes('not Markdown frontmatter')
 }
 
-export async function openVault(fs: FileSystemBackend, homeDir: string): Promise<OpenedVault> {
+export async function openVaultRoot(fs: FileSystemBackend, homeDir: string): Promise<Omit<OpenedVault, 'notes'>> {
   const stat = await fs.stat('')
   if (!stat || stat.kind !== 'directory') {
     throw new Error('Choose an existing folder to open as a vault')
@@ -142,6 +208,13 @@ export async function openVault(fs: FileSystemBackend, homeDir: string): Promise
     path: fs.rootLabel,
     broad,
     dedicated,
+  }
+}
+
+export async function openVault(fs: FileSystemBackend, homeDir: string): Promise<OpenedVault> {
+  const opened = await openVaultRoot(fs, homeDir)
+  return {
+    ...opened,
     notes: await loadNotes(fs),
   }
 }

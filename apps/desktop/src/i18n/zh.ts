@@ -328,6 +328,7 @@ export const zh: DeepString<Catalog> = {
   },
   shell: {
     addVault: '添加仓库',
+    switchingVault: '正在切换到 {{name}}…',
     vaultAlias: '别名',
     vaultAliasHint: '左下角和最近项目显示这个名字。留空则用文件夹名。路径不会改。',
     resizeSidebar: '调整侧边栏宽度',

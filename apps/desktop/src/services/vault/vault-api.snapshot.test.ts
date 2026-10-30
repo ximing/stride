@@ -38,6 +38,9 @@ const PUBLIC_FIELDS = [
   'noteMtimes',
   'indexSignature',
   'session',
+  'openGeneration',
+  'switchingVaultId',
+  'switchingLabel',
 ] as const
 
 const PUBLIC_METHODS = [

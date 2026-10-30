@@ -490,6 +490,11 @@ function decodeOwner(bytes: Uint8Array): OwnerFile | null {
   }
 }
 
+// One vault can have two caches in this process (the retiring signature and the
+// new one). They share the directory lock. Queue them here so the second flush
+// starts after the first releases, instead of sleeping the cross-process backoff.
+const flushGates = new Map<string, Promise<void>>()
+
 export class SearchDiskCache {
   readonly signature: string
   readonly dim: number
@@ -640,8 +645,15 @@ export class SearchDiskCache {
   }
 
   flush(request: FlushRequest): Promise<boolean> {
-    const run = this.tail.then(() => this.flushBody(request), () => this.flushBody(request))
-    this.tail = run.then(() => undefined, () => undefined)
+    const key = this.fs.rootLabel
+    const previous = flushGates.get(key) ?? this.tail
+    const run = previous.then(() => this.flushBody(request), () => this.flushBody(request))
+    const settled = run.then(() => undefined, () => undefined)
+    flushGates.set(key, settled)
+    settled.then(() => {
+      if (flushGates.get(key) === settled) flushGates.delete(key)
+    }, () => undefined)
+    this.tail = settled
     return run
   }
 

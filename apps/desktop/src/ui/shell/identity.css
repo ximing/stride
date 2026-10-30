@@ -1,5 +1,16 @@
 /* Vault switcher. The rail header opens it downward; the status bar opens it upward. */
 
+.vault-switching {
+  margin: 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--sd-border);
+  background: var(--sd-bg-elevated);
+  color: var(--sd-fg);
+  font-family: var(--sd-font-sans);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
 .vault-switcher {
   position: relative;
   min-width: 0;

@@ -247,6 +247,11 @@ export class VaultService extends Service {
   rebuildEpoch = 0
   /** Bumped at the start of each open. Async work captures the value it started with. */
   session = 0
+  /** Latest openBackend request. An older body stops before it publishes. */
+  openGeneration = 0
+  /** Set for the whole switch, including the time before fs and notes change. */
+  switchingVaultId = ''
+  switchingLabel = ''
   rebuildDone: Promise<void> = Promise.resolve()
   private openQueue: Promise<void> = Promise.resolve()
   private docTimer: ReturnType<typeof setTimeout> | null = null
@@ -260,6 +265,7 @@ export class VaultService extends Service {
   pendingId = ''
   private retryDelay = 1000
   private renaming = false
+  private renameTask: Promise<void> = Promise.resolve()
   private titleBaseline = new Map<string, string>()
   private leaveQueue: StrideNote[] = []
   numberDrafts: Record<string, string> = {}
@@ -513,43 +519,41 @@ export class VaultService extends Service {
       return
     }
     if (id === this.activeVaultId && this.phase === 'ready' && this.fs) return
-    const cached = this.backends.get(id)
-    if (cached) {
-      try {
-        await this.commitHeadingRename()
-        await this.openBackend(cached)
-        this.error = ''
-      } catch (error) {
-        this.error = errorText(error)
-      }
-      return
-    }
-    if (isMemoryFixture()) {
-      this.error = 'That vault is not available.'
-      return
-    }
-    if (isDesktopRuntime()) {
-      try {
-        const { TauriFileSystem } = await import('@stride/fs-tauri')
-        await this.commitHeadingRename()
-        await this.openBackend(new TauriFileSystem(entry.label))
-        this.error = ''
-      } catch (error) {
-        this.error = errorText(error)
-      }
-      return
+    this.switchingVaultId = id
+    this.switchingLabel = vaultDisplayName(entry)
+    const openTarget = async (backend: FileSystemBackend) => {
+      await this.commitHeadingRename()
+      await this.openBackend(backend)
+      if (this.switchingVaultId === id) this.error = ''
     }
     try {
+      const cached = this.backends.get(id)
+      if (cached) {
+        await openTarget(cached)
+        return
+      }
+      if (isMemoryFixture()) {
+        this.error = 'That vault is not available.'
+        return
+      }
+      if (isDesktopRuntime()) {
+        const { TauriFileSystem } = await import('@stride/fs-tauri')
+        await openTarget(new TauriFileSystem(entry.label))
+        return
+      }
       const restored = await restoreVaultById(id)
       if (!restored) {
         this.error = 'The directory handle for this vault is missing.'
         return
       }
-      await this.commitHeadingRename()
-      await this.openBackend(restored)
-      this.error = ''
+      await openTarget(restored)
     } catch (error) {
-      this.error = errorText(error)
+      if (this.switchingVaultId === id) this.error = errorText(error)
+    } finally {
+      if (this.switchingVaultId === id) {
+        this.switchingVaultId = ''
+        this.switchingLabel = ''
+      }
     }
   }
 
@@ -830,10 +834,11 @@ export class VaultService extends Service {
     if (!leaving || !fs) return
     if (this.renaming) {
       this.leaveQueue.push(leaving)
-      return
+      return this.renameTask
     }
     const fromId = leaving.id
     this.renaming = true
+    const task = (async () => {
     try {
       let diskTitle = ''
       try {
@@ -881,6 +886,9 @@ export class VaultService extends Service {
       const next = this.leaveQueue.shift()
       if (next) await this.commitHeadingRename(next)
     }
+    })()
+    this.renameTask = task
+    await task
   }
 
   updateType(type: string) {
@@ -1148,7 +1156,9 @@ export class VaultService extends Service {
   }
 
   private openBackend(backend: FileSystemBackend): Promise<void> {
-    const run = this.openQueue.catch(() => undefined).then(() => this.openBackendBody(backend))
+    this.openGeneration += 1
+    const ticket = this.openGeneration
+    const run = this.openQueue.catch(() => undefined).then(() => this.openBackendBody(backend, ticket))
     this.openQueue = run.then(() => undefined, () => undefined)
     return run
   }
@@ -1160,8 +1170,8 @@ export class VaultService extends Service {
     return this.openBackend(backend)
   }
 
-  private openBackendBody(backend: FileSystemBackend) {
-    return vaultOpen.openBackendBody(this, backend)
+  private openBackendBody(backend: FileSystemBackend, ticket: number) {
+    return vaultOpen.openBackendBody(this, backend, ticket)
   }
 
   // Best-effort mtime harvest for the note list. Never blocks or fails an open.
