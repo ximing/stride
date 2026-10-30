@@ -664,6 +664,21 @@ export class VaultService extends Service {
     this.schedule(current.id)
   }
 
+  // Blank and the Untitled sentinel are an unfinished edit: keep the previous
+  // title, file name, and wikilinks. A real title commits, then renames.
+  async commitTitleDraft(noteId: string, raw: string): Promise<void> {
+    const current = this.notes.find((note) => note.id === noteId)
+    if (!current) return
+    const next = raw.trim()
+    if (!isPlaceholderTitle(next) && next !== current.title) {
+      if (!this.titleBaseline.has(noteId)) this.titleBaseline.set(noteId, current.title)
+      this.replace({ ...current, title: next, doc: applyTitle(current.doc, next) })
+      this.schedule(noteId)
+    }
+    const fresh = this.notes.find((note) => note.id === noteId) ?? current
+    await this.commitHeadingRename(fresh)
+  }
+
   async setRenameFromHeading(enabled: boolean) {
     this.renameFromHeading = enabled
     if (!this.fs) return

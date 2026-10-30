@@ -470,6 +470,40 @@ describe('VaultService', () => {
     expect(marker.renameFromHeading).toBe(false)
   })
 
+  it('keeps the previous title when a finished edit is blank or Untitled', async () => {
+    useMemoryFixture()
+    register(VaultService)
+    register(FolderService)
+    const vault = resolve(VaultService)
+    await vault.openFromDraft()
+    await vault.createNote()
+    vault.updateTitle('Field notes')
+    await vault.commitHeadingRename()
+    const id = vault.active?.id ?? ''
+    expect(id).toBe('field-notes')
+
+    vault.updateDoc({
+      type: 'doc',
+      content: [{ type: 'paragraph', content: [{ type: 'text', text: 'kept-body' }] }],
+    })
+    await vault.commitTitleDraft(id, '')
+    await vault.commitTitleDraft(id, '   ')
+    await vault.commitTitleDraft(id, 'Untitled')
+
+    expect(vault.error).toBe('')
+    expect(vault.active?.id).toBe(id)
+    expect(vault.active?.title).toBe('Field notes')
+    const saved = await readNoteFile(vault.fs!, 'field-notes.stride.json', id)
+    expect(saved.title).toBe('Field notes')
+    expect(plainText(saved.doc)).toContain('kept-body')
+
+    await vault.commitTitleDraft(id, '  Renamed page  ')
+    expect(vault.active?.id).toBe('renamed-page')
+    expect(vault.active?.title).toBe('Renamed page')
+    expect(await vault.fs!.stat('field-notes.stride.json')).toBeNull()
+    expect((await readNoteFile(vault.fs!, 'renamed-page.stride.json', 'renamed-page')).title).toBe('Renamed page')
+  })
+
   it('rewrites wikilinks when a real heading title changes', async () => {
     useMemoryFixture()
     register(VaultService)

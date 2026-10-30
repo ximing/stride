@@ -24,6 +24,7 @@ import { SettingsPage } from './ui/settings/settings-page'
 import { Rail } from './ui/shell/sidebar'
 import { RailChrome, RailMini, RailSearchField } from './ui/shell/rail-chrome'
 import { StatusBar } from './ui/shell/status-bar'
+import { NoteTitleField } from './ui/shell/note-title'
 import { TabStrip } from './ui/shell/tab-strip'
 import { TooltipProvider } from './ui/primitives/tooltip'
 import { UpdateBanner } from './ui/shell/update-banner'
@@ -219,13 +220,7 @@ const Workspace = observer(function Workspace() {
             {note ? (
               <>
                 <div className="stage-head">
-                  <input
-                    className="note-title"
-                    data-testid="note-title"
-                    value={note.title}
-                    onChange={(event) => vault.updateTitle(event.target.value)}
-                    onBlur={() => { void vault.commitHeadingRename() }}
-                  />
+                  <NoteTitleField />
                 </div>
                 <NoteEditor key={note.id} />
               </>

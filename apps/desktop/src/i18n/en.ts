@@ -446,6 +446,7 @@ export const en = {
     all: 'All notes',
     inbox: 'Inbox',
     untitled: 'Untitled',
+    titleLabel: 'Note title',
     noMatchQuery: 'No notes match “{{query}}”.',
     noResultsQuery: 'No results for “{{query}}”.',
     nothingMatchesView: 'Nothing matches “{{name}}” yet.',

@@ -70,6 +70,7 @@ const PUBLIC_METHODS = [
   'createInstance',
   'updateDoc',
   'updateTitle',
+  'commitTitleDraft',
   'setRenameFromHeading',
   'setAutosaveDebounceMs',
   'setAdvanceInbox',

@@ -452,6 +452,7 @@ export const zh: DeepString<Catalog> = {
     all: '全部笔记',
     inbox: '收件箱',
     untitled: '无标题',
+    titleLabel: '笔记标题',
     noMatchQuery: '没有笔记匹配“{{query}}”。',
     noResultsQuery: '没有“{{query}}”的结果。',
     nothingMatchesView: '还没有内容符合“{{name}}”。',
