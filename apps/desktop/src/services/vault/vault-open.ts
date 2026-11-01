@@ -19,6 +19,7 @@ import { NoteListService } from '../notes/note-list.service'
 import { TabsService } from '../notes/tabs.service'
 import { ViewsService } from '../views/views.service'
 import { bindPagehide, openSearchSession, retireSearch, searchSlot, startRebuild } from './vault-search-session'
+import { liveDocStash } from './live-doc'
 import { resetPropertyEditor } from './vault-properties'
 import type { VaultService } from './vault.service'
 
@@ -149,6 +150,7 @@ export async function openBackendBody(vault: VaultService, backend: FileSystemBa
     vault.fs = backend
     vault.vaultPath = root.path
     vault.broad = root.broad
+    liveDocStash(vault).clear()
     vault.notes = notes
     vault.docEpoch += 1
     vault.listFilter = 'all'

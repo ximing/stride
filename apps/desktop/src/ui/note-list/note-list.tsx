@@ -520,15 +520,16 @@ export const NoteList = observer(function NoteList() {
   }, [vault.listFilter, vault.searchQuery, vault.searchHits, listFilter.query, list.sort, list.scrollEpoch, views.views, vault.viewMode])
 
   // Filter + sort only recompute when the underlying data changes, not on
-  // scroll. ListFilterService.apply scans raw (non-proxy) notes internally —
-  // proxied property reads at 10k notes cost hundreds of ms per keystroke.
+  // scroll. The raw() unwrap matters: vault getters compute over raw notes,
+  // but their result is re-proxied on access — iterating that proxy at 10k
+  // notes registers a reaction key per note and dominates every re-render.
   // Reactivity is preserved because every vault mutation replaces `notes`
   // (and `noteMtimes`) by identity, which is a memo dep. `views.views` is the
   // dep for view-definition changes (rename/edit/reorder all replace it).
   const activeView = views.activeView
   const effectiveSort: ListSort = activeView?.view.sort ?? list.sort
   const notes = useMemo(
-    () => sortNotes(listFilter.apply(vault.visibleNotes), effectiveSort, raw(vault.noteMtimes)),
+    () => sortNotes(listFilter.apply(raw(vault.visibleNotes)), effectiveSort, raw(vault.noteMtimes)),
     [vault.notes, vault.searchHits, vault.searchQuery, vault.listFilter, listFilter.query, effectiveSort, vault.noteMtimes, views.views],
   )
   const typeInfo = useMemo(() => buildTypeInfo(vault), [vault.notes])

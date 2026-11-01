@@ -83,6 +83,7 @@ import { ListFilterService } from '../search/list-filter.service'
 import { applyStageZoom } from '../layout/stage-zoom'
 import { ViewsService } from '../views/views.service'
 import { applyNoteIdChanges, FOLDER_FILTER_PREFIX } from './note-identity'
+import { liveDocStash } from './live-doc'
 import * as vaultOpen from './vault-open'
 import * as propertyEditor from './vault-properties'
 import * as searchSession from './vault-search-session'
@@ -295,7 +296,11 @@ export class VaultService extends Service {
   }
 
   get active(): StrideNote | null {
-    return this.notes.find((note) => note.id === this.activeId) ?? null
+    const found = this.notes.find((note) => note.id === this.activeId) ?? null
+    if (!found) return null
+    // Surface in-flight body edits without having committed them to `notes`.
+    const live = liveDocStash(this).get(found.id)
+    return live ? { ...found, doc: live } : found
   }
 
   get graph(): VaultGraph {
@@ -652,9 +657,21 @@ export class VaultService extends Service {
     const current = this.active
     if (!current) return
     const next = applyBody(current.title, body)
+    if (next.title === current.title && !next.lifted) {
+      // Body-only edit (the common keystroke): stash it outside the reactive
+      // notes array so typing does not invalidate every notes-derived
+      // derivation (graph, note list, folder tree) per keystroke. The
+      // debounced flush commits it; `active` merges it on read.
+      liveDocStash(this).set(current.id, next.doc)
+      this.schedule(current.id)
+      return
+    }
+    // A changed title (or a freshly lifted leading H1) is visible in the
+    // note list and tabs, so it still commits reactively right away.
     if (next.title !== current.title && !this.titleBaseline.has(current.id)) {
       this.titleBaseline.set(current.id, current.title)
     }
+    liveDocStash(this).delete(current.id)
     this.replace({ ...current, title: next.title, doc: next.doc })
     if (next.lifted) this.docEpoch += 1
     this.schedule(current.id)
@@ -1093,8 +1110,12 @@ export class VaultService extends Service {
     if (!note || !this.fs) {
       this.pendingId = ''
       this.saveStatus = 'idle'
+      liveDocStash(this).delete(id)
       return
     }
+    // In-flight body edits live in the stash until the save commits them.
+    const live = liveDocStash(this).get(id)
+    const pending = live ? { ...note, doc: live } : note
     const fs = this.fs
     this.saveStatus = 'saving'
     await this.enqueueWrite(async () => {
@@ -1106,7 +1127,7 @@ export class VaultService extends Service {
       }
       let saved: StrideNote
       try {
-        saved = await saveNote(fs, noteForSave(note))
+        saved = await saveNote(fs, noteForSave(pending))
       } catch (error) {
         if (session !== this.session) return
         this.error = errorText(error)
@@ -1135,6 +1156,7 @@ export class VaultService extends Service {
       this.retryDelay = 1000
       this.saveStatus = 'saved'
       this.error = ''
+      liveDocStash(this).delete(id)
       this.replace(saved)
       this.noteMtimes = { ...this.noteMtimes, [saved.id]: Date.now() }
       await this.upsertIndexed(saved)
@@ -1438,7 +1460,9 @@ export class VaultService extends Service {
   }
 
   replace(note: StrideNote) {
-    this.notes = this.notes.map((item) => (item.id === note.id ? note : item))
+    // Iterating the raw array avoids wrapping every element in an observable
+    // child proxy just to rebuild the list.
+    this.notes = raw(this.notes).map((item) => (item.id === note.id ? note : item))
   }
 
   schedule(id: string) {

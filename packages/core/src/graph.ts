@@ -175,6 +175,56 @@ export function resolveNote(notes: StrideNote[], ref: string): StrideNote | unde
   return idHit ?? foldedHit
 }
 
+/**
+ * O(1) link resolution for a whole-graph build: same outcome as scanning
+ * `resolveNote` per target (any title match beats the first id match, which
+ * beats the first folded-id match), without the O(n) scan per wikilink.
+ */
+function linkResolver(notes: StrideNote[]): (ref: string) => StrideNote | undefined {
+  const byTitle = new Map<string, StrideNote>()
+  const byId = new Map<string, StrideNote>()
+  const byFoldedId = new Map<string, StrideNote>()
+  for (const note of notes) {
+    const titleKey = note.title.toLowerCase()
+    if (!byTitle.has(titleKey)) byTitle.set(titleKey, note)
+    if (note.id === '') continue
+    const id = note.id.toLowerCase()
+    if (!byId.has(id)) byId.set(id, note)
+    if (!byFoldedId.has(id)) byFoldedId.set(id, note)
+  }
+  return (ref) => {
+    const key = ref.trim().toLowerCase()
+    if (!key) return undefined
+    const titleHit = byTitle.get(key)
+    if (titleHit) return titleHit
+    return byId.get(key) ?? byFoldedId.get(key.replace(/\s+/g, '-'))
+  }
+}
+
+// Per-note extraction caches. Notes are replaced immutably (an edit builds a
+// fresh note object), so identity is a valid cache key and a rebuild only
+// re-walks the notes that actually changed — not every doc in the vault.
+const relationshipCache = new WeakMap<StrideNote, { field: string; targets: string[] }[]>()
+const bodyLinkCache = new WeakMap<StrideNote, string[]>()
+
+function cachedRelationshipFields(note: StrideNote): { field: string; targets: string[] }[] {
+  let fields = relationshipCache.get(note)
+  if (!fields) {
+    fields = relationshipFields(note)
+    relationshipCache.set(note, fields)
+  }
+  return fields
+}
+
+function cachedBodyWikilinks(note: StrideNote): string[] {
+  let targets = bodyLinkCache.get(note)
+  if (!targets) {
+    targets = bodyWikilinks(note.doc)
+    bodyLinkCache.set(note, targets)
+  }
+  return targets
+}
+
 export function groupByType(notes: StrideNote[]): Map<string, StrideNote[]> {
   const groups = new Map<string, StrideNote[]>()
   for (const note of notes) {
@@ -188,6 +238,7 @@ export function groupByType(notes: StrideNote[]): Map<string, StrideNote[]> {
 
 export function buildGraph(notes: StrideNote[]): VaultGraph {
   const byId = new Map(notes.map((note) => [note.id, note]))
+  const resolve = linkResolver(notes)
   const relations = new Map<string, NoteRelations>()
   for (const note of notes) {
     relations.set(note.id, { outgoing: [], shown: [], backlinks: [] })
@@ -203,10 +254,10 @@ export function buildGraph(notes: StrideNote[]): VaultGraph {
   for (const note of notes) {
     const bag = relations.get(note.id)
     if (!bag) continue
-    for (const field of relationshipFields(note)) {
+    for (const field of cachedRelationshipFields(note)) {
       const canonical = normalizeField(field.field)
       for (const target of field.targets) {
-        const resolved = resolveNote(notes, target)
+        const resolved = resolve(target)
         bag.outgoing.push({ field: field.field, target, resolvedId: resolved?.id })
         if (!resolved) continue
         addShown(note.id, {
@@ -241,8 +292,8 @@ export function buildGraph(notes: StrideNote[]): VaultGraph {
       }
     }
     // Body wikilinks are outgoing in the inspector. They do not count toward inbox.
-    for (const target of bodyWikilinks(note.doc)) {
-      const resolved = resolveNote(notes, target)
+    for (const target of cachedBodyWikilinks(note)) {
+      const resolved = resolve(target)
       if (!resolved || resolved.id === note.id) continue
       addShown(note.id, {
         field: 'body',
@@ -262,7 +313,7 @@ export function buildGraph(notes: StrideNote[]): VaultGraph {
     notes,
     byId,
     relations,
-    inbox: notes.filter((note) => !hasOutgoingRelationship(note) && !isProcessed(note)),
+    inbox: notes.filter((note) => cachedRelationshipFields(note).length === 0 && !isProcessed(note)),
     byType: groupByType(notes),
   }
 }

@@ -1,4 +1,4 @@
-import { observer, useService } from '@rabjs/react'
+import { observer, raw, useService } from '@rabjs/react'
 import { FileText, Search } from 'lucide-react'
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -13,7 +13,7 @@ export const QuickOpen = observer(function QuickOpen() {
   const service = useService(QuickOpenService)
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLDivElement>(null)
-  const results = service.open ? quickOpenResults(vault.notes, service.query) : []
+  const results = service.open ? quickOpenResults(raw(vault.notes), service.query) : []
   const selectedIndex = results.length === 0 ? -1 : Math.min(service.selected, results.length - 1)
   const selectedId = selectedIndex >= 0 ? results[selectedIndex].id : ''
 

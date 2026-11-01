@@ -1,4 +1,4 @@
-import { observer, useService } from '@rabjs/react'
+import { observer, raw, useService } from '@rabjs/react'
 import { Search } from 'lucide-react'
 import { useEffect, useRef, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -39,7 +39,9 @@ export const SearchPanel = observer(function SearchPanel() {
   const results = service.open ? service.results : []
   const selectedIndex = results.length === 0 ? -1 : Math.min(service.selected, results.length - 1)
   const selectedId = selectedIndex >= 0 ? results[selectedIndex]?.id ?? '' : ''
-  const titles = new Map(vault.notes.map((note) => [note.id, note.title]))
+  // Raw-array scan only while the panel is open; closed renders skip the
+  // vault-wide pass entirely.
+  const titles = service.open ? new Map(raw(vault.notes).map((note) => [note.id, note.title])) : null
 
   useEffect(
     () =>
@@ -139,7 +141,7 @@ export const SearchPanel = observer(function SearchPanel() {
                   onClick={() => service.choose(hit.id)}
                 >
                   <span className="search-panel-result-row">
-                    <span className="search-panel-note-title sd-command-item-title">{titles.get(hit.id) || hit.id}</span>
+                    <span className="search-panel-note-title sd-command-item-title">{titles?.get(hit.id) || hit.id}</span>
                     <span className="search-panel-score">{hit.score}</span>
                   </span>
                   {hit.snippet ? <span className="search-panel-snippet">{markQuery(hit.snippet, service.query)}</span> : null}

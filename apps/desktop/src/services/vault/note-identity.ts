@@ -1,6 +1,7 @@
 import { has, resolve } from '@rabjs/react'
 import { NoteListService } from '../notes/note-list.service'
 import { TabsService } from '../notes/tabs.service'
+import { liveDocStash } from './live-doc'
 import type { VaultService } from './vault.service'
 
 /** listFilter prefix for the folder dimension: `folder:<path>` (subtree match). */
@@ -20,6 +21,18 @@ export async function applyNoteIdChanges(
     })
     const nextActive = byFrom.get(vault.activeId)
     if (nextActive) vault.activeId = nextActive
+    // Pending saves and in-flight body edits follow the note to its new id.
+    const remappedPending = byFrom.get(vault.pendingId)
+    if (remappedPending) vault.pendingId = remappedPending
+    const stash = liveDocStash(vault)
+    if (stash.size > 0) {
+      for (const change of moved) {
+        const doc = stash.get(change.fromId)
+        if (doc === undefined) continue
+        stash.delete(change.fromId)
+        if (!stash.has(change.toId)) stash.set(change.toId, doc)
+      }
+    }
     for (const change of moved) vault.retargetTitleBaseline(change.fromId, change.toId)
     if (vault.searchHits.some((hit) => byFrom.has(hit.id))) {
       vault.searchHits = vault.searchHits.map((hit) => {

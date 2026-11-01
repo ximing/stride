@@ -20,6 +20,7 @@ paths:
 ## React 组件消费模式
 
 - **响应式订阅**：读取 Service 状态的 React 组件必须使用 `observer(function MyComponent() { ... })` 包裹，并通过 `useService(MyService)` 获取实例，使组件仅在所读字段变化时重渲染。
+- **大集合迭代必须 `raw()` 解包**：渲染期扫描 `vault.notes` 或 getter 返回的大数组（`visibleNotes`/`listedNotes` 等）时，先 `raw(...)` 再 `filter`/`map`/`find`。直接迭代代理数组会为每个元素注册 reaction key 并包装 observable child——万级笔记下每次渲染秒级卡顿（2026-11 实测归因）。顶层读取（如 `vault.notes`）保持响应式订阅不变，解包只影响迭代本身。
 - **避免冗余局部状态**：跨面板共享的状态（如当前打开笔记、激活右侧面板、搜索词、主题、设置项）统一收敛在对应 Service 中，不要在多个组件间通过深层 props drilling 或重复 `useState` 维护两份状态。
 
 ## 命令与快捷键单一真相源

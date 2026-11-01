@@ -1,4 +1,4 @@
-import { observer, useService } from '@rabjs/react'
+import { observer, raw, useService } from '@rabjs/react'
 import { PanelRight, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { commandTitle } from '../../i18n'
@@ -31,12 +31,14 @@ export const TabStrip = observer(function TabStrip() {
   const closeName = commandTitle('tab.close', 'Close tab')
   const closeLabel = closeKeys ? `${closeName} (${closeKeys})` : closeName
   const saving = vault.saveStatus === 'pending' || vault.saveStatus === 'saving'
+  // One raw-array pass per render; per-tab find() would scan the proxied
+  // vault array (and register a reaction key per visited note) once per tab.
+  const titleById = new Map(raw(vault.notes).map((item) => [item.id, item.title]))
   return (
     <div className="tab-strip" data-testid="tab-strip" role="tablist" aria-label={t('shell.openNotes')} data-tauri-drag-region="deep">
       <div className="tabs-scroll">
         {tabs.tabs.map((tab) => {
-          const note = vault.notes.find((item) => item.id === tab.noteId)
-          const title = note?.title || t('notes.untitled')
+          const title = titleById.get(tab.noteId) || t('notes.untitled')
           const active = tab.id === tabs.activeTabId
           const dirty = active && saving
           return (

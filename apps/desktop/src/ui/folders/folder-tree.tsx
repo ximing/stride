@@ -1,5 +1,5 @@
 import { ChevronDown, ChevronRight, FilePlus, FileText, Folder, FolderPlus } from 'lucide-react'
-import { observer, useService } from '@rabjs/react'
+import { observer, raw, useService } from '@rabjs/react'
 import { useEffect, useMemo, useState, type DragEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { StrideNote } from '@stride/core/note'
@@ -551,7 +551,9 @@ export const FolderTree = observer(function FolderTree() {
     () => {
       const searching = vault.searchHits.length > 0 && vault.searchQuery.trim() !== ''
       const scoped = vault.listFilter.startsWith(FOLDER_FILTER_PREFIX)
-      return listFilter.apply(searching || !scoped ? vault.visibleNotes : vault.listedNotes)
+      // raw(): the getter result is re-proxied on access, and iterating that
+      // proxy registers a reaction key per note on large vaults.
+      return listFilter.apply(raw(searching || !scoped ? vault.visibleNotes : vault.listedNotes))
     },
     [vault.notes, vault.searchHits, vault.searchQuery, vault.listFilter, listFilter.query],
   )

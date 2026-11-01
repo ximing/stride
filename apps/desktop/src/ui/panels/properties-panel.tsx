@@ -1,5 +1,5 @@
 import { FileText, GripVertical, MoreHorizontal, Plus, SlidersHorizontal, X } from 'lucide-react'
-import { observer, useService } from '@rabjs/react'
+import { observer, raw, useService } from '@rabjs/react'
 import { useTranslation } from 'react-i18next'
 import { resolveTypeColor, typeColorKey, typeSidebarLabel } from '@stride/core'
 import {
@@ -68,12 +68,6 @@ function RelationEditor({ noteId }: { noteId: string }) {
   const vault = useService(VaultService)
   const [open, setOpen] = useState(false)
   const [kind, setKind] = useState<StructuralRelation>('belongs_to')
-  // Every vault note is a candidate from the start; the combobox's search
-  // input filters them down.
-  const targetOptions: ComboboxOption[] = vault.notes
-    .filter((item) => item.id !== noteId && !isArchived(item))
-    .map((item) => ({ value: item.id, label: item.title, testId: 'relation-match' }))
-    .sort((a, b) => (a.label ?? '').localeCompare(b.label ?? ''))
   const add = (targetId: string) => {
     vault.linkRelation(kind, targetId)
     setOpen(false)
@@ -92,6 +86,13 @@ function RelationEditor({ noteId }: { noteId: string }) {
       </Button>
     )
   }
+  // Computed only while the combobox is open: scanning the whole vault on
+  // every render is wasted while collapsed, and the raw array avoids
+  // per-note reaction registration on large vaults.
+  const targetOptions: ComboboxOption[] = raw(vault.notes)
+    .filter((item) => item.id !== noteId && !isArchived(item))
+    .map((item) => ({ value: item.id, label: item.title, testId: 'relation-match' }))
+    .sort((a, b) => (a.label ?? '').localeCompare(b.label ?? ''))
   return (
     <div
       className="relation-add-form"
@@ -638,7 +639,11 @@ export const PropertiesPanel = observer(function PropertiesPanel() {
   const fields = Object.keys(note.properties).filter((field) => (
     !isHiddenProperty(field) && !isManagedRelation(field, note.properties[field])
   ))
-  const titleById = new Map(vault.notes.map((item) => [item.id, item.title]))
+  // Whole-vault scans below run over the raw array: the tracked read of
+  // vault.notes still subscribes this panel, but iteration never registers
+  // a reaction key per note (the dominant re-render cost on large vaults).
+  const allNotes = raw(vault.notes)
+  const titleById = new Map(allNotes.map((item) => [item.id, item.title]))
   const groupLabels: { key: RelationGroup; label: string }[] = [
     { key: 'belongs_to', label: t('panels.belongsTo') },
     { key: 'related_to', label: t('panels.relatedTo') },
@@ -701,14 +706,14 @@ export const PropertiesPanel = observer(function PropertiesPanel() {
     { value: 'done', label: t('panels.statusDone'), dot: STATUS_TONE_DOT.done },
   ]
   const seenStatuses = new Set(statusOptions.map((option) => option.value.toLowerCase()))
-  for (const status of collectStatusValues(vault.notes)) {
+  for (const status of collectStatusValues(allNotes)) {
     if (seenStatuses.has(status.toLowerCase())) continue
     seenStatuses.add(status.toLowerCase())
     statusOptions.push({ value: status, dot: STATUS_TONE_DOT[statusTone(status)] })
   }
   const catalogs: FieldCatalogs = {
-    tags: collectTags(vault.notes).map((tag) => ({ value: tag })),
-    links: vault.notes
+    tags: collectTags(allNotes).map((tag) => ({ value: tag })),
+    links: allNotes
       .filter((item) => item.id !== note.id && !isArchived(item))
       .map((item) => ({ value: `[[${item.title}]]`, label: item.title }))
       .sort((a, b) => a.label.localeCompare(b.label)),

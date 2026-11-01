@@ -3,7 +3,7 @@ import { isArchived, plainText, stripLeadingH1 } from '@stride/core/note'
 import { EditorContent, useEditor } from '@tiptap/react'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { observer, useService } from '@rabjs/react'
+import { observer, raw, useService } from '@rabjs/react'
 import { watchLocale } from '../i18n'
 import { TabsService } from '../services/notes/tabs.service'
 import { VaultService } from '../services/vault/vault.service'
@@ -25,7 +25,10 @@ export const NoteEditor = observer(function NoteEditor() {
   const vault = useService(VaultService)
   const tabs = useService(TabsService)
   const note = vault.active
-  const notes = vault.notes
+  // The tracked read of vault.notes still re-renders on any vault change, but
+  // scanning the raw array below never registers a reaction key per note —
+  // on a large vault those per-key registrations dominate every re-render.
+  const notes = raw(vault.notes)
   const openLinkRef = useRef<() => boolean>(() => true)
   const getNotesRef = useRef<() => { id: string; title: string }[]>(() => [])
   const onOpenRef = useRef<(target: string) => void>(() => {})
