@@ -96,9 +96,11 @@ export function applyFavicon(mode: ThemeMode, dark?: boolean): void {
   document.querySelectorAll('link[rel="icon"]').forEach((node) => {
     if (node.id !== 'stride-favicon') node.remove()
   })
-  let link = document.getElementById('stride-favicon')
-  if (!(link instanceof HTMLLinkElement)) {
-    link = document.createElement('link')
+  const existing = document.getElementById('stride-favicon')
+  // Reassigning the getElementById result keeps the narrowed HTMLElement type,
+  // so `.rel` / `.type` fail to typecheck. Hold the created link separately.
+  const link = existing instanceof HTMLLinkElement ? existing : document.createElement('link')
+  if (!(existing instanceof HTMLLinkElement)) {
     link.id = 'stride-favicon'
     link.rel = 'icon'
     link.type = 'image/png'
