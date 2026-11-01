@@ -49,9 +49,13 @@ export const NoteEditor = observer(function NoteEditor() {
     }),
     [],
   )
+  // content is an initialization option, not a controlled value. Feeding each
+  // edit back through it makes useEditor call setOptions/updateState again.
+  // Note switches and external replacements are handled by docEpoch below.
+  const [initialContent] = useState(() => (note ? stripLeadingH1(note.doc) : emptyDoc) as object)
   const editor = useEditor({
     extensions,
-    content: ((note ? stripLeadingH1(note.doc) : emptyDoc) as object),
+    content: initialContent,
     onUpdate: ({ editor: current }) => {
       vault.updateDoc(current.getJSON() as TipTapNode)
     },
