@@ -21,6 +21,16 @@ fn main() {
         .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_shell::init())
         .plugin(tauri_plugin_keyring::init())
+        // Remember each window's size across launches; position stays managed
+        // by `windows::create_window` (cascade from the focused window).
+        .plugin(
+            tauri_plugin_window_state::Builder::new()
+                .with_state_flags(
+                    tauri_plugin_window_state::StateFlags::SIZE
+                        | tauri_plugin_window_state::StateFlags::MAXIMIZED,
+                )
+                .build(),
+        )
         .enable_macos_default_menu(false)
         .on_page_load(|webview, payload| {
             #[cfg(target_os = "macos")]

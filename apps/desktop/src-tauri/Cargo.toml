@@ -17,6 +17,7 @@ tauri-plugin-fs = "2"
 tauri-plugin-keyring = "0.1.0"
 tauri-plugin-process = "2"
 tauri-plugin-shell = "2"
+tauri-plugin-window-state = "2"
 
 # Dock menu injection uses AppKit. Linux builds must not pull GTK through muda.
 [target.'cfg(target_os = "macos")'.dependencies]
