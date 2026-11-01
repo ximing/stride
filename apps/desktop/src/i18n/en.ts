@@ -648,6 +648,7 @@ export const en = {
     more: 'More',
     moreOf: '{{label}} more',
     copy: 'Copy',
+    copied: 'Copied',
     pasteFailed: 'Could not paste.',
     pickImage: 'Choose image',
     openLink: 'Open link',

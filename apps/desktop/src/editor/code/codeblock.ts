@@ -51,9 +51,13 @@ export const codeBlockExtension = CodeBlockLowlight.extend({
       let destroyed = false
       let idleId: number | null = null
       let timerId: ReturnType<typeof setTimeout> | null = null
+      let copiedId: ReturnType<typeof setTimeout> | null = null
 
       const dom = document.createElement('div')
       dom.className = 'editor-code'
+
+      const head = document.createElement('div')
+      head.className = 'editor-code-head'
 
       const select = document.createElement('button')
       select.dataset.testid = 'code-language'
@@ -94,7 +98,14 @@ export const codeBlockExtension = CodeBlockLowlight.extend({
       overlay.setAttribute('aria-hidden', 'true')
 
       frame.append(pre, overlay)
-      dom.append(select, button, frame)
+      head.append(select, button)
+      dom.append(head, frame)
+
+      // The overlay is absolutely positioned, so it does not follow the
+      // editable pre's horizontal scroll on its own. Keep them aligned.
+      pre.addEventListener('scroll', () => {
+        overlay.scrollLeft = pre.scrollLeft
+      })
 
       const cancel = () => {
         if (idleId != null && typeof cancelIdleCallback === 'function') cancelIdleCallback(idleId)
@@ -140,7 +151,17 @@ export const codeBlockExtension = CodeBlockLowlight.extend({
         if (!clipboard || typeof clipboard.writeText !== 'function') return
         try {
           const pending = clipboard.writeText(text)
-          if (pending && typeof pending.catch === 'function') pending.catch(() => {})
+          if (pending && typeof pending.then === 'function') {
+            pending.then(() => {
+              if (destroyed) return
+              button.textContent = t('editor.copied')
+              if (copiedId != null) clearTimeout(copiedId)
+              copiedId = setTimeout(() => {
+                copiedId = null
+                if (!destroyed) button.textContent = t('editor.copy')
+              }, 1200)
+            }, () => {})
+          }
         } catch {
           // clipboard can throw when the document is not focused
         }
@@ -174,6 +195,8 @@ export const codeBlockExtension = CodeBlockLowlight.extend({
           unwatchCopy()
           languageMenu.destroy()
           cancel()
+          if (copiedId != null) clearTimeout(copiedId)
+          copiedId = null
         },
       }
     }

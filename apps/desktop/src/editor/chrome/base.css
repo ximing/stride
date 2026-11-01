@@ -290,29 +290,71 @@
 
 .editor .ProseMirror .editor-code {
   position: relative;
-  margin: 0.4rem 0;
+  margin: 0.6rem 0;
+  overflow: hidden;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-lg);
+  background: var(--sd-bg);
+}
+
+.editor .ProseMirror .editor-code.ProseMirror-selectednode {
+  border-color: var(--sd-accent);
+  box-shadow: 0 0 0 1px var(--sd-accent);
+}
+
+.editor .ProseMirror .editor-code-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 6px 2px 10px;
+  border-bottom: 1px solid var(--sd-border);
+  background: color-mix(in srgb, var(--sd-fg) 3%, transparent);
+}
+
+.editor .ProseMirror .editor-code-head .editor-code-lang,
+.editor .ProseMirror .editor-code-head .editor-code-copy {
+  width: auto;
+  min-height: 24px;
+  padding: 0 6px;
+  font-size: var(--sd-text-xs);
+}
+
+.editor .ProseMirror .editor-code-head .editor-code-lang {
+  font-family: var(--sd-font-mono);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
 }
 
 .editor .ProseMirror .editor-code pre {
   margin: 0;
+  padding: 10px 14px 12px;
+  overflow-x: auto;
   font-family: var(--sd-font-mono);
+  font-size: var(--sd-text-sm);
+  line-height: 1.6;
+  tab-size: 4;
   white-space: pre;
 }
 
-.editor .ProseMirror .editor-code-overlay {
+/* Four classes outrank the `.editor-code pre` rule above: the highlight
+   overlay scrolls programmatically (scrollLeft synced from the editable
+   pre) and must never show its own scrollbar. */
+.editor .ProseMirror .editor-code .editor-code-overlay {
   position: absolute;
   inset: 0;
+  overflow: hidden;
   pointer-events: none;
-  margin: 0;
   color: var(--sd-fg);
 }
 
-.editor .ProseMirror .editor-code select {
-  width: auto;
-}
-
-.editor .ProseMirror .editor-code button {
-  width: auto;
+/* Inline code is a quiet chip; fenced blocks are the card above. */
+.editor .ProseMirror :where(p, li, h1, h2, h3, h4, h5, h6) code {
+  padding: 0.08em 0.32em;
+  border-radius: var(--sd-radius-sm);
+  background: color-mix(in srgb, var(--sd-fg) 6%, transparent);
+  font-family: var(--sd-font-mono);
+  font-size: 0.86em;
 }
 
 .editor-code-overlay .hljs-keyword {
@@ -751,11 +793,6 @@
 .editor .ProseMirror .doc-mermaid-status {
   padding: 0.6rem;
   color: var(--sd-muted);
-}
-
-.editor .ProseMirror .editor-code-lang {
-  width: auto;
-  margin: 0 0.35rem 0.25rem 0;
 }
 
 .editor-code-menu {
