@@ -655,6 +655,13 @@ export const zh: DeepString<Catalog> = {
     moreOf: '{{label}}更多',
     copy: '复制',
     copied: '已复制',
+    codeBlock: {
+      fold: '折叠代码',
+      expand: '展开代码',
+      empty: '空代码',
+      lines: '{{count}} 行',
+      preview: '{{text}} · {{count}} 行',
+    },
     pasteFailed: '无法粘贴。',
     pickImage: '选择图片',
     openLink: '打开链接',

@@ -307,9 +307,48 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  padding: 2px 6px 2px 10px;
+  padding: 2px 6px;
   border-bottom: 1px solid var(--sd-border);
   background: color-mix(in srgb, var(--sd-fg) 3%, transparent);
+}
+
+.editor .ProseMirror .editor-code.is-collapsed .editor-code-head {
+  border-bottom: 0;
+}
+
+.editor .ProseMirror .editor-code-tools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.editor .ProseMirror .editor-code-summary {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  color: var(--sd-muted);
+  font-family: var(--sd-font-mono);
+  font-size: var(--sd-text-xs);
+  line-height: 1.4;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  user-select: none;
+}
+
+.editor .ProseMirror .editor-code-summary[hidden] {
+  display: none;
+}
+
+.editor .ProseMirror .editor-code-frame {
+  position: relative;
+  /* Keep the highlight overlay and the caret inside this card. */
+  z-index: 0;
+}
+
+.editor .ProseMirror .editor-code-frame[hidden] {
+  display: none;
 }
 
 .editor .ProseMirror .editor-code-head .editor-code-lang,
@@ -326,10 +365,18 @@
   text-transform: uppercase;
 }
 
+/* The shared `.editor .ProseMirror pre` rule paints an opaque background and a
+   border. Inside this card that plate covers whichever layer sits behind it,
+   so the editable pre and the highlight overlay both stay transparent. The
+   pre stays above the overlay: its glyphs are hidden, and the caret remains. */
 .editor .ProseMirror .editor-code pre {
+  position: relative;
+  z-index: 1;
   margin: 0;
   padding: 10px 14px 12px;
   overflow-x: auto;
+  border: 0;
+  background: transparent;
   font-family: var(--sd-font-mono);
   font-size: var(--sd-text-sm);
   line-height: 1.6;
@@ -337,13 +384,37 @@
   white-space: pre;
 }
 
+/* The caret is measured on this element. Visible glyphs are the overlay,
+   which uses the pre's font. The global `code` rule is 0.9em, so without
+   this the caret lands short and sits on a character. */
+.editor .ProseMirror .editor-code pre code {
+  font-size: inherit;
+  line-height: inherit;
+}
+
+/* macOS draws the caret from `color`. `color: transparent` hides it, so the
+   glyphs stay invisible with text-fill and the caret keeps the text color. */
+.editor .ProseMirror .editor-code pre code.is-highlighted {
+  color: var(--sd-fg);
+  -webkit-text-fill-color: transparent;
+  caret-color: var(--sd-fg);
+}
+
+.editor .ProseMirror .editor-code pre code.is-highlighted::selection {
+  -webkit-text-fill-color: transparent;
+  background: color-mix(in srgb, var(--sd-accent) 28%, transparent);
+}
+
 /* Four classes outrank the `.editor-code pre` rule above: the highlight
    overlay scrolls programmatically (scrollLeft synced from the editable
    pre) and must never show its own scrollbar. */
 .editor .ProseMirror .editor-code .editor-code-overlay {
   position: absolute;
+  z-index: 0;
   inset: 0;
   overflow: hidden;
+  border: 0;
+  background: transparent;
   pointer-events: none;
   color: var(--sd-fg);
 }

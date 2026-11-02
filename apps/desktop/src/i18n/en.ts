@@ -649,6 +649,13 @@ export const en = {
     moreOf: '{{label}} more',
     copy: 'Copy',
     copied: 'Copied',
+    codeBlock: {
+      fold: 'Collapse code',
+      expand: 'Expand code',
+      empty: 'Empty code',
+      lines: '{{count}} lines',
+      preview: '{{text}} · {{count}} lines',
+    },
     pasteFailed: 'Could not paste.',
     pickImage: 'Choose image',
     openLink: 'Open link',

@@ -1,6 +1,14 @@
 import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight'
+import { NodeSelection } from '@tiptap/pm/state'
 import { common, createLowlight } from 'lowlight'
 import { t, watchLocale } from '../../i18n'
+import {
+  CODE_FOLD_META,
+  codeBlockCollapsedAttribute,
+  codeBlockCollapsedOf,
+  codeBlockFoldLabel,
+  codeFoldTypingPlugin,
+} from './code-fold'
 import { registerDocCodeAliases } from './code-language'
 import { attachCodeLanguageMenu } from './code-language-menu'
 
@@ -39,10 +47,34 @@ function highlightHtml(language: unknown, text: string): string {
   }
 }
 
+function foldChevron(): SVGSVGElement {
+  const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg')
+  svg.setAttribute('viewBox', '0 0 24 24')
+  svg.setAttribute('width', '14')
+  svg.setAttribute('height', '14')
+  svg.setAttribute('fill', 'none')
+  svg.setAttribute('stroke', 'currentColor')
+  svg.setAttribute('stroke-width', '2')
+  svg.setAttribute('stroke-linecap', 'round')
+  svg.setAttribute('stroke-linejoin', 'round')
+  svg.setAttribute('aria-hidden', 'true')
+  const path = document.createElementNS('http://www.w3.org/2000/svg', 'path')
+  path.setAttribute('d', 'm9 18 6-6-6-6')
+  svg.append(path)
+  return svg
+}
+
 export const codeBlockExtension = CodeBlockLowlight.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      collapsed: codeBlockCollapsedAttribute(),
+    }
+  },
+
   // Decorations from the stock plugin run on every transaction. Highlight later, off the input path.
   addProseMirrorPlugins() {
-    return []
+    return [codeFoldTypingPlugin()]
   },
 
   addNodeView() {
@@ -58,6 +90,22 @@ export const codeBlockExtension = CodeBlockLowlight.extend({
 
       const head = document.createElement('div')
       head.className = 'editor-code-head'
+
+      const tools = document.createElement('div')
+      tools.className = 'editor-code-tools'
+
+      const fold = document.createElement('button')
+      fold.type = 'button'
+      fold.className = 'editor-code-fold'
+      fold.dataset.testid = 'code-fold'
+      fold.setAttribute('aria-expanded', 'true')
+      fold.append(foldChevron())
+
+      const summary = document.createElement('div')
+      summary.className = 'editor-code-summary'
+      summary.dataset.testid = 'code-summary'
+      summary.setAttribute('contenteditable', 'false')
+      summary.hidden = true
 
       const select = document.createElement('button')
       select.dataset.testid = 'code-language'
@@ -87,7 +135,7 @@ export const codeBlockExtension = CodeBlockLowlight.extend({
       const unwatchCopy = watchLocale(applyCopy)
 
       const frame = document.createElement('div')
-      frame.style.position = 'relative'
+      frame.className = 'editor-code-frame'
 
       const pre = document.createElement('pre')
       const code = document.createElement('code')
@@ -98,8 +146,60 @@ export const codeBlockExtension = CodeBlockLowlight.extend({
       overlay.setAttribute('aria-hidden', 'true')
 
       frame.append(pre, overlay)
-      head.append(select, button)
+      tools.append(fold, select, summary)
+      head.append(tools, button)
       dom.append(head, frame)
+
+      const readPos = (): number | null => {
+        const pos = getPos()
+        return typeof pos === 'number' ? pos : null
+      }
+
+      const setCollapsed = (next: boolean): void => {
+        if (editor.isDestroyed) return
+        const pos = readPos()
+        if (pos === null) return
+        const block = editor.state.doc.nodeAt(pos)
+        if (!block || block.type.name !== 'codeBlock') return
+        if (codeBlockCollapsedOf(block.attrs.collapsed) === next) return
+        const tr = editor.state.tr.setNodeMarkup(pos, undefined, { ...block.attrs, collapsed: next })
+        tr.setMeta(CODE_FOLD_META, true)
+        if (next) {
+          const mapped = tr.mapping.map(pos)
+          const updated = tr.doc.nodeAt(mapped)
+          const selection = tr.selection
+          const inside = updated !== null && selection.from > mapped && selection.to < mapped + updated.nodeSize
+          if (inside && updated) tr.setSelection(NodeSelection.create(tr.doc, mapped))
+        }
+        editor.view.dispatch(tr)
+      }
+
+      const paintFold = () => {
+        const collapsed = codeBlockCollapsedOf(current.attrs.collapsed)
+        dom.classList.toggle('is-collapsed', collapsed)
+        fold.setAttribute('aria-expanded', collapsed ? 'false' : 'true')
+        fold.setAttribute('aria-label', t(collapsed ? 'editor.codeBlock.expand' : 'editor.codeBlock.fold'))
+        summary.hidden = !collapsed
+        summary.textContent = codeBlockFoldLabel(current.textContent)
+        frame.hidden = collapsed
+      }
+      paintFold()
+      const unwatchFold = watchLocale(paintFold)
+
+      fold.addEventListener('pointerdown', (event) => {
+        if (event.button !== 0) return
+        event.preventDefault()
+        event.stopPropagation()
+        setCollapsed(!codeBlockCollapsedOf(current.attrs.collapsed))
+      })
+      fold.addEventListener('click', (event) => {
+        event.preventDefault()
+      })
+      fold.addEventListener('keydown', (event) => {
+        if (event.key !== 'Enter' && event.key !== ' ') return
+        event.preventDefault()
+        setCollapsed(!codeBlockCollapsedOf(current.attrs.collapsed))
+      })
 
       // The overlay is absolutely positioned, so it does not follow the
       // editable pre's horizontal scroll on its own. Keep them aligned.
@@ -120,13 +220,9 @@ export const codeBlockExtension = CodeBlockLowlight.extend({
         if (destroyed) return
         const html = highlightHtml(current.attrs.language, code.textContent ?? '')
         overlay.innerHTML = html
-        if (html) {
-          code.style.color = 'transparent'
-          code.style.caretColor = 'var(--sd-fg)'
-        } else {
-          code.style.color = ''
-          code.style.caretColor = ''
-        }
+        // Glyphs live in the overlay. Hiding them with `color: transparent`
+        // also hides the caret on macOS, so the CSS class uses text-fill.
+        code.classList.toggle('is-highlighted', html.length > 0)
       }
 
       const schedule = () => {
@@ -169,6 +265,21 @@ export const codeBlockExtension = CodeBlockLowlight.extend({
 
       schedule()
 
+      // Opening a document can leave the caret in a hidden block. Select the block instead.
+      queueMicrotask(() => {
+        if (destroyed || editor.isDestroyed || !editor.isEditable) return
+        const pos = readPos()
+        if (pos === null) return
+        const block = editor.state.doc.nodeAt(pos)
+        if (!block || block.type.name !== 'codeBlock' || !codeBlockCollapsedOf(block.attrs.collapsed)) return
+        const selection = editor.state.selection
+        const inside = selection.from > pos && selection.to < pos + block.nodeSize
+        if (!inside) return
+        const tr = editor.state.tr.setSelection(NodeSelection.create(editor.state.doc, pos))
+        tr.setMeta('addToHistory', false)
+        editor.view.dispatch(tr)
+      })
+
       return {
         dom,
         contentDOM: code,
@@ -176,6 +287,7 @@ export const codeBlockExtension = CodeBlockLowlight.extend({
           if (updated.type.name !== current.type.name) return false
           current = updated
           languageMenu.sync()
+          paintFold()
           schedule()
           return true
         },
@@ -188,11 +300,15 @@ export const codeBlockExtension = CodeBlockLowlight.extend({
         },
         stopEvent(event) {
           const target = event.target
-          return target instanceof globalThis.Node && (select.contains(target) || button.contains(target))
+          return (
+            target instanceof globalThis.Node &&
+            (select.contains(target) || button.contains(target) || fold.contains(target) || summary.contains(target))
+          )
         },
         destroy() {
           destroyed = true
           unwatchCopy()
+          unwatchFold()
           languageMenu.destroy()
           cancel()
           if (copiedId != null) clearTimeout(copiedId)

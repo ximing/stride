@@ -156,7 +156,12 @@ describe('editor file round trip', () => {
     const codeArb = fc.record({
       language: fc.constantFrom('javascript', 'typescript', 'json', 'python', 'bash', 'xml', 'css', 'markdown'),
       value: word,
-    }).map(({ language, value }) => ({ type: 'codeBlock', attrs: { language }, content: [text(value)] }))
+      collapsed: fc.boolean(),
+    }).map(({ language, value, collapsed }) => ({
+      type: 'codeBlock',
+      attrs: { language, collapsed },
+      content: [text(value)],
+    }))
     const linkArb = fc.record({
       target: word,
       alias: fc.option(word, { nil: null }),

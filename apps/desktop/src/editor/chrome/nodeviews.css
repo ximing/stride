@@ -1,4 +1,5 @@
 /* ProseMirror NodeViews retain their own focus, IME, and event ownership. */
+.editor .ProseMirror .editor-code-fold,
 .editor .ProseMirror .editor-code-lang,
 .editor .ProseMirror .editor-code-copy,
 .editor .ProseMirror .doc-mermaid-mode,
@@ -14,6 +15,26 @@
   font-size: 12px;
 }
 
+.editor .ProseMirror .editor-code-fold {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  min-height: 22px;
+  padding: 0;
+  flex: none;
+}
+
+.editor .ProseMirror .editor-code-fold svg {
+  display: block;
+}
+
+.editor .ProseMirror .editor-code-fold[aria-expanded='true'] svg {
+  transform: rotate(90deg);
+}
+
+.editor .ProseMirror .editor-code-fold:hover:not(:disabled),
 .editor .ProseMirror .editor-code-lang:hover:not(:disabled),
 .editor .ProseMirror .editor-code-lang.is-open,
 .editor .ProseMirror .editor-code-copy:hover:not(:disabled),
@@ -111,6 +132,7 @@
 .slash-menu-item:focus-visible,
 .editor-code-menu-filter:focus-visible,
 .editor-code-menu-option:focus-visible,
+.editor .ProseMirror .editor-code-fold:focus-visible,
 .editor .ProseMirror .editor-code-lang:focus-visible,
 .editor .ProseMirror .editor-code-copy:focus-visible,
 .editor .ProseMirror .doc-mermaid-mode:focus-visible,

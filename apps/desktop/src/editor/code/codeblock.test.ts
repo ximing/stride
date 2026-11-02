@@ -1,6 +1,6 @@
 import { Editor } from '@tiptap/core'
 import { parseNote, serializeNote, type TipTapNode } from '@stride/core/note'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { lastCopiedText } from './codeblock'
 import { createEditorExtensions } from '../extensions'
 
@@ -59,6 +59,18 @@ describe('code block', () => {
     )
     editor.commands.setContent(parsed.doc)
     expect(editor.getJSON()).toEqual(canonical)
+  })
+
+  it('highlights through the overlay without painting the editable text transparent', async () => {
+    createEditor()
+    editor.commands.setContent(codeBlockDoc)
+    const code = editor.view.dom.querySelector('.editor-code code') as HTMLElement
+    const overlay = editor.view.dom.querySelector('.editor-code-overlay')
+    await vi.waitFor(() => {
+      expect(code.classList.contains('is-highlighted')).toBe(true)
+    })
+    expect(code.style.color).toBe('')
+    expect(overlay?.textContent).toContain('export')
   })
 
   it('copies the code block text', () => {
