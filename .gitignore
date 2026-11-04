@@ -13,3 +13,6 @@ minisign.key
 *.key.pub
 .claude/scheduled_tasks.lock
 design/
+
+# Local updater signing env (never commit)
+.env

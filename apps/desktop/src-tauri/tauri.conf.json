@@ -41,7 +41,7 @@
     },
     "updater": {
       "active": true,
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEVEOTJGNkM5MDcyOEFDNkMKUldSc3JDZ0h5ZmFTN1QxWWFKMVdzUVBMNkdQTUVJejhtdEhCRlhvc2NuTnNEblQxS0I3aFQ3TEgK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEUyMEQ2NzVCNkU4MUQzNUMKUldSYzA0RnVXMmNONHE3NCtEWVEzZHBEZmtPbTMyRWZFOVhrSitCNGoxb3BBV0JkeTFMOCtyY1cK",
       "requireSignedVersion": true,
       "endpoints": [
         "https://github.com/ximing/stride/releases/latest/download/latest.json"
@@ -68,7 +68,8 @@
       "icons/icon.png"
     ],
     "macOS": {
-      "minimumSystemVersion": "10.15"
+      "minimumSystemVersion": "10.15",
+      "signingIdentity": "Apple Development: 铭 席 (G2TX5T765Q)"
     }
   }
 }

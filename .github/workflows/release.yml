@@ -22,7 +22,9 @@
 # the Release and uploading assets), signing secrets referenced only as env
 # of the single build step, actions pinned to major versions.
 # APPLE_SIGNING_IDENTITY='-' ad-hoc signs the mac builds so Apple Silicon
-# DMGs show "unidentified developer" instead of "damaged".
+# DMGs show "unidentified developer" instead of "damaged" — unless the
+# APPLE_CERTIFICATE secrets are set, in which case the stable development
+# identity from tauri.conf.json > bundle.macOS.signingIdentity is used.
 
 name: Release
 
@@ -100,7 +102,14 @@ jobs:
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: '-' # ad-hoc sign, macOS only (no-op elsewhere)
+          # When APPLE_CERTIFICATE (base64 .p12) + password secrets exist, mac
+          # builds sign with the same stable development identity used for
+          # local builds, so Keychain authorization survives auto-updates.
+          # Falls back to ad-hoc ('-') when the secrets are not set. The CLI
+          # imports the .p12 into a temporary keychain itself.
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: "${{ secrets.APPLE_CERTIFICATE != '' && 'Apple Development: 铭 席 (G2TX5T765Q)' || '-' }}"
 
       - name: Verify built version matches tag
         if: runner.os == 'macOS'
