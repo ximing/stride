@@ -10,7 +10,8 @@ use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
 use tauri::{
-    AppHandle, Emitter, LogicalPosition, Manager, State, WebviewWindow, WebviewWindowBuilder,
+    AppHandle, Emitter, LogicalPosition, Manager, Runtime, State, WebviewWindow,
+    WebviewWindowBuilder,
 };
 
 use crate::recent::{self, MenuCopy, RecentProject};
@@ -46,7 +47,7 @@ pub struct Host {
     inner: Mutex<HostInner>,
 }
 
-pub fn install(app: &AppHandle) -> Result<(), Box<dyn std::error::Error>> {
+pub fn install<R: Runtime>(app: &AppHandle<R>) -> Result<(), Box<dyn std::error::Error>> {
     let recent = prepare_loaded(load_recent(app));
     let copy = MenuCopy::default();
     let signature = recent::menu_signature(&recent, &copy);
@@ -225,7 +226,7 @@ pub fn menu_open_project(app: AppHandle) {
     spawn_deliver(app, WindowIntent::PickOpen);
 }
 
-fn with_host<T>(app: &AppHandle, f: impl FnOnce(&mut HostInner) -> T) -> T {
+fn with_host<R: Runtime, T>(app: &AppHandle<R>, f: impl FnOnce(&mut HostInner) -> T) -> T {
     let host: State<'_, Host> = app.state::<Host>();
     let mut guard = host
         .inner
@@ -279,7 +280,7 @@ fn focus_window(window: &WebviewWindow) {
     let _ = window.set_focus();
 }
 
-fn focused_origin(app: &AppHandle) -> Option<(f64, f64)> {
+fn focused_origin<R: Runtime>(app: &AppHandle<R>) -> Option<(f64, f64)> {
     let (_, window) = app
         .webview_windows()
         .into_iter()
@@ -290,7 +291,18 @@ fn focused_origin(app: &AppHandle) -> Option<(f64, f64)> {
     Some((logical.x + 28.0, logical.y + 28.0))
 }
 
-fn create_window(app: &AppHandle, intent: WindowIntent) -> Result<(), String> {
+fn create_window<R: Runtime>(app: &AppHandle<R>, intent: WindowIntent) -> Result<(), String> {
+    create_window_with(app, intent, crate::frame::attach::<R>)
+}
+
+/// Split from `create_window` so tests can swap the AppKit shadow attach:
+/// the mock runtime hands out a bogus `ns_view` pointer, and touching it
+/// segfaults the test process (production keeps `frame::attach`).
+fn create_window_with<R: Runtime>(
+    app: &AppHandle<R>,
+    intent: WindowIntent,
+    attach: impl FnOnce(&WebviewWindow<R>),
+) -> Result<(), String> {
     let position = focused_origin(app);
     let label = with_host(app, |host| {
         let label = format!("win{}", host.next_id);
@@ -322,7 +334,7 @@ fn create_window(app: &AppHandle, intent: WindowIntent) -> Result<(), String> {
             if let Some((x, y)) = position {
                 let _ = window.set_position(LogicalPosition::new(x, y));
             }
-            crate::frame::attach(&window);
+            attach(&window);
             Ok(())
         }
         Err(error) => {
@@ -334,7 +346,7 @@ fn create_window(app: &AppHandle, intent: WindowIntent) -> Result<(), String> {
     }
 }
 
-fn recent_file(app: &AppHandle) -> Result<std::path::PathBuf, String> {
+fn recent_file<R: Runtime>(app: &AppHandle<R>) -> Result<std::path::PathBuf, String> {
     let directory = app
         .path()
         .app_config_dir()
@@ -343,7 +355,7 @@ fn recent_file(app: &AppHandle) -> Result<std::path::PathBuf, String> {
     Ok(directory.join("recent-projects.json"))
 }
 
-fn load_recent(app: &AppHandle) -> Vec<RecentProject> {
+fn load_recent<R: Runtime>(app: &AppHandle<R>) -> Vec<RecentProject> {
     let Ok(path) = recent_file(app) else {
         return Vec::new();
     };
@@ -420,6 +432,47 @@ mod tests {
             plan_delivery(&WindowIntent::PickCreate, &open, &one_empty, Some("main")),
             Delivery::Emit("win2".to_string())
         );
+    }
+
+    #[test]
+    fn create_window_on_a_delivery_thread_completes_and_attaches() {
+        // Regression for the new-window crash: `menu_new_window` delivers on
+        // a spawned thread, so the whole creation path must be safe there.
+        // The AppKit shadow attach is injected (the mock runtime's NSWindow
+        // pointer is bogus) and its main-thread hop is pinned separately by
+        // `frame::tests::background_threads_plan_a_main_thread_hop_for_the_first_kick`.
+        use std::sync::{
+            atomic::{AtomicBool, Ordering},
+            Arc,
+        };
+        let mut context = tauri::test::mock_context(tauri::test::noop_assets());
+        context
+            .config_mut()
+            .app
+            .windows
+            .push(tauri::utils::config::WindowConfig {
+                label: "main".into(),
+                ..Default::default()
+            });
+        let app = tauri::test::mock_builder().build(context).unwrap();
+        install(app.handle()).unwrap();
+
+        let attached = Arc::new(AtomicBool::new(false));
+        let flag = attached.clone();
+        let handle = app.handle().clone();
+        let created = std::thread::spawn(move || {
+            create_window_with(&handle, WindowIntent::Fresh, move |_| {
+                flag.store(true, Ordering::SeqCst);
+            })
+        })
+        .join()
+        .expect("delivery thread panicked");
+        created.expect("create_window failed");
+
+        assert!(attached.load(Ordering::SeqCst));
+        assert!(app.get_webview_window("win2").is_some());
+        let intent = with_host(app.handle(), |host| host.intents.get("win2").cloned());
+        assert_eq!(intent, Some(WindowIntent::Fresh));
     }
 
     #[test]

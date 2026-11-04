@@ -9,7 +9,7 @@
 #[cfg(target_os = "macos")]
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use tauri::WebviewWindow;
+use tauri::{Runtime, WebviewWindow};
 
 #[cfg(target_os = "macos")]
 static RESIZE_TICK: AtomicU64 = AtomicU64::new(0);
@@ -29,8 +29,29 @@ pub fn corner_radius(filled: bool) -> f64 {
     }
 }
 
-pub fn attach(window: &WebviewWindow) {
-    kick(window);
+/// Where the first shadow kick may run. AppKit traps the whole process on
+/// NSWindow calls from a background thread, and window delivery spawns a
+/// thread per new window, so the inline kick is only for the main thread.
+#[cfg(target_os = "macos")]
+#[derive(Debug, PartialEq)]
+enum KickPlan {
+    Inline,
+    HopToMainThread,
+}
+
+#[cfg(target_os = "macos")]
+fn kick_plan() -> KickPlan {
+    if macos::on_main_thread() {
+        KickPlan::Inline
+    } else {
+        KickPlan::HopToMainThread
+    }
+}
+
+/// Safe from any thread: the first kick follows `kick_plan`, and the retries
+/// already hop through `run_on_main_thread`.
+pub fn attach<R: Runtime>(window: &WebviewWindow<R>) {
+    first_kick(window);
     #[cfg(target_os = "macos")]
     {
         let window = window.clone();
@@ -44,13 +65,26 @@ pub fn attach(window: &WebviewWindow) {
     }
 }
 
-pub fn sync(window: &WebviewWindow) {
+fn first_kick<R: Runtime>(window: &WebviewWindow<R>) {
+    #[cfg(target_os = "macos")]
+    match kick_plan() {
+        KickPlan::Inline => kick(window),
+        KickPlan::HopToMainThread => {
+            let again = window.clone();
+            let _ = window.run_on_main_thread(move || kick(&again));
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    kick(window);
+}
+
+pub fn sync<R: Runtime>(window: &WebviewWindow<R>) {
     apply(window, false);
 }
 
 /// Refresh after a resize, then once more so the document can drop the radius
 /// before AppKit samples the shadow. Live resizing only keeps the last pass.
-pub fn sync_after_resize(window: &WebviewWindow) {
+pub fn sync_after_resize<R: Runtime>(window: &WebviewWindow<R>) {
     sync(window);
     #[cfg(target_os = "macos")]
     {
@@ -67,11 +101,11 @@ pub fn sync_after_resize(window: &WebviewWindow) {
     }
 }
 
-pub fn kick(window: &WebviewWindow) {
+pub fn kick<R: Runtime>(window: &WebviewWindow<R>) {
     apply(window, true);
 }
 
-fn apply(window: &WebviewWindow, kick_shadow: bool) {
+fn apply<R: Runtime>(window: &WebviewWindow<R>, kick_shadow: bool) {
     #[cfg(target_os = "macos")]
     macos::apply(window, kick_shadow);
     #[cfg(not(target_os = "macos"))]
@@ -82,12 +116,24 @@ fn apply(window: &WebviewWindow, kick_shadow: bool) {
 mod macos {
     use objc2::rc::Retained;
     use objc2_app_kit::NSWindow;
-    use tauri::WebviewWindow;
+    use tauri::{Runtime, WebviewWindow};
 
-    pub fn apply(window: &WebviewWindow, kick_shadow: bool) {
+    /// True only on the process main thread (`pthread_main_np`).
+    pub fn on_main_thread() -> bool {
+        objc2::MainThreadMarker::new().is_some()
+    }
+
+    pub fn apply<R: Runtime>(window: &WebviewWindow<R>, kick_shadow: bool) {
+        // Mock windows (unit tests) have no NSWindow; bail before the thread
+        // check so tests can exercise the delivery path from any thread.
         let Ok(ptr) = window.ns_window() else {
             return;
         };
+        debug_assert!(
+            on_main_thread(),
+            "frame: AppKit window calls must run on the main thread (window {})",
+            window.label()
+        );
         let Some(ns_window) = (unsafe { Retained::<NSWindow>::retain(ptr.cast()) }) else {
             return;
         };
@@ -123,5 +169,27 @@ mod tests {
         assert!(SHADOW_RETRY_MS[0] <= 32);
         let total: u64 = SHADOW_RETRY_MS.iter().sum();
         assert!(total < 2_000);
+    }
+
+    /// Window delivery runs on spawned threads; the main-thread guard must
+    /// report them as background so `attach` hops instead of trapping.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn spawned_threads_are_not_the_main_thread() {
+        let on_main = std::thread::spawn(super::macos::on_main_thread)
+            .join()
+            .expect("probe thread panicked");
+        assert!(!on_main);
+    }
+
+    /// The new-window crash regression: from a delivery thread the first
+    /// shadow kick must hop to the main thread, never run inline.
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn background_threads_plan_a_main_thread_hop_for_the_first_kick() {
+        let plan = std::thread::spawn(super::kick_plan)
+            .join()
+            .expect("probe thread panicked");
+        assert_eq!(plan, super::KickPlan::HopToMainThread);
     }
 }

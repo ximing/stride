@@ -7,6 +7,10 @@ description = "Stride local-first notes"
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
 
+[dev-dependencies]
+# Unlocks `tauri::test` (mock runtime) for window-host regression tests.
+tauri = { version = "2", features = ["test"] }
+
 [dependencies]
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
