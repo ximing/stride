@@ -1,20 +1,32 @@
 ---
 name: stride
-description: Use when an agent needs to use Stride to create, read, organize, update, or manage vault notes, folders, relationships, categories (Types), properties, archives, or migrate/import a Tolaria or Markdown vault. 适用于使用 Stride 管理或迁移知识库内容，不适用于开发、构建或调试 Stride 本身。
+description: Use when an external agent needs to edit Stride document content, add/remove document relationships or backlinks, manage vault notes, folders, Types, properties or archives, or import a Markdown/Tolaria vault. 适用于外部 agent 修改、续写、改写文档正文，建立、替换、删除文档关系及整理知识库；不用于开发、构建或调试 Stride 本身。
 ---
 
 # 使用 Stride 管理知识库
 
-Stride 的 Vault 是一个本地文件夹，每篇笔记是 `*.stride.json` 富文本文档。用本技能完成用户的内容管理任务；不需要启动开发服务器、修改产品源码或调用内部 Service。
+Stride 的 Vault 是一个本地文件夹，每篇笔记（文档）是 `*.stride.json` 富文本文档。外部 agent 使用本 skill 随附脚本编辑正文与关系，不需要 Stride 源码、开发服务器或内部 Service。分发时复制整个 skill 目录；脚本只依赖 Node.js 18+，无需安装 npm 包，不自动暴露 MCP/应用工具。
 
 ## 选择操作入口
 
 1. 确定用户要操作的 Vault。当前工作目录可能是 Stride 源码仓库，不能自动当作用户知识库。已有 Vault 可含 `.stride/vault.json`，其中 `kind` 为 `stride-vault`；没有标记也可能是用户选定的普通文件夹。
 2. 有应用提供的笔记工具时，使用实际暴露的工具及其参数。下文列出的工具属于内置 Agent，不代表外部 Agent 自动拥有这些工具，也不是 CLI 命令。
-3. 外部 Agent 已能访问用户指定的 Vault 时，可按 [Vault 文件操作](references/vault-files.md) 直接管理文件、目录、分类与关系。先读现有内容和该 Vault 自己的 `AGENTS.md` / `CLAUDE.md`。
+3. 外部 Agent 已能访问用户指定的 Vault 时，先读该 Vault 自己的 `AGENTS.md` / `CLAUDE.md`，再按 [随附脚本](references/cli.md) 操作正文与结构关系，优先让脚本处理 JSON。脚本未覆盖的目录、分类、自定义属性等任务按 [Vault 文件操作](references/vault-files.md) 执行。
 4. 只有界面访问能力时，通过 Stride 的目录树、笔记编辑器、类型与属性/关系面板操作，按当前界面识别控件。没有写权限或对应入口时，明确缺少的能力，不虚构 API。
 
 外部文件编辑前确保应用已保存相关笔记，避免与编辑器同时写同一文件；操作后在应用中刷新或重新打开 Vault，检查显示和搜索。不要假定所有宿主都会自动监测外部修改。
+
+## 外部 Agent 快速入口
+
+以下命令在 skill 目录中执行，也可将脚本替换为绝对路径。第一次使用先读 [脚本参数、批量操作和限制](references/cli.md)。
+
+```bash
+node scripts/stride.mjs list --vault /path/to/vault
+node scripts/stride.mjs read --vault /path/to/vault --note projects/alpha
+node scripts/stride.mjs --help
+```
+
+`read` 返回完整文档、可读节点引用（如 `b1`）及 `revision`。用 `replace-text` 改字、`insert` 插入纯文本段落、`delete-block` 删除块、`relations list/add/remove` 管理关系；`apply` 一次提交多项操作。每次写入都必须传原始 `--revision`，可加 `--dry-run` 查看结果。不要让模型重写整篇 JSON；不支持的跨格式替换会明确报错，保留原文件。
 
 ## 内容模型速查
 
@@ -33,6 +45,8 @@ Stride 的 Vault 是一个本地文件夹，每篇笔记是 `*.stride.json` 富�
 
 ## 内置 Agent 工具
 
+仅在当前环境实际暴露这些工具时使用；只有文件访问能力时直接走文件流程，不等待工具接入。
+
 | 工具 | 参数 | 用途 |
 | --- | --- | --- |
 | `list_notes` | `{}` | 获得笔记 `id` 和标题 |
@@ -40,16 +54,30 @@ Stride 的 Vault 是一个本地文件夹，每篇笔记是 `*.stride.json` 富�
 | `read_note` | `{ "id": "projects/alpha" }` | 读取完整 `doc`、属性及辅助纯文本 |
 | `read_active_note` | `{}` | 读取当前打开的笔记 |
 | `get_backlinks` | `{ "id": "projects/alpha" }` | 查看入链 |
+| `get_relations` | `{ "id": "projects/alpha" }` | 查看属性关系、正文引用和入链 |
 | `create_note` | `{ "title": "Alpha" }` | 创建笔记；使用返回的实际 ID |
 | `append_to_note` | `{ "id": "…", "node": { "type": "paragraph" } }` | 追加一个 TipTap 块 |
 | `write_note` | `{ "id": "…", "path": [1], "node": { "type": "paragraph" } }` | 替换一个已有节点，`[1]` 为第二个顶层块 |
-| `undo_note` | `{ "id": "…" }` | 恢复当前工具实例中该笔记最近一次 append/write 前的快照 |
+| `insert_block` | `{ "id": "…", "index": 2, "node": { "type": "paragraph" } }` | 在顶层索引前插入块 |
+| `remove_block` | `{ "id": "…", "path": [2] }` | 删除指定路径的节点 |
+| `link_relation` / `unlink_relation` | `{ "id": "…", "kind": "belongs_to", "target": "Team" }` | 添加/删除源笔记关系；kind 也可为 `related_to` |
+| `set_note` | `{ "id": "…", "type": "项目" }` | 修改普通笔记 title/type/archived；不改变 ID |
+| `undo_note` | `{ "id": "…" }` | 恢复当前工具实例中该笔记最近一次写入前保存的快照 |
 
 `write_note` 不是整文件写入：不能靠它设置 `properties`、`type` 或创建目录；`path` 必须非空且指向已有节点，嵌套路径逐层索引 `content`。先读 `doc` 再决定位置，第一块可能是标题 H1。读取结果中的 `plainText` 只用于理解，不用于重建原文档。
 
-当前工具集没有目录管理、属性/分类设置、删除或独立重命名工具；这些任务使用文件或界面入口。安全模式会移除上述四个写工具，不要绕过模式限制；需要应用内写入时由用户切换到允许写入的模式。`undo_note` 不会撤销创建，也不是持久的多步历史。
+属性还有 `set_property`、`rename_property`、`remove_property`，分类有 `list_types`、`create_type`、`update_type`；按实际工具 schema 使用。目录管理、文件移动与笔记永久删除使用文件或界面入口。安全模式下以实际可用的只读工具为准，不绕过模式限制。`undo_note` 不会撤销创建，也不是持久的多步历史，不能假定一次撤销会还原整组操作。
 
 ## 常用任务
+
+### 修改、续写、改写与删除正文
+
+先读 [正文编辑步骤](references/vault-files.md#正文编辑步骤)，再执行：
+
+1. 用路径/ID 与标题定位文档，读取完整 JSON；通过章节标题和上下文确认要改的节点，不能直接把搜索摘要或纯文本当作原文。
+2. 明确编辑范围：改几个字、替换段落、改写章节、插入内容或删除指定块。只更新对应 `text` 或父节点 `content`，保留未涉及的 marks、图片、表格、公式和自定义节点。
+3. 有应用工具时使用 `write_note`、`append_to_note`、`insert_block`、`remove_block`；外部 agent 优先使用随附脚本。直接文件操作或应用工具增删后须重新定位路径；脚本 `apply` 内的引用固定指向原节点，独立调用间仍需使用新返回的引用和版本。
+4. 写前核对文件未变化，写后读回并比较变更范围。正文编辑默认不改标题、分类或关系；正文中的双链本身也是内容，按用户意图保留或修改。
 
 ### 从 Tolaria / Markdown Vault 迁移
 
@@ -71,7 +99,8 @@ Stride 的 Vault 是一个本地文件夹，每篇笔记是 `*.stride.json` 富�
 - `related_to` 在目标端自动展示反向相关关系。通常只写源端，不需要再手工写镜像关系。
 - 保留已有关系，去重后添加目标；若原文件使用 `belongs to` / `related to` 键，沿用该键，不额外创建另一种拼写。
 - 删除关系时只删除对应目标，保留其他目标和普通属性文本。若界面显示的是派生关系，修改实际存储关系的源笔记。
-- 正文引用不等于属性关系。Inbox 依据“没有出站属性双链”派生；只设置分类、移动文件或加正文引用不会将笔记移出 Inbox。整理时添加有意义且可解析的属性关系，不为清空 Inbox 造无意义链接。
+- 替换关系与修改关系类型见 [关系增删改步骤](references/vault-files.md#关系增删改步骤)。工具的 `target` 可接收 ID，但 `link_relation` 实际存标题双链；重名、ID 引用、别名引用需检查读回结果，必要时用获授权的文件入口精确修改。`set_property` 不允许写结构关系键或 `_` 系统键。
+- 正文引用不等于属性关系。Inbox 包含“没有出站属性双链且未标记 `_processed`”的笔记；只设置分类、移动文件或加正文引用不会将笔记移出 Inbox。用户只要求标记已处理时可设 `properties._processed: true`，恢复未处理时移除它（有属性关系的笔记仍不进入 Inbox）。不为清空 Inbox 造无意义链接。
 
 ### 重命名、移动、归档与删除
 
