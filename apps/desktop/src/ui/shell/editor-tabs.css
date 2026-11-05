@@ -67,6 +67,12 @@
   /* CJK needs more air between lines than Latin: 1.75 keeps long Chinese
      paragraphs readable without feeling loose in English. */
   line-height: 1.75;
+  /* Typewriter room: the last line can scroll up to the middle of the stage
+     instead of pinning the caret to the bottom edge (users were hitting
+     Enter at the document end to manufacture this space). The padding lives
+     on the editable element, so clicking it still lands the caret at the
+     document end. */
+  padding-bottom: 45vh;
   overflow-wrap: break-word;
   /* Let CJK punctuation hang at line edges where supported (progressive). */
   hanging-punctuation: first allow-end;
@@ -163,15 +169,11 @@
   margin-bottom: 0;
 }
 
+/* Inline code chips are styled once in editor/chrome/base.css
+   (`:not(pre) > code`); this rule only carries the mono voice. */
 .editor .ProseMirror code {
   font-family: var(--sd-font-mono);
   font-size: 0.9em;
-}
-
-.editor .ProseMirror :not(pre) > code {
-  padding: 0.1em 0.3em;
-  border-radius: var(--sd-radius);
-  background: var(--sd-surface-hover);
 }
 
 .editor .ProseMirror pre {
@@ -179,7 +181,8 @@
   padding: var(--sd-space-3) var(--sd-space-4);
   border: 1px solid var(--sd-border);
   border-radius: var(--sd-radius-panel);
-  background: var(--sd-bg);
+  /* The paper is --sd-bg; a bare --sd-bg plate is invisible against it. */
+  background: var(--sd-sunken);
   /* Code reads tighter than prose; the body line-height is tuned for CJK. */
   line-height: 1.6;
   overflow: auto;

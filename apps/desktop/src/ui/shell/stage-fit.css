@@ -23,6 +23,61 @@
 
 /* ---------- editor stage fit ---------- */
 
+/* With a note open, scrolling moves inside the editor (.editor-scroll) so
+   the title and toolbars stay pinned above the document. The empty state
+   keeps the legacy single-scroll layout (padding on .stage-scroll). */
+.stage-scroll.has-note {
+  padding: 0;
+  overflow: hidden;
+}
+
+/* The head becomes a full-width pinned band; the title input keeps the
+   paper column geometry the container padding used to provide. */
+.stage-scroll.has-note .stage-head {
+  display: block;
+  max-width: none;
+  margin-inline: 0;
+  padding: 1.9rem 2.1rem 0;
+}
+
+.stage-scroll.has-note .note-title {
+  display: block;
+  width: 100%;
+  max-width: var(--sd-note-max-width);
+  margin-inline: auto;
+}
+
+.stage-scroll.has-note .editor {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Fixed chrome (toolbar + find bar) keeps the same inset from the stage
+   edge that the container padding provided. width:100% matters: in a flex
+   column, auto margins collapse to 0 when the max-width exceeds the stage
+   (wide note-width setting in a narrow window), which left-aligned the
+   toolbar and let it overflow to the right. */
+.stage-scroll.has-note .editor-toolbar,
+.stage-scroll.has-note .editor .find-bar {
+  width: 100%;
+  max-width: calc(var(--sd-note-max-width) + 4.2rem);
+  padding-inline: 2.1rem;
+}
+
+/* The scroll region carries the horizontal padding itself, so the
+   scrollbar hugs the stage edge instead of floating inside the gutter.
+   The top border is the hairline that separates the pinned chrome
+   (title + toolbars) from the document. */
+.editor-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding-inline: 2.1rem;
+  border-top: 1px solid var(--sd-border);
+}
+
 .stage-head {
   align-items: center;
   column-gap: var(--sd-space-3);

@@ -215,8 +215,13 @@
   padding: 0.3rem 0.55rem;
 }
 
+/* The header row must read as a label band, not another body row: a sunken
+   fill plus the emphasis voice (Songti's synthetic bold is nearly invisible,
+   so CJK header glyphs use the heiti face at 600). */
 .editor .ProseMirror th {
-  background: var(--sd-bg);
+  background: var(--sd-sunken);
+  font-family: var(--sd-font-serif-strong);
+  font-weight: 600;
   text-align: left;
 }
 
@@ -294,7 +299,9 @@
   overflow: hidden;
   border: 1px solid var(--sd-border);
   border-radius: var(--sd-radius-lg);
-  background: var(--sd-bg);
+  /* The paper itself is --sd-bg, so the card must sink below it or the block
+     reads as plain text with a hairline around it. */
+  background: var(--sd-sunken);
 }
 
 .editor .ProseMirror .editor-code.ProseMirror-selectednode {
@@ -419,13 +426,26 @@
   color: var(--sd-fg);
 }
 
-/* Inline code is a quiet chip; fenced blocks are the card above. */
-.editor .ProseMirror :where(p, li, h1, h2, h3, h4, h5, h6) code {
+/* Inline code is a quiet sunken chip; fenced blocks are the card above.
+   This is the single chip rule — editor-tabs.css only carries the mono
+   font metrics. */
+.editor .ProseMirror :not(pre) > code {
   padding: 0.08em 0.32em;
   border-radius: var(--sd-radius-sm);
-  background: color-mix(in srgb, var(--sd-fg) 6%, transparent);
+  background: var(--sd-sunken);
+}
+
+.editor .ProseMirror :where(p, li, h1, h2, h3, h4, h5, h6) code {
   font-family: var(--sd-font-mono);
   font-size: 0.86em;
+}
+
+/* CJK bold in the serif body: Songti SC's synthesized bold barely reads, so
+   strong text keeps the serif Latin faces but lets CJK glyphs fall through
+   to the heiti voice (宋体正文、黑体强调). */
+.editor .ProseMirror strong {
+  font-family: var(--sd-font-serif-strong);
+  font-weight: 700;
 }
 
 .editor-code-overlay .hljs-keyword {
@@ -903,6 +923,8 @@
 
 .editor-toolbar {
   gap: 4px;
+  /* Anchor for the floating .editor-table-bar-slot. */
+  position: relative;
   /* Share the paper column's axis: same max-width and centering as the
      ProseMirror body, so the toolbar's left edge matches the text edge. */
   max-width: var(--sd-note-max-width);
@@ -1015,17 +1037,39 @@
   flex: none;
 }
 
+/* The table actions float as a pill over the top of the scroll region while
+   the selection is inside a table — no reserved band (an empty strip read as
+   a hole in the chrome) and no layout shift. The slot ignores pointer events
+   so the document beneath stays clickable; the pill re-enables them. */
+.editor-table-bar-slot {
+  position: absolute;
+  z-index: 15;
+  top: calc(100% + 14px);
+  left: 0;
+  right: 0;
+  height: 0;
+  pointer-events: none;
+}
+
 .editor-table-bar {
-  margin-top: 4px;
+  width: max-content;
+  max-width: 100%;
+  margin: 0 auto;
+  padding: 3px;
+  pointer-events: auto;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-lg);
+  background: var(--sd-bg-elevated);
+  box-shadow: var(--sd-shadow-sm, var(--sd-shadow));
 }
 
 .editor-table-label {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
+  width: 28px;
   height: 28px;
-  padding: 0 6px;
   color: var(--sd-muted);
-  font-size: 12px;
 }
 
 .editor-bubble {

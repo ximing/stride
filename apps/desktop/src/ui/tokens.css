@@ -15,6 +15,13 @@
   --sd-font-serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia,
     "Songti SC", "STSong", "Noto Serif CJK SC", "Source Han Serif SC",
     "FangSong", "KaiTi", "SimSun", serif;
+  /* Emphasis voice for a serif body: Songti SC's synthesized bold barely
+     reads, so <strong> and table headers keep the serif Latin faces but let
+     CJK glyphs fall through to a heiti (sans) face — the classic 宋体正文、
+     黑体强调 pairing. */
+  --sd-font-serif-strong: "Iowan Old Style", "Palatino Linotype", Palatino,
+    Georgia, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei",
+    "Noto Sans CJK SC", "Songti SC", "STSong", serif;
   --sd-font-mono: "SFMono-Regular", Consolas, "Liberation Mono", Menlo,
     "PingFang SC", "Microsoft YaHei", monospace;
 
@@ -109,6 +116,9 @@
   --sd-surface-active: color-mix(in srgb, var(--sd-fg) 8%, var(--sd-surface));
   --sd-inset: color-mix(in srgb, var(--sd-fg) 4%, transparent);
   --sd-inset-hover: color-mix(in srgb, var(--sd-fg) 6%, transparent);
+  /* Recessed content fills on the paper — table headers, code blocks, inline
+     code chips. One depth so every sunken region matches. */
+  --sd-sunken: color-mix(in srgb, var(--sd-fg) 5%, transparent);
   --sd-hover: var(--sd-surface-hover);
   --sd-selected: var(--sd-surface-selected);
   --sd-focus: var(--sd-accent);
@@ -168,6 +178,9 @@
   --sd-surface-active: color-mix(in srgb, var(--sd-fg) 10%, var(--sd-surface));
   --sd-inset: color-mix(in srgb, var(--sd-fg) 5%, transparent);
   --sd-inset-hover: color-mix(in srgb, var(--sd-fg) 8%, transparent);
+  /* Recessed content fills on the paper — table headers, code blocks, inline
+     code chips. One depth so every sunken region matches. */
+  --sd-sunken: color-mix(in srgb, var(--sd-fg) 7%, transparent);
   --sd-hover: var(--sd-surface-hover);
   --sd-selected: var(--sd-surface-selected);
   --sd-focus: var(--sd-accent);

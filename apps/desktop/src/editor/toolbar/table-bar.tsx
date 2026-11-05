@@ -1,6 +1,21 @@
 import type { Editor } from '@tiptap/core'
 import { useEditorState } from '@tiptap/react'
-import { PaintBucket } from 'lucide-react'
+import {
+  BetweenHorizontalEnd,
+  BetweenHorizontalStart,
+  BetweenVerticalEnd,
+  BetweenVerticalStart,
+  PaintBucket,
+  PanelLeft,
+  PanelTop,
+  Table,
+  TableCellsMerge,
+  TableCellsSplit,
+  TableColumnsSplit,
+  TableRowsSplit,
+  Trash2,
+  type LucideIcon,
+} from 'lucide-react'
 import { useState, type ReactNode } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
@@ -14,7 +29,7 @@ import {
   type TableShortcut,
 } from '../table/table-actions'
 import { Tip } from '../../ui/primitives/tooltip'
-import { ColorControl } from './color-control'
+import { ColorControl, EditorIcon } from './color-control'
 import { keepSelection } from './state'
 import { OverflowToolbar, type OverflowSlot } from './toolbar-overflow'
 
@@ -34,7 +49,7 @@ export function TableActionBar({ editor }: { editor: Editor }) {
   const [cellColorOpen, setCellColorOpen] = useState(false)
   const { t } = useTranslation()
   if (!state) return null
-  const action = (command: TableCommand, extra?: { disabled?: boolean; pressed?: boolean }) => {
+  const action = (command: TableCommand, icon: LucideIcon, extra?: { disabled?: boolean; pressed?: boolean }) => {
     const label = t(TABLE_COMMAND_KEY[command])
     const shortcut: TableShortcut | null =
       command === 'addRowBefore' ||
@@ -49,12 +64,12 @@ export function TableActionBar({ editor }: { editor: Editor }) {
     return {
       id: command,
       active: extra?.pressed,
-      measure: { className: 'editor-tool is-wide', text: label },
+      measure: 'icon',
       node: (
         <Tip content={hint ? `${label}（${hint}）` : label}>
         <button
           type="button"
-          className={`editor-tool is-wide${extra?.pressed ? ' is-active' : ''}`}
+          className={`editor-tool${extra?.pressed ? ' is-active' : ''}`}
           data-testid={`table-${command}`}
           aria-label={label}
           aria-pressed={extra?.pressed}
@@ -62,7 +77,7 @@ export function TableActionBar({ editor }: { editor: Editor }) {
           onMouseDown={keepSelection}
           onClick={() => runTableCommand(editor, command)}
         >
-          {label}
+          <EditorIcon icon={icon} />
         </button>
         </Tip>
       ),
@@ -73,20 +88,20 @@ export function TableActionBar({ editor }: { editor: Editor }) {
       label={t('editor.table.actions')}
       className="editor-table-bar"
       slots={[
-        { id: 'label', measure: { className: 'editor-table-label', text: t('editor.table.label') }, node: <span className="editor-table-label">{t('editor.table.label')}</span> },
-        action('addRowBefore'),
-        action('addRowAfter'),
-        action('deleteRow', { disabled: !state.canDeleteRow }),
+        { id: 'label', measure: 'icon', node: <span className="editor-table-label" aria-label={t('editor.table.label')}><EditorIcon icon={Table} /></span> },
+        action('addRowBefore', BetweenHorizontalStart),
+        action('addRowAfter', BetweenHorizontalEnd),
+        action('deleteRow', TableRowsSplit, { disabled: !state.canDeleteRow }),
         sepSlot('sep-row'),
-        action('addColumnBefore'),
-        action('addColumnAfter'),
-        action('deleteColumn', { disabled: !state.canDeleteColumn }),
+        action('addColumnBefore', BetweenVerticalStart),
+        action('addColumnAfter', BetweenVerticalEnd),
+        action('deleteColumn', TableColumnsSplit, { disabled: !state.canDeleteColumn }),
         sepSlot('sep-col'),
-        action('mergeCells', { disabled: !state.canMerge }),
-        action('splitCell', { disabled: !state.canSplit }),
+        action('mergeCells', TableCellsMerge, { disabled: !state.canMerge }),
+        action('splitCell', TableCellsSplit, { disabled: !state.canSplit }),
         sepSlot('sep-cell'),
-        action('toggleHeaderRow', { pressed: state.headerRow }),
-        action('toggleHeaderColumn', { pressed: state.headerColumn }),
+        action('toggleHeaderRow', PanelTop, { pressed: state.headerRow }),
+        action('toggleHeaderColumn', PanelLeft, { pressed: state.headerColumn }),
         iconSlot('cell-color', (
           <ColorControl
             testId="table-cell-color"
@@ -103,7 +118,7 @@ export function TableActionBar({ editor }: { editor: Editor }) {
           />
         ), state.background !== ''),
         sepSlot('sep-delete'),
-        action('deleteTable'),
+        action('deleteTable', Trash2),
       ]}
     />
   )

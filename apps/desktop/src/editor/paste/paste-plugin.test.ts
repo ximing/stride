@@ -210,6 +210,24 @@ function textClipboard(text: string): DataTransfer {
   } as unknown as DataTransfer
 }
 
+describe('rich html paste from the context menu', () => {
+  it('pastes rich HTML like a keyboard paste', () => {
+    const editor = createEditor(() => null)
+    pasteClipboardText(editor, 'Hi bold', () => null, undefined, '<h2>Hi</h2><p><strong>bold</strong></p>')
+    const json = JSON.stringify(editor.getJSON())
+    expect(json).toContain('"type":"heading"')
+    expect(json).toContain('"type":"bold"')
+    expect(editor.getText()).not.toContain('<h2>')
+  })
+
+  it('pastes HTML even when the clipboard has no plain text', () => {
+    const editor = createEditor(() => null)
+    pasteClipboardText(editor, '', () => null, undefined, '<p><em>only html</em></p>')
+    expect(editor.getText()).toBe('only html')
+    expect(JSON.stringify(editor.getJSON())).toContain('"type":"italic"')
+  })
+})
+
 describe('plain wikilink paste', () => {
   it('pastes [[title|alias]] as a target and a separate alias', () => {
     const editor = wikilinkEditor()

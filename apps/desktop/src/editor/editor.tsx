@@ -134,7 +134,9 @@ export const NoteEditor = observer(function NoteEditor() {
     <div data-testid="editor" className="editor" onContextMenu={editorMenu.onContextMenu}>
       <EditorFind editor={editor} />
       <EditorToolbar editor={editor} openLinkRef={openLinkRef} getFs={() => fsRef.current} />
-      <EditorContent editor={editor} />
+      <div className="editor-scroll">
+        <EditorContent editor={editor} />
+      </div>
       <TableContextMenu editor={editor} />
       {mathPrompt ? (
         <EditorPrompt

@@ -217,7 +217,7 @@ const Workspace = observer(function Workspace() {
         <ResizeHandle column="noteList" label={t('shell.resizeNotes')} />
         <main className="stage">
           <TabStrip />
-          <div className="stage-scroll">
+          <div className={`stage-scroll${note ? ' has-note' : ''}`}>
             {note ? (
               <>
                 <div className="stage-head">

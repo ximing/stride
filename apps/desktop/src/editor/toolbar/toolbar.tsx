@@ -370,7 +370,9 @@ export function EditorToolbar({
     <>
       <div data-testid="editor-toolbar" className="editor-toolbar">
         <OverflowToolbar label={translate('editor.toolbar')} onClose={() => setStyleMenu((current) => (current === 'cell' ? current : null))} slots={slots} />
-        {active.table ? <TableActionBar editor={editor} /> : null}
+        <div className="editor-table-bar-slot">
+          {active.table ? <TableActionBar editor={editor} /> : null}
+        </div>
       </div>
       <input
         ref={imageInputRef}

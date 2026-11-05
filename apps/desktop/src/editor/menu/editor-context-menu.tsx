@@ -23,6 +23,7 @@ import { formatShortcut } from '../../services/commands/commands'
 import { buildEditorMenu, type ContextMenuEntry } from '../../services/commands/context-menu'
 import { ContextMenu } from '../../ui/overlays/context-menu'
 import { runFormat } from '../extensions'
+import { copySelectionToClipboard, readClipboardData } from './editor-clipboard'
 import { pasteClipboardText } from '../paste/paste-plugin'
 import { editorTools } from '../toolbar/toolbar'
 import { resolveWikilinkClick, wikilinkAt } from '../wikilink/wikilink'
@@ -82,7 +83,7 @@ export function useEditorContextMenu(deps: EditorContextMenuDeps): {
     const wikilink = hit
       ? { ...hit, resolved: resolveWikilinkClick(deps.notes, hit.target).type === 'select' }
       : null
-    const { from, to, empty } = editor.state.selection
+    const { empty } = editor.state.selection
     const items = buildEditorMenu(
       {
         hasSelection: !empty,
@@ -96,19 +97,23 @@ export function useEditorContextMenu(deps: EditorContextMenuDeps): {
         format: (name) => runFormat(editor, name),
         link: () => deps.openLinkRef.current(),
         copy: () => {
-          void navigator.clipboard?.writeText(editor.state.doc.textBetween(from, to, ' '))
+          void copySelectionToClipboard(editor)
         },
         paste: () => {
-          const pending = navigator.clipboard?.readText()
+          const pending = readClipboardData()
           if (!pending) {
             deps.onPasteError?.(t('editor.pasteFailed'))
             return
           }
           void pending
-            .then((text) => {
-              pasteClipboardText(editor, text, () => deps.getFs?.() ?? null, (error) => {
+            .then((clip) => {
+              if (!clip) {
+                deps.onPasteError?.(t('editor.pasteFailed'))
+                return
+              }
+              pasteClipboardText(editor, clip.text, () => deps.getFs?.() ?? null, (error) => {
                 deps.onPasteError?.(pasteErrorText(error))
-              })
+              }, clip.html)
             })
             .catch((error: unknown) => {
               deps.onPasteError?.(pasteErrorText(error))

@@ -76,7 +76,12 @@ function menu(): HTMLElement | null {
   return document.querySelector<HTMLElement>('[data-testid="context-menu"]')
 }
 
-function installClipboard(clipboard: { readText?: () => Promise<string>; writeText?: (text: string) => Promise<void> }) {
+function installClipboard(clipboard: {
+  read?: () => Promise<unknown[]>
+  readText?: () => Promise<string>
+  write?: (items: unknown[]) => Promise<void>
+  writeText?: (text: string) => Promise<void>
+}) {
   Object.defineProperty(window.navigator, 'clipboard', { value: clipboard, configurable: true })
 }
 
@@ -102,6 +107,7 @@ afterEach(async () => {
   for (const editor of editors.splice(0)) editor.destroy()
   document.body.replaceChildren()
   vi.restoreAllMocks()
+  vi.unstubAllGlobals()
   delete (window.navigator as { clipboard?: unknown }).clipboard
 })
 
@@ -183,6 +189,100 @@ describe('editor context menu', () => {
     await act(async () => rightClick(host))
     await act(async () => clickMenuItem('copy-wikilink'))
     expect(writeText).toHaveBeenCalledWith('[[Alpha|A]]')
+  })
+
+  const tableDoc: JSONContent = {
+    type: 'doc',
+    content: [
+      {
+        type: 'table',
+        content: [
+          {
+            type: 'tableRow',
+            content: [
+              { type: 'tableHeader', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'H1' }] }] },
+              { type: 'tableHeader', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'H2' }] }] },
+            ],
+          },
+          {
+            type: 'tableRow',
+            content: [
+              { type: 'tableCell', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'a' }] }] },
+              { type: 'tableCell', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'b' }] }] },
+            ],
+          },
+        ],
+      },
+    ],
+  }
+
+  async function copyFromMenu(host: HTMLElement): Promise<void> {
+    await act(async () => rightClick(host))
+    await act(async () => {
+      clickMenuItem('copy')
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+  }
+
+  // jsdom Blob has no .text(); FileReader reads it fine.
+  function blobText(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(String(reader.result))
+      reader.onerror = () => reject(reader.error)
+      reader.readAsText(blob)
+    })
+  }
+
+  it('copies the selection as rich HTML plus plain text, like a keyboard copy', async () => {
+    const write = vi.fn().mockResolvedValue(undefined)
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    installClipboard({ write, writeText })
+    class FakeItem {
+      constructor(public data: Record<string, Blob>) {}
+    }
+    vi.stubGlobal('ClipboardItem', FakeItem)
+    const editor = createEditor(tableDoc)
+    editor.commands.selectAll()
+    const host = await mount({ editor, notes: [], onOpen: () => {}, onOpenInNewTab: () => {} })
+    await copyFromMenu(host)
+    expect(write).toHaveBeenCalledTimes(1)
+    expect(writeText).not.toHaveBeenCalled()
+    const item = write.mock.calls[0][0][0] as FakeItem
+    const html = await blobText(item.data['text/html'])
+    const text = await blobText(item.data['text/plain'])
+    expect(html).toContain('<table')
+    expect(text).toContain('H1')
+    expect(text).not.toContain('<table')
+  })
+
+  it('falls back to plain-text copy when ClipboardItem is missing', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined)
+    installClipboard({ writeText })
+    const editor = createEditor(tableDoc)
+    editor.commands.selectAll()
+    const host = await mount({ editor, notes: [], onOpen: () => {}, onOpenInNewTab: () => {} })
+    await copyFromMenu(host)
+    expect(writeText).toHaveBeenCalledTimes(1)
+    const text = writeText.mock.calls[0][0] as string
+    expect(text).toContain('H1')
+    expect(text).not.toContain('<table')
+  })
+
+  it('pastes rich HTML from the clipboard like a keyboard paste', async () => {
+    const html = '<table><tbody><tr><td><p>a</p></td><td><p>b</p></td></tr></tbody></table>'
+    const read = vi.fn().mockResolvedValue([
+      {
+        types: ['text/html', 'text/plain'],
+        getType: async (type: string) => ({ text: async () => (type === 'text/html' ? html : 'a b') }),
+      },
+    ])
+    installClipboard({ read, readText: vi.fn().mockResolvedValue('a b') })
+    const editor = createEditor({ type: 'doc', content: [{ type: 'paragraph' }] })
+    editor.commands.setTextSelection(1)
+    const host = await mount({ editor, notes: [], onOpen: () => {}, onOpenInNewTab: () => {} })
+    await pasteFromMenu(host)
+    expect(JSON.stringify(editor.getJSON())).toContain('"type":"table"')
   })
 
   it('pastes vector<int> as text instead of HTML', async () => {

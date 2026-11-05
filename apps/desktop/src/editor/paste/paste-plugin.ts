@@ -15,6 +15,7 @@ import {
   storeImageFiles,
 } from '../image/image'
 import { dispatchMarkdownPaste } from './paste-dispatch'
+import { htmlClipboardIsRich } from './markdown-paste'
 
 type ClipboardReader = {
   getData: (type: string) => string
@@ -90,28 +91,38 @@ export function createPasteExtension(
 }
 
 /**
- * Context-menu paste only has plain text. Markdown and a lone image URL use
- * the keyboard dispatch. A plain `[[target|alias]]` uses that same split.
- * Anything else is ProseMirror plain text, not HTML.
+ * Context-menu paste. Markdown and a lone image URL use the keyboard dispatch.
+ * A plain `[[target|alias]]` uses that same split. Rich HTML (tables, marks,
+ * custom nodes) goes through ProseMirror's HTML paste, exactly like a keyboard
+ * paste would. Anything else is plain text.
  */
 export function pasteClipboardText(
   editor: Editor,
   text: string,
   getFs: () => FileSystemBackend | null,
   onError?: (error: unknown) => void,
+  html = '',
 ): void {
-  if (!text || editor.isDestroyed || !editor.isEditable) return
+  if ((!text && !html) || editor.isDestroyed || !editor.isEditable) return
   const data: ClipboardReader = {
-    getData: (type) =>
-      type === 'text/plain' || type === 'text/markdown' || type === 'text/x-markdown' ? text : '',
+    getData: (type) => {
+      if (type === 'text/html') return html
+      return type === 'text/plain' || type === 'text/markdown' || type === 'text/x-markdown' ? text : ''
+    },
   }
   if (dispatchClipboardText(editor, data, getFs, onError)) return
-  if (insertPlainWikilinks(editor, text)) return
+  if (text && insertPlainWikilinks(editor, text)) return
   try {
-    // pasteText builds a ClipboardEvent when none is passed. jsdom has no
-    // ClipboardEvent, and a real one would make handlePaste read the clipboard
-    // again. Markdown was already tried above, so this insert is plain text.
+    // pasteText/pasteHTML build a ClipboardEvent when none is passed. jsdom has
+    // no ClipboardEvent, and a real one would make handlePaste read the
+    // clipboard again. Markdown was already tried above, so what remains here
+    // is rich HTML or plain text.
     const event = { clipboardData: null } as ClipboardEvent
+    if (htmlClipboardIsRich(html)) {
+      if (!editor.view.pasteHTML(html, event)) onError?.(new Error(t('editor.pasteFailed')))
+      return
+    }
+    if (!text) return
     if (!editor.view.pasteText(text, event)) onError?.(new Error(t('editor.pasteFailed')))
   } catch (error) {
     onError?.(error)
