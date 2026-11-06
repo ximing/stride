@@ -20,6 +20,7 @@ function defaultForm() {
     autoGitBlurSeconds: 0,
     appearance: { noteWidth: 'standard' as const, fontSize: 15, fontFamily: '' },
     editor: { autosaveDebounceMs: 350 },
+    agent: { maxTurns: 200 },
     updates: { channel: 'stable' as const, autoCheck: true },
     privacy: { telemetryEnabled: false },
   }

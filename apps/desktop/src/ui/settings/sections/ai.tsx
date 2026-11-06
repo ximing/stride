@@ -5,8 +5,9 @@
 // it, a mask-shaped draft keeps it, anything else replaces it.
 
 import { observer, useService } from '@rabjs/react'
-import { catalogBaseUrl, catalogModelSuggestions, LLM_PROVIDERS, llmProviderInfo, type PublicLlmConfig } from '@stride/core'
+import { AGENT_MAX_TURNS_DEFAULT, AGENT_MAX_TURNS_MAX, AGENT_MAX_TURNS_MIN, catalogBaseUrl, catalogModelSuggestions, LLM_PROVIDERS, llmProviderInfo, type PublicLlmConfig } from '@stride/core'
 import { CircleAlert, CircleCheck, LoaderCircle, Plus, Star, Trash2 } from 'lucide-react'
+import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { t } from '../../../i18n'
 import { SettingsService } from '../../../services/settings/settings.service'
@@ -55,6 +56,67 @@ export function hasLlmErrors(errors: LlmFieldErrors): boolean {
   return Object.values(errors).some(Boolean)
 }
 
+function parseTurnLimit(text: string): number | null {
+  if (!/^\d+$/.test(text.trim())) return null
+  const parsed = Number(text)
+  if (!Number.isInteger(parsed) || parsed < AGENT_MAX_TURNS_MIN || parsed > AGENT_MAX_TURNS_MAX) return null
+  return parsed
+}
+
+const AgentTurnField = observer(function AgentTurnField() {
+  const { t } = useTranslation()
+  const settings = useService(SettingsService)
+  const [draft, setDraft] = useState<string | null>(null)
+  const [invalid, setInvalid] = useState(false)
+  const stored = settings.form.agent?.maxTurns ?? AGENT_MAX_TURNS_DEFAULT
+  const error = invalid
+    ? t('settings.ai.turnsError', { min: AGENT_MAX_TURNS_MIN, max: AGENT_MAX_TURNS_MAX })
+    : ''
+
+  const onChange = (text: string) => {
+    setDraft(text)
+    const parsed = parseTurnLimit(text)
+    if (parsed === null) {
+      setInvalid(true)
+      return
+    }
+    setInvalid(false)
+    if (parsed === settings.form.agent?.maxTurns) return
+    settings.form = { ...settings.form, agent: { maxTurns: parsed } }
+    void settings.save()
+  }
+
+  return (
+    <div className="settings-ai-agent">
+      <div className="settings-ai-agent-field">
+        <Input
+          label={t('settings.ai.turns')}
+          className="settings-ai-input"
+          data-testid="agent-max-turns"
+          type="number"
+          inputMode="numeric"
+          min={AGENT_MAX_TURNS_MIN}
+          max={AGENT_MAX_TURNS_MAX}
+          step={1}
+          value={draft ?? String(stored)}
+          aria-invalid={Boolean(error)}
+          aria-describedby="agent-max-turns-hint"
+          aria-errormessage={error ? 'agent-max-turns-error' : undefined}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      </div>
+      <p className="settings-ai-meta" id="agent-max-turns-hint">
+        {t('settings.ai.turnsHint', { min: AGENT_MAX_TURNS_MIN, max: AGENT_MAX_TURNS_MAX, default: AGENT_MAX_TURNS_DEFAULT })}
+      </p>
+      {error ? (
+        <p className="settings-ai-error" id="agent-max-turns-error" role="alert" data-testid="agent-max-turns-error">
+          {error}
+        </p>
+      ) : null}
+    </div>
+  )
+})
+
 export const AiSection = observer(function AiSection() {
   const { t } = useTranslation()
   const settings = useService(SettingsService)
@@ -74,6 +136,7 @@ export const AiSection = observer(function AiSection() {
 
   return (
     <div className="settings-ai" data-testid="settings-section-ai">
+      <AgentTurnField />
       {configs.length === 0 ? (
         <p className="settings-ai-empty" data-testid="llm-empty">
           {t('settings.ai.empty')}

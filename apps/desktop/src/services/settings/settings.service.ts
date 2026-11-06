@@ -10,6 +10,7 @@ import {
   emptyTokenUsage,
   localDateKey,
   maskSecret,
+  normalizeAgentMaxTurns,
   parseTokenUsage,
   readSettings,
   readTokenUsageHistory,
@@ -38,6 +39,7 @@ interface PublicSettings {
   autoGitBlurSeconds: number
   appearance: AppSettings['appearance']
   editor: AppSettings['editor']
+  agent: AppSettings['agent']
   updates: AppSettings['updates']
   privacy: AppSettings['privacy']
 }
@@ -53,6 +55,7 @@ const emptySettings = (): PublicSettings => ({
   autoGitBlurSeconds: 0,
   appearance: { noteWidth: 'standard', fontSize: 15, fontFamily: '' },
   editor: { autosaveDebounceMs: 350 },
+  agent: { maxTurns: 200 },
   updates: { channel: 'stable', autoCheck: true },
   privacy: { telemetryEnabled: false },
 })
@@ -157,6 +160,7 @@ function mergePartitions(preferred: PublicSettings, baseline: PublicSettings, fa
     autoGitBlurSeconds: pick('autoGitBlurSeconds'),
     appearance: pick('appearance'),
     editor: pick('editor'),
+    agent: pick('agent'),
     updates: pick('updates'),
     privacy: pick('privacy'),
   }
@@ -566,6 +570,7 @@ export class SettingsService extends Service {
         autoGitBlurSeconds: form.autoGitBlurSeconds,
         appearance: { ...form.appearance },
         editor: { ...form.editor },
+        agent: { maxTurns: normalizeAgentMaxTurns(form.agent?.maxTurns) },
         updates: { ...form.updates },
         privacy: { ...form.privacy },
       }
@@ -612,6 +617,7 @@ export class SettingsService extends Service {
         autoGitBlurSeconds: settings.autoGitBlurSeconds,
         appearance: settings.appearance,
         editor: settings.editor,
+        agent: settings.agent,
         updates: settings.updates,
         privacy: settings.privacy,
       }
@@ -725,6 +731,7 @@ export class SettingsService extends Service {
         autoGitBlurSeconds: settings.autoGitBlurSeconds,
         appearance: settings.appearance,
         editor: settings.editor,
+        agent: settings.agent,
         updates: settings.updates,
         privacy: settings.privacy,
       }

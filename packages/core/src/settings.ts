@@ -29,6 +29,15 @@ export interface EditorSettings {
   autosaveDebounceMs: number
 }
 
+/** One model round, including a round that only calls tools. */
+export const AGENT_MAX_TURNS_DEFAULT = 200
+export const AGENT_MAX_TURNS_MIN = 1
+export const AGENT_MAX_TURNS_MAX = 2000
+
+export interface AgentSettings {
+  maxTurns: number
+}
+
 export type UpdateChannel = 'stable' | 'beta'
 
 export interface UpdatesSettings {
@@ -51,6 +60,7 @@ export interface AppSettings {
   autoGitBlurSeconds: number
   appearance: AppearanceSettings
   editor: EditorSettings
+  agent: AgentSettings
   updates: UpdatesSettings
   privacy: PrivacySettings
 }
@@ -77,6 +87,7 @@ interface SealedSettings {
   autoGitBlurSeconds: number
   appearance: AppearanceSettings
   editor: EditorSettings
+  agent: AgentSettings
   updates: UpdatesSettings
   privacy: PrivacySettings
 }
@@ -104,6 +115,7 @@ interface ParsedSettings {
   autoGitBlurSeconds?: unknown
   appearance?: { noteWidth?: unknown; fontSize?: unknown; fontFamily?: unknown }
   editor?: { autosaveDebounceMs?: unknown }
+  agent?: { maxTurns?: unknown }
   updates?: { channel?: unknown; autoCheck?: unknown }
   privacy?: { telemetryEnabled?: unknown }
 }
@@ -138,6 +150,19 @@ export function defaultAppearanceSettings(): AppearanceSettings {
 
 export function defaultEditorSettings(): EditorSettings {
   return { autosaveDebounceMs: 350 }
+}
+
+export function defaultAgentSettings(): AgentSettings {
+  return { maxTurns: AGENT_MAX_TURNS_DEFAULT }
+}
+
+/** Missing or non-integer values use the default. Values above the cap clamp to it. */
+export function normalizeAgentMaxTurns(value: unknown): number {
+  if (typeof value !== 'number' || !Number.isInteger(value) || value < AGENT_MAX_TURNS_MIN) {
+    return AGENT_MAX_TURNS_DEFAULT
+  }
+  if (value > AGENT_MAX_TURNS_MAX) return AGENT_MAX_TURNS_MAX
+  return value
 }
 
 export function defaultUpdatesSettings(): UpdatesSettings {
@@ -191,6 +216,10 @@ function readEditor(parsed: ParsedSettings['editor']): EditorSettings {
   return { autosaveDebounceMs: normalizeAutosaveDebounceMs(parsed?.autosaveDebounceMs) }
 }
 
+function readAgent(parsed: ParsedSettings['agent']): AgentSettings {
+  return { maxTurns: normalizeAgentMaxTurns(parsed?.maxTurns) }
+}
+
 function readUpdates(parsed: ParsedSettings['updates']): UpdatesSettings {
   return {
     channel: normalizeUpdateChannel(parsed?.channel),
@@ -214,6 +243,7 @@ export function defaultSettings(): AppSettings {
     autoGitBlurSeconds: 5,
     appearance: defaultAppearanceSettings(),
     editor: defaultEditorSettings(),
+    agent: defaultAgentSettings(),
     updates: defaultUpdatesSettings(),
     privacy: defaultPrivacySettings(),
   }
@@ -321,6 +351,7 @@ async function sealAll(secrets: SecretsStore, settings: AppSettings): Promise<Se
       fontFamily: normalizeFontFamily(settings.appearance?.fontFamily),
     },
     editor: { autosaveDebounceMs: normalizeAutosaveDebounceMs(settings.editor?.autosaveDebounceMs) },
+    agent: { maxTurns: normalizeAgentMaxTurns(settings.agent?.maxTurns) },
     updates: {
       channel: normalizeUpdateChannel(settings.updates?.channel),
       autoCheck: settings.updates?.autoCheck !== false,
@@ -340,6 +371,7 @@ export function publicSettings(settings: AppSettings): {
   autoGitBlurSeconds: number
   appearance: AppearanceSettings
   editor: EditorSettings
+  agent: AgentSettings
   updates: UpdatesSettings
   privacy: PrivacySettings
 } {
@@ -371,6 +403,7 @@ export function publicSettings(settings: AppSettings): {
       fontFamily: normalizeFontFamily(settings.appearance?.fontFamily),
     },
     editor: { autosaveDebounceMs: normalizeAutosaveDebounceMs(settings.editor?.autosaveDebounceMs) },
+    agent: { maxTurns: normalizeAgentMaxTurns(settings.agent?.maxTurns) },
     updates: {
       channel: normalizeUpdateChannel(settings.updates?.channel),
       autoCheck: settings.updates?.autoCheck !== false,
@@ -418,6 +451,7 @@ export async function readSettings(
     autoGitBlurSeconds: normalizeAutoGitSeconds(parsed.autoGitBlurSeconds),
     appearance: readAppearance(parsed.appearance),
     editor: readEditor(parsed.editor),
+    agent: readAgent(parsed.agent),
     updates: readUpdates(parsed.updates),
     privacy: readPrivacy(parsed.privacy),
   }

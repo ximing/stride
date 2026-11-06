@@ -1,8 +1,9 @@
 import { MessageCircle, Plus, Send, Square } from 'lucide-react'
-import type { PublicLlmConfig } from '@stride/core'
+import { normalizeAgentMaxTurns, type PublicLlmConfig } from '@stride/core'
 import { observer, useService } from '@rabjs/react'
 import { useTranslation } from 'react-i18next'
 import { CHAT_TURN_LIMIT_ERROR, ChatService } from '../../services/chat/chat.service'
+import type { ChatToolCall } from '../../services/chat/chat-turn'
 import { SettingsService } from '../../services/settings/settings.service'
 import { VaultService } from '../../services/vault/vault.service'
 import { ChatMarkdown } from './chat-markdown'
@@ -12,10 +13,34 @@ import { Mark } from '../primitives/icon'
 import { Select } from '../primitives/select'
 import { Tabs, TabsList, TabsTrigger } from '../primitives/tabs'
 
-function chatErrorText(error: string, translate: (key: string) => string): string {
+function chatErrorText(
+  error: string,
+  translate: (key: string, options?: Record<string, unknown>) => string,
+  turns: number,
+): string {
   if (error === 'Add a model provider, base URL, model, and key in Settings') return translate('chat.needProvider')
-  if (error === CHAT_TURN_LIMIT_ERROR) return translate('chat.turnLimit')
+  if (error === CHAT_TURN_LIMIT_ERROR) return translate('chat.turnLimit', { count: turns })
   return error
+}
+
+function ChatTool({ tool }: { tool: ChatToolCall }) {
+  const { t } = useTranslation()
+  return (
+    <details className={tool.isError ? 'chat-tool is-error' : 'chat-tool'} data-testid="chat-tool">
+      <summary className="chat-tool-summary">
+        <span className="chat-tool-name" data-testid="chat-tool-name">{tool.name}</span>
+        {tool.pending ? <span className="chat-tool-status">{t('chat.running')}</span> : null}
+        {tool.isError ? <span className="chat-tool-status">{t('chat.failed')}</span> : null}
+        {typeof tool.durationMs === 'number' ? (
+          <span className="chat-tool-duration" data-testid="chat-tool-duration">{t('chat.duration', { ms: tool.durationMs })}</span>
+        ) : null}
+      </summary>
+      <div className="chat-tool-body">
+        {tool.argsSummary ? <span className="chat-tool-args" data-testid="chat-tool-args">{tool.argsSummary}</span> : null}
+        {tool.pending ? null : <span className="chat-tool-result" data-testid="chat-tool-result">{tool.resultSummary}</span>}
+      </div>
+    </details>
+  )
 }
 
 function modelOptionLabel(config: PublicLlmConfig): string {
@@ -81,12 +106,7 @@ export const ChatPanel = observer(function ChatPanel() {
               </details>
             ) : null}
             {message.role === 'assistant' && message.tools.map((tool) => (
-              <div key={tool.id} className={tool.isError ? 'chat-tool is-error' : 'chat-tool'} data-testid="chat-tool">
-                <span className="chat-tool-name" data-testid="chat-tool-name">{tool.name}</span>
-                <span className="chat-tool-args" data-testid="chat-tool-args">{tool.argsSummary}</span>
-                {tool.pending ? <span className="chat-tool-status">{t('chat.running')}</span> : <span data-testid="chat-tool-result">{tool.resultSummary}</span>}
-                {typeof tool.durationMs === 'number' ? <span className="chat-tool-duration" data-testid="chat-tool-duration">{t('chat.duration', { ms: tool.durationMs })}</span> : null}
-              </div>
+              <ChatTool key={tool.id} tool={tool} />
             ))}
             {message.role === 'assistant' ? <ChatMarkdown text={message.text} /> : <p>{message.text}</p>}
           </div>
@@ -94,7 +114,7 @@ export const ChatPanel = observer(function ChatPanel() {
       </div>
       {chat.error && (
         <p className="error" data-testid="chat-error" role="alert">
-          {chatErrorText(chat.error, t)}
+          {chatErrorText(chat.error, t, normalizeAgentMaxTurns(settings.form.agent?.maxTurns))}
         </p>
       )}
       <div className="chat-compose">

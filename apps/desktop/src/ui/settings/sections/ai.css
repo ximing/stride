@@ -5,6 +5,16 @@
   width: 100%;
 }
 
+.settings-ai-agent-field {
+  width: 180px;
+  max-width: 100%;
+}
+
+.settings-ai-agent-field .sd-field {
+  width: 100%;
+  min-width: 0;
+}
+
 .settings-ai-empty {
   margin: 0;
   padding: 12px 0;

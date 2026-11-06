@@ -23,6 +23,7 @@ function defaultForm() {
     autoGitBlurSeconds: 0,
     appearance: { noteWidth: 'standard' as const, fontSize: 15, fontFamily: '' },
     editor: { autosaveDebounceMs: 350 },
+    agent: { maxTurns: 200 },
     updates: { channel: 'stable' as const, autoCheck: true },
     privacy: { telemetryEnabled: false },
   }
@@ -414,5 +415,31 @@ describe('ai settings section', () => {
       tokenUsageMonth('2026-10-22'),
     ])
     expect(document.querySelector('[data-testid="token-usage-period"]')?.textContent).toBe('2026-10')
+  })
+
+  it('saves a valid assistant turn limit and rejects values outside 1–2000', async () => {
+    await mount()
+    const input = field('agent-max-turns')
+    expect(input.value).toBe('200')
+    expect(document.getElementById('agent-max-turns-hint')?.textContent).toContain('1–2000')
+
+    await act(async () => {
+      setInputValue(input, '0')
+    })
+    expect(document.querySelector('[data-testid="agent-max-turns-error"]')).not.toBeNull()
+    expect(resolve(SettingsService).form.agent.maxTurns).toBe(200)
+
+    await act(async () => {
+      setInputValue(input, '40')
+    })
+    expect(document.querySelector('[data-testid="agent-max-turns-error"]')).toBeNull()
+    const settings = resolve(SettingsService)
+    await act(async () => {
+      for (let index = 0; index < 200 && settings.$model.save.loading; index += 1) {
+        await new Promise((resolvePromise) => setTimeout(resolvePromise, 10))
+      }
+    })
+    expect(settings.form.agent.maxTurns).toBe(40)
+    expect(localStorage.getItem(SETTINGS_STORAGE_KEY) ?? '').toContain('"maxTurns": 40')
   })
 })

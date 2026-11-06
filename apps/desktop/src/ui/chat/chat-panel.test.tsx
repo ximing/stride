@@ -2,7 +2,7 @@ import { register, resolve } from '@rabjs/react'
 import { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it } from 'vitest'
-import { ChatService } from '../../services/chat/chat.service'
+import { CHAT_TURN_LIMIT_ERROR, ChatService } from '../../services/chat/chat.service'
 import { SettingsService } from '../../services/settings/settings.service'
 import { VaultService } from '../../services/vault/vault.service'
 import { ChatPanel } from './chat-panel'
@@ -111,6 +111,64 @@ describe('ChatPanel', () => {
         resolve(ChatService).setModel('missing')
       })
       expect(resolve(ChatService).modelId).toBe('b')
+    } finally {
+      await unmount(element, root)
+    }
+  })
+
+  it('shows each tool call as a collapsed bar', async () => {
+    register(VaultService)
+    register(SettingsService)
+    register(ChatService)
+    const chat = resolve(ChatService)
+    chat.sessions = [{
+      id: 'session-1',
+      title: 'New',
+      messages: [{
+        role: 'assistant',
+        text: 'done',
+        thinking: '',
+        tools: [{
+          id: 'call-1',
+          name: 'read_note',
+          argsSummary: '{"id":"规则"}',
+          resultSummary: '{"content":"Note not found"}',
+          durationMs: 2,
+          isError: false,
+          pending: false,
+        }],
+      }],
+    }]
+    const { host: element, root } = host()
+    try {
+      await render(root, <ChatPanel />)
+      const tool = element.querySelector('details[data-testid="chat-tool"]') as HTMLDetailsElement | null
+      expect(tool).not.toBeNull()
+      expect(tool?.open).toBe(false)
+      expect(tool?.querySelector('[data-testid="chat-tool-name"]')?.textContent).toBe('read_note')
+      expect(tool?.querySelector('[data-testid="chat-tool-duration"]')?.textContent).toBe('2 ms')
+      expect(tool?.querySelector('[data-testid="chat-tool-args"]')?.textContent).toContain('规则')
+    } finally {
+      chat.sessions = [{ id: 'session-1', title: 'New', messages: [] }]
+      await unmount(element, root)
+    }
+  })
+
+  it('reports the configured turn limit', async () => {
+    register(VaultService)
+    register(SettingsService)
+    register(ChatService)
+    const chat = resolve(ChatService)
+    chat.error = CHAT_TURN_LIMIT_ERROR
+    const { host: element, root } = host()
+    try {
+      await render(root, <ChatPanel />)
+      expect(element.querySelector('[data-testid="chat-error"]')?.textContent).toBe('Reached the 200-turn limit and stopped.')
+      await act(async () => {
+        const settings = resolve(SettingsService)
+        settings.form = { ...settings.form, agent: { maxTurns: 40 } }
+      })
+      expect(element.querySelector('[data-testid="chat-error"]')?.textContent).toBe('Reached the 40-turn limit and stopped.')
     } finally {
       await unmount(element, root)
     }

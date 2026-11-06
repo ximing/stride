@@ -13,6 +13,7 @@ describe('settings page sections schema (T7.1)', () => {
     const defaults = defaultSettings()
     expect(defaults.appearance).toEqual({ noteWidth: 'standard', fontSize: 16, fontFamily: '' })
     expect(defaults.editor).toEqual({ autosaveDebounceMs: 350 })
+    expect(defaults.agent).toEqual({ maxTurns: 200 })
     expect(defaults.updates).toEqual({ channel: 'stable', autoCheck: true })
     expect(defaults.privacy).toEqual({ telemetryEnabled: false })
   })
@@ -29,6 +30,7 @@ describe('settings page sections schema (T7.1)', () => {
     const loaded = await readSettings(files, 'legacy.json', secrets)
     expect(loaded.appearance).toEqual(defaultSettings().appearance)
     expect(loaded.editor).toEqual(defaultSettings().editor)
+    expect(loaded.agent).toEqual(defaultSettings().agent)
     expect(loaded.updates).toEqual(defaultSettings().updates)
     expect(loaded.privacy).toEqual(defaultSettings().privacy)
   })
@@ -39,23 +41,27 @@ describe('settings page sections schema (T7.1)', () => {
     const settings = defaultSettings()
     settings.appearance = { noteWidth: 'wide', fontSize: 18, fontFamily: 'Songti SC' }
     settings.editor = { autosaveDebounceMs: 800 }
+    settings.agent = { maxTurns: 40 }
     settings.updates = { channel: 'beta', autoCheck: false }
     settings.privacy = { telemetryEnabled: true }
     await writeSettings(files, 'roundtrip.json', settings, secrets)
     const raw = JSON.parse(await files.readText('roundtrip.json'))
     expect(raw.appearance).toEqual({ noteWidth: 'wide', fontSize: 18, fontFamily: 'Songti SC' })
     expect(raw.editor).toEqual({ autosaveDebounceMs: 800 })
+    expect(raw.agent).toEqual({ maxTurns: 40 })
     expect(raw.updates).toEqual({ channel: 'beta', autoCheck: false })
     expect(raw.privacy).toEqual({ telemetryEnabled: true })
     const loaded = await readSettings(files, 'roundtrip.json', secrets)
     expect(loaded.appearance).toEqual(settings.appearance)
     expect(loaded.editor).toEqual(settings.editor)
+    expect(loaded.agent).toEqual(settings.agent)
     expect(loaded.updates).toEqual(settings.updates)
     expect(loaded.privacy).toEqual(settings.privacy)
     // Public view carries the same non-secret sections.
     const pub = publicSettings(loaded)
     expect(pub.appearance).toEqual(settings.appearance)
     expect(pub.editor).toEqual(settings.editor)
+    expect(pub.agent).toEqual(settings.agent)
     expect(pub.updates).toEqual(settings.updates)
     expect(pub.privacy).toEqual(settings.privacy)
   })
@@ -66,12 +72,14 @@ describe('settings page sections schema (T7.1)', () => {
     await files.writeText('bad.json', JSON.stringify({
       appearance: { noteWidth: 'huge', fontSize: -3, fontFamily: 'Bad;Font' },
       editor: { autosaveDebounceMs: 'fast' },
+      agent: { maxTurns: 'lots' },
       updates: { channel: 'nightly', autoCheck: 'yes' },
       privacy: { telemetryEnabled: 'no' },
     }))
     const loaded = await readSettings(files, 'bad.json', secrets)
     expect(loaded.appearance).toEqual({ noteWidth: 'standard', fontSize: 16, fontFamily: '' })
     expect(loaded.editor).toEqual({ autosaveDebounceMs: 350 })
+    expect(loaded.agent).toEqual({ maxTurns: 200 })
     expect(loaded.updates).toEqual({ channel: 'stable', autoCheck: true })
     expect(loaded.privacy).toEqual({ telemetryEnabled: false })
   })

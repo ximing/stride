@@ -1,6 +1,6 @@
 import type { AgentTool, StreamFn } from '@earendil-works/pi-agent-core'
 import type { Api, Model } from '@earendil-works/pi-ai'
-import { runAgentLoop, type AgentUsage } from '@stride/core'
+import { AGENT_MAX_TURNS_DEFAULT, normalizeAgentMaxTurns, runAgentLoop, type AgentUsage } from '@stride/core'
 
 export interface ChatToolCall {
   id: string
@@ -107,6 +107,8 @@ export async function playChatTurn(input: {
   signal?: AbortSignal
   streamFn: StreamFn
   tools?: AgentTool[]
+  /** Model rounds for this message. Missing or invalid values use the default. */
+  maxTurns?: number
   onText: (delta: string) => void
   onThinking: (delta: string) => void
   onToolStart?: (call: { id: string; name: string; args: unknown }) => void
@@ -119,7 +121,7 @@ export async function playChatTurn(input: {
     systemPrompt: input.systemPrompt,
     prompt: input.prompt,
     tools: input.tools ?? [],
-    maxTurns: 8,
+    maxTurns: normalizeAgentMaxTurns(input.maxTurns ?? AGENT_MAX_TURNS_DEFAULT),
     signal: input.signal,
     streamFn: input.streamFn,
     onEvent: (event) => {

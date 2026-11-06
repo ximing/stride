@@ -114,6 +114,7 @@ export class ChatService extends Service {
         systemPrompt: chatSystemPrompt(this.resolve(VaultService)),
         prompt: text,
         tools: this.vaultTools(),
+        maxTurns: this.settings.form.agent?.maxTurns,
         signal: controller.signal,
         streamFn: (model, context, options) => resolved.models.streamSimple(model, context, {
           ...options,
