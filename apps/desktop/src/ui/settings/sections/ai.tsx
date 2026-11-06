@@ -82,7 +82,7 @@ const AgentTurnField = observer(function AgentTurnField() {
     }
     setInvalid(false)
     if (parsed === settings.form.agent?.maxTurns) return
-    settings.form = { ...settings.form, agent: { maxTurns: parsed } }
+    settings.form = { ...settings.form, agent: { ...settings.form.agent, maxTurns: parsed } }
     void settings.save()
   }
 

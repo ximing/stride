@@ -1,4 +1,4 @@
-import type { AgentTool, StreamFn } from '@earendil-works/pi-agent-core'
+import type { AgentMessage, AgentTool, StreamFn } from '@earendil-works/pi-agent-core'
 import type { Api, Model } from '@earendil-works/pi-ai'
 import { AGENT_MAX_TURNS_DEFAULT, normalizeAgentMaxTurns, runAgentLoop, type AgentUsage } from '@stride/core'
 
@@ -17,12 +17,54 @@ export interface ChatMessage {
   text: string
   thinking: string
   tools: ChatToolCall[]
+  /** Stable id and creation time, assigned when the message is appended; persisted with the session. */
+  id?: string
+  ts?: string
+}
+
+export interface ChatSessionMemory {
+  distilledUpTo: number
+  lastDistillAt: string
 }
 
 export interface ChatSession {
   id: string
   title: string
+  createdAt: string
+  updatedAt: string
+  status: 'active' | 'closed'
+  /** Locked to the model of the first completed assistant turn; empty follows the composer. */
+  modelId: string
   messages: ChatMessage[]
+  /** Transcript without system messages, maintained in memory for continuation and persistence. */
+  transcript: AgentMessage[]
+  memory: ChatSessionMemory
+  usage: AgentUsage
+}
+
+export function emptyChatUsage(): AgentUsage {
+  return { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, costTotal: 0 }
+}
+
+export function newChatMessageId(): string {
+  return `msg_${globalThis.crypto.randomUUID()}`
+}
+
+/** A fresh in-memory session. Blank sessions are never persisted. */
+export function blankChatSession(id: string, title = 'New'): ChatSession {
+  const now = new Date().toISOString()
+  return {
+    id,
+    title,
+    createdAt: now,
+    updatedAt: now,
+    status: 'active',
+    modelId: '',
+    messages: [],
+    transcript: [],
+    memory: { distilledUpTo: 0, lastDistillAt: '' },
+    usage: emptyChatUsage(),
+  }
 }
 
 function lastAssistant(sessions: ChatSession[], sessionId: string): ChatMessage | null {
@@ -99,11 +141,31 @@ export function appendToolEnd(
   existing.resultSummary = summary
 }
 
+/** Provider failure surfaced like the loop used to throw, but with the transcript attached for persistence. */
+export class ChatTurnError extends Error {
+  readonly transcript: AgentMessage[]
+  constructor(message: string, transcript: AgentMessage[]) {
+    super(message)
+    this.name = 'ChatTurnError'
+    this.transcript = transcript
+  }
+}
+
+export interface ChatTurnResult {
+  text: string
+  usage: AgentUsage
+  aborted: boolean
+  turnLimit: boolean
+  transcript: AgentMessage[]
+}
+
 export async function playChatTurn(input: {
   model: Model<Api>
   apiKey: string
   systemPrompt: string
   prompt: string
+  /** Prior transcript without system messages, for multi-turn continuation. */
+  history?: AgentMessage[]
   signal?: AbortSignal
   streamFn: StreamFn
   tools?: AgentTool[]
@@ -114,12 +176,13 @@ export async function playChatTurn(input: {
   onToolStart?: (call: { id: string; name: string; args: unknown }) => void
   onToolEnd?: (call: { id: string; name: string; isError: boolean; durationMs: number; resultSummary: string }) => void
   onUsage?: (usage: AgentUsage) => void
-}): Promise<{ text: string; usage: AgentUsage; aborted: boolean; turnLimit: boolean }> {
-  return runAgentLoop({
+}): Promise<ChatTurnResult> {
+  const result = await runAgentLoop({
     model: input.model,
     apiKey: input.apiKey,
     systemPrompt: input.systemPrompt,
     prompt: input.prompt,
+    history: input.history,
     tools: input.tools ?? [],
     maxTurns: normalizeAgentMaxTurns(input.maxTurns ?? AGENT_MAX_TURNS_DEFAULT),
     signal: input.signal,
@@ -139,4 +202,6 @@ export async function playChatTurn(input: {
       } else if (event.type === 'usage') input.onUsage?.(event.usage)
     },
   })
+  if (result.error) throw new ChatTurnError(result.error, result.transcript)
+  return result
 }

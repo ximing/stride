@@ -31,6 +31,7 @@ export async function suggestCommitMessage(input: {
     signal: input.signal,
     streamFn: input.streamFn,
   })
+  if (result.error) throw new Error(result.error)
   return {
     message: subjectLine(redactSecret(result.text, input.apiKey)),
     aborted: result.aborted,

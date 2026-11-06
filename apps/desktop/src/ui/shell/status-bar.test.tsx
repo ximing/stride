@@ -3,6 +3,7 @@ import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it } from 'vitest'
 import { ChatService } from '../../services/chat/chat.service'
+import { blankChatSession } from '../../services/chat/chat-turn'
 import { GitService } from '../../services/git/git.service'
 import { LAYOUT_STORAGE_KEY } from '../../services/layout/layout'
 import { LayoutService } from '../../services/layout/layout.service'
@@ -56,8 +57,7 @@ describe('status bar commit gate', () => {
     chat.running = false
     chat.error = ''
     chat.draft = ''
-    chat.sessions = [{ id: 'session-1', title: 'New', messages: [] }]
-    chat.activeId = 'session-1'
+    chat.session = blankChatSession('session-1')
     layoutSnapshot = localStorage.getItem(LAYOUT_STORAGE_KEY) ?? ''
     previousTab = layout.rightPanelTab
     previousCollapsed = layout.rightPanelCollapsed

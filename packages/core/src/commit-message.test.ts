@@ -123,4 +123,25 @@ describe('suggestCommitMessage', () => {
     })
     expect(result.aborted).toBe(true)
   })
+
+  it('rejects with the redacted provider error', async () => {
+    const streamFn: StreamFn = () => {
+      const stream = createAssistantMessageEventStream()
+      queueMicrotask(() => {
+        const error = assistant('', 'error')
+        error.errorMessage = 'provider exploded sk-passed'
+        stream.push({ type: 'error', reason: 'error', error })
+        stream.end(error)
+      })
+      return stream
+    }
+    const failure = suggestCommitMessage({
+      diff: 'fix the title',
+      model,
+      apiKey: 'sk-passed',
+      streamFn,
+    })
+    await expect(failure).rejects.toThrow('provider exploded ••••')
+    await expect(failure).rejects.toThrow(/^provider exploded ••••$/)
+  })
 })

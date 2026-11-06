@@ -10,6 +10,7 @@ export const SETTINGS_SECTION_IDS = [
   'appearance',
   'editor',
   'ai',
+  'memory',
   'embedding',
   'git',
   'updates',

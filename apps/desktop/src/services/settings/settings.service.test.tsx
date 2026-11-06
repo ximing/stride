@@ -17,7 +17,7 @@ function resetSettingsMemory() {
     autoGitBlurSeconds: 0,
     appearance: { noteWidth: 'standard', fontSize: 15, fontFamily: '' },
     editor: { autosaveDebounceMs: 350 },
-    agent: { maxTurns: 200 },
+    agent: { maxTurns: 200, memoryEnabled: true, memoryModelId: '' },
     updates: { channel: 'stable', autoCheck: true },
     privacy: { telemetryEnabled: false },
   }
@@ -98,6 +98,35 @@ describe('settings service', () => {
     localStorage.removeItem(TOKEN_USAGE_STORAGE_KEY)
     if (has(SettingsService)) resetSettingsMemory()
     resetSecretsStore()
+  })
+
+  it('resolves memoryRuntime from the memory model or the chat default', async () => {
+    setSecretsStore(new MemorySecretsStore())
+    register(SettingsService)
+    const settings = resolve(SettingsService)
+    settings.addLlmConfig()
+    const first = settings.selectedLlmId
+    settings.llmKeyDrafts = { [first]: 'sk-alpha' }
+    settings.addLlmConfig()
+    const second = settings.selectedLlmId
+    settings.patchLlmConfig({ name: 'Backup', provider: 'deepseek' })
+    settings.llmKeyDrafts = { ...settings.llmKeyDrafts, [second]: 'sk-beta' }
+    Object.assign(settings, { memoryLlmKeys: { [first]: 'sk-alpha', [second]: 'sk-beta' } })
+
+    // '' follows the chat default (the first config, still the default).
+    expect(settings.memoryRuntime()?.apiKey).toBe('sk-alpha')
+    settings.form = { ...settings.form, agent: { ...settings.form.agent, memoryModelId: second } }
+    expect(settings.memoryRuntime()?.provider).toBe('deepseek')
+    expect(settings.memoryRuntime()?.apiKey).toBe('sk-beta')
+
+    // Removing the referenced config resets the memory model to the default.
+    settings.removeLlmConfig(second)
+    expect(settings.form.agent.memoryModelId).toBe('')
+    expect(settings.memoryRuntime()?.apiKey).toBe('sk-alpha')
+
+    // No configs at all: no runtime, memory work skips silently.
+    settings.removeLlmConfig(first)
+    expect(settings.memoryRuntime()).toBeNull()
   })
 
   it('does not write the plaintext embedding key to localStorage', async () => {

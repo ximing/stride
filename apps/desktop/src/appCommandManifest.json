@@ -246,6 +246,14 @@
       "keywords": ["chat", "agent", "提问"]
     },
     {
+      "id": "ai.distillMemory",
+      "title": "Organize Memory Now",
+      "shortcut": "Mod+Shift+M",
+      "section": "AI",
+      "enabledWhen": "vaultReady",
+      "keywords": ["memory", "distill", "记忆", "整理"]
+    },
+    {
       "id": "list.archiveSelected",
       "title": "Archive Selected Notes",
       "section": "List",

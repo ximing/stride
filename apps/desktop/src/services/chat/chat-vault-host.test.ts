@@ -44,7 +44,25 @@ describe('chatVaultHost', () => {
     expect(prompt).toContain('ferns by the wall')
     expect(prompt).toContain('list_types')
     expect(prompt).toContain('save_view')
+    expect(prompt).toContain('memory_read')
+    expect(prompt).toContain('memory_write')
     expect(prompt).not.toContain('apiKey')
+  })
+
+  it('inserts the memory section between the snapshot and the prompts', () => {
+    const vault = {
+      active: note,
+      notes: [note],
+      currentVaultLabel: 'Field notes',
+    } as unknown as VaultService
+    const section = '## Long-term memory index\n\n### Project memory (this vault)\n- [fact] Stack — Tauri 2 (mem_1)'
+    const prompt = chatSystemPrompt(vault, section)
+    expect(prompt).toContain(`${section}\n`)
+    expect(prompt.indexOf('ferns by the wall')).toBeLessThan(prompt.indexOf(section))
+    expect(prompt.indexOf(section)).toBeLessThan(prompt.indexOf('list_types'))
+    // No memory section: snapshot flows straight into the prompts.
+    const bare = chatSystemPrompt(vault)
+    expect(bare).not.toContain('Long-term memory index')
   })
 
   it('says when no note is open', () => {

@@ -1,11 +1,12 @@
 import { createAssistantMessageEventStream } from '@earendil-works/pi-ai/utils/event-stream'
 import { Type, type AssistantMessage, type Model, type StopReason } from '@earendil-works/pi-ai'
-import type { AgentTool, StreamFn } from '@earendil-works/pi-agent-core'
+import type { AgentMessage, AgentTool, StreamFn } from '@earendil-works/pi-agent-core'
 import { has, register, resolve } from '@rabjs/react'
 import { describe, expect, it } from 'vitest'
 import { ChatService } from './chat.service'
 import { SettingsService } from '../settings/settings.service'
-import { appendAssistantDelta, appendToolEnd, appendToolStart, playChatTurn, type ChatSession } from './chat-turn'
+import { VaultService } from '../vault/vault.service'
+import { appendAssistantDelta, appendToolEnd, appendToolStart, blankChatSession, ChatTurnError, playChatTurn, type ChatSession } from './chat-turn'
 
 const usage = {
   input: 3,
@@ -118,8 +119,8 @@ describe('playChatTurn', () => {
 
   it('writes deltas only into the session that started the turn', () => {
     const sessions: ChatSession[] = [
-      { id: 'a', title: 'A', messages: [{ role: 'assistant', text: '', thinking: '', tools: [] }] },
-      { id: 'b', title: 'B', messages: [] },
+      { ...blankChatSession('a', 'A'), messages: [{ role: 'assistant', text: '', thinking: '', tools: [] }] },
+      blankChatSession('b', 'B'),
     ]
     appendAssistantDelta(sessions, 'a', 'text', 'hello')
     appendAssistantDelta(sessions, 'a', 'thinking', 'hmm')
@@ -128,6 +129,7 @@ describe('playChatTurn', () => {
   })
 
   it('does not call the model when no key is configured', async () => {
+    if (!has(VaultService)) register(VaultService)
     if (!has(SettingsService)) register(SettingsService)
     if (!has(ChatService)) register(ChatService)
     const chat = resolve(ChatService)
@@ -135,38 +137,39 @@ describe('playChatTurn', () => {
     chat.error = ''
     await chat.send()
     expect(chat.error).toContain('Settings')
-    expect(chat.sessions[0]?.messages).toEqual([])
+    expect(chat.session.messages).toEqual([])
   })
 
-  it('ask starts a fresh session and keeps the prompt when no model is configured', async () => {
+  it('ask continues the current session and keeps the prompt when no model is configured', async () => {
+    if (!has(VaultService)) register(VaultService)
     if (!has(SettingsService)) register(SettingsService)
     if (!has(ChatService)) register(ChatService)
     const chat = resolve(ChatService)
     chat.running = false
     chat.error = ''
     chat.draft = ''
-    chat.sessions = [{ id: 'session-1', title: 'Old', messages: [{ role: 'user', text: 'hi', thinking: '', tools: [] }] }]
-    chat.activeId = 'session-1'
+    await chat.ensureLoaded()
+    const staged = blankChatSession('session-1', 'Old')
+    staged.messages.push({ role: 'user', text: 'hi', thinking: '', tools: [] })
+    chat.session = staged
     await chat.ask('fix the gate')
-    expect(chat.activeId).not.toBe('session-1')
-    expect(chat.sessions).toHaveLength(2)
-    expect(chat.sessions.find((item) => item.id === chat.activeId)?.messages).toEqual([])
+    expect(chat.session.id).toBe('session-1')
+    expect(chat.session.messages).toHaveLength(1)
     expect(chat.draft).toBe('fix the gate')
     expect(chat.error).toContain('Settings')
 
     chat.running = true
     chat.draft = ''
-    const active = chat.activeId
     await chat.ask('second')
-    expect(chat.activeId).toBe(active)
+    expect(chat.session.id).toBe('session-1')
     expect(chat.draft).toBe('')
     chat.running = false
   })
 
   it('records a tool card on the session that started the turn', () => {
     const sessions: ChatSession[] = [
-      { id: 'a', title: 'A', messages: [{ role: 'assistant', text: '', thinking: '', tools: [] }] },
-      { id: 'b', title: 'B', messages: [] },
+      { ...blankChatSession('a', 'A'), messages: [{ role: 'assistant', text: '', thinking: '', tools: [] }] },
+      blankChatSession('b', 'B'),
     ]
     appendToolStart(sessions, 'a', { id: 'call_1', name: 'search_vault', args: { query: 'moss' } })
     appendToolEnd(sessions, 'a', {
@@ -242,5 +245,73 @@ describe('playChatTurn', () => {
     expect(ended[0]?.includes('••••')).toBe(true)
     expect(result.aborted).toBe(false)
     expect(result.text).toBe('after')
+  })
+
+  it('forwards history to the loop and returns the stripped transcript', async () => {
+    const history: AgentMessage[] = [
+      { role: 'user', content: 'earlier question', timestamp: 1 },
+      assistant('earlier answer'),
+    ]
+    let seenRoles: string[] = []
+    const streamFn: StreamFn = (calledModel, context, options) => {
+      seenRoles = context.messages.map((message) => message.role)
+      const stream = createAssistantMessageEventStream()
+      queueMicrotask(() => {
+        const done = assistant('next')
+        stream.push({ type: 'start', partial: assistant('') })
+        stream.push({ type: 'text_delta', contentIndex: 0, delta: 'next', partial: done })
+        stream.push({ type: 'done', reason: 'stop', message: done })
+        stream.end(done)
+      })
+      return stream
+    }
+    const result = await playChatTurn({
+      model,
+      apiKey: 'sk-passed',
+      systemPrompt: 'test',
+      prompt: 'go',
+      history,
+      streamFn,
+      onText: () => {},
+      onThinking: () => {},
+    })
+    expect(seenRoles).toEqual(['system', 'user', 'assistant', 'user'])
+    expect(result.text).toBe('next')
+    expect(result.transcript.some((message) => message.role === 'system')).toBe(false)
+    expect(result.transcript.map((message) => message.role)).toEqual(['user', 'assistant', 'user', 'assistant'])
+  })
+
+  it('throws ChatTurnError with the transcript on a provider error', async () => {
+    const streamFn: StreamFn = () => {
+      const stream = createAssistantMessageEventStream()
+      queueMicrotask(() => {
+        const partial = assistant('hel')
+        const error = assistant('hel', 'error')
+        error.errorMessage = 'provider exploded sk-passed'
+        stream.push({ type: 'start', partial: assistant('') })
+        stream.push({ type: 'text_delta', contentIndex: 0, delta: 'hel', partial })
+        stream.push({ type: 'error', reason: 'error', error })
+        stream.end(error)
+      })
+      return stream
+    }
+    let text = ''
+    const failure = playChatTurn({
+      model,
+      apiKey: 'sk-passed',
+      systemPrompt: 'test',
+      prompt: 'go',
+      streamFn,
+      onText: (delta) => { text += delta },
+      onThinking: () => {},
+    })
+    await expect(failure).rejects.toBeInstanceOf(ChatTurnError)
+    await expect(failure).rejects.toThrow('provider exploded ••••')
+    const caught = await failure.catch((error: unknown) => error)
+    expect(text).toBe('hel')
+    expect(caught).toBeInstanceOf(ChatTurnError)
+    const transcript = (caught as ChatTurnError).transcript
+    expect(transcript.some((message) => message.role === 'system')).toBe(false)
+    expect(transcript.map((message) => message.role)).toEqual(['user', 'assistant'])
   })
 })

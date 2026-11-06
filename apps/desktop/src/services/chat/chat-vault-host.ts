@@ -8,12 +8,13 @@ import {
   readViewsOrder,
   saveVaultView,
   VAULT_ASSISTANT_PROMPT,
+  VAULT_MEMORY_PROMPT,
   type VaultToolHost,
 } from '@stride/core'
 import { VaultService } from '../vault/vault.service'
 import { ViewsService } from '../views/views.service'
 
-export function chatSystemPrompt(vault: VaultService): string {
+export function chatSystemPrompt(vault: VaultService, memorySection = '', memoryPrompt = true): string {
   const active = vault.active
   const snapshot = buildAgentContext({
     activeNote: active
@@ -32,7 +33,9 @@ export function chatSystemPrompt(vault: VaultService): string {
       titles: vault.notes.map((note) => note.title),
     },
   })
-  return `${snapshot}\n${VAULT_ASSISTANT_PROMPT}`
+  // memoryPrompt=false when long-term memory is disabled: no tools are
+  // mounted, so the prompt must not claim they exist.
+  return `${snapshot}${memorySection ? `\n${memorySection}\n` : ''}\n${VAULT_ASSISTANT_PROMPT}${memoryPrompt ? `\n${VAULT_MEMORY_PROMPT}` : ''}`
 }
 
 function liveViews(vault: VaultService): boolean {

@@ -64,7 +64,7 @@ describe('VaultService', () => {
         autoGitBlurSeconds: 0,
         appearance: { noteWidth: 'standard', fontSize: 15, fontFamily: '' },
         editor: { autosaveDebounceMs: 350 },
-        agent: { maxTurns: 200 },
+        agent: { maxTurns: 200, memoryEnabled: true, memoryModelId: '' },
         updates: { channel: 'stable', autoCheck: true },
         privacy: { telemetryEnabled: false },
       }

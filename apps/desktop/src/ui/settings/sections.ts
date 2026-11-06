@@ -2,6 +2,7 @@
 // render from, in fixed order. Forms live in ./sections/*.
 
 import {
+  Brain,
   GitBranch,
   Keyboard,
   Network,
@@ -20,6 +21,7 @@ import { AiSection } from './sections/ai'
 import { EditorSection } from './sections/editor'
 import { EmbeddingSection } from './sections/embedding'
 import { GitSection } from './sections/git'
+import { MemorySection } from './sections/memory'
 import { PrivacySection } from './sections/privacy'
 import { ShortcutsSection } from './sections/shortcuts'
 import { UpdatesSection } from './sections/updates'
@@ -36,6 +38,7 @@ export const SETTINGS_SECTIONS: readonly SettingsSection[] = [
   { id: 'appearance', title: 'Appearance', icon: Palette, component: AppearanceSection },
   { id: 'editor', title: 'Editor', icon: NotebookPen, component: EditorSection },
   { id: 'ai', title: 'AI', icon: Sparkles, component: AiSection },
+  { id: 'memory', title: 'Memory', icon: Brain, component: MemorySection },
   { id: 'embedding', title: 'Embedding', icon: Network, component: EmbeddingSection },
   { id: 'git', title: 'Git', icon: GitBranch, component: GitSection },
   { id: 'updates', title: 'Updates', icon: RefreshCw, component: UpdatesSection },

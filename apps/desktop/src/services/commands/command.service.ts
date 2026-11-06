@@ -7,6 +7,7 @@ import {
 } from './commands'
 import { RIGHT_PANEL_TABS } from '../layout/layout'
 import { LayoutService } from '../layout/layout.service'
+import { ChatService } from '../chat/chat.service'
 import { NoteListService } from '../notes/note-list.service'
 import { GitService } from '../git/git.service'
 import { QuickOpenService } from '../search/quick-open.service'
@@ -194,6 +195,11 @@ export class CommandService extends Service {
     })
     this.registerHandler('ai.ask', {
       run: () => this.resolve(LayoutService).setRightPanelTab('chat'),
+    })
+    this.registerHandler('ai.distillMemory', {
+      run: () => {
+        void this.resolve(ChatService).distillMemoryNow()
+      },
     })
     // Same code path as the status-bar "检查更新" button (T8.3). Hidden when
     // no updater can run here (plain browser dev).

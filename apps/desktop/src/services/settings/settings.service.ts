@@ -11,6 +11,7 @@ import {
   localDateKey,
   maskSecret,
   normalizeAgentMaxTurns,
+  normalizeMemoryModelId,
   parseTokenUsage,
   readSettings,
   readTokenUsageHistory,
@@ -56,7 +57,7 @@ const emptySettings = (): PublicSettings => ({
   autoGitBlurSeconds: 0,
   appearance: { noteWidth: 'standard', fontSize: 15, fontFamily: '' },
   editor: { autosaveDebounceMs: 350 },
-  agent: { maxTurns: 200 },
+  agent: { maxTurns: 200, memoryEnabled: true, memoryModelId: '' },
   updates: { channel: 'stable', autoCheck: true },
   privacy: { telemetryEnabled: false },
 })
@@ -285,6 +286,10 @@ export class SettingsService extends Service {
     const memory = { ...this.memoryLlmKeys }
     delete memory[id]
     this.memoryLlmKeys = memory
+    // A removed config cannot stay referenced as the memory model.
+    if (this.form.agent?.memoryModelId === id) {
+      this.form = { ...this.form, agent: { ...this.form.agent, memoryModelId: '' } }
+    }
     if (this.selectedLlmId === id) {
       this.selectedLlmId = llmConfigs.find((config) => config.isDefault)?.id ?? llmConfigs[0]?.id ?? ''
     }
@@ -481,6 +486,12 @@ export class SettingsService extends Service {
     }
   }
 
+  /** Runtime for memory distillation/curation: the configured memory model, else the chat default. */
+  memoryRuntime(): { provider: string; model: string; baseUrl: string; apiKey: string } | null {
+    const id = this.form.agent?.memoryModelId ?? ''
+    return this.llmRuntime(id || undefined)
+  }
+
   devLlmBaseUrl(baseUrl: string): string {
     if (!import.meta.env.DEV || !isHttpUrl(baseUrl)) return baseUrl
     try {
@@ -571,7 +582,11 @@ export class SettingsService extends Service {
         autoGitBlurSeconds: form.autoGitBlurSeconds,
         appearance: { ...form.appearance },
         editor: { ...form.editor },
-        agent: { maxTurns: normalizeAgentMaxTurns(form.agent?.maxTurns) },
+        agent: {
+          maxTurns: normalizeAgentMaxTurns(form.agent?.maxTurns),
+          memoryEnabled: form.agent?.memoryEnabled !== false,
+          memoryModelId: normalizeMemoryModelId(form.agent?.memoryModelId, form.llmConfigs),
+        },
         updates: { ...form.updates },
         privacy: { ...form.privacy },
       }

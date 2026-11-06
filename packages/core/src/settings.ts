@@ -36,6 +36,10 @@ export const AGENT_MAX_TURNS_MAX = 2000
 
 export interface AgentSettings {
   maxTurns: number
+  /** Master switch for long-term memory: tools, index injection, and distillation. */
+  memoryEnabled: boolean
+  /** LLM config id for memory distillation/curation; '' follows the chat default model. */
+  memoryModelId: string
 }
 
 export type UpdateChannel = 'stable' | 'beta'
@@ -115,7 +119,7 @@ interface ParsedSettings {
   autoGitBlurSeconds?: unknown
   appearance?: { noteWidth?: unknown; fontSize?: unknown; fontFamily?: unknown }
   editor?: { autosaveDebounceMs?: unknown }
-  agent?: { maxTurns?: unknown }
+  agent?: { maxTurns?: unknown; memoryEnabled?: unknown; memoryModelId?: unknown }
   updates?: { channel?: unknown; autoCheck?: unknown }
   privacy?: { telemetryEnabled?: unknown }
 }
@@ -153,7 +157,7 @@ export function defaultEditorSettings(): EditorSettings {
 }
 
 export function defaultAgentSettings(): AgentSettings {
-  return { maxTurns: AGENT_MAX_TURNS_DEFAULT }
+  return { maxTurns: AGENT_MAX_TURNS_DEFAULT, memoryEnabled: true, memoryModelId: '' }
 }
 
 /** Missing or non-integer values use the default. Values above the cap clamp to it. */
@@ -163,6 +167,19 @@ export function normalizeAgentMaxTurns(value: unknown): number {
   }
   if (value > AGENT_MAX_TURNS_MAX) return AGENT_MAX_TURNS_MAX
   return value
+}
+
+/** Only an explicit false disables memory. */
+export function normalizeMemoryEnabled(value: unknown): boolean {
+  return value !== false
+}
+
+/** '' follows the chat default. An id no saved config carries normalizes back to ''. */
+export function normalizeMemoryModelId(value: unknown, configs: readonly { id: string }[]): string {
+  if (typeof value !== 'string') return ''
+  const trimmed = value.trim()
+  if (!trimmed) return ''
+  return configs.some((config) => config.id === trimmed) ? trimmed : ''
 }
 
 export function defaultUpdatesSettings(): UpdatesSettings {
@@ -216,8 +233,12 @@ function readEditor(parsed: ParsedSettings['editor']): EditorSettings {
   return { autosaveDebounceMs: normalizeAutosaveDebounceMs(parsed?.autosaveDebounceMs) }
 }
 
-function readAgent(parsed: ParsedSettings['agent']): AgentSettings {
-  return { maxTurns: normalizeAgentMaxTurns(parsed?.maxTurns) }
+function readAgent(parsed: ParsedSettings['agent'], configs: readonly { id: string }[]): AgentSettings {
+  return {
+    maxTurns: normalizeAgentMaxTurns(parsed?.maxTurns),
+    memoryEnabled: normalizeMemoryEnabled(parsed?.memoryEnabled),
+    memoryModelId: normalizeMemoryModelId(parsed?.memoryModelId, configs),
+  }
 }
 
 function readUpdates(parsed: ParsedSettings['updates']): UpdatesSettings {
@@ -351,7 +372,11 @@ async function sealAll(secrets: SecretsStore, settings: AppSettings): Promise<Se
       fontFamily: normalizeFontFamily(settings.appearance?.fontFamily),
     },
     editor: { autosaveDebounceMs: normalizeAutosaveDebounceMs(settings.editor?.autosaveDebounceMs) },
-    agent: { maxTurns: normalizeAgentMaxTurns(settings.agent?.maxTurns) },
+    agent: {
+      maxTurns: normalizeAgentMaxTurns(settings.agent?.maxTurns),
+      memoryEnabled: normalizeMemoryEnabled(settings.agent?.memoryEnabled),
+      memoryModelId: normalizeMemoryModelId(settings.agent?.memoryModelId, llmConfigs),
+    },
     updates: {
       channel: normalizeUpdateChannel(settings.updates?.channel),
       autoCheck: settings.updates?.autoCheck !== false,
@@ -403,7 +428,11 @@ export function publicSettings(settings: AppSettings): {
       fontFamily: normalizeFontFamily(settings.appearance?.fontFamily),
     },
     editor: { autosaveDebounceMs: normalizeAutosaveDebounceMs(settings.editor?.autosaveDebounceMs) },
-    agent: { maxTurns: normalizeAgentMaxTurns(settings.agent?.maxTurns) },
+    agent: {
+      maxTurns: normalizeAgentMaxTurns(settings.agent?.maxTurns),
+      memoryEnabled: normalizeMemoryEnabled(settings.agent?.memoryEnabled),
+      memoryModelId: normalizeMemoryModelId(settings.agent?.memoryModelId, settings.llmConfigs),
+    },
     updates: {
       channel: normalizeUpdateChannel(settings.updates?.channel),
       autoCheck: settings.updates?.autoCheck !== false,
@@ -435,6 +464,7 @@ export async function readSettings(
   if (!(await fs.stat(file))) return defaultSettings()
   const parsed = JSON.parse(await fs.readText(file)) as ParsedSettings
   const base = defaultSettings()
+  const llmConfigs = await openLlmConfigs(parsed, secrets)
   return {
     embedding: {
       endpoint: parsed.embedding?.endpoint ?? '',
@@ -442,7 +472,7 @@ export async function readSettings(
       apiKey: parsed.embedding?.keySeal ? await secrets.open(parsed.embedding.keySeal) : '',
       dim: normalizeEmbeddingDim(parsed.embedding?.dim, base.embedding.dim),
     },
-    llmConfigs: await openLlmConfigs(parsed, secrets),
+    llmConfigs,
     releasesUrl: parsed.releasesUrl ?? '',
     gitEnabled: parsed.gitEnabled !== false,
     autoSyncMinutes: normalizeAutoSyncMinutes(parsed.autoSyncMinutes),
@@ -451,7 +481,7 @@ export async function readSettings(
     autoGitBlurSeconds: normalizeAutoGitSeconds(parsed.autoGitBlurSeconds),
     appearance: readAppearance(parsed.appearance),
     editor: readEditor(parsed.editor),
-    agent: readAgent(parsed.agent),
+    agent: readAgent(parsed.agent, llmConfigs),
     updates: readUpdates(parsed.updates),
     privacy: readPrivacy(parsed.privacy),
   }

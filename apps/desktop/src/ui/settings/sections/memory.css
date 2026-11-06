@@ -1,0 +1,135 @@
+.memory-section {
+  width: 100%;
+}
+
+.memory-group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.memory-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.memory-field {
+  min-width: 260px;
+}
+
+.memory-hint {
+  max-width: 64ch;
+  margin: 0;
+  color: var(--sd-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.memory-section .error {
+  max-width: 64ch;
+  margin: 0;
+  color: var(--sd-danger);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.memory-entries {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid var(--sd-border);
+}
+
+.memory-entries-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.memory-entries-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.memory-entries-scope {
+  margin: 0;
+  color: var(--sd-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.memory-entries-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.memory-entry {
+  border: 1px solid var(--sd-border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: var(--sd-bg-elevated);
+}
+
+.memory-entry-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.memory-entry-kind {
+  flex-shrink: 0;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--sd-accent-soft, var(--sd-bg));
+  color: var(--sd-accent);
+  font-size: 11px;
+}
+
+.memory-entry-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.memory-entry-time {
+  flex-shrink: 0;
+  color: var(--sd-muted);
+  font-size: 11px;
+}
+
+.memory-entry-text {
+  margin: 4px 0 0;
+  color: var(--sd-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.memory-entry-content {
+  margin: 6px 0 0;
+  padding-top: 6px;
+  border-top: 1px solid var(--sd-border);
+  font-size: 12px;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+

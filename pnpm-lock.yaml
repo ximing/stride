@@ -40,6 +40,12 @@ importers:
       '@radix-ui/react-tooltip':
         specifier: ^1.4.1
         version: 1.4.1(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.3.0(react@19.3.0))(react@19.3.0)
+      '@stride/appdata-tauri':
+        specifier: workspace:*
+        version: link:../../packages/appdata-tauri
+      '@stride/appdata-web':
+        specifier: workspace:*
+        version: link:../../packages/appdata-web
       '@stride/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -227,6 +233,41 @@ importers:
       vite:
         specifier: ^6.2.0
         version: 6.4.4(@types/node@22.20.5)(tsx@4.23.15)
+      vitest:
+        specifier: ^3.0.5
+        version: 3.2.7(@types/debug@4.1.13)(@types/node@22.20.5)(jsdom@26.1.0)(tsx@4.23.15)
+
+  packages/appdata-tauri:
+    dependencies:
+      '@stride/fs-tauri':
+        specifier: workspace:*
+        version: link:../fs-tauri
+      '@stride/platform':
+        specifier: workspace:*
+        version: link:../platform
+      '@tauri-apps/api':
+        specifier: ^2.8.0
+        version: 2.12.3
+      '@tauri-apps/plugin-fs':
+        specifier: ^2.3.0
+        version: 2.7.0
+    devDependencies:
+      typescript:
+        specifier: ^5.8.2
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.5
+        version: 3.2.7(@types/debug@4.1.13)(@types/node@22.20.5)(jsdom@26.1.0)(tsx@4.23.15)
+
+  packages/appdata-web:
+    dependencies:
+      '@stride/platform':
+        specifier: workspace:*
+        version: link:../platform
+    devDependencies:
+      typescript:
+        specifier: ^5.8.2
+        version: 5.9.3
       vitest:
         specifier: ^3.0.5
         version: 3.2.7(@types/debug@4.1.13)(@types/node@22.20.5)(jsdom@26.1.0)(tsx@4.23.15)

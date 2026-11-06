@@ -1,3 +1,4 @@
+export * from './appdata.ts'
 export * from './error.ts'
 export * from './fonts.ts'
 export * from './fs.ts'

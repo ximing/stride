@@ -1,5 +1,6 @@
-import { Agent, type AgentTool, type StreamFn } from '@earendil-works/pi-agent-core'
+import { Agent, type AgentMessage, type AgentTool, type StreamFn } from '@earendil-works/pi-agent-core'
 import type { Api, AssistantMessage, Model } from '@earendil-works/pi-ai'
+import { stripSystemMessages } from './chat-session.ts'
 import { redactSecret } from './llm.ts'
 
 export interface AgentUsage {
@@ -70,17 +71,30 @@ function providerErrorMessage(message: { role?: string; stopReason?: string; err
   return message.errorMessage?.trim() || 'Agent failed'
 }
 
+export interface AgentLoopResult {
+  text: string
+  usage: AgentUsage
+  aborted: boolean
+  turnLimit: boolean
+  /** Copy of the agent transcript with system messages stripped; safe to persist. */
+  transcript: AgentMessage[]
+  /** Provider failure, redacted. Abort is not an error. Present instead of throwing. */
+  error?: string
+}
+
 export async function runAgentLoop(input: {
   model: Model<Api>
   apiKey: string
   systemPrompt: string
   prompt: string
+  /** Prior transcript without system messages; the system prompt is rebuilt every turn. */
+  history?: AgentMessage[]
   tools?: AgentTool[]
   maxTurns?: number
   signal?: AbortSignal
   streamFn: StreamFn
   onEvent?: (event: AgentLoopEvent) => void
-}): Promise<{ text: string; usage: AgentUsage; aborted: boolean; turnLimit: boolean }> {
+}): Promise<AgentLoopResult> {
   const maxTurns = input.maxTurns ?? 24
   let turns = 0
   let aborted = Boolean(input.signal?.aborted)
@@ -95,6 +109,7 @@ export async function runAgentLoop(input: {
       systemPrompt: input.systemPrompt,
       model: input.model,
       tools: input.tools ?? [],
+      messages: input.history ?? [],
     },
     finishTurn: (turn) => {
       const reason = turn.message.stopReason
@@ -146,24 +161,34 @@ export async function runAgentLoop(input: {
       if (event.message.stopReason === 'aborted') aborted = true
     }
   })
+  let errorMessage: string | undefined
   try {
     if (!aborted) await agent.prompt(input.prompt)
   } catch (error) {
     if (!aborted && !input.signal?.aborted) {
-      const message = error instanceof Error ? error.message : String(error)
-      throw new Error(redactSecret(message, input.apiKey))
+      errorMessage = redactSecret(error instanceof Error ? error.message : String(error), input.apiKey)
+    } else {
+      aborted = true
     }
-    aborted = true
   } finally {
     input.signal?.removeEventListener('abort', onAbort)
   }
+  // The messages getter returns the live array; copy before persisting.
+  const transcript = stripSystemMessages([...agent.state.messages])
   const last = [...agent.state.messages].reverse().find((message) => message.role === 'assistant')
-  const failure = providerErrorMessage(last)
-  if (failure && !aborted && input.signal?.aborted !== true) {
-    throw new Error(redactSecret(failure, input.apiKey))
+  if (!errorMessage) {
+    const failure = providerErrorMessage(last)
+    if (failure && !aborted && input.signal?.aborted !== true) errorMessage = redactSecret(failure, input.apiKey)
   }
   const text = deltas || textOf(last)
-  const result = { text, usage, aborted: aborted || input.signal?.aborted === true, turnLimit: turnLimit && !aborted && input.signal?.aborted !== true }
-  emit({ type: 'done', ...result })
+  const result: AgentLoopResult = {
+    text,
+    usage,
+    aborted: aborted || input.signal?.aborted === true,
+    turnLimit: turnLimit && !aborted && input.signal?.aborted !== true,
+    transcript,
+    ...(errorMessage ? { error: errorMessage } : {}),
+  }
+  if (!result.error) emit({ type: 'done', text: result.text, usage: result.usage, aborted: result.aborted, turnLimit: result.turnLimit })
   return result
 }

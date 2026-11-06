@@ -1,6 +1,6 @@
 import { createAssistantMessageEventStream } from '@earendil-works/pi-ai/utils/event-stream'
 import { Type, type AssistantMessage, type Model, type StopReason } from '@earendil-works/pi-ai'
-import type { AgentTool, StreamFn } from '@earendil-works/pi-agent-core'
+import type { AgentMessage, AgentTool, StreamFn } from '@earendil-works/pi-agent-core'
 import { describe, expect, it } from 'vitest'
 import { runAgentLoop, type AgentLoopEvent } from './agent-loop.ts'
 
@@ -98,6 +98,9 @@ describe('runAgentLoop', () => {
       expect(events.filter((event) => event.type === 'text_delta').map((event) => event.type === 'text_delta' ? event.delta : '')).toEqual(['hel', 'lo'])
       expect(events.some((event) => event.type === 'usage' && event.usage.output === 2)).toBe(true)
       expect(events.at(-1)).toMatchObject({ type: 'done', text: 'hello', aborted: false, turnLimit: false })
+      expect(result.error).toBeUndefined()
+      expect(result.transcript.some((message) => message.role === 'system')).toBe(false)
+      expect(result.transcript.map((message) => message.role)).toEqual(['user', 'assistant'])
     } finally {
       if (previous === undefined) delete process.env.OPENAI_API_KEY
       else process.env.OPENAI_API_KEY = previous
@@ -206,7 +209,7 @@ describe('runAgentLoop', () => {
     expect(events.at(-1)).toMatchObject({ type: 'done', aborted: false, turnLimit: true })
   })
 
-  it('rejects a provider error instead of returning a normal end', async () => {
+  it('resolves a provider error with the transcript instead of throwing', async () => {
     const events: AgentLoopEvent[] = []
     const streamFn: StreamFn = () => {
       const stream = createAssistantMessageEventStream()
@@ -221,7 +224,7 @@ describe('runAgentLoop', () => {
       })
       return stream
     }
-    const failure = runAgentLoop({
+    const result = await runAgentLoop({
       model,
       apiKey: 'sk-passed',
       systemPrompt: 'test',
@@ -229,13 +232,16 @@ describe('runAgentLoop', () => {
       streamFn,
       onEvent: (event) => events.push(event),
     })
-    await expect(failure).rejects.toThrow('provider exploded ••••')
-    await expect(failure).rejects.toThrow(/^provider exploded ••••$/)
+    expect(result.error).toBe('provider exploded ••••')
+    expect(result.text).toBe('hel')
+    expect(result.aborted).toBe(false)
+    expect(result.transcript.some((message) => message.role === 'system')).toBe(false)
+    expect(result.transcript.map((message) => message.role)).toEqual(['user', 'assistant'])
     expect(events.some((event) => event.type === 'text_delta')).toBe(true)
     expect(events.some((event) => event.type === 'done')).toBe(false)
   })
 
-  it('rejects a provider error that has no errorMessage', async () => {
+  it('resolves a provider error that has no errorMessage', async () => {
     const streamFn: StreamFn = () => {
       const stream = createAssistantMessageEventStream()
       queueMicrotask(() => {
@@ -245,13 +251,43 @@ describe('runAgentLoop', () => {
       })
       return stream
     }
-    await expect(runAgentLoop({
+    const result = await runAgentLoop({
       model,
       apiKey: 'sk-passed',
       systemPrompt: 'test',
       prompt: 'go',
       streamFn,
-    })).rejects.toThrow('Agent failed')
+    })
+    expect(result.error).toBe('Agent failed')
+    expect(result.transcript.some((message) => message.role === 'system')).toBe(false)
+  })
+
+  it('seeds the agent with history and returns it in the transcript', async () => {
+    const history: AgentMessage[] = [
+      { role: 'user', content: 'earlier question', timestamp: 1 },
+      assistant('earlier answer'),
+    ]
+    let seenRoles: string[] = []
+    const streamFn: StreamFn = (calledModel, context, options) => {
+      seenRoles = context.messages.map((message) => message.role)
+      return textStream(['next'])(calledModel, context, options)
+    }
+    const result = await runAgentLoop({
+      model,
+      apiKey: 'sk-passed',
+      systemPrompt: 'test',
+      prompt: 'go',
+      history,
+      streamFn,
+    })
+    // The rebuilt system message leads; the seeded history follows.
+    expect(seenRoles).toEqual(['system', 'user', 'assistant', 'user'])
+    expect(result.error).toBeUndefined()
+    expect(result.transcript.map((message) => message.role)).toEqual(['user', 'assistant', 'user', 'assistant'])
+    const seeded = result.transcript[0]
+    expect(seeded?.role).toBe('user')
+    if (seeded?.role === 'user') expect(seeded.content).toBe('earlier question')
+    expect(result.text).toBe('next')
   })
 
   it('returns a thrown tool error to the model instead of failing the loop', async () => {
