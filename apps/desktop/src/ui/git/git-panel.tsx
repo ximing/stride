@@ -1,4 +1,4 @@
-import { ArrowDown, ArrowUp, CircleAlert, CircleCheck, GitBranch } from 'lucide-react'
+import { ArrowDown, ArrowUp, CircleAlert, CircleCheck, GitBranch, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { DEDICATED_ERROR, type GitChange } from '@stride/core'
@@ -109,6 +109,8 @@ export function GitPanelView(props: {
   browserNeedsInit?: boolean
   error?: string
   onRetryError?: () => void
+  onSolveError?: () => void
+  solveDisabled?: boolean
   onCommitOpenChange?: (open: boolean) => void
   conflicts?: readonly string[]
   onKeepSide?: (path: string, side: 'ours' | 'theirs') => void
@@ -377,10 +379,27 @@ export function GitPanelView(props: {
       {props.error ? (
         <div className="git-error-row">
           <p className="error" data-testid="git-error" role="alert">{statusCopy(props.error)}</p>
-          {props.onRetryError ? (
-            <Button size="sm" tone="secondary" className="save-retry" data-testid="git-error-retry" onClick={() => props.onRetryError?.()}>
-              {t('common.retry')}
-            </Button>
+          {props.onSolveError || props.onRetryError ? (
+            <div className="git-error-actions">
+              {props.onSolveError ? (
+                <Button
+                  size="sm"
+                  tone="secondary"
+                  className="git-solve"
+                  data-testid="git-error-solve"
+                  disabled={props.solveDisabled}
+                  icon={<Mark icon={Sparkles} size={14} />}
+                  onClick={() => props.onSolveError?.()}
+                >
+                  {t('git.solveWithAi')}
+                </Button>
+              ) : null}
+              {props.onRetryError ? (
+                <Button size="sm" tone="secondary" className="save-retry" data-testid="git-error-retry" onClick={() => props.onRetryError?.()}>
+                  {t('common.retry')}
+                </Button>
+              ) : null}
+            </div>
           ) : null}
         </div>
       ) : null}

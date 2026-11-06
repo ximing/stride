@@ -274,21 +274,6 @@
   border-radius: var(--sd-radius);
 }
 
-.git-error-row {
-  display: flex;
-  gap: 0.5rem;
-}
-
-.git-error-row .error {
-  flex: 1;
-  min-width: 0;
-  margin: 0;
-}
-
-.git-error-row .save-retry {
-  flex: none;
-}
-
 .save-retry:hover {
   border-color: var(--sd-danger);
 }

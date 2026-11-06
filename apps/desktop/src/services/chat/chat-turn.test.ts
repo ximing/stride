@@ -138,6 +138,31 @@ describe('playChatTurn', () => {
     expect(chat.sessions[0]?.messages).toEqual([])
   })
 
+  it('ask starts a fresh session and keeps the prompt when no model is configured', async () => {
+    if (!has(SettingsService)) register(SettingsService)
+    if (!has(ChatService)) register(ChatService)
+    const chat = resolve(ChatService)
+    chat.running = false
+    chat.error = ''
+    chat.draft = ''
+    chat.sessions = [{ id: 'session-1', title: 'Old', messages: [{ role: 'user', text: 'hi', thinking: '', tools: [] }] }]
+    chat.activeId = 'session-1'
+    await chat.ask('fix the gate')
+    expect(chat.activeId).not.toBe('session-1')
+    expect(chat.sessions).toHaveLength(2)
+    expect(chat.sessions.find((item) => item.id === chat.activeId)?.messages).toEqual([])
+    expect(chat.draft).toBe('fix the gate')
+    expect(chat.error).toContain('Settings')
+
+    chat.running = true
+    chat.draft = ''
+    const active = chat.activeId
+    await chat.ask('second')
+    expect(chat.activeId).toBe(active)
+    expect(chat.draft).toBe('')
+    chat.running = false
+  })
+
   it('records a tool card on the session that started the turn', () => {
     const sessions: ChatSession[] = [
       { id: 'a', title: 'A', messages: [{ role: 'assistant', text: '', thinking: '', tools: [] }] },

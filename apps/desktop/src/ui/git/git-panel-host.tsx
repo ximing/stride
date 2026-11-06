@@ -2,11 +2,16 @@ import { observer, useService } from '@rabjs/react'
 import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { DEDICATED_ERROR } from '@stride/core'
+import { ChatService } from '../../services/chat/chat.service'
+import { startCommitGateFix, isCommitGateOutput } from '../../services/git/commit-gate'
 import { GitService } from '../../services/git/git.service'
+import { LayoutService } from '../../services/layout/layout.service'
 import { GitPanelView } from './git-panel'
 
 export const GitPanel = observer(function GitPanel() {
   const git = useService(GitService)
+  const chat = useService(ChatService)
+  const layout = useService(LayoutService)
   const { t } = useTranslation()
   useEffect(() => {
     void git.refresh()
@@ -58,6 +63,14 @@ export const GitPanel = observer(function GitPanel() {
       conflicts={git.conflicts}
       onKeepSide={(path, side) => { void git.keepSide(path, side) }}
       onRetryError={() => { void git.refresh() }}
+      onSolveError={isCommitGateOutput(error) ? () => {
+        startCommitGateFix(error, {
+          running: chat.running,
+          ask: (text) => chat.ask(text),
+          openChat: () => layout.setRightPanelTab('chat'),
+        })
+      } : undefined}
+      solveDisabled={chat.running}
       onCommitOpenChange={(open) => {
         if (!open) git.abortSuggest()
       }}

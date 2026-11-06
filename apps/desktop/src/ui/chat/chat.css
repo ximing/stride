@@ -7,10 +7,6 @@
   overflow: auto;
 }
 
-.chat-thinking {
-  color: var(--sd-muted);
-}
-
 .chat-compose {
   display: flex;
   flex-direction: column;
@@ -145,6 +141,15 @@
   margin: 0 0 8px;
 }
 
+/* User messages keep their original line breaks and sit in a soft bubble, so
+   pasted check output / logs stay readable instead of collapsing into a wall. */
+.chat-message.is-user > p {
+  padding: 8px 10px;
+  white-space: pre-wrap;
+  background: var(--sd-inset);
+  border-radius: var(--sd-radius-lg);
+}
+
 .chat-message > p:last-child,
 .chat-markdown p:last-child,
 .chat-markdown ul:last-child,
@@ -189,13 +194,24 @@
   overflow-wrap: anywhere;
 }
 
+/* Thinking is a muted, collapsed-by-default card (native <details> without
+   `open`); it only expands when the user clicks the summary. */
 .chat-thinking {
   margin: 4px 0 8px;
+  padding: 6px 8px;
+  color: var(--sd-muted);
   font-size: 12px;
+  background: color-mix(in srgb, var(--sd-muted) 7%, transparent);
+  border-radius: var(--sd-radius);
 }
 
 .chat-thinking summary {
   cursor: pointer;
+  font-weight: 500;
+}
+
+.chat-thinking[open] summary {
+  margin-bottom: 4px;
 }
 
 .chat-tool {

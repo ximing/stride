@@ -5,6 +5,8 @@ import { GitBranch, RefreshCw, Search, Settings, Sparkles } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { t } from '../../i18n'
+import { ChatService } from '../../services/chat/chat.service'
+import { isCommitGateOutput, startCommitGateFix } from '../../services/git/commit-gate'
 import { LayoutService } from '../../services/layout/layout.service'
 import { GitService } from '../../services/git/git.service'
 import { SettingsPageService } from '../../services/settings/settings-page.service'
@@ -36,6 +38,31 @@ function gitBadge(surface: GitSurface, state: SyncState): string {
   if (state === 'error') return t('git.badge.error')
   return state
 }
+
+export const GitSolveButton = observer(function GitSolveButton({ output }: { output: string }) {
+  const { t: translate } = useTranslation()
+  const chat = useService(ChatService)
+  const layout = useService(LayoutService)
+  return (
+    <Button
+      tone="quiet"
+      size="sm"
+      className="statusbar-item statusbar-action statusbar-git-solve"
+      data-testid="statusbar-git-solve"
+      disabled={chat.running}
+      icon={<span className="statusbar-icon statusbar-icon-ai"><Mark icon={Sparkles} size={14} /></span>}
+      onClick={() => {
+        startCommitGateFix(output, {
+          running: chat.running,
+          ask: (text) => chat.ask(text),
+          openChat: () => layout.setRightPanelTab('chat'),
+        })
+      }}
+    >
+      {translate('git.solveWithAi')}
+    </Button>
+  )
+})
 
 export const GitStatusBadge = observer(function GitStatusBadge() {
   const { t: translate } = useTranslation()
@@ -150,6 +177,7 @@ export const StatusBar = observer(function StatusBar() {
         </span>
       ) : null}
       <GitStatusBadge />
+      {isCommitGateOutput(git.output) ? <GitSolveButton output={git.output} /> : null}
       {vault.indexPhase === 'error' || (vault.indexPhase === 'ready' && vault.indexWork === 'embedding') ? (
         <Tip content={vault.indexPhase === 'error' ? translate('shell.indexFailedTitle') : translate('shell.indexEmbeddingTitle')}>
         <Button

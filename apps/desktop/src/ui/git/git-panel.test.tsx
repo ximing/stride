@@ -38,6 +38,9 @@ function Harness(props: {
   onAddRemote?: (url: string) => void
   browserNeedsInit?: boolean
   error?: string
+  onRetryError?: () => void
+  onSolveError?: () => void
+  solveDisabled?: boolean
   conflicts?: readonly string[]
   onKeepSide?: (path: string, side: 'ours' | 'theirs') => void
   historyEntries?: readonly { hash: string; subject: string }[]
@@ -77,6 +80,9 @@ function Harness(props: {
       onPush={props.onPush ?? (() => {})}
       browserNeedsInit={props.browserNeedsInit}
       error={props.error}
+      onRetryError={props.onRetryError}
+      onSolveError={props.onSolveError}
+      solveDisabled={props.solveDisabled}
       conflicts={props.conflicts}
       onKeepSide={props.onKeepSide}
       historyEntries={props.historyEntries}
@@ -424,5 +430,54 @@ describe('GitPanelView', () => {
       document.querySelector<HTMLButtonElement>('[data-testid="git-history-restore-confirm"]')?.click()
     })
     expect(restored).toEqual(['restore'])
+  })
+
+  it('offers AI fix only for a commit check, beside retry', async () => {
+    const solved: string[] = []
+    const retried: string[] = []
+    const gate = 'ERROR notes/a.stride.json: 缺少必填字段: status\n3 error(s), 0 warning(s)'
+    await render(<Harness error="network down" />)
+    expect(host?.querySelector('[data-testid="git-error-solve"]')).toBeNull()
+
+    await rerender(
+      <Harness
+        error={gate}
+        onSolveError={() => solved.push('solve')}
+        solveDisabled
+      />,
+    )
+    const solve = host?.querySelector<HTMLButtonElement>('[data-testid="git-error-solve"]')
+    expect(solve?.textContent).toContain('Fix with AI')
+    expect(solve?.disabled).toBe(true)
+    await act(async () => {
+      solve?.click()
+    })
+    expect(solved).toEqual([])
+
+    await rerender(
+      <Harness
+        error={gate}
+        onSolveError={() => solved.push('solve')}
+        solveDisabled={false}
+      />,
+    )
+    const ready = host?.querySelector<HTMLButtonElement>('[data-testid="git-error-solve"]')
+    expect(host?.querySelector('[data-testid="git-error-retry"]')).toBeNull()
+    await act(async () => {
+      ready?.click()
+    })
+    expect(solved).toEqual(['solve'])
+
+    await rerender(
+      <Harness
+        error={gate}
+        onSolveError={() => solved.push('solve')}
+        onRetryError={() => retried.push('retry')}
+      />,
+    )
+    await act(async () => {
+      host?.querySelector<HTMLButtonElement>('[data-testid="git-error-retry"]')?.click()
+    })
+    expect(retried).toEqual(['retry'])
   })
 })

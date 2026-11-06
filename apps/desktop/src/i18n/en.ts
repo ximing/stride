@@ -400,6 +400,8 @@ export const en = {
     conflictsBody: 'Keep ours or theirs for each file.',
     keepOurs: 'Keep ours',
     keepTheirs: 'Keep theirs',
+    solveWithAi: 'Fix with AI',
+    solveGatePrompt: 'A commit check blocked this vault. Update the notes so the check passes. Edit the notes in place and keep their document structure. Do not commit or push.\n\nChecker output:\n{{output}}',
     broadFolder: 'Choose a dedicated vault folder before initializing Git. This path looks like a broad personal folder.',
     badge: {
       unavailable: 'Git unavailable',

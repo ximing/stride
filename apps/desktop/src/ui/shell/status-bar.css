@@ -155,6 +155,11 @@
   color: var(--sd-dot-blue);
 }
 
+.statusbar .statusbar-git-solve.sd-btn {
+  flex: none;
+  padding-inline: 6px;
+}
+
 /* Fixed semantic hues for status bar icons; they keep their color on hover. */
 .statusbar-icon {
   display: inline-flex;

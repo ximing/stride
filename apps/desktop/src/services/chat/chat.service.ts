@@ -55,6 +55,16 @@ export class ChatService extends Service {
     this.activeId = id
   }
 
+  /** Send `text` as the next user turn. A session that already has messages starts fresh. */
+  async ask(text: string) {
+    const prompt = text.trim()
+    if (!prompt || this.running) return
+    const current = this.sessions.find((item) => item.id === this.activeId)
+    if (!current || current.messages.length > 0) this.newSession()
+    this.draft = prompt
+    await this.send()
+  }
+
   abort() {
     this.controller?.abort()
   }
@@ -80,7 +90,7 @@ export class ChatService extends Service {
     if (!session) return
     this.error = ''
     this.draft = ''
-    if (session.title === 'New') session.title = text.slice(0, 32)
+    if (session.title === 'New') session.title = text.replace(/\s+/g, ' ').trim().slice(0, 24)
     session.messages.push({ role: 'user', text, thinking: '', tools: [] })
     session.messages.push({ role: 'assistant', text: '', thinking: '', tools: [] })
     const sessionId = session.id

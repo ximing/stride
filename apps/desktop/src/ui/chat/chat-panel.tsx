@@ -43,6 +43,7 @@ export const ChatPanel = observer(function ChatPanel() {
                 key={item.id}
                 className="chat-tab"
                 value={item.id}
+                title={item.title}
                 aria-pressed={item.id === chat.activeId}
               >
                 {item.title}

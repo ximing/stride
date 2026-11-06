@@ -256,11 +256,33 @@
 }
 
 .git-error-row {
-  align-items: flex-start;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
   min-width: 0;
 }
 
 .git-error-row .error {
   overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.git-error-actions {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: 6px;
+}
+
+.git-error-actions .sd-btn {
+  flex: none;
+  width: auto;
+}
+
+.git-solve .sd-btn-icon {
+  color: var(--sd-dot-purple);
 }
 
