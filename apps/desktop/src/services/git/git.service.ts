@@ -28,6 +28,7 @@ import {
   type LlmConfig,
 } from '@stride/core'
 import { browserGitBackend } from '@stride/git-web'
+import { hostFetch } from '../platform/host-fetch'
 import { PlatformError, type FileSystemBackend, type GitBackend } from '@stride/platform'
 import { hostHomeDirectory } from '../platform/home'
 import { isDesktopRuntime } from '../platform/runtime'
@@ -552,6 +553,7 @@ export class GitService extends Service {
       streamFn: (model, context, options) => resolved.models.streamSimple(model, context, {
         ...options,
         apiKey: resolved.apiKey,
+        fetch: hostFetch,
       }),
     })
     if (suggested.usage) {

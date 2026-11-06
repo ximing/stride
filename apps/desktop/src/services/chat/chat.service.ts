@@ -11,6 +11,7 @@ import { appendAssistantDelta, appendToolEnd, appendToolStart, playChatTurn, typ
 /** Stored in `error` when the loop stops at max turns. The panel translates it. */
 export const CHAT_TURN_LIMIT_ERROR = 'max-turns'
 import { chatSystemPrompt, chatVaultHost } from './chat-vault-host'
+import { hostFetch } from '../platform/host-fetch'
 import { SettingsService } from '../settings/settings.service'
 import { VaultService } from '../vault/vault.service'
 
@@ -119,6 +120,7 @@ export class ChatService extends Service {
         streamFn: (model, context, options) => resolved.models.streamSimple(model, context, {
           ...options,
           apiKey: resolved.apiKey,
+          fetch: hostFetch,
         }),
         onText: (delta) => appendAssistantDelta(this.sessions, sessionId, 'text', delta),
         onThinking: (delta) => appendAssistantDelta(this.sessions, sessionId, 'thinking', delta),

@@ -25,6 +25,7 @@ import {
 } from '@stride/core'
 import { MemoryFileSystem, type FileSystemBackend, type SecretsStore } from '@stride/platform'
 import { webSecretsStore } from '@stride/secrets-web'
+import { hostFetch } from '../platform/host-fetch'
 import { isDesktopRuntime } from '../platform/runtime'
 import { VaultService } from '../vault/vault.service'
 
@@ -653,7 +654,7 @@ export class SettingsService extends Service {
       dim,
     }
     try {
-      const [vector] = await new EmbeddingClient((input, init) => globalThis.fetch(input, init)).embed(['connection test'], settings)
+      const [vector] = await new EmbeddingClient((input, init) => hostFetch(input, init)).embed(['connection test'], settings)
       if (!vector || vector.length !== dim) {
         this.embeddingTestResult = `dim:${dim}:${vector?.length ?? 0}`
         return
@@ -691,7 +692,7 @@ export class SettingsService extends Service {
         baseUrl = undefined
       }
     }
-    const result = await testLlmConnection(config, { fetch: globalThis.fetch.bind(globalThis), baseUrl })
+    const result = await testLlmConnection(config, { fetch: hostFetch, baseUrl })
     this.llmTestResult = result.ok ? 'ok' : result.error
   }
 
