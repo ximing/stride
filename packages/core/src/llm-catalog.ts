@@ -58,7 +58,7 @@ export const LLM_PROVIDERS: readonly LlmProviderInfo[] = [
   { id: 'gemini', label: 'Gemini', api: 'openai-completions', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', defaultModel: 'gemini-3.8-flash', suggestions: suggestionsFor('gemini-3.8-flash', 'gemini') },
   { id: 'xai', label: 'Grok', api: 'openai-responses', baseUrl: 'https://api.x.ai/v1', defaultModel: 'grok-4.7', suggestions: suggestionsFor('grok-4.7', 'xai') },
   { id: 'mistral', label: 'Mistral', api: 'openai-completions', baseUrl: 'https://api.mistral.ai/v1', defaultModel: 'mistral-small-latest', suggestions: suggestionsFor('mistral-small-latest', 'mistral') },
-  { id: 'zhipu', label: '智谱', api: 'openai-responses', baseUrl: 'https://open.bigmodel.cn/api/v1', defaultModel: 'glm-5.3-flash', suggestions: suggestionsFor('glm-5.3-flash', 'zhipu') },
+  { id: 'zhipu', label: '智谱', api: 'openai-completions', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', defaultModel: 'glm-5.3-flash', suggestions: suggestionsFor('glm-5.3-flash', 'zhipu') },
   { id: 'dashscope', label: '通义百炼', api: 'openai-completions', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', defaultModel: 'qwen3.8-flash', suggestions: suggestionsFor('qwen3.8-flash', 'dashscope') },
   { id: 'kimi', label: 'Kimi', api: 'openai-completions', baseUrl: 'https://api.moonshot.cn/v1', defaultModel: 'kimi-k3.1-pro-highspeed', suggestions: suggestionsFor('kimi-k3.1-pro-highspeed', 'kimi') },
   { id: 'minimax', label: 'MiniMax', api: 'openai-completions', baseUrl: 'https://api.minimax.cn/v1', defaultModel: 'MiniMax-M3.1-Flash', suggestions: suggestionsFor('MiniMax-M3.1-Flash', 'minimax') },

@@ -111,7 +111,7 @@ function authorizationOf(input: RequestInfo | URL, init?: RequestInit): string {
   return ''
 }
 
-const RESPONSES_PROVIDERS = new Set(['openai', 'xai', 'zhipu'])
+const RESPONSES_PROVIDERS = new Set(['openai', 'xai'])
 
 describe('llm catalog', () => {
   it('pins each provider to its official API kind, host, and current default model', () => {
@@ -120,8 +120,7 @@ describe('llm catalog', () => {
     expect(catalogDefaultModel('claude')).toBe('claude-haiku-5-5')
     expect(llmApi('openai')).toBe('openai-responses')
     expect(llmApi('xai')).toBe('openai-responses')
-    expect(llmApi('zhipu')).toBe('openai-responses')
-    expect(catalogBaseUrl('zhipu')).toBe('https://open.bigmodel.cn/api/v1')
+    expect(catalogBaseUrl('zhipu')).toBe('https://open.bigmodel.cn/api/paas/v4')
     expect(catalogDefaultModel('zhipu')).toBe('glm-5.3-flash')
     for (const provider of LLM_PROVIDERS) {
       if (provider.id === 'claude') expect(llmApi(provider.id)).toBe('anthropic-messages')
@@ -251,18 +250,19 @@ describe('llm connection', () => {
       baseUrl: '',
       apiKey: 'sk-zhipu',
     }))
-    expect(zhipu.model.api).toBe('openai-responses')
-    expect(zhipu.model.baseUrl).toBe('https://open.bigmodel.cn/api/v1')
+    expect(zhipu.model.api).toBe('openai-completions')
+    expect(zhipu.model.baseUrl).toBe('https://open.bigmodel.cn/api/paas/v4')
     expect(zhipu.model.reasoning).toBe(true)
-    expect(zhipu.model.maxTokens).toBe(8_192)
     expect(zhipu.model.thinkingLevelMap).toMatchObject({ off: 'low', low: 'low', high: 'high', max: 'max' })
     expect(zhipu.model.compat).toMatchObject({
+      supportsStore: false,
       supportsDeveloperRole: false,
-      supportsLongCacheRetention: false,
-      supportsStrictMode: false,
+      supportsReasoningEffort: true,
+      maxTokensField: 'max_tokens',
+      thinkingFormat: 'openai',
     })
-    expect(effectiveBaseUrl({ provider: 'zhipu', baseUrl: 'https://open.bigmodel.cn/api/paas/v4/' })).toBe(
-      'https://open.bigmodel.cn/api/v1',
+    expect(effectiveBaseUrl({ provider: 'zhipu', baseUrl: 'https://open.bigmodel.cn/api/v1/' })).toBe(
+      'https://open.bigmodel.cn/api/paas/v4',
     )
 
     const minimax = resolveLlm(config({
@@ -342,22 +342,31 @@ describe('llm connection', () => {
     expect(redactSecret(`invalid api key ${key}`, key)).toBe('invalid api key ••••')
   })
 
-  it('calls the Zhipu responses endpoint from the catalog base URL', async () => {
+  it('calls Zhipu chat completions with low reasoning effort and max_tokens', async () => {
     let seen = ''
+    let body = ''
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
       seen = requestUrl(input)
+      body = typeof init?.body === 'string' ? init.body : ''
       expect(authorizationOf(input, init)).toContain('sk-zhipu')
-      return responsesSseResponse()
+      return sseResponse()
     })
     const result = await testLlmConnection(config({
       provider: 'zhipu',
-      model: 'glm-5.3',
+      model: 'glm-5.3-flash',
       baseUrl: '',
       apiKey: 'sk-zhipu',
     }), { fetch: fetchMock })
     expect(result).toEqual({ ok: true })
-    expect(seen).toContain('https://open.bigmodel.cn/api/v1/responses')
-    expect(seen).not.toContain('/chat/completions')
+    expect(seen).toContain('https://open.bigmodel.cn/api/paas/v4/chat/completions')
+    expect(seen).not.toContain('/responses')
+    expect(JSON.parse(body)).toMatchObject({
+      model: 'glm-5.3-flash',
+      reasoning_effort: 'low',
+      max_tokens: 16,
+    })
+    expect(JSON.parse(body).thinking).toBeUndefined()
+    expect(JSON.parse(body).store).toBeUndefined()
   })
 
   it('calls the DeepSeek chat completions endpoint and disables thinking', async () => {

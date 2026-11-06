@@ -73,13 +73,16 @@ const ZHIPU_THINKING = {
   max: 'max',
 } as const satisfies ThinkingMap
 
-const ZHIPU_RESPONSES_COMPAT = {
-  supportsDeveloperRole: false,
-  supportsLongCacheRetention: false,
-  supportsStrictMode: false,
-} as const satisfies ResponsesCompat
+/** GLM-5.3-Flash official Chat Completions: reasoning_effort only, never thinking.disabled. */
+const ZHIPU_COMPAT = {
+  ...NO_STORE,
+  supportsReasoningEffort: true,
+  maxTokensField: 'max_tokens',
+  thinkingFormat: 'openai',
+  requiresReasoningContentOnAssistantMessages: true,
+} as const satisfies CompletionsCompat
 
-const ZHIPU_LEGACY_COMPLETIONS = 'https://open.bigmodel.cn/api/paas/v4'
+const ZHIPU_RESPONSES = 'https://open.bigmodel.cn/api/v1'
 const MINIMAX_LEGACY_COMPLETIONS = 'https://api.minimaxi.com/v1'
 
 /** MiniMax-M3.1-Flash always thinks; only low / medium / high / xhigh / max. */
@@ -262,6 +265,7 @@ const COMPLETIONS_PROFILES: Record<string, CompletionsProfile> = {
   kimi: { reasoning: true, compat: KIMI_COMPAT, thinkingLevelMap: KIMI_THINKING },
   deepseek: { reasoning: true, compat: DEEPSEEK_COMPAT },
   minimax: { reasoning: true, compat: MINIMAX_COMPAT, thinkingLevelMap: MINIMAX_THINKING },
+  zhipu: { reasoning: true, compat: ZHIPU_COMPAT, thinkingLevelMap: ZHIPU_THINKING },
   gemini: { reasoning: true, compat: GEMINI_COMPAT, thinkingLevelMap: GEMINI_THINKING },
   dashscope: { reasoning: true, compat: DASHSCOPE_COMPAT, thinkingLevelMap: QWEN_THINKING },
   doubao: { reasoning: true, compat: DOUBAO_COMPAT, thinkingLevelMap: DOUBAO_THINKING },
@@ -274,7 +278,6 @@ const COMPLETIONS_PROFILES: Record<string, CompletionsProfile> = {
 const RESPONSES_PROFILES: Record<string, ResponsesProfile> = {
   openai: { reasoning: true, maxTokens: 4_096, compat: OPENAI_RESPONSES_COMPAT, thinkingLevelMap: OPENAI_THINKING },
   xai: { reasoning: true, maxTokens: 4_096, compat: XAI_RESPONSES_COMPAT, thinkingLevelMap: XAI_THINKING },
-  zhipu: { reasoning: true, maxTokens: 8_192, compat: ZHIPU_RESPONSES_COMPAT, thinkingLevelMap: ZHIPU_THINKING },
 }
 
 export interface ResolvedLlm {
@@ -295,7 +298,7 @@ export function effectiveBaseUrl(config: { provider: string; baseUrl: string }):
   const trimmed = config.baseUrl.trim()
   const resolved = trimmed || catalogBaseUrl(config.provider)
   const normalized = resolved.replace(/\/+$/, '')
-  if (config.provider === 'zhipu' && normalized === ZHIPU_LEGACY_COMPLETIONS) {
+  if (config.provider === 'zhipu' && normalized === ZHIPU_RESPONSES) {
     return catalogBaseUrl('zhipu')
   }
   if (config.provider === 'minimax' && normalized === MINIMAX_LEGACY_COMPLETIONS) {
