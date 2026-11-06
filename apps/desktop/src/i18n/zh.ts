@@ -431,7 +431,7 @@ export const zh: DeepString<Catalog> = {
     keepOurs: '保留我方',
     keepTheirs: '保留对方',
     solveWithAi: 'AI解决',
-    solveGatePrompt: '提交检查拦住了这个仓库。请修改笔记让检查通过，保持笔记的文档结构。不要提交或推送。\n\n检查输出：\n{{output}}',
+    solveGatePrompt: '提交检查拦住了这个仓库。如果检查指出了笔记里的问题，就地修改那篇笔记并保持文档结构。如果检查在读笔记之前就失败了，用 bash 修 hook 或 shell 环境。不要提交或推送。\n\n检查输出：\n{{output}}',
     broadFolder: '初始化 Git 前请选择专用仓库文件夹。这个路径看起来像宽泛的个人目录。',
     badge: {
       unavailable: 'Git 不可用',

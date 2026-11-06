@@ -3,6 +3,7 @@ paths:
   - "packages/platform/**/*.ts"
   - "packages/fs-*/**/*.ts"
   - "packages/git-*/**/*.ts"
+  - "packages/shell-*/**/*.ts"
   - "packages/search-web/**/*.ts"
   - "packages/secrets-*/**/*.ts"
 ---
@@ -11,12 +12,12 @@ paths:
 
 ## 契约先行
 
-- 所有宿主能力必须先在 `@stride/platform` 中声明接口（`FileSystemBackend`、`GitBackend`、`SearchBackend`、`SecretsStore`、`UpdaterBackend`、`HostPaths`），并在 `@stride/platform` 内提供配套的内存替身（Test Doubles）。
+- 所有宿主能力必须先在 `@stride/platform` 中声明接口（`FileSystemBackend`、`GitBackend`、`ShellBackend`、`SearchBackend`、`SecretsStore`、`UpdaterBackend`、`HostPaths`），并在 `@stride/platform` 内提供配套的内存替身（Test Doubles）。
 - `packages/*-tauri` 与 `packages/*-web` 仅负责将宿主 API 适配到 `@stride/platform` 接口，不包含领域业务规则。
 
 ## Tauri 端适配器（`*-tauri`）
 
-- 文件系统与 Git 操作通过 Tauri 插件（plugin-fs / plugin-shell）与 Rust 端桥接。
+- 文件系统、Git 与 Shell 操作通过 Tauri 插件（plugin-fs / plugin-shell）与 Rust 端桥接。Shell 只放行 `bash`、`zsh`、`sh`，由适配器在仓库根目录执行。
 - 严格校验并规范化路径，防止目录穿越；`git init` 等写操作必须遵守 `@stride/core` 的安全根目录限制（禁止在 Home / Desktop 等宽泛目录初始化）。
 
 ## 浏览器端适配器（`*-web`）

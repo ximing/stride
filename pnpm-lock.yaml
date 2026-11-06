@@ -73,6 +73,12 @@ importers:
       '@stride/secrets-web':
         specifier: workspace:*
         version: link:../../packages/secrets-web
+      '@stride/shell-tauri':
+        specifier: workspace:*
+        version: link:../../packages/shell-tauri
+      '@stride/shell-web':
+        specifier: workspace:*
+        version: link:../../packages/shell-web
       '@tauri-apps/api':
         specifier: ^2.8.0
         version: 2.12.3
@@ -406,6 +412,35 @@ importers:
         version: 3.2.7(@types/debug@4.1.13)(@types/node@22.20.5)(jsdom@26.1.0)(tsx@4.23.15)
 
   packages/secrets-web:
+    dependencies:
+      '@stride/platform':
+        specifier: workspace:*
+        version: link:../platform
+    devDependencies:
+      typescript:
+        specifier: ^5.8.2
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.5
+        version: 3.2.7(@types/debug@4.1.13)(@types/node@22.20.5)(jsdom@26.1.0)(tsx@4.23.15)
+
+  packages/shell-tauri:
+    dependencies:
+      '@stride/platform':
+        specifier: workspace:*
+        version: link:../platform
+      '@tauri-apps/plugin-shell':
+        specifier: ^2.3.0
+        version: 2.5.0
+    devDependencies:
+      typescript:
+        specifier: ^5.8.2
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.5
+        version: 3.2.7(@types/debug@4.1.13)(@types/node@22.20.5)(jsdom@26.1.0)(tsx@4.23.15)
+
+  packages/shell-web:
     dependencies:
       '@stride/platform':
         specifier: workspace:*

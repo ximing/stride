@@ -44,6 +44,7 @@ describe('chatVaultHost', () => {
     expect(prompt).toContain('ferns by the wall')
     expect(prompt).toContain('list_types')
     expect(prompt).toContain('save_view')
+    expect(prompt).toContain('bash')
     expect(prompt).toContain('memory_read')
     expect(prompt).toContain('memory_write')
     expect(prompt).not.toContain('apiKey')
@@ -77,6 +78,13 @@ describe('chatVaultHost', () => {
   it('refuses to create a note when no vault is open', async () => {
     const vault = { fs: null, notes: [], activeId: '' } as unknown as VaultService
     await expect(chatVaultHost(vault).createNote('A seed')).rejects.toThrow('Open a vault first')
+  })
+
+  it('refuses shell without a vault and in the browser', async () => {
+    const closed = { fs: null } as unknown as VaultService
+    await expect(chatVaultHost(closed).shell?.exec('echo hi')).rejects.toThrow('Open a vault first')
+    const browser = { fs: { rootLabel: '/vault' } } as unknown as VaultService
+    await expect(chatVaultHost(browser).shell?.exec('echo hi')).rejects.toThrow('Shell is not available in the browser')
   })
 
   it('saves a view through the vault filesystem when this vault is not the open service', async () => {

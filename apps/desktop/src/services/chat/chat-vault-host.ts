@@ -11,6 +11,7 @@ import {
   VAULT_MEMORY_PROMPT,
   type VaultToolHost,
 } from '@stride/core'
+import { resolveShellBackend } from '../platform/shell'
 import { VaultService } from '../vault/vault.service'
 import { ViewsService } from '../views/views.service'
 
@@ -100,6 +101,19 @@ export function chatVaultHost(vault: VaultService): VaultToolHost {
         }
         if (!vault.fs) throw new Error('Open a vault first')
         await deleteVaultView(vault.fs, file)
+      },
+    },
+    shell: {
+      async exec(command, options) {
+        if (!vault.fs) throw new Error('Open a vault first')
+        const backend = await resolveShellBackend()
+        if (!backend.available) throw new Error('Shell is not available in the browser')
+        return backend.exec({
+          command,
+          cwd: vault.fs.rootLabel,
+          timeoutSeconds: options?.timeout,
+          signal: options?.signal,
+        })
       },
     },
   }

@@ -1,5 +1,6 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core'
 import { Type } from '@earendil-works/pi-ai'
+import { ShellAbortError, ShellTimeoutError, type ShellOutput } from '@stride/platform'
 import {
   addRelationTarget,
   buildGraph,
@@ -51,11 +52,13 @@ export const WRITE_VAULT_TOOLS = [
   'update_type',
   'save_view',
   'delete_view',
+  'bash',
 ] as const
 
 export const VAULT_ASSISTANT_PROMPT = [
   'You are Stride, a local vault assistant. Use the vault tools before answering.',
-  'Safe mode can read. Power mode can also change the vault. Do not delete notes, rename note files, or run shell or git commands.',
+  'Safe mode can read. Power mode can also change the vault and run bash in the vault directory.',
+  'Do not delete notes or rename note files. Edit note documents with the note tools. Do not rewrite *.stride.json from the shell.',
   'Notes stay TipTap JSON. Edit content by node. Never replace a document with a plain-text paragraph.',
   'Notes: list_notes, search_vault, read_note, read_active_note, create_note, set_note. set_note changes title, type, or archived. The note id stays the same.',
   'Content: append_to_note, write_note, insert_block, remove_block, undo_note. undo_note restores the last snapshot of that note.',
@@ -63,6 +66,7 @@ export const VAULT_ASSISTANT_PROMPT = [
   'Relationships: get_relations, get_backlinks, link_relation, unlink_relation. Kinds are belongs_to and related_to. Do not store those keys with set_property.',
   'Types: list_types, create_type, update_type. A type is a note whose type is Type. Renaming a type updates instances and saved views that filter on it.',
   'Views: list_views, save_view, delete_view. A view filters notes by type and properties.',
+  'Shell: bash runs in the vault root. PATH comes from the user login shell. It returns stdout and stderr. A non-zero exit is an error. Output keeps the last 2000 lines or 50KB. Optional timeout is in seconds.',
 ].join('\n')
 
 export function toolsForAgentMode(tools: AgentTool[], mode: 'safe' | 'power'): AgentTool[] {
@@ -85,10 +89,66 @@ export interface VaultToolHost {
   loadNotes(): Promise<StrideNote[]> | StrideNote[]
   activeNoteId?: string
   views?: VaultViewStore
+  /** Power-mode bash. Omitted only in hosts that have no shell port. */
+  shell?: {
+    exec(command: string, options?: { timeout?: number; signal?: AbortSignal }): Promise<ShellOutput> | ShellOutput
+  }
 }
 
 function toolText(text: string, details: unknown = null) {
   return { content: [{ type: 'text' as const, text }], details }
+}
+
+const SHELL_MAX_LINES = 2_000
+const SHELL_MAX_BYTES = 50 * 1024
+const MAX_TIMEOUT_SECONDS = 2_147_483.647
+
+function shellBytes(text: string): number {
+  return new TextEncoder().encode(text).length
+}
+
+function cleanShell(text: string): string {
+  return text.replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFF9-\uFFFB]/g, '')
+}
+
+/** Keep the tail, matching pi's bash output cap: last 2000 lines or 50KB. */
+function tailShell(text: string): { text: string; notice: string } {
+  const clean = cleanShell(text)
+  const lines = clean.split('\n')
+  if (lines.length <= SHELL_MAX_LINES && shellBytes(clean) <= SHELL_MAX_BYTES) return { text: clean, notice: '' }
+  const kept: string[] = []
+  let bytes = 0
+  for (let index = lines.length - 1; index >= 0 && kept.length < SHELL_MAX_LINES; index -= 1) {
+    const line = lines[index] ?? ''
+    const next = shellBytes(line) + (kept.length > 0 ? 1 : 0)
+    if (bytes + next > SHELL_MAX_BYTES) {
+      if (kept.length === 0) {
+        const encoded = new TextEncoder().encode(line)
+        kept.unshift(new TextDecoder().decode(encoded.slice(Math.max(0, encoded.length - SHELL_MAX_BYTES))))
+      }
+      break
+    }
+    kept.unshift(line)
+    bytes += next
+  }
+  const start = Math.max(1, lines.length - kept.length + 1)
+  return {
+    text: kept.join('\n'),
+    notice: `[Showing lines ${start}-${lines.length} of ${lines.length}. Output truncated.]`,
+  }
+}
+
+function formatShell(output: ShellOutput): string {
+  const combined = output.stdout && output.stderr ? `${output.stdout}\n${output.stderr}` : output.stdout || output.stderr
+  const tailed = tailShell(combined)
+  let text = tailed.text || '(no output)'
+  if (tailed.notice) text = `${text}\n\n${tailed.notice}`
+  if (output.truncated) text = `${text}\n\n[Output truncated]`
+  return text
+}
+
+function withStatus(text: string, status: string): string {
+  return `${text}\n\n${status}`
 }
 
 function notePayload(note: StrideNote) {
@@ -838,6 +898,48 @@ export function vaultTools(host: VaultToolHost): AgentTool[] {
     },
   }
 
+  const bash: AgentTool = {
+    name: 'bash',
+    label: 'bash',
+    description: 'Execute a bash command in the vault root. PATH is the user login PATH. Returns stdout and stderr. Output is truncated to the last 2000 lines or 50KB. Optionally provide a timeout in seconds. Edit notes with the note tools, not by rewriting .stride.json files.',
+    parameters: Type.Object({
+      command: Type.String({ description: 'Shell command to execute', minLength: 1 }),
+      timeout: Type.Optional(Type.Number({ description: 'Timeout in seconds (optional, no default timeout)' })),
+    }),
+    execute: async (_toolCallId, params, signal) => {
+      if (!host.shell) throw new Error('Shell is not available')
+      const record = params as { command?: string; timeout?: number }
+      const command = record.command ?? ''
+      if (!command.trim()) throw new Error('Command is empty')
+      const timeout = record.timeout
+      if (timeout !== undefined && (!Number.isFinite(timeout) || timeout <= 0 || timeout > MAX_TIMEOUT_SECONDS)) {
+        throw new Error('Invalid timeout: must be a finite number of seconds')
+      }
+      try {
+        const output = await host.shell.exec(command, { timeout, signal })
+        const text = formatShell(output)
+        if (output.code === null) {
+          return { ...toolText(withStatus(text, 'Command terminated without an exit code'), { code: null }), isError: true }
+        }
+        if (output.code !== 0) {
+          return { ...toolText(withStatus(text, `Command exited with code ${output.code}`), { code: output.code }), isError: true }
+        }
+        return toolText(text, { code: 0 })
+      } catch (error) {
+        if (error instanceof ShellAbortError) {
+          return { ...toolText(withStatus(formatShell(error.output), 'Command aborted'), { aborted: true }), isError: true }
+        }
+        if (error instanceof ShellTimeoutError) {
+          return {
+            ...toolText(withStatus(formatShell(error.output), `Command timed out after ${error.seconds} seconds`), { timeout: error.seconds }),
+            isError: true,
+          }
+        }
+        throw error
+      }
+    },
+  }
+
   const deleteView: AgentTool = {
     name: 'delete_view',
     label: 'Delete view',
@@ -875,5 +977,6 @@ export function vaultTools(host: VaultToolHost): AgentTool[] {
     updateType,
     saveView,
     deleteView,
+    bash,
   ]
 }

@@ -4,6 +4,7 @@ export type PlatformErrorCode =
   | 'escape'
   | 'unsupported'
   | 'git-unavailable'
+  | 'shell-unavailable'
   | 'io'
 
 export class PlatformError extends Error {

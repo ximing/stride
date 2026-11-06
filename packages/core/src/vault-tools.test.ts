@@ -1,4 +1,4 @@
-import { MemoryFileSystem } from '@stride/platform'
+import { MemoryFileSystem, ShellAbortError, ShellTimeoutError } from '@stride/platform'
 import { describe, expect, it } from 'vitest'
 import type { AgentTool } from '@earendil-works/pi-agent-core'
 import { createVaultNote, loadNotes, notePath, readNoteFile, saveNote } from './vault.ts'
@@ -240,5 +240,54 @@ describe('vault tools', () => {
     expect(types).toContain('Effort')
     await call(tools, 'undo_note', { id: note.id })
     expect((await readNoteFile(fs, notePath(note.id), note.id)).type).toBe('Project')
+  })
+
+  it('runs bash only in power mode and reports the exit code', async () => {
+    const fs = new MemoryFileSystem('/tmp/stride-vault-bash')
+    const seen: { command: string; timeout?: number }[] = []
+    const tools = vaultTools(memoryHost(fs, {
+      shell: {
+        exec(command, options) {
+          seen.push({ command, timeout: options?.timeout })
+          return { stdout: 'from-hook', stderr: 'node: command not found', code: command === 'false' ? 1 : 0 }
+        },
+      },
+    }))
+    expect(toolsForAgentMode(tools, 'safe').map((tool) => tool.name)).not.toContain('bash')
+    const ok = await call(tools, 'bash', { command: 'cat .git/hooks/pre-commit', timeout: 5 })
+    expect(ok).toContain('from-hook')
+    expect(ok).toContain('node: command not found')
+    expect(seen).toEqual([{ command: 'cat .git/hooks/pre-commit', timeout: 5 }])
+
+    const tool = tools.find((item) => item.name === 'bash')
+    const failed = await tool?.execute('call_test', { command: 'false' })
+    expect(failed?.isError).toBe(true)
+    expect(failed?.content.map((part) => (part.type === 'text' ? part.text : '')).join('')).toContain('Command exited with code 1')
+    await expect(call(tools, 'bash', { command: 'echo', timeout: 0 })).rejects.toThrow('Invalid timeout')
+    await expect(call(vaultTools(memoryHost(fs)), 'bash', { command: 'echo' })).rejects.toThrow('Shell is not available')
+  })
+
+  it('keeps the tail of a long bash result and surfaces abort and timeout', async () => {
+    const fs = new MemoryFileSystem('/tmp/stride-vault-bash-tail')
+    const lines = Array.from({ length: 2_005 }, (_, index) => `line-${index}`)
+    const tools = vaultTools(memoryHost(fs, {
+      shell: {
+        exec(command) {
+          if (command === 'abort') return Promise.reject(new ShellAbortError({ stdout: 'stopped', stderr: '', code: null }))
+          if (command === 'timeout') return Promise.reject(new ShellTimeoutError(3, { stdout: 'slow', stderr: '', code: null }))
+          return { stdout: lines.join('\n'), stderr: '', code: 0 }
+        },
+      },
+    }))
+    const text = await call(tools, 'bash', { command: 'yes' })
+    expect(text).toContain('line-2004')
+    expect(text).not.toContain('line-0\n')
+    expect(text).toContain('Output truncated')
+    const tool = tools.find((item) => item.name === 'bash')
+    const aborted = await tool?.execute('call_test', { command: 'abort' })
+    expect(aborted?.isError).toBe(true)
+    expect(aborted?.content.map((part) => (part.type === 'text' ? part.text : '')).join('')).toContain('Command aborted')
+    const timed = await tool?.execute('call_test', { command: 'timeout' })
+    expect(timed?.content.map((part) => (part.type === 'text' ? part.text : '')).join('')).toContain('Command timed out after 3 seconds')
   })
 })

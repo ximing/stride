@@ -4,6 +4,7 @@ import {
   MemorySecretsStore,
   memorySearchOpener,
   unavailableGit,
+  unavailableShell,
   unsupportedUpdater,
 } from './index.ts'
 
@@ -42,6 +43,17 @@ describe('unavailableGit', () => {
     for (const call of calls) {
       await expect(call).rejects.toMatchObject({ name: 'PlatformError', code: 'git-unavailable' })
     }
+  })
+})
+
+describe('unavailableShell', () => {
+  it('rejects exec with shell-unavailable', async () => {
+    const shell = unavailableShell()
+    expect(shell.available).toBe(false)
+    await expect(shell.exec({ command: 'echo hi', cwd: '/vault' })).rejects.toMatchObject({
+      name: 'PlatformError',
+      code: 'shell-unavailable',
+    })
   })
 })
 

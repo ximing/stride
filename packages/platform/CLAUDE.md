@@ -10,9 +10,10 @@
 - `secrets.ts`：`SecretsStore` 接口与内存实现
 - `updater.ts`：`UpdaterBackend` 接口
 - `host.ts`：`HostPaths.homeDirectory` 与 `memoryHostPaths`
+- `shell.ts`：`ShellBackend`、`unavailableShell` 与 `MemoryShell`
 - `error.ts`：跨平台统一错误类型与错误码
 
-同级的适配器包（`packages/fs-tauri`、`fs-web`、`git-tauri`、`git-web`、`search-web`、`secrets-tauri`、`secrets-web`）均以本包的接口为唯一契约。
+同级的适配器包（`packages/fs-tauri`、`fs-web`、`git-tauri`、`git-web`、`shell-tauri`、`shell-web`、`search-web`、`secrets-tauri`、`secrets-web`）均以本包的接口为唯一契约。
 
 ## 放置约束
 

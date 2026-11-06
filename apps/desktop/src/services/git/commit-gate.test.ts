@@ -26,14 +26,17 @@ describe('commit gate output', () => {
     expect(isCommitGateOutput('error: failed to push some refs')).toBe(false)
   })
 
-  it('asks the agent to edit notes and includes the checker output', async () => {
+  it('asks the agent to edit notes or fix a hook and includes the checker output', async () => {
     await i18n.changeLanguage('en')
     const prompt = commitGatePrompt(SAMPLE)
     expect(prompt).toContain('Do not commit or push')
+    expect(prompt).toContain('bash')
     expect(prompt).toContain('缺少必填字段: status')
     expect(prompt).toContain('3 error(s), 1 warning(s)')
     await i18n.changeLanguage('zh')
-    expect(commitGatePrompt('ERROR a.stride.json: 缺少必填字段: status')).toContain('不要提交或推送')
+    const zh = commitGatePrompt('ERROR a.stride.json: 缺少必填字段: status')
+    expect(zh).toContain('不要提交或推送')
+    expect(zh).toContain('bash')
     await i18n.changeLanguage('en')
   })
 
