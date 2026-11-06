@@ -205,7 +205,7 @@ describe('settings service', () => {
     expect(settings.form.llmConfigs[0]?.isDefault).toBe(true)
     expect(settings.form.llmConfigs[1]?.isDefault).toBe(false)
     settings.patchLlmConfig({ name: 'Backup', provider: 'deepseek' })
-    expect(settings.form.llmConfigs.find((config) => config.id === second)?.model).toBe('deepseek-chat')
+    expect(settings.form.llmConfigs.find((config) => config.id === second)?.model).toBe('deepseek-flash')
     settings.llmKeyDrafts = { ...settings.llmKeyDrafts, [second]: 'sk-stride-llm-beta-key' }
     await settings.save()
     const stored = localStorage.getItem(SETTINGS_STORAGE_KEY) ?? ''
@@ -229,7 +229,7 @@ describe('settings service', () => {
     await settings.load()
     expect(settings.llmRuntime()?.provider).toBe('deepseek')
     expect(settings.llmRuntime()?.apiKey).toBe('sk-stride-llm-beta-key')
-    expect(settings.llmRuntime()?.model).toBe('deepseek-chat')
+    expect(settings.llmRuntime()?.model).toBe('deepseek-flash')
     expect(settings.llmRuntime(first)?.provider).toBe('openai')
     expect(settings.llmRuntime(first)?.apiKey).toBe('sk-stride-llm-alpha-key')
     expect(settings.llmRuntime('missing')?.provider).toBe('deepseek')
@@ -327,11 +327,29 @@ describe('settings service', () => {
 
   it('reports a successful llm probe from the selected config', async () => {
     const sse = [
-      'data: {"id":"x","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"role":"assistant","content":"pong"},"finish_reason":null}]}',
+      'event: response.created',
+      'data: {"type":"response.created","response":{"id":"resp_x","object":"response","status":"in_progress","output":[]}}',
       '',
-      'data: {"id":"x","object":"chat.completion.chunk","choices":[{"index":0,"delta":{},"finish_reason":"stop"}],"usage":{"prompt_tokens":1,"completion_tokens":1,"total_tokens":2}}',
+      'event: response.output_item.added',
+      'data: {"type":"response.output_item.added","output_index":0,"item":{"id":"msg_x","type":"message","role":"assistant","status":"in_progress","content":[]}}',
       '',
-      'data: [DONE]',
+      'event: response.content_part.added',
+      'data: {"type":"response.content_part.added","output_index":0,"content_index":0,"item_id":"msg_x","part":{"type":"output_text","text":""}}',
+      '',
+      'event: response.output_text.delta',
+      'data: {"type":"response.output_text.delta","output_index":0,"content_index":0,"item_id":"msg_x","delta":"pong"}',
+      '',
+      'event: response.output_text.done',
+      'data: {"type":"response.output_text.done","output_index":0,"content_index":0,"item_id":"msg_x","text":"pong"}',
+      '',
+      'event: response.content_part.done',
+      'data: {"type":"response.content_part.done","output_index":0,"content_index":0,"item_id":"msg_x","part":{"type":"output_text","text":"pong"}}',
+      '',
+      'event: response.output_item.done',
+      'data: {"type":"response.output_item.done","output_index":0,"item":{"id":"msg_x","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"pong"}]}}',
+      '',
+      'event: response.completed',
+      'data: {"type":"response.completed","response":{"id":"resp_x","object":"response","status":"completed","output":[{"id":"msg_x","type":"message","role":"assistant","status":"completed","content":[{"type":"output_text","text":"pong"}]}],"usage":{"input_tokens":1,"output_tokens":1,"total_tokens":2}}}',
       '',
     ].join('\n')
     const fetchMock = vi.fn(async () => new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } }))

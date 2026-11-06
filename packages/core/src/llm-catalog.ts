@@ -17,7 +17,7 @@ export const LLM_PROVIDER_IDS = [
 
 export type LlmProviderId = (typeof LLM_PROVIDER_IDS)[number]
 
-export type LlmApiKind = 'openai-completions' | 'anthropic-messages'
+export type LlmApiKind = 'openai-completions' | 'openai-responses' | 'anthropic-messages'
 
 export interface LlmProviderInfo {
   id: LlmProviderId
@@ -30,14 +30,19 @@ export interface LlmProviderInfo {
 }
 
 const EXTRA_MODELS: Partial<Record<LlmProviderId, readonly string[]>> = {
-  gemini: ['gemini-2.5-pro', 'gemini-3.8-flash'],
+  openai: ['gpt-6.1-terra', 'gpt-6.1-sol'],
+  claude: ['claude-sonnet-5-5', 'claude-opus-5-5'],
+  gemini: ['gemini-3.6-flash', 'gemini-3.5-flash-lite'],
   xai: ['grok-4.6', 'grok-4.5', 'grok-4.3'],
   mistral: ['mistral-medium-latest', 'mistral-large-latest', 'codestral-latest'],
-  kimi: ['kimi-k2.7-code', 'kimi-k2.7-code-highspeed', 'kimi-k2.6'],
-  minimax: ['MiniMax-M2.7-highspeed', 'MiniMax-M3'],
-  doubao: ['doubao-seed-1-6-251015'],
-  groq: ['llama-3.1-8b-instant', 'qwen/qwen3.6-27b'],
-  openrouter: ['anthropic/claude-sonnet-4.5', 'deepseek/deepseek-chat'],
+  kimi: ['kimi-k3.1-pro', 'kimi-k3'],
+  deepseek: ['deepseek-v4-pro'],
+  zhipu: ['glm-5.3-flashx', 'glm-5.3'],
+  dashscope: ['qwen-flash', 'qwen3.8-max'],
+  minimax: ['MiniMax-M3'],
+  doubao: ['doubao-seed-2-1-pro-260915', 'doubao-seed-evolving'],
+  groq: ['llama-3.3-70b-versatile', 'openai/gpt-oss-20b'],
+  openrouter: ['anthropic/claude-haiku-5.5', 'openai/gpt-6-luna'],
 }
 
 function suggestionsFor(defaultModel: string, id: LlmProviderId): readonly string[] {
@@ -47,19 +52,19 @@ function suggestionsFor(defaultModel: string, id: LlmProviderId): readonly strin
 }
 
 export const LLM_PROVIDERS: readonly LlmProviderInfo[] = [
-  { id: 'openai', label: 'OpenAI', api: 'openai-completions', baseUrl: 'https://api.openai.com/v1', defaultModel: 'gpt-4o-mini', suggestions: suggestionsFor('gpt-4o-mini', 'openai') },
-  { id: 'deepseek', label: 'DeepSeek', api: 'openai-completions', baseUrl: 'https://api.deepseek.com', defaultModel: 'deepseek-chat', suggestions: suggestionsFor('deepseek-chat', 'deepseek') },
-  { id: 'claude', label: 'Claude', api: 'anthropic-messages', baseUrl: 'https://api.anthropic.com', defaultModel: 'claude-sonnet-4-5', suggestions: suggestionsFor('claude-sonnet-4-5', 'claude') },
-  { id: 'gemini', label: 'Gemini', api: 'openai-completions', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', defaultModel: 'gemini-2.5-flash', suggestions: suggestionsFor('gemini-2.5-flash', 'gemini') },
-  { id: 'xai', label: 'Grok', api: 'openai-completions', baseUrl: 'https://api.x.ai/v1', defaultModel: 'grok-4.7', suggestions: suggestionsFor('grok-4.7', 'xai') },
+  { id: 'openai', label: 'OpenAI', api: 'openai-responses', baseUrl: 'https://api.openai.com/v1', defaultModel: 'gpt-6-luna', suggestions: suggestionsFor('gpt-6-luna', 'openai') },
+  { id: 'deepseek', label: 'DeepSeek', api: 'openai-completions', baseUrl: 'https://api.deepseek.com', defaultModel: 'deepseek-flash', suggestions: suggestionsFor('deepseek-flash', 'deepseek') },
+  { id: 'claude', label: 'Claude', api: 'anthropic-messages', baseUrl: 'https://api.anthropic.com', defaultModel: 'claude-haiku-5-5', suggestions: suggestionsFor('claude-haiku-5-5', 'claude') },
+  { id: 'gemini', label: 'Gemini', api: 'openai-completions', baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai', defaultModel: 'gemini-3.8-flash', suggestions: suggestionsFor('gemini-3.8-flash', 'gemini') },
+  { id: 'xai', label: 'Grok', api: 'openai-responses', baseUrl: 'https://api.x.ai/v1', defaultModel: 'grok-4.7', suggestions: suggestionsFor('grok-4.7', 'xai') },
   { id: 'mistral', label: 'Mistral', api: 'openai-completions', baseUrl: 'https://api.mistral.ai/v1', defaultModel: 'mistral-small-latest', suggestions: suggestionsFor('mistral-small-latest', 'mistral') },
-  { id: 'zhipu', label: '智谱', api: 'openai-completions', baseUrl: 'https://open.bigmodel.cn/api/paas/v4', defaultModel: 'glm-4', suggestions: suggestionsFor('glm-4', 'zhipu') },
-  { id: 'dashscope', label: '通义百炼', api: 'openai-completions', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', defaultModel: 'qwen-plus', suggestions: suggestionsFor('qwen-plus', 'dashscope') },
-  { id: 'kimi', label: 'Kimi', api: 'openai-completions', baseUrl: 'https://api.moonshot.cn/v1', defaultModel: 'kimi-k3', suggestions: suggestionsFor('kimi-k3', 'kimi') },
-  { id: 'minimax', label: 'MiniMax', api: 'openai-completions', baseUrl: 'https://api.minimaxi.com/v1', defaultModel: 'MiniMax-M2.7', suggestions: suggestionsFor('MiniMax-M2.7', 'minimax') },
-  { id: 'doubao', label: '豆包', api: 'openai-completions', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', defaultModel: 'doubao-seed-2-1-pro-260628', suggestions: suggestionsFor('doubao-seed-2-1-pro-260628', 'doubao') },
-  { id: 'groq', label: 'Groq', api: 'openai-completions', baseUrl: 'https://api.groq.com/openai/v1', defaultModel: 'llama-3.3-70b-versatile', suggestions: suggestionsFor('llama-3.3-70b-versatile', 'groq') },
-  { id: 'openrouter', label: 'OpenRouter', api: 'openai-completions', baseUrl: 'https://openrouter.ai/api/v1', defaultModel: 'google/gemini-2.5-flash', suggestions: suggestionsFor('google/gemini-2.5-flash', 'openrouter') },
+  { id: 'zhipu', label: '智谱', api: 'openai-responses', baseUrl: 'https://open.bigmodel.cn/api/v1', defaultModel: 'glm-5.3-flash', suggestions: suggestionsFor('glm-5.3-flash', 'zhipu') },
+  { id: 'dashscope', label: '通义百炼', api: 'openai-completions', baseUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1', defaultModel: 'qwen3.8-flash', suggestions: suggestionsFor('qwen3.8-flash', 'dashscope') },
+  { id: 'kimi', label: 'Kimi', api: 'openai-completions', baseUrl: 'https://api.moonshot.cn/v1', defaultModel: 'kimi-k3.1-pro-highspeed', suggestions: suggestionsFor('kimi-k3.1-pro-highspeed', 'kimi') },
+  { id: 'minimax', label: 'MiniMax', api: 'openai-completions', baseUrl: 'https://api.minimax.cn/v1', defaultModel: 'MiniMax-M3.1-Flash', suggestions: suggestionsFor('MiniMax-M3.1-Flash', 'minimax') },
+  { id: 'doubao', label: '豆包', api: 'openai-completions', baseUrl: 'https://ark.cn-beijing.volces.com/api/v3', defaultModel: 'doubao-seed-2-1-lite-260915', suggestions: suggestionsFor('doubao-seed-2-1-lite-260915', 'doubao') },
+  { id: 'groq', label: 'Groq', api: 'openai-completions', baseUrl: 'https://api.groq.com/openai/v1', defaultModel: 'llama-3.1-8b-instant', suggestions: suggestionsFor('llama-3.1-8b-instant', 'groq') },
+  { id: 'openrouter', label: 'OpenRouter', api: 'openai-completions', baseUrl: 'https://openrouter.ai/api/v1', defaultModel: 'google/gemini-3.8-flash', suggestions: suggestionsFor('google/gemini-3.8-flash', 'openrouter') },
   { id: 'custom', label: 'Custom', api: 'openai-completions', baseUrl: '', defaultModel: '', suggestions: suggestionsFor('', 'custom') },
 ]
 
