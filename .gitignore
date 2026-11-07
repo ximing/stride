@@ -4,6 +4,7 @@ dist-ssr
 target
 .DS_Store
 *.log
+verification/
 .vite
 playwright-report
 test-results
