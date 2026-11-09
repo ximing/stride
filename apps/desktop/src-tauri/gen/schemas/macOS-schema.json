@@ -2349,6 +2349,114 @@
       "description": "Permission identifier",
       "oneOf": [
         {
+          "description": "Enables the list_font_families command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-list-font-families",
+          "markdownDescription": "Enables the list_font_families command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the menu_new_project command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-menu-new-project",
+          "markdownDescription": "Enables the menu_new_project command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the menu_new_window command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-menu-new-window",
+          "markdownDescription": "Enables the menu_new_window command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the menu_open_project command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-menu-open-project",
+          "markdownDescription": "Enables the menu_open_project command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the shell_exec_cancel command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-shell-exec-cancel",
+          "markdownDescription": "Enables the shell_exec_cancel command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the shell_exec_spawn command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-shell-exec-spawn",
+          "markdownDescription": "Enables the shell_exec_spawn command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the sync_recent_projects command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-sync-recent-projects",
+          "markdownDescription": "Enables the sync_recent_projects command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the window_intent command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-window-intent",
+          "markdownDescription": "Enables the window_intent command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the window_set_project command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-window-set-project",
+          "markdownDescription": "Enables the window_set_project command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the list_font_families command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-list-font-families",
+          "markdownDescription": "Denies the list_font_families command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the menu_new_project command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-menu-new-project",
+          "markdownDescription": "Denies the menu_new_project command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the menu_new_window command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-menu-new-window",
+          "markdownDescription": "Denies the menu_new_window command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the menu_open_project command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-menu-open-project",
+          "markdownDescription": "Denies the menu_open_project command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the shell_exec_cancel command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-shell-exec-cancel",
+          "markdownDescription": "Denies the shell_exec_cancel command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the shell_exec_spawn command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-shell-exec-spawn",
+          "markdownDescription": "Denies the shell_exec_spawn command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the sync_recent_projects command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-sync-recent-projects",
+          "markdownDescription": "Denies the sync_recent_projects command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the window_intent command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-window-intent",
+          "markdownDescription": "Denies the window_intent command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the window_set_project command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-window-set-project",
+          "markdownDescription": "Denies the window_set_project command without any pre-configured scope."
+        },
+        {
           "description": "Default core plugins set.\n#### This default permission set includes:\n\n- `core:path:default`\n- `core:event:default`\n- `core:window:default`\n- `core:webview:default`\n- `core:app:default`\n- `core:image:default`\n- `core:resources:default`\n- `core:menu:default`\n- `core:tray:default`",
           "type": "string",
           "const": "core:default",

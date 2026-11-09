@@ -8,6 +8,8 @@ mod frame;
 mod menu;
 mod recent;
 #[cfg(desktop)]
+mod shell_exec;
+#[cfg(desktop)]
 mod windows;
 
 #[cfg(desktop)]
@@ -34,6 +36,12 @@ fn main() {
         )
         .enable_macos_default_menu(false)
         .on_page_load(|webview, payload| {
+            // Document reload. Not macOS-only: every desktop target cancels
+            // sessions for this label. Vite client routing does not emit this.
+            #[cfg(desktop)]
+            if payload.event() == tauri::webview::PageLoadEvent::Started {
+                shell_exec::cancel_label(webview, webview.label());
+            }
             #[cfg(target_os = "macos")]
             if payload.event() == tauri::webview::PageLoadEvent::Finished {
                 let host = webview.window();
@@ -57,6 +65,7 @@ fn main() {
             }
             #[cfg(desktop)]
             {
+                app.manage(shell_exec::ShellHost::new());
                 windows::install(app.handle())?;
                 menu::install(app.handle())?;
                 if let Some(window) = app.get_webview_window("main") {
@@ -73,6 +82,7 @@ fn main() {
             #[cfg(desktop)]
             if matches!(event, tauri::WindowEvent::Destroyed) {
                 windows::forget_window(window.app_handle(), window.label());
+                shell_exec::cancel_label(window.app_handle(), window.label());
             }
             #[cfg(target_os = "macos")]
             if matches!(event, tauri::WindowEvent::Resized(_)) {
@@ -96,11 +106,17 @@ fn main() {
             windows::menu_open_project,
             menu::sync_recent_projects,
             fonts::list_font_families,
+            shell_exec::shell_exec_spawn,
+            shell_exec::shell_exec_cancel,
         ]);
     builder
         .build(tauri::generate_context!())
         .expect("error while building Stride")
         .run(|app, event| {
+            #[cfg(desktop)]
+            if matches!(event, tauri::RunEvent::Exit) {
+                shell_exec::cancel_all(app);
+            }
             #[cfg(target_os = "macos")]
             if let tauri::RunEvent::Reopen {
                 has_visible_windows,

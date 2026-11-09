@@ -12,6 +12,7 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = ["test"] }
 
 [dependencies]
+getrandom = "0.2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tauri = { version = "2", features = [] }
@@ -23,6 +24,21 @@ tauri-plugin-keyring = "0.1.0"
 tauri-plugin-process = "2"
 tauri-plugin-shell = "2"
 tauri-plugin-window-state = "2"
+
+# killpg. Not a default dependency: Windows builds must not link libc for this.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+# Suspended create, job object, toolhelp snapshot, ResumeThread.
+# Feature set is only what shell_exec.rs calls.
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.60", features = [
+  "Win32_Foundation",
+  "Win32_Security",
+  "Win32_System_Threading",
+  "Win32_System_JobObjects",
+  "Win32_System_Diagnostics_ToolHelp",
+] }
 
 # Dock menu injection uses AppKit. Linux builds must not pull GTK through muda.
 [target.'cfg(target_os = "macos")'.dependencies]
