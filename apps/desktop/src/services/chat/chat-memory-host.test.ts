@@ -144,4 +144,33 @@ describe('chatMemoryHost', () => {
       settings.form = previousForm
     }
   })
+
+  it('keeps a shorter llm key ahead of a longer embedding key', () => {
+    if (!has(SettingsService)) register(SettingsService)
+    const settings = resolve(SettingsService)
+    const internals = settings as unknown as {
+      memoryLlmKeys: Record<string, string>
+      memoryEmbeddingKey: string
+    }
+    const previousKeys = internals.memoryLlmKeys
+    const previousEmbedding = internals.memoryEmbeddingKey
+    const previousForm = settings.form
+    internals.memoryLlmKeys = { cfg_a: 'sk-short' }
+    internals.memoryEmbeddingKey = 'sk-short-and-more'
+    settings.form = {
+      ...settings.form,
+      llmConfigs: [
+        { id: 'cfg_a', name: 'A', provider: 'openai', model: 'gpt-4o-mini', baseUrl: '', keyMask: '', isDefault: true },
+      ],
+    }
+    try {
+      const host = chatMemoryHost(makeVault('vault-a'))
+      expect(settings.configuredSecretValues()).toEqual(['sk-short', 'sk-short-and-more'])
+      expect(host.secretValues()).toEqual(['sk-short', 'sk-short-and-more'])
+    } finally {
+      internals.memoryLlmKeys = previousKeys
+      internals.memoryEmbeddingKey = previousEmbedding
+      settings.form = previousForm
+    }
+  })
 })

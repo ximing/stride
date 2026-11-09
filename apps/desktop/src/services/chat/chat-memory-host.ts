@@ -134,10 +134,7 @@ function makeMemoryHost(projectKey: () => string | null): MemoryToolHost {
     },
     secretValues() {
       if (!has(SettingsService)) return []
-      const settings = resolve(SettingsService)
-      const keys = settings.form.llmConfigs.map((config) => settings.llmRuntime(config.id)?.apiKey ?? '')
-      keys.push(settings.embeddingRuntime().apiKey)
-      return keys.filter((key) => key !== '')
+      return resolve(SettingsService).configuredSecretValues()
     },
   }
 }

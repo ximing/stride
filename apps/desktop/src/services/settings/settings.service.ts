@@ -486,6 +486,13 @@ export class SettingsService extends Service {
     }
   }
 
+  /** LLM config keys in form order, then the embedding key. Empty keys are dropped. Not sorted. */
+  configuredSecretValues(): string[] {
+    const keys = this.form.llmConfigs.map((config) => this.llmRuntime(config.id)?.apiKey ?? '')
+    keys.push(this.embeddingRuntime().apiKey)
+    return keys.filter((key) => key !== '')
+  }
+
   /** Runtime for memory distillation/curation: the configured memory model, else the chat default. */
   memoryRuntime(): { provider: string; model: string; baseUrl: string; apiKey: string } | null {
     const id = this.form.agent?.memoryModelId ?? ''

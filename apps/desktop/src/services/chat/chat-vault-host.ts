@@ -6,12 +6,15 @@ import {
   listViews,
   plainText,
   readViewsOrder,
+  redactSecret,
   saveVaultView,
   VAULT_ASSISTANT_PROMPT,
   VAULT_MEMORY_PROMPT,
   type VaultToolHost,
 } from '@stride/core'
+import { ShellAbortError, ShellTimeoutError, type ShellOutput } from '@stride/platform'
 import { resolveShellBackend } from '../platform/shell'
+import { SettingsService } from '../settings/settings.service'
 import { VaultService } from '../vault/vault.service'
 import { ViewsService } from '../views/views.service'
 
@@ -41,6 +44,25 @@ export function chatSystemPrompt(vault: VaultService, memorySection = '', memory
 
 function liveViews(vault: VaultService): boolean {
   return has(VaultService) && resolve(VaultService) === vault && has(ViewsService) && Boolean(vault.fs)
+}
+
+function configuredSecretsLongestFirst(): string[] {
+  if (!has(SettingsService)) return []
+  const secrets = resolve(SettingsService).configuredSecretValues().filter((secret) => secret !== '')
+  // Longest first so a shorter prefix cannot split a longer key.
+  return [...secrets].sort((left, right) => right.length - left.length)
+}
+
+function redactShellOutput(output: ShellOutput): ShellOutput {
+  const secrets = configuredSecretsLongestFirst()
+  if (secrets.length === 0) return output
+  let stdout = output.stdout
+  let stderr = output.stderr
+  for (const secret of secrets) {
+    stdout = redactSecret(stdout, secret)
+    stderr = redactSecret(stderr, secret)
+  }
+  return { ...output, stdout, stderr }
 }
 
 export function chatVaultHost(vault: VaultService): VaultToolHost {
@@ -108,12 +130,23 @@ export function chatVaultHost(vault: VaultService): VaultToolHost {
         if (!vault.fs) throw new Error('Open a vault first')
         const backend = await resolveShellBackend()
         if (!backend.available) throw new Error('Shell is not available in the browser')
-        return backend.exec({
-          command,
-          cwd: vault.fs.rootLabel,
-          timeoutSeconds: options?.timeout,
-          signal: options?.signal,
-        })
+        try {
+          const output = await backend.exec({
+            command,
+            cwd: vault.fs.rootLabel,
+            timeoutSeconds: options?.timeout,
+            signal: options?.signal,
+          })
+          return redactShellOutput(output)
+        } catch (error) {
+          if (error instanceof ShellAbortError) {
+            throw new ShellAbortError(redactShellOutput(error.output))
+          }
+          if (error instanceof ShellTimeoutError) {
+            throw new ShellTimeoutError(error.seconds, redactShellOutput(error.output))
+          }
+          throw error
+        }
       },
     },
   }
