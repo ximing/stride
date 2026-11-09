@@ -110,6 +110,18 @@ export const NoteEditor = observer(function NoteEditor() {
   useEffect(() => {
     installImeEnterGuard()
   }, [])
+  // Toggles .is-scrolled on the scroll region so the pinned chrome casts a
+  // shade once the document slides under it. classList, not state: scroll
+  // fires per frame and must not re-render the editor.
+  const scrollRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const sync = () => el.classList.toggle('is-scrolled', el.scrollTop > 0)
+    sync()
+    el.addEventListener('scroll', sync, { passive: true })
+    return () => el.removeEventListener('scroll', sync)
+  }, [note?.id])
   useEffect(() => {
     if (!editor) return
     setMathClickHandler((pos, kind, latex) => setMathPrompt({ pos, kind, latex }))
@@ -134,7 +146,7 @@ export const NoteEditor = observer(function NoteEditor() {
     <div data-testid="editor" className="editor" onContextMenu={editorMenu.onContextMenu}>
       <EditorFind editor={editor} />
       <EditorToolbar editor={editor} openLinkRef={openLinkRef} getFs={() => fsRef.current} />
-      <div className="editor-scroll">
+      <div className="editor-scroll" ref={scrollRef}>
         <EditorContent editor={editor} />
       </div>
       <TableContextMenu editor={editor} />

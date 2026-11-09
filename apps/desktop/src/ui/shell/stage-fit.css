@@ -75,7 +75,18 @@
   min-height: 0;
   overflow-y: auto;
   padding-inline: 2.1rem;
+  /* The top band doubles as the dock for the floating table pill
+     (.editor-table-bar-slot): tall enough that at rest the pill never
+     covers the first line; scrolled content passes beneath it. */
+  padding-top: 3rem;
   border-top: 1px solid var(--sd-border);
+}
+
+/* Once the document slides under the pinned chrome, an inset shade at the
+   top of the scroll region keeps the boundary legible (the sticky-header
+   shadow pattern). The class is toggled from editor.tsx on scroll. */
+.editor-scroll.is-scrolled {
+  box-shadow: var(--sd-shadow-scroll);
 }
 
 .stage-head {

@@ -907,14 +907,16 @@
 /* Quiet, compact editor chrome. Colors and elevation come from semantic tokens. */
 
 .editor-toolbar {
-  gap: 4px;
-  /* Anchor for the floating .editor-table-bar-slot. */
+  gap: 6px;
   position: relative;
   /* Share the paper column's axis: same max-width and centering as the
      ProseMirror body, so the toolbar's left edge matches the text edge. */
   max-width: var(--sd-note-max-width);
-  margin: 0 auto 8px;
-  padding: 0;
+  margin: 0 auto;
+  /* Quiet band, no card: the tools float on the paper with breathing room
+     above and below (Notion/Craft keep the chrome nearly invisible); the
+     layering comes from the hairline and the scroll shade, not a box. */
+  padding: 6px 0 10px;
   border: 0;
   border-radius: 0;
   background: transparent;
@@ -1022,30 +1024,36 @@
   flex: none;
 }
 
-/* The table actions float as a pill over the top of the scroll region while
-   the selection is inside a table — no reserved band (an empty strip read as
-   a hole in the chrome) and no layout shift. The slot ignores pointer events
-   so the document beneath stays clickable; the pill re-enables them. */
+/* The table actions float as a centered pill in the scroll region's top
+   padding band (reserved in stage-fit.css) while the selection is inside a
+   table: appearing or leaving never shifts the document, and at rest the
+   pill sits in the band above the first line instead of covering it. Once
+   scrolled, lines simply slide beneath the floating pill. The slot ignores
+   pointer events so the document beneath stays clickable. */
 .editor-table-bar-slot {
   position: absolute;
   z-index: 15;
-  top: calc(100% + 14px);
+  top: calc(100% + 8px);
   left: 0;
   right: 0;
   height: 0;
+  display: flex;
+  justify-content: center;
   pointer-events: none;
 }
 
+/* A solid elevated pebble with a soft shadow and no border: it floats over
+   scrolled content, so the translucent sunken wash would read muddy here. */
 .editor-table-bar {
   width: max-content;
   max-width: 100%;
-  margin: 0 auto;
+  height: max-content;
   padding: 3px;
   pointer-events: auto;
-  border: 1px solid var(--sd-border);
+  border: 0;
   border-radius: var(--sd-radius-lg);
   background: var(--sd-bg-elevated);
-  box-shadow: var(--sd-shadow-sm, var(--sd-shadow));
+  box-shadow: var(--sd-shadow-sm);
 }
 
 .editor-table-label {
