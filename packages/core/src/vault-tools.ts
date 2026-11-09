@@ -1,6 +1,6 @@
 import type { AgentTool } from '@earendil-works/pi-agent-core'
 import { Type } from '@earendil-works/pi-ai'
-import { ShellAbortError, ShellTimeoutError, type ShellOutput } from '@stride/platform'
+import { ShellAbortError, ShellDeniedError, ShellTimeoutError, type ShellOutput } from '@stride/platform'
 import {
   addRelationTarget,
   buildGraph,
@@ -934,6 +934,10 @@ export function vaultTools(host: VaultToolHost): AgentTool[] {
             ...toolText(withStatus(formatShell(error.output), `Command timed out after ${error.seconds} seconds`), { timeout: error.seconds }),
             isError: true,
           }
+        }
+        if (error instanceof ShellDeniedError) {
+          const reason = error.reason.trim() || 'denied'
+          return { ...toolText(`Command denied: ${reason}`, { denied: true }), isError: true }
         }
         throw error
       }

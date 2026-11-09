@@ -1,4 +1,4 @@
-import { MemoryFileSystem, ShellAbortError, ShellTimeoutError } from '@stride/platform'
+import { MemoryFileSystem, ShellAbortError, ShellDeniedError, ShellTimeoutError } from '@stride/platform'
 import { describe, expect, it } from 'vitest'
 import type { AgentTool } from '@earendil-works/pi-agent-core'
 import { createVaultNote, loadNotes, notePath, readNoteFile, saveNote } from './vault.ts'
@@ -289,5 +289,44 @@ describe('vault tools', () => {
     expect(aborted?.content.map((part) => (part.type === 'text' ? part.text : '')).join('')).toContain('Command aborted')
     const timed = await tool?.execute('call_test', { command: 'timeout' })
     expect(timed?.content.map((part) => (part.type === 'text' ? part.text : '')).join('')).toContain('Command timed out after 3 seconds')
+  })
+
+  it('returns a denied bash result when the host throws ShellDeniedError', async () => {
+    const fs = new MemoryFileSystem('/tmp/stride-vault-bash-denied')
+    const tools = vaultTools(memoryHost(fs, {
+      shell: {
+        exec() {
+          return Promise.reject(new ShellDeniedError('unsafe command'))
+        },
+      },
+    }))
+    const tool = tools.find((item) => item.name === 'bash')
+    const denied = await tool?.execute('call_test', { command: 'rm -rf /' })
+    const body = denied?.content.map((part) => (part.type === 'text' ? part.text : '')).join('') ?? ''
+    expect(denied?.isError).toBe(true)
+    expect(body).toContain('Command denied:')
+    expect(body).toContain('unsafe command')
+    expect(body).not.toContain('(no output)')
+    expect(denied?.details).toEqual({ denied: true })
+    console.log(body)
+  })
+
+  it('returns Command denied: denied when the ShellDeniedError reason is blank', async () => {
+    const fs = new MemoryFileSystem('/tmp/stride-vault-bash-denied-blank')
+    const tools = vaultTools(memoryHost(fs, {
+      shell: {
+        exec() {
+          return Promise.reject(new ShellDeniedError('   '))
+        },
+      },
+    }))
+    const tool = tools.find((item) => item.name === 'bash')
+    const denied = await tool?.execute('call_test', { command: 'echo' })
+    const body = denied?.content.map((part) => (part.type === 'text' ? part.text : '')).join('') ?? ''
+    expect(denied?.isError).toBe(true)
+    expect(body).toContain('Command denied: denied')
+    expect(body).not.toContain('(no output)')
+    expect(denied?.details).toEqual({ denied: true })
+    console.log(body)
   })
 })

@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest'
 import {
+  allowAllShellReviewer,
   MemorySearchBackend,
   MemorySecretsStore,
+  MemoryShell,
+  ShellAbortError,
+  ShellDeniedError,
   memorySearchOpener,
   unavailableGit,
   unavailableShell,
@@ -54,6 +58,46 @@ describe('unavailableShell', () => {
       name: 'PlatformError',
       code: 'shell-unavailable',
     })
+  })
+})
+
+describe('shell review', () => {
+  it('allowAllShellReviewer resolves review to allow', async () => {
+    const review = await allowAllShellReviewer().review({ command: 'echo hi', cwd: '/vault', timeoutSeconds: 3 })
+    expect(review).toEqual({ action: 'allow' })
+    console.log('allowAllShellReviewer', review.action)
+  })
+
+  it('ShellDeniedError keeps name, reason, and message denied:nope', () => {
+    const error = new ShellDeniedError('nope')
+    expect(error.name).toBe('ShellDeniedError')
+    expect(error.reason).toBe('nope')
+    expect(error.message).toBe('denied:nope')
+    console.log(error.name, error.reason, error.message)
+  })
+})
+
+describe('MemoryShell', () => {
+  it('records calls and returns next, rejecting when next is an Error', async () => {
+    const shell = new MemoryShell()
+    const first = { command: 'echo hi', cwd: '/vault', timeoutSeconds: 5 }
+    await expect(shell.exec(first)).resolves.toEqual({ stdout: '', stderr: '', code: 0 })
+    expect(shell.calls).toEqual([first])
+
+    shell.next = { stdout: 'ok', stderr: 'warn', code: 0 }
+    const second = { command: 'true', cwd: '/vault' }
+    await expect(shell.exec(second)).resolves.toEqual({ stdout: 'ok', stderr: 'warn', code: 0 })
+    expect(shell.calls).toEqual([first, second])
+
+    shell.next = new Error('boom')
+    const third = { command: 'bad', cwd: '/vault' }
+    await expect(shell.exec(third)).rejects.toThrow('boom')
+    expect(shell.calls).toEqual([first, second, third])
+
+    const controller = new AbortController()
+    controller.abort()
+    await expect(shell.exec({ command: 'stopped', cwd: '/vault', signal: controller.signal })).rejects.toBeInstanceOf(ShellAbortError)
+    expect(shell.calls).toEqual([first, second, third])
   })
 })
 

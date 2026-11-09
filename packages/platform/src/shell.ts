@@ -67,3 +67,30 @@ export class MemoryShell implements ShellBackend {
     return Promise.resolve(this.next)
   }
 }
+
+export interface ShellReviewRequest {
+  command: string
+  cwd: string
+  timeoutSeconds?: number
+}
+
+export type ShellReview =
+  | { action: 'allow' }
+  | { action: 'deny'; reason: string }
+
+export interface ShellReviewer {
+  review(request: ShellReviewRequest, signal?: AbortSignal): Promise<ShellReview>
+}
+
+export function allowAllShellReviewer(): ShellReviewer {
+  return { review: () => Promise.resolve({ action: 'allow' }) }
+}
+
+export class ShellDeniedError extends Error {
+  readonly reason: string
+  constructor(reason: string) {
+    super(`denied:${reason}`)
+    this.name = 'ShellDeniedError'
+    this.reason = reason
+  }
+}
