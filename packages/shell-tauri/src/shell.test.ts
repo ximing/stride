@@ -1,191 +1,318 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { ShellAbortError, ShellTimeoutError } from '@stride/platform'
-import { resetShellSessionForTests, shellBackend } from './index.ts'
+import { ShellAbortError, ShellDeniedError, ShellTimeoutError } from '@stride/platform'
+import { shellBackend } from './index.ts'
 
-interface ShellCall {
-  program: string
-  args: string[]
+interface EventChannel {
+  onmessage: ((message: unknown) => void) | null
+}
+
+interface SpawnPayload {
+  command?: string
   cwd?: string
-  env?: Record<string, string>
-  processGroup?: boolean
+  timeoutMs?: number
+  onEvent: EventChannel
+  [key: string]: unknown
 }
 
-interface ShellResult {
-  code: number | null
-  stdout: string
-  stderr: string
-  hang?: boolean
-  error?: string
-}
+const invoke = vi.hoisted(() => vi.fn())
 
-const shell = vi.hoisted(() => {
-  const calls: ShellCall[] = []
-  let kills = 0
-  let handler: (call: ShellCall) => ShellResult = () => ({ code: 0, stdout: '', stderr: '' })
-  return {
-    calls,
-    get kills() {
-      return kills
-    },
-    handle(next: (call: ShellCall) => ShellResult) {
-      handler = next
-    },
-    reset() {
-      calls.length = 0
-      kills = 0
-      handler = () => ({ code: 0, stdout: '', stderr: '' })
-    },
-    respond(call: ShellCall): ShellResult {
-      calls.push(call)
-      return handler(call)
-    },
-    killed() {
-      kills += 1
-    },
-  }
-})
-
-vi.mock('@tauri-apps/plugin-shell', () => ({
-  Command: {
-    create(program: string, args: string | string[] = [], options?: { cwd?: string; env?: Record<string, string>; processGroup?: boolean }) {
-      const argv = typeof args === 'string' ? [args] : [...args]
-      const listeners = new Map<string, ((payload: unknown) => void)[]>()
-      const command = {
-        stdout: {
-          on(event: string, listener: (payload: string) => void) {
-            const list = listeners.get(`stdout:${event}`) ?? []
-            list.push(listener as (payload: unknown) => void)
-            listeners.set(`stdout:${event}`, list)
-          },
-        },
-        stderr: {
-          on(event: string, listener: (payload: string) => void) {
-            const list = listeners.get(`stderr:${event}`) ?? []
-            list.push(listener as (payload: unknown) => void)
-            listeners.set(`stderr:${event}`, list)
-          },
-        },
-        on(event: string, listener: (payload: unknown) => void) {
-          const list = listeners.get(event) ?? []
-          list.push(listener)
-          listeners.set(event, list)
-        },
-        emit(event: string, payload: unknown) {
-          for (const listener of listeners.get(event) ?? []) listener(payload)
-        },
-        async spawn() {
-          const result = shell.respond({
-            program,
-            args: argv,
-            cwd: options?.cwd,
-            env: options?.env,
-            processGroup: options?.processGroup,
-          })
-          if (result.error) {
-            this.emit('error', result.error)
-            return { async kill() { shell.killed() } }
-          }
-          const emitClose = () => {
-            if (result.stdout) this.emit('stdout:data', result.stdout)
-            if (result.stderr) this.emit('stderr:data', result.stderr)
-            this.emit('close', { code: result.code, signal: null })
-          }
-          if (!result.hang) emitClose()
-          return {
-            async kill() {
-              shell.killed()
-              if (result.hang) emitClose()
-            },
-          }
-        },
-      }
-      return command
-    },
+vi.mock('@tauri-apps/api/core', () => ({
+  invoke,
+  Channel: class Channel {
+    onmessage: ((message: unknown) => void) | null = null
   },
 }))
 
-function pathOutput(path: string): ShellResult {
-  return { code: 0, stdout: `\n__STRIDE_PATH__${path}`, stderr: '' }
+function exit(reason: string, code: number | null = 0, truncated = false) {
+  return { event: 'exit', code, truncated, reason }
 }
 
-const backend = shellBackend()
-
 beforeEach(() => {
-  shell.reset()
-  resetShellSessionForTests()
+  invoke.mockReset()
 })
 
 describe('desktop shell', () => {
-  it('runs bash in the vault and injects the login shell PATH', async () => {
-    shell.handle((call) => {
-      if (call.args[0] === '-lic') return pathOutput('/opt/homebrew/bin:/usr/bin')
-      return { code: 0, stdout: 'hi', stderr: 'warn' }
+  it('deny before invoke leaves invoke count at 0', async () => {
+    const backend = shellBackend({
+      reviewer: {
+        review: () => Promise.resolve({ action: 'deny', reason: 'unsafe' }),
+      },
     })
-    const output = await backend.exec({ command: 'echo hi', cwd: '/vault' })
-    expect(output).toMatchObject({ stdout: 'hi', stderr: 'warn', code: 0 })
-    expect(shell.calls[0]).toMatchObject({ program: 'zsh', args: ['-lic', expect.stringContaining('__STRIDE_PATH__')] })
-    expect(shell.calls[1]).toEqual({
-      program: 'bash',
-      args: ['-c', 'echo hi'],
-      cwd: '/vault',
-      env: { PATH: '/opt/homebrew/bin:/usr/bin' },
-      processGroup: true,
-    })
+    const pending = backend.exec({ command: 'echo hi', cwd: '/vault' })
+    await expect(pending).rejects.toBeInstanceOf(ShellDeniedError)
+    await expect(pending).rejects.toMatchObject({ reason: 'unsafe' })
+    expect(invoke).toHaveBeenCalledTimes(0)
   })
 
-  it('keeps a non-zero exit and reuses the probed PATH', async () => {
-    shell.handle((call) => {
-      if (call.args[0] === '-lic') return pathOutput('/usr/bin')
-      return { code: 1, stdout: '', stderr: 'no' }
+  it('abort during review leaves invoke count at 0', async () => {
+    let allow: ((decision: { action: 'allow' }) => void) | undefined
+    const review = new Promise<{ action: 'allow' }>((resolve) => {
+      allow = resolve
     })
-    expect((await backend.exec({ command: 'false', cwd: '/vault' })).code).toBe(1)
-    await backend.exec({ command: 'false', cwd: '/vault' })
-    const probes = shell.calls.filter((call) => call.args[0] === '-lic')
-    expect(probes).toHaveLength(1)
-  })
-
-  it('probes bash when zsh is not allowed', async () => {
-    shell.handle((call) => {
-      if (call.program === 'zsh') return { code: null, stdout: '', stderr: '', error: 'program not allowed on the configured shell scope: zsh' }
-      if (call.args[0] === '-lic') return pathOutput('/usr/local/bin')
-      return { code: 0, stdout: 'ok', stderr: '' }
+    const backend = shellBackend({
+      reviewer: {
+        review: () => review,
+      },
     })
-    await backend.exec({ command: 'true', cwd: '/vault' })
-    expect(shell.calls.map((call) => call.program)).toEqual(['zsh', 'bash', 'bash'])
-    expect(shell.calls[2]?.env).toEqual({ PATH: '/usr/local/bin' })
-  })
-
-  it('kills the process group when the timeout fires', async () => {
-    shell.handle((call) => {
-      if (call.args[0] === '-lic') return pathOutput('/usr/bin')
-      return { code: null, stdout: 'partial', stderr: '', hang: true }
-    })
-    const pending = backend.exec({ command: 'sleep 30', cwd: '/vault', timeoutSeconds: 0.02 })
-    await expect(pending).rejects.toBeInstanceOf(ShellTimeoutError)
-    await expect(pending).rejects.toMatchObject({ seconds: 0.02, output: { stdout: 'partial' } })
-    expect(shell.kills).toBe(1)
-  })
-
-  it('rejects an aborted command before the shell starts', async () => {
-    const signal = new AbortController()
-    signal.abort()
-    await expect(backend.exec({ command: 'echo', cwd: '/vault', signal: signal.signal })).rejects.toBeInstanceOf(ShellAbortError)
-    expect(shell.calls).toHaveLength(0)
-  })
-
-  it('kills a running command when the caller aborts', async () => {
-    let started: (() => void) | undefined
-    const ready = new Promise<void>((resolve) => { started = resolve })
-    shell.handle((call) => {
-      if (call.args[0] === '-lic') return pathOutput('/usr/bin')
-      started?.()
-      return { code: null, stdout: '', stderr: '', hang: true }
-    })
-    const signal = new AbortController()
-    const pending = backend.exec({ command: 'sleep 30', cwd: '/vault', signal: signal.signal })
-    await ready
-    signal.abort()
+    const controller = new AbortController()
+    const pending = backend.exec({ command: 'echo hi', cwd: '/vault', signal: controller.signal })
+    controller.abort()
     await expect(pending).rejects.toBeInstanceOf(ShellAbortError)
-    expect(shell.kills).toBe(1)
+    await expect(pending).rejects.toMatchObject({ output: { stdout: '', stderr: '', code: null } })
+    expect(invoke).toHaveBeenCalledTimes(0)
+    allow?.({ action: 'allow' })
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(invoke).toHaveBeenCalledTimes(0)
+  })
+
+  it('allow passes only command, cwd, timeoutMs, and onEvent', async () => {
+    let payload: SpawnPayload | undefined
+    let onmessageAtInvoke: unknown
+    invoke.mockImplementation((command: string, args: SpawnPayload) => {
+      expect(command).toBe('shell_exec_spawn')
+      onmessageAtInvoke = args.onEvent.onmessage
+      payload = args
+      args.onEvent.onmessage?.(exit('exit', 0, false))
+      return Promise.resolve('id-1')
+    })
+    const requests: unknown[] = []
+    const backend = shellBackend({
+      reviewer: {
+        review(request) {
+          requests.push(request)
+          return Promise.resolve({ action: 'allow' })
+        },
+      },
+    })
+    await backend.exec({ command: 'echo hi', cwd: '/vault', timeoutSeconds: 0.0204 })
+    expect(typeof onmessageAtInvoke).toBe('function')
+    expect(payload).toBeDefined()
+    expect(Object.keys(payload ?? {}).sort()).toEqual(['command', 'cwd', 'onEvent', 'timeoutMs'])
+    expect(payload).toMatchObject({ command: 'echo hi', cwd: '/vault' })
+    expect(payload?.timeoutMs).toBe(0.0204 * 1000)
+    expect(payload?.timeoutMs).not.toBe(20)
+    expect(payload?.timeoutMs).not.toBe(21)
+    expect(payload?.timeoutMs).not.toBe(Math.round(0.0204 * 1000))
+    expect(payload).not.toHaveProperty('program')
+    expect(payload).not.toHaveProperty('args')
+    expect(payload).not.toHaveProperty('env')
+    expect(payload).not.toHaveProperty('webview')
+    expect(payload).not.toHaveProperty('request')
+    expect(requests).toEqual([{ command: 'echo hi', cwd: '/vault', timeoutSeconds: 0.0204 }])
+  })
+
+  it('cap resolves with null code and truncated true', async () => {
+    invoke.mockImplementation((_command: string, args: SpawnPayload) => {
+      args.onEvent.onmessage?.({ event: 'stderr', data: 'partial' })
+      args.onEvent.onmessage?.(exit('cap', null, true))
+      return Promise.resolve('id-1')
+    })
+    const output = await shellBackend().exec({ command: 'echo hi', cwd: '/vault' })
+    expect(output.code).toBeNull()
+    expect(output.truncated).toBe(true)
+    expect(output.stderr).toBe('partial\n[output truncated]')
+    expect(output.stderr).toContain('[output truncated]')
+  })
+
+  it('abort after id cancels exactly once', async () => {
+    const controller = new AbortController()
+    let payload: SpawnPayload | undefined
+    const cancels: unknown[] = []
+    let resolveSpawn: ((id: string) => void) | undefined
+    const spawned = new Promise<string>((resolve) => {
+      resolveSpawn = resolve
+    })
+    invoke.mockImplementation((command: string, args: unknown) => {
+      if (command === 'shell_exec_cancel') {
+        cancels.push(args)
+        return Promise.resolve()
+      }
+      payload = args as SpawnPayload
+      return spawned
+    })
+    const pending = shellBackend().exec({
+      command: 'sleep 30',
+      cwd: '/vault',
+      signal: controller.signal,
+    })
+    await vi.waitFor(() => {
+      expect(typeof payload?.onEvent.onmessage).toBe('function')
+    })
+    payload?.onEvent.onmessage?.({ event: 'started', id: 'job-1' })
+    payload?.onEvent.onmessage?.({ event: 'stdout', data: 'so-far' })
+    resolveSpawn?.('job-1')
+    await Promise.resolve()
+    await Promise.resolve()
+    controller.abort()
+    expect(cancels).toEqual([{ id: 'job-1' }])
+    let settled = false
+    void pending.then(
+      () => {
+        settled = true
+      },
+      () => {
+        settled = true
+      },
+    )
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(settled).toBe(false)
+    expect(invoke.mock.calls.filter((call) => call[0] === 'shell_exec_cancel')).toHaveLength(1)
+    payload?.onEvent.onmessage?.(exit('cancel', null, false))
+    await expect(pending).rejects.toBeInstanceOf(ShellAbortError)
+    await expect(pending).rejects.toMatchObject({ output: { stdout: 'so-far', code: null } })
+    expect(cancels).toEqual([{ id: 'job-1' }])
+  })
+
+  it('concatenates raw stdout chunks without inserting newlines', async () => {
+    invoke.mockImplementation((_command: string, args: SpawnPayload) => {
+      args.onEvent.onmessage?.({ event: 'stdout', data: 'foo' })
+      args.onEvent.onmessage?.({ event: 'stdout', data: 'bar' })
+      args.onEvent.onmessage?.({ event: 'stderr', data: 'a' })
+      args.onEvent.onmessage?.({ event: 'stderr', data: 'b' })
+      args.onEvent.onmessage?.(exit('exit', 0, false))
+      return Promise.resolve('id-1')
+    })
+    const output = await shellBackend().exec({ command: 'printf hi', cwd: '/vault' })
+    expect(output.stdout).toBe('foobar')
+    expect(output.stderr).toBe('ab')
+    expect(output.code).toBe(0)
+  })
+
+  it('maps a timeout exit to the caller timeoutSeconds', async () => {
+    invoke.mockImplementation((_command: string, args: SpawnPayload) => {
+      args.onEvent.onmessage?.({ event: 'stdout', data: 'partial' })
+      args.onEvent.onmessage?.({ event: 'stderr', data: 'err' })
+      args.onEvent.onmessage?.(exit('timeout', null, false))
+      return Promise.resolve('id-1')
+    })
+    const pending = shellBackend().exec({ command: 'sleep 30', cwd: '/vault', timeoutSeconds: 0.0204 })
+    await expect(pending).rejects.toBeInstanceOf(ShellTimeoutError)
+    await expect(pending).rejects.toMatchObject({
+      seconds: 0.0204,
+      output: { stdout: 'partial', stderr: 'err' },
+    })
+  })
+
+  it('keeps the original timeoutSeconds when dividing the milliseconds would drift', async () => {
+    invoke.mockImplementation((_command: string, args: SpawnPayload) => {
+      args.onEvent.onmessage?.(exit('timeout', null, false))
+      return Promise.resolve('id-1')
+    })
+    const timeoutSeconds = 0.0021
+    const pending = shellBackend().exec({ command: 'sleep 1', cwd: '/vault', timeoutSeconds })
+    await expect(pending).rejects.toMatchObject({ seconds: timeoutSeconds })
+    expect((timeoutSeconds * 1000) / 1000).not.toBe(timeoutSeconds)
+  })
+
+  it('does not invoke an empty command', async () => {
+    await expect(shellBackend().exec({ command: ' \n\t', cwd: '/vault' })).rejects.toThrow('Command is empty')
+    await expect(shellBackend().exec({ command: 'echo', cwd: '  ' })).rejects.toThrow('Working directory is empty')
+    expect(invoke).not.toHaveBeenCalled()
+  })
+
+  it('does not probe PATH from JavaScript', async () => {
+    invoke.mockImplementation((_command: string, args: SpawnPayload) => {
+      args.onEvent.onmessage?.(exit('exit', 0, false))
+      return Promise.resolve('id-1')
+    })
+    await shellBackend().exec({ command: 'echo hi', cwd: '/vault' })
+    expect(invoke).toHaveBeenCalledTimes(1)
+    for (const call of invoke.mock.calls) {
+      const blob = JSON.stringify(call, (_key, value) => (typeof value === 'function' ? undefined : value))
+      expect(blob).not.toContain('-lic')
+      expect(blob).not.toContain('__STRIDE_PATH__')
+    }
+  })
+
+  it('cancels once when the caller aborted before the id arrived', async () => {
+    const controller = new AbortController()
+    let payload: SpawnPayload | undefined
+    const cancels: unknown[] = []
+    let resolveSpawn: ((id: string) => void) | undefined
+    const spawned = new Promise<string>((resolve) => {
+      resolveSpawn = resolve
+    })
+    invoke.mockImplementation((command: string, args: unknown) => {
+      if (command === 'shell_exec_cancel') {
+        cancels.push(args)
+        return Promise.resolve()
+      }
+      payload = args as SpawnPayload
+      return spawned
+    })
+    const pending = shellBackend().exec({ command: 'sleep 30', cwd: '/vault', signal: controller.signal })
+    await vi.waitFor(() => {
+      expect(typeof payload?.onEvent.onmessage).toBe('function')
+    })
+    controller.abort()
+    expect(cancels).toEqual([])
+    payload?.onEvent.onmessage?.({ event: 'started', id: 'early' })
+    expect(cancels).toEqual([{ id: 'early' }])
+    resolveSpawn?.('early')
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(cancels).toEqual([{ id: 'early' }])
+    payload?.onEvent.onmessage?.({ event: 'stdout', data: 'partial' })
+    payload?.onEvent.onmessage?.(exit('cancel', null, false))
+    await expect(pending).rejects.toMatchObject({ output: { stdout: 'partial' } })
+  })
+
+  it('ignores the channel end frame until an exit event', async () => {
+    let emit: ((message: unknown) => void) | undefined
+    invoke.mockImplementation((_command: string, args: SpawnPayload) => {
+      emit = (message) => args.onEvent.onmessage?.(message)
+      emit({ end: true })
+      return Promise.resolve('id-1')
+    })
+    const pending = shellBackend().exec({ command: 'echo hi', cwd: '/vault' })
+    let settled = false
+    void pending.then(
+      () => {
+        settled = true
+      },
+      () => {
+        settled = true
+      },
+    )
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(settled).toBe(false)
+    emit?.({ event: 'stdout', data: 'ok' })
+    emit?.(exit('exit', 3, false))
+    await expect(pending).resolves.toMatchObject({ stdout: 'ok', code: 3, truncated: false })
+    emit?.({ event: 'stdout', data: 'late' })
+    await expect(pending).resolves.toMatchObject({ stdout: 'ok' })
+  })
+
+  it('strips control characters, trims, and cuts a deny reason to 200 characters', async () => {
+    const backend = shellBackend({
+      reviewer: {
+        review: () => Promise.resolve({ action: 'deny', reason: `\u0001  ${'x'.repeat(250)}\n\u007F` }),
+      },
+    })
+    await expect(backend.exec({ command: 'echo hi', cwd: '/vault' })).rejects.toMatchObject({
+      reason: 'x'.repeat(200),
+    })
+    const empty = shellBackend({
+      reviewer: {
+        review: () => Promise.resolve({ action: 'deny', reason: '\u0000\n' }),
+      },
+    })
+    await expect(empty.exec({ command: 'echo hi', cwd: '/vault' })).rejects.toMatchObject({ reason: '' })
+    expect(invoke).not.toHaveBeenCalled()
+  })
+
+  it('rejects with the error event message and rethrows invoke failures', async () => {
+    invoke.mockImplementation((_command: string, args: SpawnPayload) => {
+      args.onEvent.onmessage?.({ event: 'error', message: 'No shell is available' })
+      return Promise.resolve('id-1')
+    })
+    await expect(shellBackend().exec({ command: 'echo hi', cwd: '/vault' })).rejects.toThrow('No shell is available')
+    invoke.mockRejectedValue(new Error('spawn failed'))
+    await expect(shellBackend().exec({ command: 'echo hi', cwd: '/vault' })).rejects.toThrow('spawn failed')
+    invoke.mockRejectedValue('boom')
+    await expect(shellBackend().exec({ command: 'echo hi', cwd: '/vault' })).rejects.toThrow('boom')
   })
 })

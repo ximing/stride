@@ -1,1 +1,1 @@
-export { resetShellSessionForTests, shellBackend } from './shell.ts'
+export { shellBackend } from './shell.ts'

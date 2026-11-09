@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@stride/platform": "workspace:*",
-    "@tauri-apps/plugin-shell": "^2.3.0"
+    "@tauri-apps/api": "^2.8.0"
   },
   "devDependencies": {
     "typescript": "^5.8.2",

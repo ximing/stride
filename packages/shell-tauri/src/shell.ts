@@ -1,44 +1,32 @@
-import { Command } from '@tauri-apps/plugin-shell'
+import { Channel, invoke } from '@tauri-apps/api/core'
 import {
+  allowAllShellReviewer,
   ShellAbortError,
+  ShellDeniedError,
   ShellTimeoutError,
   type ShellBackend,
   type ShellExecOptions,
   type ShellOutput,
+  type ShellReview,
+  type ShellReviewer,
+  type ShellReviewRequest,
 } from '@stride/platform'
 
-const SENTINEL = '__STRIDE_PATH__'
-const PROBE_TIMEOUT_MS = 8_000
-const MAX_COLLECT_BYTES = 1024 * 1024
-const LOGIN_SHELLS = ['zsh', 'bash', 'sh'] as const
-const COMMAND_SHELLS = ['bash', 'zsh', 'sh'] as const
-
-interface RunOptions {
-  cwd?: string
-  env?: Record<string, string>
-  timeoutMs?: number
-  signal?: AbortSignal
-}
-
-let pathCache: Promise<string | undefined> | null = null
-let commandShell: string | null = null
-
-export function resetShellSessionForTests() {
-  pathCache = null
-  commandShell = null
-}
+const TRUNCATION_NOTICE = '[output truncated]'
 
 function emptyOutput(): ShellOutput {
   return { stdout: '', stderr: '', code: null }
 }
 
-function missingProgram(error: unknown): boolean {
-  const text = error instanceof Error ? error.message : String(error)
-  return text.includes('program not allowed on the configured shell scope')
-    || text.includes('No such file or directory')
-    || text.includes('os error 2')
+function abortError(): ShellAbortError {
+  return new ShellAbortError(emptyOutput())
 }
 
+function sanitizeReason(reason: string): string {
+  return reason.replace(/[\u0000-\u001F\u007F]/g, '').trim().slice(0, 200)
+}
+
+/** Newline rule for the cap suffix only. Raw stdout and stderr chunks are concatenated as-is. */
 function appendChunk(current: string, chunk: string): string {
   if (!chunk) return current
   if (!current) return chunk
@@ -46,171 +34,196 @@ function appendChunk(current: string, chunk: string): string {
   return `${current}\n${chunk}`
 }
 
-function byteLength(text: string): number {
-  return new TextEncoder().encode(text).length
+function reviewRequest(options: ShellExecOptions): ShellReviewRequest {
+  const request: ShellReviewRequest = { command: options.command, cwd: options.cwd }
+  if (options.timeoutSeconds !== undefined) request.timeoutSeconds = options.timeoutSeconds
+  return request
 }
 
-function readPath(output: ShellOutput): string | undefined {
-  if (output.code !== 0) return undefined
-  const text = `${output.stdout}\n${output.stderr}`
-  const at = text.lastIndexOf(SENTINEL)
-  if (at < 0) return undefined
-  const path = text.slice(at + SENTINEL.length).trim().split(/\r?\n/)[0]?.trim()
-  return path || undefined
+function startReview(reviewer: ShellReviewer, request: ShellReviewRequest, signal?: AbortSignal): Promise<ShellReview> {
+  try {
+    return Promise.resolve(reviewer.review(request, signal))
+  } catch (error) {
+    return Promise.reject(error)
+  }
 }
 
-/**
- * Spawn a configured shell program. stdout and stderr events are lines; a missing
- * trailing newline is preserved when the chunk already contains one.
- */
-function run(program: string, args: string[], options: RunOptions = {}): Promise<ShellOutput> {
-  if (options.signal?.aborted) return Promise.reject(new ShellAbortError(emptyOutput()))
-  const command = Command.create(program, args, {
-    cwd: options.cwd,
-    env: options.env,
-    processGroup: true,
+function raceReview(review: Promise<ShellReview>, signal?: AbortSignal): Promise<ShellReview> {
+  void review.catch(() => {})
+  if (!signal) return review
+  let stop = () => {}
+  const aborted = new Promise<never>((_, reject) => {
+    if (signal.aborted) {
+      reject(abortError())
+      return
+    }
+    const onAbort = () => reject(abortError())
+    signal.addEventListener('abort', onAbort)
+    stop = () => signal.removeEventListener('abort', onAbort)
   })
+  return Promise.race([review, aborted]).finally(stop)
+}
+
+interface ExitEvent {
+  code: number | null
+  truncated: boolean
+  reason: string
+}
+
+function readCode(value: unknown): number | null {
+  return typeof value === 'number' ? value : null
+}
+
+function mapExit(event: ExitEvent, stdout: string, stderr: string, timeoutSeconds: number | undefined): ShellOutput | Error {
+  const base = { stdout, stderr, code: event.code, truncated: event.truncated }
+  if (event.reason === 'timeout') return new ShellTimeoutError(timeoutSeconds ?? 0, base)
+  if (event.reason === 'cancel') return new ShellAbortError(base)
+  if (event.reason === 'cap') {
+    return {
+      stdout,
+      stderr: stderr.includes(TRUNCATION_NOTICE) ? stderr : appendChunk(stderr, TRUNCATION_NOTICE),
+      code: event.code,
+      truncated: true,
+    }
+  }
+  if (event.reason === 'exit') return { stdout, stderr, code: event.code, truncated: event.truncated }
+  return new Error(`Unknown shell exit: ${event.reason}`)
+}
+
+interface SpawnHooks {
+  rememberId: (id: string) => void
+  stopAbort: () => void
+}
+
+function spawn(options: ShellExecOptions, signal: AbortSignal | undefined, hooks: SpawnHooks): Promise<ShellOutput> {
+  if (signal?.aborted) {
+    hooks.stopAbort()
+    return Promise.reject(abortError())
+  }
+
   let stdout = ''
   let stderr = ''
-  let truncated = false
-  let child: { kill(): Promise<void> } | null = null
   let settled = false
-  let timer: ReturnType<typeof setTimeout> | undefined
-  let stop: 'abort' | 'timeout' | null = null
-
-  return new Promise((resolve, reject) => {
-    const finish = (fn: () => void) => {
+  const onEvent = new Channel<unknown>()
+  const output = new Promise<ShellOutput>((resolve, reject) => {
+    const finish = (settle: () => void) => {
       if (settled) return
       settled = true
-      if (timer) clearTimeout(timer)
-      options.signal?.removeEventListener('abort', onAbort)
-      fn()
+      onEvent.onmessage = () => {}
+      hooks.stopAbort()
+      settle()
     }
-    const kill = () => {
-      if (child) void child.kill()
-    }
-    const onAbort = () => {
-      stop = 'abort'
-      kill()
-    }
-    const cap = (next: string) => {
-      if (truncated) return
-      if (byteLength(next) <= MAX_COLLECT_BYTES) return
-      truncated = true
-      kill()
-    }
-    command.stdout.on('data', (chunk: string) => {
-      if (truncated) return
-      stdout = appendChunk(stdout, chunk)
-      cap(stdout + stderr)
-    })
-    command.stderr.on('data', (chunk: string) => {
-      if (truncated) return
-      stderr = appendChunk(stderr, chunk)
-      cap(stdout + stderr)
-    })
-    command.on('error', (error: string) => {
-      finish(() => reject(new Error(error)))
-    })
-    command.on('close', (payload: { code: number | null }) => {
-      const result: ShellOutput = {
+
+    onEvent.onmessage = (message: unknown) => {
+      if (settled || !message || typeof message !== 'object') return
+      const record = message as Record<string, unknown>
+      if (record.event === 'started') {
+        if (typeof record.id === 'string') hooks.rememberId(record.id)
+        return
+      }
+      if (record.event === 'stdout') {
+        if (typeof record.data === 'string') stdout += record.data
+        return
+      }
+      if (record.event === 'stderr') {
+        if (typeof record.data === 'string') stderr += record.data
+        return
+      }
+      if (record.event === 'error') {
+        const text = typeof record.message === 'string' ? record.message : ''
+        finish(() => reject(new Error(text)))
+        return
+      }
+      if (record.event !== 'exit') return
+      const result = mapExit(
+        {
+          code: readCode(record.code),
+          truncated: record.truncated === true,
+          reason: typeof record.reason === 'string' ? record.reason : '',
+        },
         stdout,
-        stderr: truncated ? appendChunk(stderr, '[output truncated]') : stderr,
-        code: payload.code,
-        truncated,
-      }
-      if (stop === 'abort') {
-        finish(() => reject(new ShellAbortError(result)))
-        return
-      }
-      if (stop === 'timeout') {
-        finish(() => reject(new ShellTimeoutError((options.timeoutMs ?? 0) / 1000, result)))
-        return
-      }
-      finish(() => resolve(result))
-    })
-    if (options.signal) options.signal.addEventListener('abort', onAbort)
-    if (options.timeoutMs !== undefined) {
-      timer = setTimeout(() => {
-        stop = 'timeout'
-        kill()
-      }, options.timeoutMs)
-    }
-    command.spawn().then((spawned) => {
-      child = spawned
-      if (settled) return
-      if (stop || options.signal?.aborted) {
-        if (options.signal?.aborted) stop = 'abort'
-        void spawned.kill()
-      }
-    }).catch((error: unknown) => {
-      finish(() => reject(error instanceof Error ? error : new Error(String(error))))
-    })
-  })
-}
-
-async function probeLoginPath(signal?: AbortSignal): Promise<string | undefined> {
-  for (const program of LOGIN_SHELLS) {
-    if (signal?.aborted) throw new ShellAbortError(emptyOutput())
-    try {
-      const output = await run(program, ['-lic', `printf '\\n${SENTINEL}%s' "$PATH"`], {
-        timeoutMs: PROBE_TIMEOUT_MS,
-        signal,
+        stderr,
+        options.timeoutSeconds,
+      )
+      finish(() => {
+        if (result instanceof Error) reject(result)
+        else resolve(result)
       })
-      const path = readPath(output)
-      if (path) return path
-    } catch (error) {
-      if (error instanceof ShellAbortError) throw error
     }
-  }
-  return undefined
-}
-
-function loginPath(signal?: AbortSignal): Promise<string | undefined> {
-  if (signal?.aborted) return Promise.reject(new ShellAbortError(emptyOutput()))
-  if (!pathCache) {
-    pathCache = probeLoginPath(signal).catch((error: unknown) => {
-      pathCache = null
-      throw error
-    })
-  }
-  return pathCache
-}
-
-async function runCommand(command: string, options: RunOptions): Promise<ShellOutput> {
-  const programs = commandShell ? [commandShell] : [...COMMAND_SHELLS]
-  let last: unknown
-  for (const program of programs) {
-    try {
-      const output = await run(program, ['-c', command], options)
-      commandShell = program
-      return output
-    } catch (error) {
-      if (error instanceof ShellAbortError || error instanceof ShellTimeoutError || !missingProgram(error)) throw error
-      commandShell = null
-      last = error
-    }
-  }
-  throw last instanceof Error ? last : new Error('No shell is available')
-}
-
-async function execShell(options: ShellExecOptions): Promise<ShellOutput> {
-  const command = options.command
-  if (!command.trim()) throw new Error('Command is empty')
-  if (!options.cwd.trim()) throw new Error('Working directory is empty')
-  const path = await loginPath(options.signal)
-  const timeoutMs = options.timeoutSeconds === undefined ? undefined : options.timeoutSeconds * 1000
-  return runCommand(command, {
-    cwd: options.cwd,
-    env: path ? { PATH: path } : undefined,
-    timeoutMs,
-    signal: options.signal,
   })
+
+  const payload: {
+    command: string
+    cwd: string
+    timeoutMs?: number
+    onEvent: Channel<unknown>
+  } = {
+    command: options.command,
+    cwd: options.cwd,
+    onEvent,
+  }
+  if (options.timeoutSeconds !== undefined) payload.timeoutMs = options.timeoutSeconds * 1000
+
+  return invoke<string>('shell_exec_spawn', payload).then(
+    (returned) => {
+      if (typeof returned === 'string') hooks.rememberId(returned)
+      return output
+    },
+    (error: unknown) => {
+      if (settled) return output
+      settled = true
+      onEvent.onmessage = () => {}
+      hooks.stopAbort()
+      throw error instanceof Error ? error : new Error(String(error))
+    },
+  )
 }
 
-export function shellBackend(): ShellBackend {
+async function execShell(options: ShellExecOptions, reviewer: ShellReviewer): Promise<ShellOutput> {
+  if (!options.command.trim()) throw new Error('Command is empty')
+  if (!options.cwd.trim()) throw new Error('Working directory is empty')
+
+  const signal = options.signal
+  if (signal?.aborted) throw abortError()
+
+  let id: string | null = null
+  let cancelSent = false
+  const cancelOnce = () => {
+    if (id === null || cancelSent) return
+    cancelSent = true
+    void invoke('shell_exec_cancel', { id }).catch(() => {})
+  }
+  const onAbort = () => {
+    cancelOnce()
+  }
+  signal?.addEventListener('abort', onAbort)
+  const stopAbort = () => {
+    signal?.removeEventListener('abort', onAbort)
+  }
+  const rememberId = (next: string) => {
+    if (!next) return
+    if (id === null) id = next
+    if (signal?.aborted) cancelOnce()
+  }
+
+  try {
+    const decision = await raceReview(startReview(reviewer, reviewRequest(options), signal), signal)
+    if (signal?.aborted) throw abortError()
+    if (decision.action === 'deny') throw new ShellDeniedError(sanitizeReason(decision.reason))
+    if (signal?.aborted) throw abortError()
+    return await spawn(options, signal, { rememberId, stopAbort })
+  } catch (error) {
+    stopAbort()
+    throw error
+  }
+}
+
+export function shellBackend(options?: { reviewer?: ShellReviewer }): ShellBackend {
+  const reviewer = options?.reviewer ?? allowAllShellReviewer()
   return {
     available: true,
-    exec: execShell,
+    exec(execOptions) {
+      return execShell(execOptions, reviewer)
+    },
   }
 }

@@ -429,9 +429,9 @@ importers:
       '@stride/platform':
         specifier: workspace:*
         version: link:../platform
-      '@tauri-apps/plugin-shell':
-        specifier: ^2.3.0
-        version: 2.5.0
+      '@tauri-apps/api':
+        specifier: ^2.8.0
+        version: 2.12.3
     devDependencies:
       typescript:
         specifier: ^5.8.2

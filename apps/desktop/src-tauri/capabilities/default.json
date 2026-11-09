@@ -34,53 +34,6 @@
           "cmd": "git",
           "args": true,
           "sidecar": false
-        },
-        {
-          "name": "bash",
-          "cmd": "bash",
-          "args": true,
-          "sidecar": false
-        },
-        {
-          "name": "zsh",
-          "cmd": "zsh",
-          "args": true,
-          "sidecar": false
-        },
-        {
-          "name": "sh",
-          "cmd": "sh",
-          "args": true,
-          "sidecar": false
-        }
-      ]
-    },
-    {
-      "identifier": "shell:allow-spawn",
-      "allow": [
-        {
-          "name": "git",
-          "cmd": "git",
-          "args": true,
-          "sidecar": false
-        },
-        {
-          "name": "bash",
-          "cmd": "bash",
-          "args": true,
-          "sidecar": false
-        },
-        {
-          "name": "zsh",
-          "cmd": "zsh",
-          "args": true,
-          "sidecar": false
-        },
-        {
-          "name": "sh",
-          "cmd": "sh",
-          "args": true,
-          "sidecar": false
         }
       ]
     },
