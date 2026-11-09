@@ -1,0 +1,113 @@
+{
+  "format": "tiptap",
+  "title": "现场记录",
+  "type": "note",
+  "properties": {
+    "status": "draft"
+  },
+  "futureMetadata": {
+    "keep": true
+  },
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "heading",
+        "attrs": {
+          "level": 1
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "现场记录"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "attrs": {
+          "custom": 7
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "周五上线",
+            "marks": [
+              {
+                "type": "bold"
+              }
+            ]
+          },
+          {
+            "type": "text",
+            "text": "，请关注。"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "**不是加粗**"
+          },
+          {
+            "type": "hardBreak"
+          },
+          {
+            "type": "text",
+            "text": "第二行"
+          }
+        ]
+      },
+      {
+        "type": "heading",
+        "attrs": {
+          "level": 2
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "进展"
+          }
+        ]
+      },
+      {
+        "type": "bulletList",
+        "content": [
+          {
+            "type": "listItem",
+            "content": [
+              {
+                "type": "paragraph",
+                "content": [
+                  {
+                    "type": "text",
+                    "text": "已完成",
+                    "marks": [
+                      {
+                        "type": "bold"
+                      }
+                    ]
+                  },
+                  {
+                    "type": "text",
+                    "text": "迁移"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "futureWidget",
+        "attrs": {
+          "payload": [
+            "untouched"
+          ]
+        }
+      }
+    ]
+  }
+}

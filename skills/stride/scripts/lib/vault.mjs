@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, realpathSync, lstatSync, openSync, closeSync, writeFileSync, fsyncSync, renameSync, unlinkSync, fchmodSync } from 'node:fs'
+import { readFileSync, readdirSync, realpathSync, lstatSync, openSync, closeSync, writeFileSync, fsyncSync, renameSync, unlinkSync, fchmodSync, mkdirSync, linkSync } from 'node:fs'
 import { join, dirname, basename } from 'node:path'
 import { createHash, randomUUID } from 'node:crypto'
 import { fail, validateDocument } from './document.mjs'
@@ -11,11 +11,15 @@ export const rootPath = (root) => {
   return resolved
 }
 
-export function notePath(root, id) {
+export function assertId(id) {
   if (typeof id !== 'string' || !id || /[\\\x00-\x1f:]/.test(id) || id.endsWith('.stride.json') ||
       id.split('/').some((part) => !part || part.startsWith('.') || part === 'node_modules')) {
     fail('INVALID_ID', 'Use a vault-relative note ID without extension, hidden segments, .., backslashes or absolute paths.')
   }
+}
+
+export function notePath(root, id) {
+  assertId(id)
   const parts = `${id}.stride.json`.split('/')
   let path = root
   for (const [index, part] of parts.entries()) {
@@ -95,4 +99,53 @@ export function save(root, original, file, verify) {
   const actual = load(root, original.id)
   if (actual.raw !== raw) fail('POST_WRITE_CONFLICT', 'File changed after replacement; write may have happened. Read current state before retrying.')
   return { changed: true, revision: actual.revision }
+}
+
+/** Resolve a new note path. Missing parents are allowed. Existing files, symlinks, and non-directories are not. */
+export function newNotePath(root, id) {
+  assertId(id)
+  const parts = `${id}.stride.json`.split('/')
+  let path = root
+  let missing = false
+  for (const [index, part] of parts.entries()) {
+    path = join(path, part)
+    if (missing) continue
+    let stat
+    try { stat = lstatSync(path) } catch (error) {
+      if (error.code !== 'ENOENT') throw error
+      stat = null
+    }
+    const last = index === parts.length - 1
+    if (stat?.isSymbolicLink()) fail('SYMLINK', 'Symlinks are not followed by this tool.')
+    if (last) {
+      if (stat) fail('EXISTS', `Note ${id} already exists. Import does not overwrite.`)
+    } else if (!stat) missing = true
+    else if (!stat.isDirectory()) fail('INVALID_ID', 'Expected directories followed by a new note file.')
+  }
+  return path
+}
+
+export function createNote(root, id, file) {
+  validateDocument(file)
+  const path = newNotePath(root, id)
+  mkdirSync(dirname(path), { recursive: true })
+  const raw = JSON.stringify(file, null, 2) + '\n'
+  const temp = join(dirname(path), `.${basename(path)}.${randomUUID()}.tmp`)
+  let fd
+  try {
+    fd = openSync(temp, 'wx', 0o644)
+    writeFileSync(fd, raw)
+    fsyncSync(fd)
+    closeSync(fd); fd = undefined
+    try { linkSync(temp, path) } catch (error) {
+      if (error.code === 'EEXIST') fail('EXISTS', `Note ${id} already exists. Import does not overwrite.`)
+      throw error
+    }
+  } finally {
+    if (fd !== undefined) closeSync(fd)
+    try { unlinkSync(temp) } catch (error) { if (error.code !== 'ENOENT') throw error }
+  }
+  const actual = load(root, id)
+  if (actual.raw !== raw) fail('POST_WRITE_CONFLICT', 'File changed after creation. Read current state before retrying.')
+  return { id, changed: true, revision: actual.revision }
 }

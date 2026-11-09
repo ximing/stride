@@ -9,6 +9,7 @@ stride/
   SKILL.md
   references/
     cli.md
+    markdown.md
     vault-files.md
     migration.md
   scripts/
@@ -16,6 +17,7 @@ stride/
     stride.test.mjs
     lib/
       document.mjs
+      markdown.mjs
       relations.mjs
       vault.mjs
 ```
@@ -32,13 +34,13 @@ node scripts/stride.mjs read --vault /path/to/vault --note projects/alpha
 
 除 `--help` 输出说明外，成功输出 JSON 到 stdout；失败输出 `{ "error": { "code": "…", "message": "…" } }` 到 stderr，退出码为 1。工具不会修改应用配置、提交 Git 或调用网络。
 
-命令行参数值若以 `--` 开头会被拒绝，避免漏填参数时把 `--dry-run` 当正文而意外写入；这类文字使用 `apply` JSON 或 `--text-file` 传入。长正文也优先用文件或 stdin，避免 shell 转义问题。
+命令行参数值若以 `--` 开头会被拒绝，避免漏填参数时把 `--dry-run` 当正文而意外写入。这类文字用 `apply` JSON、`--text-file` 或 `--markdown-file` 传入；frontmatter 以 `---` 开头，也必须走文件或 stdin。长正文优先用文件或 stdin，避免 shell 转义问题。
 
 ## 先读再改
 
 `read` 返回：
 
-- `revision`：原文件字节的 SHA-256。所有写操作都要求 `--revision` 匹配。
+- `revision`：原文件字节的 SHA-256。改已有笔记的写操作都要求 `--revision` 匹配。`convert` 不写文件，`import` 只新建、不覆盖，这两个命令不用 revision。
 - `blocks`：每个节点的 `ref`、`type`、可读 `text`，标题另含 `level`。例如 `b2` 是第三个顶层节点，`b2.0` 是它的第一个子节点；text 叶节点也有引用。
 - `document`：完整原始文档，用于理解格式及复杂内容，通常无需模型重新生成。
 
@@ -69,9 +71,31 @@ node scripts/stride.mjs delete-block \
 ```
 
 - 插入可用 `--text` 或 `--text-file`（二选一），`--text-file -` 从 stdin 读取。默认追加到末尾，`--before` / `--after` 只接受顶层节点，不允许插入到标题 H1 前面。
-- 文本按字面插入：空行分段，单个换行变为 `hardBreak`。**不解析 Markdown**；`**文字**` 会保留星号。要编辑现有带格式文字，用 `replace-text`；复杂富文本创建使用应用工具或按文件参考构造，不通过整文档 Markdown 往返。
+- `insert` 按字面插入：空行分段，单个换行变为 `hardBreak`。`**文字**` 会保留星号。要排版用下一节的 Markdown 命令；要改现有带格式文字用 `replace-text`。
 - 删除块默认拒绝包含图片、表格、代码、双链或未知节点的子树。只有用户明确要删除这些内容时才传 `--allow-rich-delete`；这表示删除整个选中子树。
 - 删除列表项、单元格的最后一个段落时，保留必要的空段落；不支持的容器操作报错。工具保留未知节点，但不具备应用所有自定义节点的 schema 验证能力。
+
+## 从 Markdown 新建或插入
+
+语法、frontmatter、警告码和限制只写在 [markdown.md](markdown.md)。这里只列调用。
+
+```bash
+node scripts/stride.mjs convert --from /path/to/note.md --title "Alpha"
+node scripts/stride.mjs import \
+  --vault /path/to/vault --note guides/alpha --from /path/to/note.md --dry-run
+node scripts/stride.mjs insert-markdown \
+  --vault /path/to/vault --note projects/alpha --revision ORIGINAL_HASH \
+  --after b1 --markdown-file /path/to/section.md
+node scripts/stride.mjs replace-block \
+  --vault /path/to/vault --note projects/alpha --revision ORIGINAL_HASH \
+  --block b2 --markdown '替换后的段落' --allow-rich-delete
+```
+
+- `convert` 不接受 `--vault`，只向 stdout 打印 `{ document, warnings, titleSource, typeSource }`。
+- `import` 要 `--note` 和 `--from`，不要 `--revision`。已有文件、符号链接都不会被覆盖。`--dry-run` 只检查路径，不创建文件。没有 H1 时用笔记 ID 的最后一段做标题。
+- `--from`、`--markdown-file` 用 `-` 表示 stdin。`--markdown` 与 `--markdown-file` 二选一，`--title` / `--type` 只对 `convert` 和 `import` 有效。
+- `insert-markdown` 默认追加到末尾。`replace-block` 只换一个顶层块；目标含图片、表格、代码、双链、公式等时必须带 `--allow-rich-delete`，否则报 `RICH_CONTENT` 且不写文件。
+- 这两个写入命令遇到 frontmatter 报 `FRONTMATTER`。结果里的 `warnings` 是 `{ code, message }` 数组；退出码 0 仍可能有降级，要读这个数组。
 
 ## 关系查询和维护
 
@@ -101,6 +125,8 @@ node scripts/stride.mjs relations remove \
 [
   { "op": "replace-text", "block": "b1", "old": "周五发布", "new": "周一发布" },
   { "op": "insert", "after": "b1", "text": "新增进展。\n\n下一步计划。" },
+  { "op": "insert-markdown", "after": "b1", "markdown": "## 进展\n\n- **已完成**迁移" },
+  { "op": "replace-block", "block": "b3", "markdown": "替换后的段落", "allowRichDelete": true },
   { "op": "delete-block", "block": "b2" },
   { "op": "relation-remove", "kind": "belongs_to", "target": "projects/old-team" },
   { "op": "relation-add", "kind": "belongs_to", "target": "projects/new-team" }

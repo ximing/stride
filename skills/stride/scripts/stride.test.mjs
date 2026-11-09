@@ -1,10 +1,11 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, symlinkSync, cpSync } from 'node:fs'
+import { mkdtempSync, mkdirSync, readFileSync, writeFileSync, rmSync, symlinkSync, cpSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { spawnSync } from 'node:child_process'
+import { buildNote } from './lib/markdown.mjs'
 
 const script = fileURLToPath(new URL('./stride.mjs', import.meta.url))
 const text = (value, extra = {}) => ({ type: 'text', text: value, ...extra })
@@ -190,4 +191,228 @@ test('skill scripts work after copying away from repository and node_modules', (
   const result = spawnSync(process.execPath, [join(destination, 'stride.mjs'), 'read', '--vault', f.vault, '--note', 'projects/alpha'], { cwd: tmpdir(), encoding: 'utf8' })
   assert.equal(result.status, 0, result.stderr)
   assert.equal(JSON.parse(result.stdout).id, 'projects/alpha')
+  const converted = spawnSync(process.execPath, [join(destination, 'stride.mjs'), 'convert', '--from', '-'], {
+    cwd: tmpdir(), encoding: 'utf8', input: '# Portable\n\n**bold**\n',
+  })
+  assert.equal(converted.status, 0, converted.stderr)
+  assert.equal(JSON.parse(converted.stdout).document.doc.content[1].content[0].marks[0].type, 'bold')
+})
+
+const sampleMarkdown = `---
+title: Ignored
+type: Project
+status: active
+count: 3
+tags:
+  - a
+  - b
+belongs_to:
+  - "[[Team]]"
+---
+
+# Alpha
+
+See **bold** and *italic* and ~~gone~~ and \`code\` and ==mark==.
+A [link](https://example.com) and [[Team|Alias]] and $E=mc^2$.
+
+- item
+  - child
+
+- [ ] todo
+- [x] done
+
+1. first
+
+3. third
+
+> quote
+
+> [!WARNING]
+> Careful
+
+| A | B |
+| --- | --- |
+| 1 | 2 |
+
+\`\`\`ts
+# not a heading
+const [[nope]] = 1
+\`\`\`
+
+\`\`\`mermaid
+graph TD
+\`\`\`
+
+![shot](attachments/shot.png)
+
+![local](./local.png)
+
+<div>kept</div>
+
+\\[
+a+b
+\\]
+`
+
+test('markdown conversion builds editor nodes and reports degraded syntax', () => {
+  const built = buildNote(sampleMarkdown)
+  const content = built.document.doc.content
+  const ofType = (type) => content.filter((node) => node.type === type)
+  assert.equal(built.document.title, 'Alpha')
+  assert.equal(built.titleSource, 'h1')
+  assert.equal(built.document.type, 'Project')
+  assert.equal(built.document.properties.title, undefined)
+  assert.equal(built.document.properties.status, 'active')
+  assert.equal(built.document.properties.count, 3)
+  assert.deepEqual(built.document.properties.tags, ['a', 'b'])
+  assert.deepEqual(built.document.properties.belongs_to, ['[[Team]]'])
+  assert.equal(content[0].content[0].text, 'Alpha')
+  const paragraph = content.find((node) => node.content?.some((child) => child.text === 'bold'))
+  assert.deepEqual(paragraph.content.find((child) => child.text === 'bold').marks, [{ type: 'bold' }])
+  assert.deepEqual(paragraph.content.find((child) => child.text === 'italic').marks, [{ type: 'italic' }])
+  assert.deepEqual(paragraph.content.find((child) => child.text === 'gone').marks, [{ type: 'strike' }])
+  assert.deepEqual(paragraph.content.find((child) => child.text === 'code').marks, [{ type: 'code' }])
+  assert.deepEqual(paragraph.content.find((child) => child.text === 'mark').marks, [{ type: 'highlight' }])
+  assert.equal(paragraph.content.find((child) => child.text === 'link').marks[0].attrs.href, 'https://example.com')
+  assert.deepEqual(paragraph.content.find((child) => child.type === 'wikilink').attrs, { target: 'Team', alias: 'Alias' })
+  assert.equal(paragraph.content.find((child) => child.type === 'inlineMath').attrs.latex, 'E=mc^2')
+  const bullet = ofType('bulletList')[0]
+  assert.equal(bullet.content[0].content[0].content[0].text, 'item')
+  assert.equal(bullet.content[0].content[1].type, 'bulletList')
+  assert.equal(bullet.content[0].content[1].content[0].content[0].content[0].text, 'child')
+  const tasks = ofType('taskList')[0]
+  assert.equal(tasks.content[0].attrs.checked, false)
+  assert.equal(tasks.content[1].attrs.checked, true)
+  assert.equal(tasks.content[0].content[0].type, 'paragraph')
+  const ordered = ofType('orderedList')
+  assert.equal(ordered[0].attrs, undefined)
+  assert.equal(ordered[1].attrs.start, 3)
+  assert.equal(ofType('blockquote')[0].content[0].content[0].text, 'quote')
+  assert.equal(ofType('callout')[0].attrs.kind, 'warning')
+  assert.equal(ofType('callout')[0].content[0].content[0].text, 'Careful')
+  const table = ofType('table')[0]
+  assert.equal(table.content[0].content[0].type, 'tableHeader')
+  assert.equal(table.content[1].content[1].content[0].content[0].text, '2')
+  const code = ofType('codeBlock')[0]
+  assert.equal(code.attrs.language, 'ts')
+  assert.match(code.content[0].text, /# not a heading/)
+  assert.match(code.content[0].text, /\[\[nope\]\]/)
+  assert.equal(code.content.some((node) => node.type === 'wikilink'), false)
+  assert.equal(ofType('mermaid')[0].attrs.view, 'render')
+  assert.match(ofType('mermaid')[0].content[0].text, /graph TD/)
+  assert.deepEqual(ofType('image')[0].attrs, { src: 'attachments/shot.png', alt: 'shot' })
+  assert.equal(ofType('blockMath')[0].attrs.latex, 'a+b')
+  assert.ok(content.some((node) => node.type === 'paragraph' && node.content?.some((child) => child.text?.includes('<div>kept</div>'))))
+  assert.ok(content.some((node) => node.type === 'paragraph' && node.content?.some((child) => child.text?.includes('![local](./local.png)'))))
+  assert.equal(content.at(-1).type, 'paragraph')
+  assert.deepEqual(built.warnings.map((warning) => warning.code).sort(), ['html-kept', 'image-kept', 'title-mismatch'])
+})
+
+test('markdown headings, frontmatter and literal inserts stay distinct', () => {
+  const titled = buildNote('No heading\n', { fallbackTitle: 'stem' })
+  assert.equal(titled.document.title, 'stem')
+  assert.equal(titled.titleSource, 'filename')
+  assert.equal(titled.document.doc.content[0].content[0].text, 'stem')
+  const fromMatter = buildNote('---\ntitle: From matter\n---\n\nBody\n')
+  assert.equal(fromMatter.titleSource, 'frontmatter')
+  assert.equal(fromMatter.document.doc.content[0].type, 'heading')
+  assert.equal(fromMatter.document.doc.content[1].content[0].text, 'Body')
+  const wrapped = buildNote('**hello\nworld**\n')
+  assert.equal(wrapped.document.doc.content[0].content[0].text, 'hello world')
+  assert.deepEqual(wrapped.document.doc.content[0].content[0].marks, [{ type: 'bold' }])
+  const broken = buildNote('hello  \nworld\\\nnext\n')
+  assert.deepEqual(broken.document.doc.content[0].content.map((node) => node.type === 'text' ? node.text : node.type), ['hello', 'hardBreak', 'world', 'hardBreak', 'next'])
+  const literal = buildNote('---\nbio: |\n  hello\n  world\n---\n\n# T\n')
+  assert.equal(literal.document.properties.bio, 'hello\nworld')
+  const loose = buildNote('- one\n\n  still\n\n- two\n\n1. a\n\n2. b\n')
+  const bulletLists = loose.document.doc.content.filter((node) => node.type === 'bulletList')
+  const orderedLists = loose.document.doc.content.filter((node) => node.type === 'orderedList')
+  assert.equal(bulletLists.length, 1)
+  assert.equal(bulletLists[0].content.length, 2)
+  assert.equal(bulletLists[0].content[0].content[1].content[0].text, 'still')
+  assert.equal(orderedLists.length, 1)
+  assert.equal(orderedLists[0].content.length, 2)
+  assert.equal(orderedLists[0].attrs, undefined)
+  const headingImage = buildNote('# see **![x](attachments/a.png)**\n')
+  const heading = headingImage.document.doc.content[0]
+  assert.equal(heading.content.some((node) => node.type === 'image'), false)
+  assert.ok(heading.content.some((node) => node.text?.includes('![x](attachments/a.png)') && node.marks?.some((mark) => mark.type === 'bold')))
+  assert.ok(headingImage.warnings.some((warning) => warning.code === 'image-inline'))
+  const mail = buildNote('<mailto:a@b.c>\n')
+  assert.equal(mail.document.doc.content[0].content[0].marks[0].attrs.href, 'mailto:a@b.c')
+  assert.equal(mail.warnings.some((warning) => warning.code === 'html-kept'), false)
+  const linkedImage = buildNote('[![alt](attachments/a.png)](https://example.com/go)\n')
+  assert.equal(linkedImage.document.doc.content.some((node) => node.type === 'image'), false)
+  assert.equal(linkedImage.document.doc.content[0].content[0].marks[0].attrs.href, 'https://example.com/go')
+  assert.ok(linkedImage.warnings.some((warning) => warning.code === 'image-inline'))
+  const linkedMath = buildNote('[$E=mc^2$](https://example.com/go)\n')
+  assert.equal(linkedMath.document.doc.content[0].content.some((node) => node.text === 'https://example.com/go'), true)
+  assert.ok(linkedMath.warnings.some((warning) => warning.code === 'link-kept'))
+  const codeBreak = buildNote('`code\\\nmore`\n')
+  assert.equal(codeBreak.document.doc.content[0].content.some((node) => node.type === 'hardBreak'), false)
+  assert.equal(codeBreak.document.doc.content[0].content[0].text, 'code\\ more')
+  const codeSpaces = buildNote('`code  \nmore`\n')
+  assert.equal(codeSpaces.document.doc.content[0].content.some((node) => node.type === 'hardBreak'), false)
+  assert.match(codeSpaces.document.doc.content[0].content[0].text, /code {2}/)
+  const brokenLink = buildNote('[label](https://example.com/a\nb)\n')
+  assert.equal(JSON.stringify(brokenLink.document).includes('\uE000'), false)
+  assert.match(JSON.stringify(brokenLink.document), /example\.com\/a/)
+  const brokenImage = buildNote('![alt](attachments/foo\nbar.png)\n')
+  assert.equal(brokenImage.document.doc.content.some((node) => node.type === 'image'), false)
+  assert.equal(JSON.stringify(brokenImage.document).includes('\uE000'), false)
+  const proto = buildNote('---\n__proto__: hi\nconstructor: keep\n---\n\n# T\n')
+  assert.deepEqual(Object.entries(proto.document.properties), [['__proto__', 'hi'], ['constructor', 'keep']])
+  const meta = buildNote('---\nmeta:\n  a: 1\n  b:\n    c: 2\n---\n\n# T\n')
+  assert.equal(meta.document.properties.meta, '{"a":1,"b":{"c":2}}')
+  assert.ok(meta.warnings.some((warning) => warning.code === 'frontmatter-degraded'))
+  const nestedTags = buildNote('---\ntags:\n  - a\n    - b\n---\n\n# T\n')
+  assert.equal(nestedTags.document.properties.tags, '[["a",["b"]]]')
+  assert.ok(nestedTags.warnings.some((warning) => warning.code === 'frontmatter-degraded'))
+  const flow = buildNote('---\nitems: [[a], b]\n---\n\n# T\n')
+  assert.equal(flow.document.properties.items, '[["a"],"b"]')
+  const spaces = buildNote('---\nbio: |\n  hello  \n  world\n---\n\n# T\n')
+  assert.equal(spaces.document.properties.bio, 'hello  \nworld')
+  const headingImageUnsafe = buildNote('# ![x](./local.png)\n')
+  assert.ok(headingImageUnsafe.warnings.some((warning) => warning.code === 'image-inline'))
+  assert.equal(headingImageUnsafe.warnings.some((warning) => warning.code === 'image-kept'), false)
+})
+
+test('import creates a note, refuses overwrite, and insert-markdown preserves the rest', (t) => {
+  const f = fixture(t)
+  const file = join(f.vault, 'note.md')
+  writeFileSync(file, sampleMarkdown)
+  const preview = f.run(['import', '--note', 'guides/alpha', '--from', file, '--dry-run'])
+  assert.equal(preview.dryRun, true)
+  assert.equal(existsSync(join(f.vault, 'guides')), false)
+  const created = f.run(['import', '--note', 'guides/alpha', '--from', file])
+  assert.equal(created.id, 'guides/alpha')
+  assert.equal(created.document.type, 'Project')
+  const read = f.run(['read', '--note', 'guides/alpha'])
+  assert.equal(read.revision, created.revision)
+  assert.equal(read.blocks.find((block) => block.type === 'codeBlock').language, 'ts')
+  assert.equal(read.blocks.find((block) => block.type === 'taskItem' && block.checked === true).text, 'done')
+  const before = readFileSync(join(f.vault, 'guides/alpha.stride.json'), 'utf8')
+  assert.equal(f.run(['import', '--note', 'guides/alpha', '--from', file], 1).error.code, 'EXISTS')
+  assert.equal(readFileSync(join(f.vault, 'guides/alpha.stride.json'), 'utf8'), before)
+  const original = f.read()
+  f.run([...f.writeArgs('insert-markdown'), '--after', 'b1', '--markdown', '## Section\n\n- kept **fmt**'])
+  assert.equal(f.disk().doc.content[2].type, 'heading')
+  assert.equal(f.disk().doc.content[3].type, 'bulletList')
+  assert.equal(f.disk().doc.content[3].content[0].content[0].content[1].marks[0].type, 'bold')
+  assert.equal(f.disk().properties.status, original.document.properties.status)
+  assert.equal(f.disk().doc.content[5].type, 'table')
+  assert.equal(f.run([...f.writeArgs('insert-markdown'), '--before', 'b0', '--markdown', 'nope'], 1).error.code, 'TITLE_PROTECTED')
+  assert.equal(f.run([...f.writeArgs('insert-markdown'), '--markdown-file', '-'], 1, '---\ntitle: X\n---\n\nHi').error.code, 'FRONTMATTER')
+  assert.equal(f.run([...f.writeArgs('replace-block'), '--block', 'b0', '--markdown', 'replacement'], 1).error.code, 'TITLE_PROTECTED')
+  const table = f.read().blocks.find((block) => block.type === 'table')
+  assert.equal(f.run([...f.writeArgs('replace-block'), '--block', table.ref, '--markdown', 'replacement'], 1).error.code, 'RICH_CONTENT')
+  const bytes = readFileSync(join(f.vault, 'projects/alpha.stride.json'), 'utf8')
+  f.run([...f.writeArgs('apply'), '--operations', '-'], 1, JSON.stringify([
+    { op: 'insert-markdown', after: 'b1', markdown: 'added' },
+    { op: 'replace-text', block: 'b1', old: 'missing', new: 'x' },
+  ]))
+  assert.equal(readFileSync(join(f.vault, 'projects/alpha.stride.json'), 'utf8'), bytes)
+  symlinkSync(join(f.vault, 'projects'), join(f.vault, 'linked'))
+  assert.equal(f.run(['import', '--note', 'linked/nope', '--from', file], 1).error.code, 'SYMLINK')
+  assert.equal(f.run(['import', '--note', '../escape', '--from', file], 1).error.code, 'INVALID_ID')
 })

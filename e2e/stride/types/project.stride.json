@@ -1,0 +1,32 @@
+{
+  "format": "tiptap",
+  "title": "项目",
+  "type": "Type",
+  "properties": {},
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "heading",
+        "attrs": {
+          "level": 1
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "项目"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "成员笔记的 type 使用这个标题。"
+          }
+        ]
+      }
+    ]
+  }
+}

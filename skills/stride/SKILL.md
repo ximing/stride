@@ -1,6 +1,6 @@
 ---
 name: stride
-description: Use when an external agent needs to edit Stride document content, add/remove document relationships or backlinks, manage vault notes, folders, Types, properties or archives, or import a Markdown/Tolaria vault. 适用于外部 agent 修改、续写、改写文档正文，建立、替换、删除文档关系及整理知识库；不用于开发、构建或调试 Stride 本身。
+description: Use when an external agent needs to edit Stride document content, convert Markdown into a Stride note, add/remove document relationships or backlinks, manage vault notes, folders, Types, properties or archives, or import a Markdown/Tolaria vault. 适用于外部 agent 修改、续写、改写文档正文，把 Markdown 转成笔记，建立、替换、删除文档关系及整理知识库；不用于开发、构建或调试 Stride 本身。
 ---
 
 # 使用 Stride 管理知识库
@@ -26,7 +26,23 @@ node scripts/stride.mjs read --vault /path/to/vault --note projects/alpha
 node scripts/stride.mjs --help
 ```
 
-`read` 返回完整文档、可读节点引用（如 `b1`）及 `revision`。用 `replace-text` 改字、`insert` 插入纯文本段落、`delete-block` 删除块、`relations list/add/remove` 管理关系；`apply` 一次提交多项操作。每次写入都必须传原始 `--revision`，可加 `--dry-run` 查看结果。不要让模型重写整篇 JSON；不支持的跨格式替换会明确报错，保留原文件。
+`read` 返回完整文档、可读节点引用（如 `b1`）及 `revision`。每次写入都必须传原始 `--revision`，可加 `--dry-run` 查看结果。不要让模型重写整篇 JSON，也不要手写整篇 TipTap。
+
+## 改几个字，还是写入排版
+
+精细修改保留 marks、未知节点和版本检查，适合小改动。它不适合从 Markdown 新建笔记或插入一整节排版。那种情况用随附转换器，仍然不用手写 JSON。语法和警告只写在 [Markdown 转换](references/markdown.md)，命令参数只写在 [cli.md](references/cli.md)。
+
+| 要做的事 | 用 |
+| --- | --- |
+| 改几个词，并保留加粗、链接等 marks | `replace-text` |
+| 插入没有排版的文字 | `insert`。星号和井号按字面保留 |
+| 新建一篇笔记 | `import`。先看结果用 `convert`，它不写 Vault |
+| 往已有笔记插入标题、列表、表格、代码或公式 | `insert-markdown` |
+| 用一段排版换掉一个顶层块 | `replace-block`。含图片、表格、代码、双链等时要显式允许 |
+| 删除一块，或改归属/相关 | `delete-block`、`relations` |
+| 一次提交多步 | `apply` |
+
+不要把已有富文本笔记整篇转成 Markdown 再转回来。`import` 发现同名笔记会失败，不会覆盖。转换当时不解析这篇笔记指向 Vault 里的哪一篇；相对链接和附件按 [迁移的两遍处理](references/migration.md) 做。
 
 ## 内容模型速查
 
@@ -75,8 +91,8 @@ node scripts/stride.mjs --help
 先读 [正文编辑步骤](references/vault-files.md#正文编辑步骤)，再执行：
 
 1. 用路径/ID 与标题定位文档，读取完整 JSON；通过章节标题和上下文确认要改的节点，不能直接把搜索摘要或纯文本当作原文。
-2. 明确编辑范围：改几个字、替换段落、改写章节、插入内容或删除指定块。只更新对应 `text` 或父节点 `content`，保留未涉及的 marks、图片、表格、公式和自定义节点。
-3. 有应用工具时使用 `write_note`、`append_to_note`、`insert_block`、`remove_block`；外部 agent 优先使用随附脚本。直接文件操作或应用工具增删后须重新定位路径；脚本 `apply` 内的引用固定指向原节点，独立调用间仍需使用新返回的引用和版本。
+2. 明确编辑范围。改几个词用 `replace-text`。插入或替换一整节排版用 `insert-markdown` / `replace-block`，按 [Markdown 转换](references/markdown.md) 执行。不要为了改一节而重建整篇文档。
+3. 有应用工具时使用 `write_note`、`append_to_note`、`insert_block`、`remove_block`；外部 agent 优先使用随附脚本。直接文件操作或应用工具增删后须重新定位路径；脚本 `apply` 内的引用固定指向原节点，独立调用间仍需使用新返回的引用和版本。未改到的 marks、图片、表格、公式和自定义节点保持原样。
 4. 写前核对文件未变化，写后读回并比较变更范围。正文编辑默认不改标题、分类或关系；正文中的双链本身也是内容，按用户意图保留或修改。
 
 ### 从 Tolaria / Markdown Vault 迁移
@@ -85,7 +101,7 @@ node scripts/stride.mjs --help
 
 ### 创建文件、目录与分类
 
-- 先检索是否已有同名内容；不要因为重试重复创建。
+- 先检索是否已有同名内容；不要因为重试重复创建。正文来自 Markdown 时用 `import`，不要照文件参考里的短例子手写长文档。
 - 创建目录时只创建用户需要的实际文件夹。新笔记保留 `.stride.json` 扩展名，路径决定 ID。
 - 创建分类前检查是否已有同标题且 `type: "Type"` 的定义笔记；复用已有分类。创建定义后，把成员的 `type` 设成定义标题，保持大小写一致。定义可放在普通目录中，不要求固定 `types/`。
 - 修改正文时保留原有 marks、图片、表格、公式、自定义节点和未涉及的属性，只改变目标节点。

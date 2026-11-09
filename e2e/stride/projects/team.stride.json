@@ -1,0 +1,32 @@
+{
+  "format": "tiptap",
+  "title": "团队",
+  "type": "note",
+  "properties": {},
+  "doc": {
+    "type": "doc",
+    "content": [
+      {
+        "type": "heading",
+        "attrs": {
+          "level": 1
+        },
+        "content": [
+          {
+            "type": "text",
+            "text": "团队"
+          }
+        ]
+      },
+      {
+        "type": "paragraph",
+        "content": [
+          {
+            "type": "text",
+            "text": "Alpha 属于这篇笔记。"
+          }
+        ]
+      }
+    ]
+  }
+}

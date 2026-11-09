@@ -1,4 +1,6 @@
 // Standalone skill implementation: imports must stay inside this skill or node:*.
+import { parseFragment } from './markdown.mjs'
+
 export function fail(code, message) {
   throw Object.assign(new Error(message), { code })
 }
@@ -36,24 +38,34 @@ export function validateDocument(file) {
 }
 
 export function nodeText(node) {
+  if (!node) return ''
   if (node.type === 'text') return node.text
   if (node.type === 'hardBreak') return '\n'
   if (node.type === 'wikilink') return `[[${node.attrs?.target ?? ''}${node.attrs?.alias ? `|${node.attrs.alias}` : ''}]]`
+  if (node.type === 'inlineMath') return `$${node.attrs?.latex ?? ''}$`
+  if (node.type === 'blockMath') return `$$${node.attrs?.latex ?? ''}$$`
+  if (node.type === 'image') return node.attrs?.alt ? `![${node.attrs.alt}](${node.attrs.src ?? ''})` : String(node.attrs?.src ?? '')
   return (node.content ?? []).map(nodeText).join('')
+}
+
+/** Visible title of a heading: text and wikilink targets, joined like core plainText. */
+export function visibleTitle(node) {
+  const parts = []
+  const walk = (current) => {
+    if (!current) return
+    if (current.type === 'text') parts.push(current.text)
+    else if (current.type === 'wikilink' && typeof current.attrs?.target === 'string' && current.attrs.target) parts.push(current.attrs.target)
+    current.content?.forEach(walk)
+  }
+  walk(node)
+  return parts.join(' ').replace(/\s+/g, ' ').trim()
 }
 
 export function effectiveTitle(file, id) {
   // Match core's leadingH1Text -> plainText, including its text-node spacing.
   const first = file.doc.content?.[0]
   if (first?.type === 'heading' && first.attrs?.level === 1) {
-    const parts = []
-    const walk = (n) => {
-      if (n.type === 'text') parts.push(n.text)
-      else if (n.type === 'wikilink' && typeof n.attrs?.target === 'string' && n.attrs.target) parts.push(n.attrs.target)
-      n.content?.forEach(walk)
-    }
-    walk(first)
-    const title = parts.join(' ').replace(/\s+/g, ' ').trim()
+    const title = visibleTitle(first)
     if (title) return title
   }
   return file.title.trim() ? file.title : id
@@ -75,6 +87,9 @@ export function describe(id, revision, file) {
     blocks: [...indexNodes(file.doc)].map(([ref, node]) => ({
       ref, type: node.type, text: nodeText(node),
       ...(node.type === 'heading' ? { level: node.attrs?.level } : {}),
+      ...(typeof node.attrs?.language === 'string' && node.attrs.language ? { language: node.attrs.language } : {}),
+      ...(node.type === 'taskItem' ? { checked: node.attrs?.checked === true } : {}),
+      ...(node.type === 'callout' && typeof node.attrs?.kind === 'string' ? { kind: node.attrs.kind } : {}),
     })),
     document: file,
   }
@@ -120,9 +135,9 @@ export function editDocument(file, refs, op) {
       fail('TITLE_PROTECTED', 'This edits the leading title H1. Rename requires separate title/reference maintenance.')
     }
   }
-  if (op.op === 'insert') {
+  if (op.op === 'insert' || op.op === 'insert-markdown') {
     if (op.before !== undefined && op.after !== undefined) fail('ARGUMENT', 'Use before OR after, not both.')
-    const blocks = paragraphs(op.text)
+    const parsed = op.op === 'insert' ? { blocks: paragraphs(op.text), warnings: [] } : parseFragment(op.markdown)
     doc.content ??= []
     let index = doc.content.length
     const ref = op.before ?? op.after
@@ -133,8 +148,8 @@ export function editDocument(file, refs, op) {
       if (op.before !== undefined) protectTitle(node)
       index = at.index + (op.after !== undefined ? 1 : 0)
     }
-    doc.content.splice(index, 0, ...blocks)
-    return
+    doc.content.splice(index, 0, ...parsed.blocks)
+    return parsed.warnings
   }
   const node = resolve(op.block)
   protectTitle(node)
@@ -158,7 +173,18 @@ export function editDocument(file, refs, op) {
       const at = locate(doc, match.node)
       at.parent.content.splice(at.index, 1)
     }
-    return
+    return []
+  }
+  if (op.op === 'replace-block') {
+    if (node.type === 'text') fail('ARGUMENT', 'replace-block replaces a whole block. Use replace-text to change inline text.')
+    const at = locate(doc, node)
+    if (at.parent !== doc) fail('ARGUMENT', 'replace-block accepts top-level blocks only.')
+    if (containsRich(node) && op.allowRichDelete !== true) {
+      fail('RICH_CONTENT', 'Block includes media, links, code, table or unknown nodes. Explicit allowRichDelete=true is required to replace all its content.')
+    }
+    const parsed = parseFragment(op.markdown)
+    doc.content.splice(at.index, 1, ...parsed.blocks)
+    return parsed.warnings
   }
   if (op.op === 'delete-block') {
     if (node.type === 'text') fail('ARGUMENT', 'Use replace-text with new="" to remove inline text.')
@@ -172,7 +198,7 @@ export function editDocument(file, refs, op) {
     if (!at.parent.content.length || (['listItem', 'taskItem'].includes(at.parent.type) && at.parent.content[0].type !== 'paragraph')) {
       at.parent.content.unshift({ type: 'paragraph' })
     }
-    return
+    return []
   }
   fail('ARGUMENT', `Unknown operation ${op.op}.`)
 }
