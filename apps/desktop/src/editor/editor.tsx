@@ -13,6 +13,7 @@ import { installImeEnterGuard } from './ime-enter'
 import { setMathClickHandler, updateMathLatex } from './math/math'
 import { EditorPrompt } from './prompt'
 import { plainTextSelection } from './find/search-jump'
+import { BlockHandle } from './block/block-handle'
 import { TableContextMenu } from './table/table-menu'
 import { EditorFind } from './find/find-bar'
 import { EditorToolbar } from './toolbar/toolbar'
@@ -148,6 +149,7 @@ export const NoteEditor = observer(function NoteEditor() {
       <EditorToolbar editor={editor} openLinkRef={openLinkRef} getFs={() => fsRef.current} />
       <div className="editor-scroll" ref={scrollRef}>
         <EditorContent editor={editor} />
+        <BlockHandle editor={editor} />
       </div>
       <TableContextMenu editor={editor} />
       {mathPrompt ? (

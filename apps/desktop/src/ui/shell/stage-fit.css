@@ -71,6 +71,7 @@
    The top border is the hairline that separates the pinned chrome
    (title + toolbars) from the document. */
 .editor-scroll {
+  position: relative;
   flex: 1;
   min-height: 0;
   overflow-y: auto;

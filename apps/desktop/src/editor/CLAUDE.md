@@ -15,7 +15,7 @@
   - `math/`：KaTeX 行内/块级公式渲染与折叠编辑
   - `mermaid/`：Mermaid 图表节点视图与 SVG 渲染
   - `image/`：图片粘贴/拖拽写入 `attachments/`、尺寸调整与预览
-- **粘贴、查找与链接**：`paste/`（Markdown 与富文本粘贴转 ProseMirror 节点）、`find/`（页内查找替换、高亮装饰、搜索跳转）、`link/`（外部链接）、`menu/`（编辑器右键菜单）。
+- **粘贴、查找与链接**：`paste/`（Markdown 与富文本粘贴转 ProseMirror 节点）、`find/`（页内查找替换、高亮装饰、搜索跳转）、`link/`（外部链接）、`menu/`（编辑器右键菜单）、`block/`（代码块与表格左侧的方块，点开后复制、剪切、删除）。
 
 ## 放置约束
 
