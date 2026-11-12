@@ -198,21 +198,37 @@
   border-color: var(--sd-accent);
 }
 
+/* The paper column stays put. A table wider than the column scrolls here
+   instead of dragging the whole note sideways. */
+.editor .ProseMirror .tableWrapper {
+  width: 100%;
+  margin: 0.4rem 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+}
+
 .editor .ProseMirror table {
   border-collapse: collapse;
-  margin: 0.4rem 0;
+  /* Fill the column when the grid is narrower. Column sizing writes an
+     inline min-width or width, and cell content can grow the table further;
+     the wrapper scrolls whatever exceeds the paper. */
+  width: 100%;
+  margin: 0;
 }
 
 .editor .ProseMirror th {
   position: relative;
   border: 1px solid var(--sd-border);
   padding: 0.3rem 0.55rem;
+  vertical-align: top;
 }
 
 .editor .ProseMirror td {
   position: relative;
   border: 1px solid var(--sd-border);
   padding: 0.3rem 0.55rem;
+  vertical-align: top;
 }
 
 /* The header row must read as a label band, not another body row: a sunken
