@@ -57,6 +57,7 @@ async function resumeRetiredRebuild(
 
 export async function openBackendBody(vault: VaultService, backend: FileSystemBackend, ticket: number) {
   if (ticket !== vault.openGeneration) return
+  vault.unwatchDisk()
   // Monotonic for this open. In-flight saves and upserts captured the previous value.
   vault.session += 1
   const retiringIndex = vault.index
@@ -195,6 +196,7 @@ export async function openBackendBody(vault: VaultService, backend: FileSystemBa
     if (has(ViewsService)) await vault.resolve(ViewsService).onVaultOpened()
     const { SettingsService } = await import('../settings/settings.service')
     if (has(SettingsService)) await vault.resolve(SettingsService).bindUsageVault(backend)
+    if (vault.openGeneration === ticket && vault.phase === 'ready') vault.watchDisk()
   } catch (error) {
     abandoned = true
     await closeBackend(sessionToClose)

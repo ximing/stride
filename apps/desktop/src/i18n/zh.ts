@@ -236,6 +236,7 @@ export const zh: DeepString<Catalog> = {
       newNote: '新建笔记',
       newInstance: '按类型新建笔记',
       save: '立即保存笔记',
+      refresh: '从磁盘刷新',
     },
     nav: {
       quickOpen: '快速打开',

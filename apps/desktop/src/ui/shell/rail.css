@@ -307,19 +307,39 @@
 .rail-group-action {
   display: inline-flex;
   flex: none;
+  gap: 2px;
+}
+
+/* The refresh control stays visible. Create actions still appear on hover
+   or when the header row itself has focus. */
+.rail-group-action .sd-icon-button:not(.is-persistent) {
   opacity: 0;
   transition: opacity var(--sd-motion-hover) var(--sd-ease-standard);
 }
 
-.rail-group-head:hover .rail-group-action,
-.rail-group-head:focus-within .rail-group-action,
-.rail-group-action:focus-within {
+.rail-group-head:hover .rail-group-action .sd-icon-button:not(.is-persistent),
+.rail-group-head:focus-within .rail-group-action .sd-icon-button:not(.is-persistent),
+.rail-group-action .sd-icon-button:not(.is-persistent):focus-visible {
   opacity: 1;
 }
 
+.rail-group-action .sd-icon-button.is-refreshing svg {
+  animation: rail-refresh-spin 0.8s linear infinite;
+}
+
+@keyframes rail-refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .rail-group-action {
+  .rail-group-action .sd-icon-button:not(.is-persistent) {
     transition: none;
+  }
+
+  .rail-group-action .sd-icon-button.is-refreshing svg {
+    animation: none;
   }
 }
 

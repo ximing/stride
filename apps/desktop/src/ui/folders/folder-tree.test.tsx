@@ -1,5 +1,6 @@
 import { has, register, resolve } from '@rabjs/react'
-import { createNote } from '@stride/core/note'
+import { createNote, serializeNote } from '@stride/core/note'
+import { notePath } from '@stride/core'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -97,7 +98,9 @@ describe('folder tree', () => {
     window.history.replaceState(null, '', '/')
     vi.unstubAllGlobals()
     try {
-      resolve(VaultService).cancelPending()
+      const vault = resolve(VaultService)
+      vault.unwatchDisk()
+      vault.cancelPending()
     } catch {
       // The service is registered by the cases that render the rail.
     }
@@ -292,5 +295,31 @@ describe('folder tree', () => {
     })
     expect(host.querySelectorAll('[data-testid="note-link"]').length).toBe(FOLDER_NOTE_RENDER_CAP)
     expect(host.querySelector('[data-testid="folder-overflow"]')?.textContent).toContain('5 more')
+  })
+
+  it('refreshes a folder and note created on disk', async () => {
+    const { host, vault } = await mountRail()
+    await act(async () => {
+      await vault.openFromDraft()
+    })
+    const button = host.querySelector<HTMLButtonElement>('[data-testid="refresh-folders"]')
+    expect(button).not.toBeNull()
+    expect(button!.disabled).toBe(false)
+    const fs = vault.fs
+    expect(fs).not.toBeNull()
+    await fs!.mkdir('inbox-box')
+    await fs!.writeText(
+      notePath('inbox-box/fresh'),
+      serializeNote(createNote('inbox-box/fresh', 'Fresh from disk')),
+    )
+    expect(host.querySelector('[data-testid="folder-row"][data-path="inbox-box"]')).toBeNull()
+
+    await act(async () => {
+      button!.click()
+    })
+    await vi.waitFor(() => {
+      expect(host.querySelector('[data-testid="folder-row"][data-path="inbox-box"]')).not.toBeNull()
+      expect(host.querySelector('[data-testid="note-link"]')?.textContent).toContain('Fresh from disk')
+    })
   })
 })

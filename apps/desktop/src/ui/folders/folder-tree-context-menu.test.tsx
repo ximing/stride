@@ -73,7 +73,9 @@ afterEach(async () => {
   window.history.replaceState(null, '', '/')
   vi.unstubAllGlobals()
   try {
-    resolve(VaultService).cancelPending()
+    const vault = resolve(VaultService)
+    vault.unwatchDisk()
+    vault.cancelPending()
   } catch {
     // not registered in this test
   }
@@ -201,7 +203,7 @@ describe('folder tree context menu', () => {
   it('right-click on empty tree space offers New Folder at the root', async () => {
     const { host } = await mountRail()
     await act(async () => rightClick(host.querySelector('[data-testid="folder-root"]')))
-    expect(menuItemIds()).toEqual(['new-folder'])
+    expect(menuItemIds()).toEqual(['refresh', 'new-folder'])
     await act(async () => clickMenuItem('new-folder'))
     expect(host.querySelector('[data-testid="folder-name"]')).not.toBeNull()
   })

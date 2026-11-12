@@ -84,6 +84,8 @@ import { applyStageZoom } from '../layout/stage-zoom'
 import { ViewsService } from '../views/views.service'
 import { applyNoteIdChanges, FOLDER_FILTER_PREFIX } from './note-identity'
 import { liveDocStash } from './live-doc'
+import { refreshVaultFromDisk, refreshVaultPaths, type RefreshBaseline } from './vault-refresh'
+import { bindVaultRefresh, unbindVaultRefresh } from './vault-watch'
 import * as vaultOpen from './vault-open'
 import * as propertyEditor from './vault-properties'
 import * as searchSession from './vault-search-session'
@@ -222,6 +224,8 @@ export class VaultService extends Service {
   indexDone = 0
   indexTotal = 0
   docEpoch = 0
+  /** True while a user-initiated disk refresh is queued or running. */
+  refreshing = false
   renameFromHeading = true
   agentMode: 'safe' | 'power' = 'safe'
   advanceInbox = true
@@ -272,6 +276,7 @@ export class VaultService extends Service {
   numberDrafts: Record<string, string> = {}
   listDrafts: Record<string, string> = {}
   private saveGeneration = 0
+  private refreshWaiters = 0
   private saveChain: Promise<void> = Promise.resolve()
   private registryReady = false
   private registryListening = false
@@ -564,6 +569,7 @@ export class VaultService extends Service {
 
   async showChooser() {
     if (this.phase === 'chooser') return
+    this.unwatchDisk()
     this.error = ''
     await this.commitHeadingRename()
     this.phase = 'chooser'
@@ -1161,6 +1167,49 @@ export class VaultService extends Service {
       this.noteMtimes = { ...this.noteMtimes, [saved.id]: Date.now() }
       await this.upsertIndexed(saved)
     })
+  }
+
+  /** Re-read folders and notes from disk. Unsaved edits are written first and kept. */
+  async refreshFromDisk(): Promise<void> {
+    await this.runDiskRefresh(true, () => refreshVaultFromDisk(this, () => this.diskRefreshBaseline()))
+  }
+
+  /** Subscribe to focus, visibility, and (on the desktop) filesystem watch events. */
+  watchDisk(): void {
+    bindVaultRefresh(this, {
+      full: () => {
+        void this.runDiskRefresh(false, () => refreshVaultFromDisk(this, () => this.diskRefreshBaseline()))
+      },
+      paths: (paths) => {
+        void this.runDiskRefresh(false, () => refreshVaultPaths(this, paths, () => this.diskRefreshBaseline()))
+      },
+    })
+  }
+
+  unwatchDisk(): void {
+    unbindVaultRefresh(this)
+  }
+
+  private async runDiskRefresh(interactive: boolean, job: () => Promise<void>): Promise<void> {
+    if (this.phase !== 'ready' || !this.fs) return
+    if (interactive) {
+      this.refreshWaiters += 1
+      this.refreshing = true
+    }
+    try {
+      await job()
+    } finally {
+      if (!interactive) return
+      this.refreshWaiters = Math.max(0, this.refreshWaiters - 1)
+      if (this.refreshWaiters === 0) this.refreshing = false
+    }
+  }
+
+  private diskRefreshBaseline(): RefreshBaseline {
+    const dirty = new Set<string>(liveDocStash(this).keys())
+    if (this.pendingId) dirty.add(this.pendingId)
+    for (const id of this.titleBaseline.keys()) dirty.add(id)
+    return { dirty, generation: this.saveGeneration }
   }
 
   get listFilterService() {

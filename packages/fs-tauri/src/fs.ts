@@ -7,8 +7,10 @@ import {
   remove,
   rename,
   stat,
+  watch as watchPaths,
   writeFile,
   writeTextFile,
+  type WatchEvent as PluginWatchEvent,
 } from '@tauri-apps/plugin-fs'
 import {
   normalizeRelativePath,
@@ -58,6 +60,52 @@ function isNotFound(error: unknown): boolean {
     || /cannot find the (file|path)/i.test(detail)
 }
 
+function watchKind(type: PluginWatchEvent['type']): WatchEvent['kind'] | null {
+  if (type === 'any' || type === 'other') return 'modify'
+  if (typeof type !== 'object' || type === null) return 'modify'
+  if ('access' in type) return null
+  if ('create' in type) return 'create'
+  if ('remove' in type) return 'remove'
+  if ('modify' in type) return 'modify'
+  return 'modify'
+}
+
+function fileUrlToPath(input: string): string {
+  if (!input.startsWith('file:')) return input
+  try {
+    const path = decodeURIComponent(new URL(input).pathname)
+    return /^\/[A-Za-z]:/.test(path) ? path.slice(1) : path
+  } catch {
+    return input
+  }
+}
+
+function foldPathKey(path: string): string {
+  return /^[A-Za-z]:/.test(path) ? path.toLowerCase() : path
+}
+
+/** Plugin paths are absolute or file URLs. Returned paths are vault-relative, or null when outside the root. */
+function toVaultRelative(root: string, rawPath: string): string | null {
+  const path = fileUrlToPath(rawPath).replaceAll('\\', '/')
+  const rootNorm = root.replaceAll('\\', '/').replace(/\/+$/, '')
+  const pathKey = foldPathKey(path)
+  const rootKey = foldPathKey(rootNorm)
+  if (pathKey === rootKey) return ''
+  const prefix = `${rootKey}/`
+  if (pathKey.startsWith(prefix)) return path.slice(rootNorm.length + 1)
+  if (path.startsWith('/') || /^[A-Za-z]:/.test(path)) return null
+  try {
+    return normalizeRelativePath(path)
+  } catch {
+    return null
+  }
+}
+
+function matchesWatchPrefix(path: string, prefix: string): boolean {
+  if (!prefix) return true
+  return path === prefix || path.startsWith(`${prefix}/`)
+}
+
 function mapError(error: unknown, rel: string): Error {
   if (error instanceof PlatformError) return error
   if (isNotFound(error)) return new PlatformError('not-found', `No such path: ${rel || '.'}`)
@@ -80,7 +128,7 @@ let tempSerial = 0
 
 export class TauriFileSystem implements FileSystemBackend {
   readonly rootLabel: string
-  readonly capabilities: FileSystemCapabilities = { watch: false }
+  readonly capabilities: FileSystemCapabilities = { watch: true }
 
   constructor(root: string) {
     if (!isAbsoluteRoot(root)) throw new PlatformError('escape', 'Root must be absolute')
@@ -198,9 +246,25 @@ export class TauriFileSystem implements FileSystemBackend {
     }
   }
 
-  async watch(filePath: string, _cb: (event: WatchEvent) => void): Promise<() => void> {
-    normalizeRelativePath(filePath)
-    return () => {}
+  async watch(filePath: string, cb: (event: WatchEvent) => void): Promise<() => void> {
+    const relative = normalizeRelativePath(filePath)
+    const absolute = joinRoot(this.rootLabel, relative)
+    const stop = await watchPaths(
+      absolute,
+      (event) => {
+        const kind = watchKind(event.type)
+        if (!kind) return
+        for (const rawPath of event.paths) {
+          const path = toVaultRelative(this.rootLabel, rawPath)
+          if (path === null || !matchesWatchPrefix(path, relative)) continue
+          cb({ kind, path })
+        }
+      },
+      { recursive: true, delayMs: 200 },
+    )
+    return () => {
+      stop()
+    }
   }
 
   private async writeAtomically(

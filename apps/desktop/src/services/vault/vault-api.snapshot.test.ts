@@ -21,6 +21,7 @@ const PUBLIC_FIELDS = [
   'indexDone',
   'indexTotal',
   'docEpoch',
+  'refreshing',
   'renameFromHeading',
   'agentMode',
   'advanceInbox',
@@ -119,6 +120,9 @@ const PUBLIC_METHODS = [
   'writeExternalNote',
   'restoreActiveNote',
   'flush',
+  'refreshFromDisk',
+  'watchDisk',
+  'unwatchDisk',
   'openClonedVault',
   'reopenForSettings',
   'refreshMtimes',
@@ -172,6 +176,8 @@ const PRIVATE_METHODS = [
   'clearFieldDraft',
   'resetPropertyEditor',
   'mutateNotes',
+  'runDiskRefresh',
+  'diskRefreshBaseline',
 ] as const
 
 describe('VaultService API snapshot', () => {

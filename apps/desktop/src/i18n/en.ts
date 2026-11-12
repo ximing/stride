@@ -230,6 +230,7 @@ export const en = {
       newNote: 'New Note',
       newInstance: 'New Note of Type',
       save: 'Save Note Now',
+      refresh: 'Refresh from Disk',
     },
     nav: {
       quickOpen: 'Quick Open',

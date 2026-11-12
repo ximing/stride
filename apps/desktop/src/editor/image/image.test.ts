@@ -45,6 +45,7 @@ function createEditor(fs: MemoryFileSystem): Editor {
 }
 
 afterEach(() => {
+  vi.restoreAllMocks()
   vi.unstubAllGlobals()
   document.querySelector('[data-testid="image-lightbox"]')?.remove()
   editors.splice(0).forEach((editor) => editor.destroy())
@@ -132,6 +133,37 @@ describe('image attachments', () => {
     vi.stubGlobal('fetch', () => Promise.reject(new Error('offline')))
     const url = 'https://example.invalid/a.png'
     await expect(localizeRemoteImage(fs, url)).resolves.toBe(url)
+  })
+
+  it('loads an svg attachment as an image', async () => {
+    const fs = new MemoryFileSystem()
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8"></svg>'
+    await fs.writeBytes('attachments/diagram.svg', new TextEncoder().encode(svg))
+    const types: string[] = []
+    // jsdom's URL has no blob helpers; define them before spying.
+    const urlApi = URL as unknown as {
+      createObjectURL?: (blob: Blob) => string
+      revokeObjectURL?: (url: string) => void
+    }
+    urlApi.createObjectURL ??= () => ''
+    urlApi.revokeObjectURL ??= () => {}
+    const create = vi.spyOn(URL, 'createObjectURL').mockImplementation((blob) => {
+      types.push(blob instanceof Blob ? blob.type : '')
+      return 'blob:diagram'
+    })
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => {})
+    const editor = createEditor(fs)
+    editor.commands.setContent({
+      type: 'doc',
+      content: [{ type: 'image', attrs: { src: 'attachments/diagram.svg' } }],
+    })
+    await vi.waitFor(() => {
+      expect(create).toHaveBeenCalled()
+    })
+    expect(types).toContain('image/svg+xml')
+    const img = editor.view.dom.querySelector('.editor-image img')
+    expect(img).toBeInstanceOf(HTMLImageElement)
+    expect(img?.getAttribute('src') ?? (img as HTMLImageElement | null)?.src).toBe('blob:diagram')
   })
 
   it('round-trips an image src through the note file', () => {

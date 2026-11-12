@@ -21,6 +21,7 @@ import {
   FolderOpen,
   FolderPlus,
   Highlighter,
+  RefreshCw,
   Italic,
   Link as LinkIcon,
   NotebookPen,
@@ -465,11 +466,25 @@ export function buildFolderNoteMenu(
 
 export interface TreeRootMenuActions {
   newFolder(): void
+  refresh(): void
 }
 
-/** Right-click on the tree's empty space: only a root-level create makes sense. */
-export function buildTreeRootMenu(actions: TreeRootMenuActions): ContextMenuEntry[] {
+/** Right-click on the tree's empty space: refresh the vault, then create a root folder. */
+export function buildTreeRootMenu(
+  actions: TreeRootMenuActions,
+  commands: readonly AppCommand[] = [],
+): ContextMenuEntry[] {
+  const refresh = commandRef(commands, 'file.refresh')
   return [
+    {
+      kind: 'item',
+      id: 'refresh',
+      label: refresh.title,
+      icon: RefreshCw,
+      shortcut: refresh.shortcut,
+      onSelect: () => actions.refresh(),
+    },
+    separator('root-create'),
     {
       kind: 'item',
       id: 'new-folder',

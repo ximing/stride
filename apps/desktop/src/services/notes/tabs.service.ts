@@ -216,6 +216,11 @@ export class TabsService extends Service {
     return vault !== null && vault.notes.some((note) => note.id === noteId)
   }
 
+  /** Drop tabs whose notes disappeared and follow the vault selection. */
+  reconcile() {
+    this.syncNow()
+  }
+
   private scheduleSync() {
     if (this.scheduled) return
     this.scheduled = true

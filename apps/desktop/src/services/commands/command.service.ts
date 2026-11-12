@@ -155,6 +155,12 @@ export class CommandService extends Service {
         void this.resolve(VaultService).flush()
       },
     })
+    this.registerHandler('file.refresh', {
+      available: () => has(VaultService),
+      run: () => {
+        void this.resolve(VaultService).refreshFromDisk()
+      },
+    })
     // The palette expands file.newInstance into one item per visible type.
     // The bare entry itself has nothing to run.
     this.registerHandler('file.newInstance', {

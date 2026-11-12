@@ -9,7 +9,7 @@ export interface RailGroupHeaderProps {
   title: string
   collapsed: boolean
   onToggle: () => void
-  /** Create affordance pinned right; revealed on hover/focus-within. */
+  /** Trailing controls. A persistent refresh stays visible; other actions reveal on hover. */
   action?: ReactNode
   testId?: string
 }

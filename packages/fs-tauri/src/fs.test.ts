@@ -115,8 +115,16 @@ const plugin = vi.hoisted(() => {
     lstatRootSymlink: false,
     windowsRename: false,
     failRename: null as ((oldPath: string, newPath: string) => boolean) | null,
+    watchers: [] as Array<{
+      paths: string[]
+      cb: (event: { type: unknown; paths: string[] }) => void
+      options?: { recursive?: boolean; delayMs?: number }
+    }>,
     setStatError(message: string | null) {
       api.statError = message
+    },
+    emitWatch(event: { type: unknown; paths: string[] }) {
+      for (const watcher of api.watchers) watcher.cb(event)
     },
     reset() {
       calls.length = 0
@@ -126,6 +134,7 @@ const plugin = vi.hoisted(() => {
       api.lstatRootSymlink = false
       api.windowsRename = false
       api.failRename = null
+      api.watchers.length = 0
       nodes.set('/vault', { kind: 'directory', bytes: new Uint8Array(), mtimeMs: 0 })
     },
     notFound,
@@ -262,6 +271,20 @@ vi.mock('@tauri-apps/plugin-fs', () => ({
       readonly: false,
     }
   },
+  async watch(
+    paths: string | string[],
+    cb: (event: { type: unknown; paths: string[] }) => void,
+    options?: { recursive?: boolean; delayMs?: number },
+  ): Promise<() => void> {
+    const list = Array.isArray(paths) ? paths : [paths]
+    for (const path of list) plugin.calls.push(`watch ${path}`)
+    const watcher = { paths: list, cb, options }
+    plugin.watchers.push(watcher)
+    return () => {
+      const index = plugin.watchers.indexOf(watcher)
+      if (index >= 0) plugin.watchers.splice(index, 1)
+    }
+  },
   async lstat(path: string) {
     plugin.calls.push(`lstat ${path}`)
     if (plugin.lstatRootSymlink && (path === '/vault' || path === '/vault/')) {
@@ -327,7 +350,7 @@ describe('TauriFileSystem', () => {
 
   it('keeps an absolute root unchanged', () => {
     expect(new TauriFileSystem('/vault').rootLabel).toBe('/vault')
-    expect(new TauriFileSystem('/vault').capabilities.watch).toBe(false)
+    expect(new TauriFileSystem('/vault').capabilities.watch).toBe(true)
     expect(new TauriFileSystem('C:\\Vault').rootLabel).toBe('C:\\Vault')
     expect(new TauriFileSystem('\\\\server\\share').rootLabel).toBe('\\\\server\\share')
     expect(new TauriFileSystem('/vault/../kept').rootLabel).toBe('/vault/../kept')
@@ -422,7 +445,7 @@ describe('TauriFileSystem', () => {
     expect(plugin.calls).toEqual([])
   })
 
-  it('joins windows separators and watches as a no-op', async () => {
+  it('joins windows separators and watches the vault tree', async () => {
     const windows = new TauriFileSystem('C:\\vault')
     await windows.writeText('a/b.txt', 'x')
     expect(published('writeTextFile', 'C:\\vault\\a\\b.txt')).toBe(true)
@@ -437,7 +460,43 @@ describe('TauriFileSystem', () => {
     expect(published('writeTextFile', '/vault/a.txt')).toBe(true)
     expect(plugin.calls).not.toContain('writeTextFile /vault//a.txt')
     const stop = await fs().watch('notes', () => {})
+    expect(plugin.calls).toContain('watch /vault/notes')
+    expect(plugin.watchers[0]?.options).toMatchObject({ recursive: true, delayMs: 200 })
     expect(stop()).toBeUndefined()
+    expect(plugin.watchers).toHaveLength(0)
+  })
+
+  it('maps plugin watch events into vault-relative changes', async () => {
+    const events: { kind: string; path: string }[] = []
+    await fs().watch('', (event) => events.push(event))
+    expect(plugin.calls).toContain('watch /vault')
+    plugin.emitWatch({
+      type: { modify: { kind: 'data', mode: 'content' } },
+      paths: ['/vault/notes/a.stride.json', '/vault/notes/b.stride.json'],
+    })
+    plugin.emitWatch({ type: { access: { kind: 'any' } }, paths: ['/vault/notes/a.stride.json'] })
+    plugin.emitWatch({ type: { create: { kind: 'folder' } }, paths: ['/vault/box'] })
+    plugin.emitWatch({ type: { remove: { kind: 'file' } }, paths: ['/other/nope.txt'] })
+    plugin.emitWatch({ type: 'any', paths: ['file:///vault/notes/c.stride.json'] })
+    plugin.emitWatch({ type: 'other', paths: ['/vault/notes/d.stride.json'] })
+    expect(events).toEqual([
+      { kind: 'modify', path: 'notes/a.stride.json' },
+      { kind: 'modify', path: 'notes/b.stride.json' },
+      { kind: 'create', path: 'box' },
+      { kind: 'modify', path: 'notes/c.stride.json' },
+      { kind: 'modify', path: 'notes/d.stride.json' },
+    ])
+
+    const windowsEvents: { kind: string; path: string }[] = []
+    await new TauriFileSystem('C:\\Vault').watch('', (event) => windowsEvents.push(event))
+    plugin.emitWatch({
+      type: { modify: { kind: 'data', mode: 'content' } },
+      paths: ['c:\\vault\\notes\\a.stride.json', 'file:///C:/Vault/notes/b.stride.json'],
+    })
+    expect(windowsEvents).toEqual([
+      { kind: 'modify', path: 'notes/a.stride.json' },
+      { kind: 'modify', path: 'notes/b.stride.json' },
+    ])
   })
 
   it('keeps the previous file when a temp write fails', async () => {

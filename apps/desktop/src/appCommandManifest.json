@@ -45,6 +45,13 @@
       "keywords": ["flush", "write", "保存"]
     },
     {
+      "id": "file.refresh",
+      "title": "Refresh from Disk",
+      "section": "File",
+      "enabledWhen": "vaultReady",
+      "keywords": ["reload", "refresh", "disk", "刷新", "磁盘"]
+    },
+    {
       "id": "nav.quickOpen",
       "title": "Quick Open",
       "shortcut": "Mod+P",

@@ -74,6 +74,7 @@
       "allow": [{ "path": "**" }, { "path": "**/*" }]
     },
     "fs:allow-lstat",
+    "fs:allow-watch",
     {
       "identifier": "http:default",
       "allow": [

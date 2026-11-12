@@ -1,4 +1,4 @@
-import { ChevronDown, ChevronRight, FilePlus, FileText, Folder, FolderPlus } from 'lucide-react'
+import { ChevronDown, ChevronRight, FilePlus, FileText, Folder, FolderPlus, RefreshCw } from 'lucide-react'
 import { observer, raw, useService } from '@rabjs/react'
 import { useEffect, useMemo, useState, type DragEvent } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -9,6 +9,7 @@ import {
   buildTreeRootMenu,
   type ContextMenuEntry,
 } from '../../services/commands/context-menu'
+import { CommandService } from '../../services/commands/command.service'
 import { FolderService } from '../../services/vault/folder.service'
 import { folderNotesToShow, parentFolder, showFolder, showNoteInFolder } from '../../services/vault/reveal-note'
 import { FOLDER_FILTER_PREFIX, VaultService } from '../../services/vault/vault.service'
@@ -411,6 +412,7 @@ export const FolderTree = observer(function FolderTree() {
   const tabs = useService(TabsService)
   const noteList = useService(NoteListService)
   const layout = useService(LayoutService)
+  const commands = useService(CommandService)
   const [creating, setCreating] = useState(false)
   const [name, setName] = useState('')
   const [renaming, setRenaming] = useState('')
@@ -540,7 +542,19 @@ export const FolderTree = observer(function FolderTree() {
   }
 
   function openRootMenu(x: number, y: number) {
-    setMenu({ x, y, items: buildTreeRootMenu({ newFolder: () => setCreating(true) }) })
+    setMenu({
+      x,
+      y,
+      items: buildTreeRootMenu(
+        {
+          refresh: () => {
+            commands.execute('file.refresh')
+          },
+          newFolder: () => setCreating(true),
+        },
+        commands.commands,
+      ),
+    })
   }
 
   // Memoized: re-filtering 10k notes per keystroke is only paid when the
@@ -593,19 +607,34 @@ export const FolderTree = observer(function FolderTree() {
         onToggle={() => layout.toggleRailSection('notes')}
         testId="rail-group-notes"
         action={
-          <IconButton
-            icon={FolderPlus}
-            label={t('folders.newFolder')}
-            size="sm"
-            iconSize={14}
-            data-testid="new-folder"
-            onClick={() => {
-              // The ghost row renders in the group body; expand so it is visible.
-              layout.setRailSectionCollapsed('notes', false)
-              setName('')
-              setCreating(true)
-            }}
-          />
+          <>
+            <IconButton
+              icon={RefreshCw}
+              label={t('commands.file.refresh')}
+              size="sm"
+              iconSize={14}
+              className={vault.refreshing ? 'is-persistent is-refreshing' : 'is-persistent'}
+              data-testid="refresh-folders"
+              aria-busy={vault.refreshing}
+              disabled={vault.refreshing || vault.phase !== 'ready'}
+              onClick={() => {
+                commands.execute('file.refresh')
+              }}
+            />
+            <IconButton
+              icon={FolderPlus}
+              label={t('folders.newFolder')}
+              size="sm"
+              iconSize={14}
+              data-testid="new-folder"
+              onClick={() => {
+                // The ghost row renders in the group body; expand so it is visible.
+                layout.setRailSectionCollapsed('notes', false)
+                setName('')
+                setCreating(true)
+              }}
+            />
+          </>
         }
       />
       {!layout.railCollapsed.notes && (

@@ -21,6 +21,7 @@ const COMMANDS: AppCommand[] = [
   { id: 'list.deleteSelected', title: 'Delete Selected Notes…', section: 'List', enabledWhen: 'hasListSelection' },
   { id: 'list.retypeSelected', title: 'Change Type of Selected Notes…', section: 'List', enabledWhen: 'hasListSelection' },
   { id: 'file.newNote', title: 'New Note', shortcut: 'Mod+N', section: 'File', enabledWhen: 'vaultReady' },
+  { id: 'file.refresh', title: 'Refresh from Disk', section: 'File', enabledWhen: 'vaultReady' },
 ]
 
 function itemIds(entries: ContextMenuEntry[]): string[] {
@@ -336,11 +337,16 @@ describe('buildFolderNoteMenu', () => {
 })
 
 describe('buildTreeRootMenu', () => {
-  it('offers only a root-level new folder', () => {
+  it('offers refresh and a root-level new folder', () => {
+    const refresh = vi.fn()
     const newFolder = vi.fn()
-    const entries = buildTreeRootMenu({ newFolder })
-    expect(itemIds(entries)).toEqual(['new-folder'])
+    const entries = buildTreeRootMenu({ refresh, newFolder }, COMMANDS)
+    expect(itemIds(entries)).toEqual(['refresh', '|', 'new-folder'])
+    expect(item(entries, 'refresh').label).toBe(commandRef(COMMANDS, 'file.refresh').title)
+    expect(item(entries, 'refresh').shortcut).toBeNull()
+    item(entries, 'refresh').onSelect?.()
     item(entries, 'new-folder').onSelect?.()
+    expect(refresh).toHaveBeenCalledTimes(1)
     expect(newFolder).toHaveBeenCalledTimes(1)
   })
 })
