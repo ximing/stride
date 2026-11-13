@@ -134,7 +134,7 @@ export const RightPanel = observer(function RightPanel() {
   const layout = useService(LayoutService)
   return (
     <div className="panel-wrap" data-testid="right-panel">
-      <div className="panel-head" data-tauri-drag-region="deep">
+      <div className="panel-head">
         <span className="panel-title">{t(TAB_CHROME[layout.rightPanelTab].labelKey)}</span>
         {layout.rightPanelTab === 'properties' && <NoteActions />}
       </div>

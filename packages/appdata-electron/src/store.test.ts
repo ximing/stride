@@ -5,7 +5,7 @@ const homeDir = vi.hoisted(() => vi.fn(async () => '/home/test/'))
 
 
 
-// Minimal in-memory plugin-fs with POSIX paths. Directories exist only after
+// Minimal in-memory filesystem double with POSIX paths. Directories exist only after
 // mkdir; files live in a flat map keyed by absolute path.
 const plugin = vi.hoisted(() => {
   const files = new Map<string, string>()

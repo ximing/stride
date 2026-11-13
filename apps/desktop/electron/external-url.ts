@@ -14,7 +14,7 @@ function hasCredentials(url: URL): boolean {
   return url.username.length > 0 || url.password.length > 0
 }
 
-/** https anywhere, and http only on loopback. Matches the Tauri HTTP allow-list. */
+/** https anywhere, and http only on loopback. */
 export function isAllowedFetchUrl(value: string): boolean {
   const url = parsed(value)
   if (!url || hasCredentials(url)) return false

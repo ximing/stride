@@ -95,7 +95,7 @@ describe('UpdateService', () => {
     localStorage.removeItem(DISMISSED_UPDATE_KEY)
   })
 
-  it('stays idle outside Tauri when no driver exists', async () => {
+  it('stays idle without a desktop bridge when no driver exists', async () => {
     const updates = freshUpdates()
     await updates.check()
     expect(updates.phase).toBe('idle')

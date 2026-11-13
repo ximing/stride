@@ -88,7 +88,7 @@ export interface UpdateAutocheckOptions {
  * is read when the timer fires, so toggling it in Settings takes effect
  * immediately (and the next launch always obeys the saved value). No loading
  * UI, failures swallowed — UpdateService.check stays silent by design, and
- * outside Tauri it never leaves idle.
+ * without a desktop bridge it never leaves idle.
  */
 export function scheduleUpdateAutocheck(options?: UpdateAutocheckOptions): () => void {
   const delayMs = options?.delayMs ?? UPDATE_AUTOCHECK_DELAY_MS

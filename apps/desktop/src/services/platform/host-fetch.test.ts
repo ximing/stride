@@ -6,7 +6,7 @@ describe('hostFetch', () => {
     vi.unstubAllGlobals()
   })
 
-  it('uses the page fetch outside Tauri', async () => {
+  it('uses the page fetch when there is no desktop bridge', async () => {
     const fetchMock = vi.fn(async () => new Response('ok', { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
     const result = await hostFetch('https://example.com/v1')

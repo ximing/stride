@@ -10,7 +10,7 @@ const exec = promisify(execFile)
 
 // Agent-facing contract, same shape as CSI:
 //   POST /command  {"action","args","session"}  ->  { success, data } | { success:false, error, code? }
-// The Tauri webview connects out (POST /bridge/poll) the way the CSI extension connects to its daemon.
+// The Electron renderer or the browser page connects out (POST /bridge/poll) the way the CSI extension connects to its daemon.
 // Bind is 127.0.0.1 only. Port: STRIDE_INSPECT_PORT or 14388.
 
 const TOOLS = ['snapshot', 'click', 'fill', 'evaluate', 'wait', 'screenshot', 'status'] as const

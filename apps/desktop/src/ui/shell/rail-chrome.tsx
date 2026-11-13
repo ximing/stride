@@ -75,7 +75,6 @@ export const VaultSwitcher = observer(function VaultSwitcher({ side = 'bottom' }
         sideOffset={4}
         collisionPadding={8}
         className="vault-switcher-menu"
-        data-tauri-drag-region="false"
         onOpenAutoFocus={(event) => event.preventDefault()}
       >
         <div className="vault-switcher-list" id="vault-switcher-options" role="listbox" aria-label={t('search.vaults')}>
@@ -200,7 +199,7 @@ export const RailSearchField = observer(function RailSearchField() {
 export const RailChrome = observer(function RailChrome() {
   const desktop = isDesktopRuntime()
   return (
-    <div className="rail-chrome" data-tauri-drag-region="deep">
+    <div className="rail-chrome">
       {desktop ? <WindowControls /> : null}
       <VaultSwitcher />
       <div className="rail-drag" />
@@ -216,7 +215,7 @@ export const RailMini = observer(function RailMini() {
   const { commands, degraded, title } = useSearchHint()
   const desktop = isDesktopRuntime()
   return (
-    <aside className="rail-mini" data-tauri-drag-region="deep">
+    <aside className="rail-mini">
       {desktop ? <WindowControls /> : null}
       <SidebarToggle />
       <span className="rail-search-slot">

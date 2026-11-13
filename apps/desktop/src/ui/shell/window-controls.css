@@ -82,8 +82,8 @@
   -webkit-app-region: drag;
 }
 
-/* Electron ignores data-tauri-drag-region. Interactive controls inside or beside
-   the drag strip must opt out or clicks never reach them. */
+/* Interactive controls inside or beside the drag strip must opt out or clicks
+   never reach them. */
 .rail-drag button,
 .rail-drag input,
 .rail-drag select,

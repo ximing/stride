@@ -1,4 +1,4 @@
-/** Startup or menu action for one BrowserWindow. `kind` matches the Tauri host. */
+/** Startup or menu action for one BrowserWindow. `kind` is the BrowserWindow intent. */
 export type WindowIntent =
   | { kind: 'restore' }
   | { kind: 'fresh' }
@@ -16,7 +16,7 @@ export interface RecentProject {
 
 /**
  * File menu labels supplied by the renderer.
- * Field names match `sync_recent_projects` on the Tauri host.
+ * Field names are the recent-project contract.
  */
 export interface MenuCopy {
   file: string

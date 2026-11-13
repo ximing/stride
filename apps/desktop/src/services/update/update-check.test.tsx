@@ -93,7 +93,7 @@ describe('parseStaticUpdateManifest', () => {
     })
   })
 
-  it('parses the tauri static latest.json shape', () => {
+  it('parses the legacy static latest.json shape', () => {
     const offer = parseStaticUpdateManifest(
       { version: '0.2.0', notes: 'release notes', pub_date: '2026-10-16', platforms: {} },
       '0.1.0',

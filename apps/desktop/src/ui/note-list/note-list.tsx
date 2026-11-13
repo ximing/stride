@@ -137,7 +137,7 @@ export const ListFilterInput = observer(function ListFilterInput({
   const { t: translate } = useTranslation()
   const listFilter = useService(ListFilterService)
   return (
-    <div className="list-filter" id="note-list-filter" data-tauri-drag-region="false">
+    <div className="list-filter" id="note-list-filter">
       <Mark icon={Search} size={14} />
       <Input
         ref={inputRef}
@@ -718,7 +718,7 @@ export const NoteList = observer(function NoteList() {
         }
       }}
     >
-      <header className="note-list-head" data-tauri-drag-region="deep">
+      <header className="note-list-head">
         <h2 className="note-list-title" data-testid="note-list-title">{title}</h2>
         <span className="note-list-count" data-testid="note-list-count">{notes.length}</span>
         <IconButton

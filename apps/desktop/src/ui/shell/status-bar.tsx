@@ -168,7 +168,7 @@ export const StatusBar = observer(function StatusBar() {
   const settingsPage = useService(SettingsPageService)
   const updateCheck = useService(UpdateCheckService)
   return (
-    <footer className="statusbar" data-testid="statusbar" data-tauri-drag-region="deep">
+    <footer className="statusbar" data-testid="statusbar">
       <VaultSwitcher side="top" />
       {git.branch ? (
         <span className="statusbar-item" data-testid="statusbar-branch">
@@ -201,7 +201,7 @@ export const StatusBar = observer(function StatusBar() {
           {indexStatusLabel(vault.indexPhase, vault.indexWork, vault.indexDone, vault.indexTotal)}
         </span>
       )}
-      <span className="statusbar-spacer" data-tauri-drag-region />
+      <span className="statusbar-spacer" />
       {updateCheck.supported ? (
         <Tip content={translate('shell.checkUpdates')}>
         <Button

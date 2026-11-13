@@ -1,9 +1,10 @@
 // Polished update banner (T8.2, FEATURES 7.3). Renders the UpdateService state
 // machine (services/update/update.service.ts): available → version + release notes +
 // download, downloading → background progress bar, ready → restart, error →
-// retry. `checking` stays silent, and outside Tauri the service never leaves
-// `idle`, so the banner simply never mounts in plain-browser dev. Release
-// notes render as plain-text lines on purpose — no markdown dependency.
+// retry. `checking` stays silent, and without a desktop bridge the service
+// never leaves `idle`, so the banner simply never mounts in plain-browser
+// dev. Release notes render as plain-text lines on purpose — no markdown
+// dependency.
 
 import { observer, useService } from '@rabjs/react'
 import { CircleArrowUp, CircleAlert, Download, RefreshCw, X } from 'lucide-react'
@@ -37,7 +38,7 @@ export const UpdateBanner = observer(function UpdateBanner() {
     setSnoozed(false)
   }, [phase, version])
 
-  // checking stays quiet; idle covers "nothing offered" and non-Tauri dev.
+  // checking stays quiet; idle covers "nothing offered" and no desktop bridge.
   if (phase === 'idle' || phase === 'checking') return null
   if (phase === 'ready' && snoozed) return null
 

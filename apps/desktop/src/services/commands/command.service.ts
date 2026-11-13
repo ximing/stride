@@ -114,7 +114,7 @@ export class CommandService extends Service {
     if (event.repeat || event.defaultPrevented) return false
     const command = commandForKeyEvent(this.commands, event)
     if (!command || !this.isRunnable(command)) return false
-    // See DESKTOP_DISABLED_SHORTCUTS: the OS/Tauri menu owns these chords on desktop.
+    // See DESKTOP_DISABLED_SHORTCUTS: the desktop app menu owns these chords.
     if (DESKTOP_DISABLED_SHORTCUTS.has(command.id) && isDesktopRuntime()) return false
     event.preventDefault()
     event.stopPropagation()

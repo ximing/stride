@@ -35,7 +35,7 @@ export const TabStrip = observer(function TabStrip() {
   // vault array (and register a reaction key per visited note) once per tab.
   const titleById = new Map(raw(vault.notes).map((item) => [item.id, item.title]))
   return (
-    <div className="tab-strip" data-testid="tab-strip" role="tablist" aria-label={t('shell.openNotes')} data-tauri-drag-region="deep">
+    <div className="tab-strip" data-testid="tab-strip" role="tablist" aria-label={t('shell.openNotes')}>
       <div className="tabs-scroll">
         {tabs.tabs.map((tab) => {
           const title = titleById.get(tab.noteId) || t('notes.untitled')

@@ -16,8 +16,8 @@ import { Mark } from '../../primitives/icon'
 import { Input } from '../../primitives/input'
 import './updates.css'
 
-// Empty means the channel default feed. Anything else must be a real http(s)
-// URL: either a tauri static latest.json or a GitHub release API URL.
+// Empty means the channel default feed. Anything else must be any http(s)
+// URL, including a static latest.json or a GitHub release API URL.
 function releasesUrlInvalid(text: string): boolean {
   const trimmed = text.trim()
   if (trimmed === '') return false

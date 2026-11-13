@@ -43,7 +43,7 @@ const Chooser = observer(function Chooser() {
   return (
     <section className="chooser" data-testid="vault-surface">
       {desktop ? (
-        <div className="chooser-window" data-tauri-drag-region="deep">
+        <div className="chooser-window">
           <WindowControls />
           <div className="rail-drag" />
         </div>

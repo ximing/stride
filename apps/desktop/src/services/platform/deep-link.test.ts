@@ -85,7 +85,7 @@ describe('startDeepLinkListener', () => {
     vi.restoreAllMocks()
   })
 
-  it('is a graceful no-op outside Tauri (no api injected)', async () => {
+  it('is a graceful no-op without a desktop bridge (no api injected)', async () => {
     const error = vi.fn()
     const dispose = startDeepLinkListener({ onError: error })
     await flush()
