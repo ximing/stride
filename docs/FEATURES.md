@@ -3,7 +3,7 @@
 > 复刻 [tolaria](https://github.com/refactoringhq/tolaria)（local-first / git-first / AI-first 知识库），
 > 四处关键差异：① 本地产物为 **TipTap 富文本 JSON**（非 Markdown）；② 搜索用 **vane**（默认 BM25，可选 embedding hybrid）；③ Agent 框架用 **pi-agent-core + pi-ai**（BYOK）；④ 自动升级同 tolaria（GitHub Release 后台下载 + 提示）。
 >
-> 技术栈：React 19 + TS + Vite + `@rabjs/react`（Service 响应式状态管理）+ pnpm workspace + Tauri 2。
+> 技术栈：React 19 + TS + Vite + `@rabjs/react`（Service 响应式状态管理）+ pnpm workspace + Electron。主进程在 `apps/desktop/electron/`；渲染进程适配器（`packages/fs-electron`、`git-electron`、`shell-electron`、`secrets-electron`、`appdata-electron`）经 `packages/electron-api` IPC 调用，不引入 `node:fs` / `node:child_process`。`pnpm dev` 是浏览器，`pnpm electron:dev` 是桌面应用。
 >
 > 来源：对 tolaria / inwit / vane / stride 现状的调研（2026-10-13）。
 
@@ -21,12 +21,12 @@
 
 | # | 功能 | 说明 | 优先级 |
 |---|---|---|---|
-| 1.1 | 打开 vault | 系统目录选择器（Tauri dialog）/ 浏览器 File System Access API 选目录 | P0 |
+| 1.1 | 打开 vault | Electron 主进程目录对话框（`dialog:pickDirectory`）；浏览器 `showDirectoryPicker` | P0 |
 | 1.2 | 新建 vault | 指定目录初始化：写 `.stride/vault.json` 标记 + 种子类型文档 | P0 |
-| 1.3 | 多 vault 注册表 | 浏览器：localStorage `stride:vaults`（id/label/color/icon/lastOpened）+ IndexedDB 目录句柄；Tauri：同一份元数据，label 为目录路径。启动恢复上次 vault。没有应用数据目录，所以浏览器侧不写 `vaults.json` 文件 | P1 |
+| 1.3 | 多 vault 注册表 | 两端都用 localStorage 键 `stride:vaults`。浏览器另把目录句柄放在 IndexedDB。Electron `userData` 存窗口状态、最近项目和 seal key。vault 列表不是 `vaults.json`。启动恢复上次 vault | P1 |
 | 1.4 | vault 切换器 | 状态栏/侧边栏切换 | P1 |
 | 1.5 | Onboarding 欢迎页 | 三选一：新建空 vault / 打开已有文件夹 / 克隆示例库 | P1 |
-| 1.6 | 文件监听 | 外部改动自动 reload（Tauri notify；浏览器模式下手动刷新按钮） | P2 |
+| 1.6 | 文件监听 | Electron 主进程用 chokidar（`fs:watch`）监听外部改动并 reload；浏览器不监听，手动刷新 | P2 |
 | 1.7 | 文件夹树 | 侧边栏目录树：内联新建/重命名/删除/拖拽移动笔记 | P1 |
 
 ## 2. 笔记模型与关系图谱
@@ -126,7 +126,7 @@
 | # | 功能 | 说明 | 优先级 |
 |---|---|---|---|
 | 8.1 | 四栏布局 | Sidebar(类型/视图/文件夹) ｜ NoteList ｜ Editor ｜ RightPanel(属性/反链/TOC/Git/Chat 互斥切换) + 底部 StatusBar；各栏可拖拽调宽、可折叠 | P0 |
-| 8.2 | 设计系统 | CSS 变量主题 + 组件库（按钮/输入/菜单/弹层/Tooltip/Toast/Modal），Phosphor 图标，light/dark/system 主题 | P0 |
+| 8.2 | 设计系统 | CSS 变量主题 + 组件库（按钮/输入/菜单/弹层/Tooltip/Toast/Modal），lucide-react 图标，light/dark/system 主题 | P0 |
 | 8.3 | 命令面板 | Cmd+K：命令 + 笔记跳转 + AI 模式；命令清单单一来源（`appCommandManifest.json` 模式） | P1 |
 | 8.4 | 快捷键体系 | Cmd+N 新建 / Cmd+S 保存 / Cmd+P 快速打开 / Cmd+F 查找 / Cmd+Shift+F 全库搜索 / Cmd+[/] 历史导航 / Cmd+1-9 切 tab | P1 |
 | 8.5 | 多 tab | 笔记多 tab 打开 + 导航历史（前进/后退） | P1 |
@@ -141,7 +141,7 @@
 | # | 功能 | 说明 | 优先级 |
 |---|---|---|---|
 | 9.1 | 分区设置页 | 外观 / 编辑器 / AI(LLM) / Embedding / Git / 更新 / 隐私 / 快捷键 | P0 |
-| 9.2 | 密钥安全存储 | LLM/embedding key 加密存储（Tauri keychain 插件 或 AES seal），掩码回显 `••••xxxx` | P0 |
+| 9.2 | 密钥安全存储 | Electron 用 safeStorage/keychain 保存 AES seal key（`packages/secrets-electron`）；浏览器用存储里的 AES seal（`packages/secrets-web`）。掩码回显 `••••xxxx`。密钥不写入 Vault | P0 |
 | 9.3 | 外观设置 | 主题 light/dark/system、笔记宽度、字体大小 | P1 |
 | 9.4 | AI 设置 | 多 provider 配置管理、默认模型、权限模式默认值 | P0 |
 | 9.5 | Embedding 设置 | endpoint/model/key/dim；测试连接按钮；降级状态显示 | P1 |
@@ -153,9 +153,9 @@
 
 | # | 功能 | 说明 | 优先级 |
 |---|---|---|---|
-| 10.1 | **FS 适配层** | `FileSystemBackend` 接口（read/write/list/mkdir/rename/delete/watch）：Tauri 实现（plugin-fs）+ Chrome 实现（File System Access API，目录句柄存 IndexedDB 持久授权） | P0 |
+| 10.1 | **FS 适配层** | `FileSystemBackend`（read/write/list/mkdir/rename/delete/watch）：`packages/fs-electron` 经 IPC 调主进程；浏览器 `packages/fs-web` 用 File System Access API，目录句柄存 IndexedDB。渲染进程适配器不引入 `node:fs` | P0 |
 | 10.2 | **Chrome 全功能调试** | `pnpm dev` 纯浏览器跑起完整应用（vault 选目录 → 编辑/搜索/agent 全可用），配合 `/csi` 让 AI 直接操控调试 | P0 |
-| 10.3 | Git 适配层 | Tauri 实现（plugin-shell 调系统 git）；Chrome 实现：isomorphic-git + LightningFS（或显式降级为 "Git 不可用"） | P1 |
+| 10.3 | Git 适配层 | `packages/git-electron` 的 `ShellGitBackend` 经 `execGit` IPC 调系统 git；`packages/git-web` 的 `browserGitBackend()` 返回 `unavailableGit()`。没有 isomorphic-git | P1 |
 | 10.4 | 搜索适配层 | vane WASM（`@vane-rs/web`，浏览器/ webview 通用）；embedding 走 HTTP | P0 |
 | 10.5 | inspect daemon | 现有 agent 调试通道（snapshot/click/fill/evaluate/screenshot），保留并适配 Chrome | P1 |
 | 10.6 | e2e | Playwright 浏览器模式 e2e（核心流：开库→建笔记→搜索→agent→git） | P1 |
@@ -165,7 +165,7 @@
 
 | # | 功能 | 说明 | 优先级 |
 |---|---|---|---|
-| 11.1 | Tauri 打包自洽 | 打包后无外部 Node 依赖：业务逻辑全部跑在 webview（FS/Git/搜索走适配层） | P0 |
+| 11.1 | Electron 打包 | electron-builder（`pnpm electron:build`，配置 `apps/desktop/electron-builder.yml`）。业务逻辑在渲染进程；Node I/O 只在主进程 `apps/desktop/electron/`，渲染进程适配器只发 IPC | P0 |
 | 11.2 | 应用图标/元信息 | bundle 配置、deep link `stride://` | P1 |
 | 11.3 | macOS 签名公证 | 发布流水线签名 + notarize | P2 |
 | 11.4 | Windows/Linux 打包 | vane-wasm 方案天然跨平台（CLI sidecar 不支持 Windows 的问题被规避） | P2 |

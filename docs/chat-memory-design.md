@@ -319,12 +319,12 @@ export async function runAgentLoop(input: {
 index.json 是 read-modify-write，存在两类并发风险：
 
 1. **同渲染进程内**：聊天轮中 Agent 调 `memory_write` 与后台蒸馏/梳理在 await 点交错即丢更新。
-2. **跨 tab / 跨窗口**：浏览器多 tab 或 Tauri 多窗口指向同一 vault，内存锁失效。
+2. **跨 tab / 跨窗口**：浏览器多 tab 或 Electron `BrowserWindow` 多窗口指向同一 vault，内存锁失效。
 
 措施：
 
 - `chatMemoryHost` 内建**串行写队列**：所有 memory 写操作（Agent 工具、蒸馏、梳理）进同一 Promise 链，写前重读 index 再合并，杜绝同进程交错；
-- Web 端加 **Web Locks API**（`navigator.locks`，按 `stride-memory-<scope>` 命名）兜底跨 tab；桌面端 Tauri 多窗口场景声明为首版已知限制（窗口少、操作稀疏），靠 curation 兜底修复；
+- Web 端加 **Web Locks API**（`navigator.locks`，按 `stride-memory-<scope>` 命名）兜底跨 tab；桌面端 Electron `BrowserWindow` 多窗口写同一 vault 记忆没有跨进程锁，声明为首版已知限制（窗口少、操作稀疏），靠 curation 兜底修复；
 - 残余的 last-writer-wins 风险在 §6.3 由 curation 的合并规则兜底。
 
 ## 6. 记忆蒸馏与梳理（模块 D）
@@ -430,7 +430,7 @@ interface AgentSettings {
 
 | 里程碑 | 内容 | 依赖 |
 |---|---|---|
-| M1 | `AppDataStore` 端口 + tauri（纯 JS/plugin-fs）/web（IDB）适配器 + 内存替身 | — |
+| M1 | `AppDataStore` 端口 + `appdata-electron`（IPC 文件）与 `appdata-web`（IndexedDB）适配器 + 内存替身 | — |
 | M2 | `runAgentLoop` history/transcript/error 改造 + 会话文件 schema（core，含去 system 约定） | — |
 | M3 | ChatService 持久化 + 多轮 + 关闭/终止/删除/召回；面板头部重构与工具折叠（A） | M1、M2 |
 | M4 | 记忆存储层 + 写队列/Web Locks + index 注入 + `memory_*` 工具 + `VAULT_MEMORY_PROMPT` | M1 |
@@ -444,4 +444,4 @@ interface AgentSettings {
 - 记忆的向量检索：当前索引注入 + `memory_read` 足够；条目规模超阈值后再评估接入 `search-web`。
 - 跨设备同步：`.stride` 目录不进 git；将来可经独立同步通道处理。
 - 记忆的手动编辑 UI：首版只读（History 面板可看条数），编辑交给 Agent 工具。
-- Tauri 多窗口写同一 vault 记忆的跨进程锁：首版已知限制（§5.6）。
+- Electron `BrowserWindow` 多窗口写同一 vault 记忆没有跨进程锁：首版已知限制（§5.6）。

@@ -17,8 +17,9 @@ paths:
 
 ## Electron 端适配器（`*-electron`）
 
-- 文件系统、Git 与 Shell 通过 Electron 主进程 IPC 执行。Node I/O 只放在主进程。Shell 只放行 `bash`、`zsh`、`sh`，由适配器在仓库根目录执行。
-- 严格校验并规范化路径，防止目录穿越；`git init` 等写操作必须遵守 `@stride/core` 的安全根目录限制（禁止在 Home / Desktop 等宽泛目录初始化）。
+- 文件系统、Git 与 Shell 由 `packages/*-electron` 经 IPC 调用 Electron 主进程。这些包是 IPC 客户端，不引入 `node:fs` 或 `node:child_process`。Node I/O 只在主进程 `apps/desktop/electron/`。
+- Shell 只放行 `bash`、`zsh`、`sh`。`cwd` 是调用方传入的绝对目录（`apps/desktop/electron/shell.ts` 的 `checkCwd`），通常是 vault 根，不是写死的仓库根。
+- 严格校验并规范化路径，防止目录穿越。禁止在 Home / Desktop 等宽泛目录 `git init` 的检查留在 `@stride/core` 的 `isBroadPersonalRoot`（在 `GitBackend.init` 之前调用），不放进适配器。
 
 ## 浏览器端适配器（`*-web`）
 

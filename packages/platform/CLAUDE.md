@@ -13,7 +13,7 @@
 - `shell.ts`：`ShellBackend`、`unavailableShell` 与 `MemoryShell`
 - `error.ts`：跨平台统一错误类型与错误码
 
-同级的适配器包（`packages/fs-electron`、`fs-web`、`git-electron`、`git-web`、`shell-electron`、`shell-web`、`search-web`、`secrets-electron`、`secrets-web`）均以本包的接口为唯一契约。Node I/O 只出现在 Electron 主进程适配器，不出现在本包。
+同级的适配器包（`packages/fs-electron`、`fs-web`、`git-electron`、`git-web`、`shell-electron`、`shell-web`、`search-web`、`secrets-electron`、`secrets-web`）均以本包的接口为唯一契约。Node I/O 只在 Electron 主进程（`apps/desktop/electron/`）；`packages/*-electron` 只通过 IPC 实现端口。本包与这些适配器包都不做 Node I/O。
 
 ## 放置约束
 

@@ -6,18 +6,18 @@
 
 ## 关键架构决策（开发前确认）
 
-**AD-1：业务逻辑全部跑在 webview，废弃 Node server 路线。**
-现状是"前端 → HTTP → Node server(1421)"，导致 Tauri 打包后没有后端。改为：
-- `packages/core` 浏览器化：所有 `node:fs`/`child_process` 依赖抽象为端口（`FileSystemBackend` / `GitBackend` / `SearchBackend` / `SecretsStore`），core 只依赖接口。
-- Tauri 环境：TauriFS（plugin-fs）+ ShellGit（plugin-shell 调系统 git）+ KeychainSecrets。
-- Chrome 环境：BrowserFS（File System Access API + IndexedDB 句柄持久化）+ IsoGit（isomorphic-git，或降级禁用）+ LocalSecrets（AES seal）。
+**AD-1：业务逻辑跑在渲染进程或浏览器，不走 Node server。当前桌面宿主是 Electron。**
+2026-10 的实现先在 Tauri 上交付，该宿主已替换。
+- `packages/core` 只依赖端口（`FileSystemBackend` / `GitBackend` / `SearchBackend` / `SecretsStore`），不引入 `node:fs` 或 `node:child_process`。
+- Electron：`packages/fs-electron`、`git-electron`（`ShellGitBackend` 经 `execGit` IPC 调系统 git）、`shell-electron`、`secrets-electron`（safeStorage/keychain 保存 AES seal key）、`appdata-electron` 经 `packages/electron-api` 调主进程 `apps/desktop/electron/`。这些包是 IPC 客户端。桌面检测是 `window.__STRIDE_ELECTRON__`。开发入口 `pnpm electron:dev`，打包 `pnpm electron:build`。
+- 浏览器：`packages/fs-web`（File System Access API + IndexedDB 句柄）、`packages/git-web` 的 `browserGitBackend()` 返回 `unavailableGit()`（没有 isomorphic-git）、`packages/secrets-web`（存储里的 AES seal）。开发入口 `pnpm dev`。
 - 搜索统一走 **vane WASM（`@vane-rs/web`）**：BM25 不需要任何外部服务；embedding 是前端直连 OpenAI 兼容 HTTP 接口。规避了 vane CLI 不支持 Windows 的问题，也没有 sidecar 生命周期管理。
-- 现有 `server/desk.ts` 的逻辑（git/updater/agent 编排细节）迁移进 core，server 目录退役。
-- LLM 调用直连：webview → provider HTTPS（CORS 由 Tauri webview 自定义协议规避；Chrome dev 用 vite proxy 规避）。
+- 旧 Node server 路线已退役。
+- LLM：桌面应用经 Electron 宿主 fetch；浏览器走页面 fetch；Chrome dev 用 vite proxy。
 
 **AD-2：升级用 electron-updater，发布 GitHub Releases 上的平台 metadata**（`latest-mac.yml`、`latest-linux.yml`、`latest.yml`）。
 
-**AD-3：UI 不引入重型组件库**，CSS 变量 + 少量 Radix 原语 + Phosphor 图标，参考 tolaria 的 Bear 风四栏。
+**AD-3：UI 不引入重型组件库**，CSS 变量 + 少量 Radix 原语 + lucide-react 图标，参考 tolaria 的 Bear 风四栏。
 
 ---
 
@@ -28,20 +28,20 @@
 | T0.1 ✅ 2026-10-13 | 定义端口接口：`FileSystemBackend`（read/write/list/mkdir/rename/delete/stat/watch）、`GitBackend`、`SearchBackend`、`SecretsStore`、`UpdaterBackend` | — | 接口 + 类型包 `@stride/platform` 建立 |
 | T0.2 ✅ 2026-10-13 | core 浏览器化改造：note/vault/graph/git/settings/agent/updater 全部改为依赖注入端口，移除 `node:*` 顶层引用。临时包 `@stride/platform-node` 只给遗留 `server/` 注入，T8.5 随 server 删除 | T0.1 | `vitest`（jsdom 环境）全绿；`vite build` 不引入 node polyfill |
 | T0.3 ✅ 2026-10-13 | BrowserFS：File System Access API 实现；目录句柄存 IndexedDB，启动时恢复授权（`queryPermission/requestPermission`）；不支持时优雅提示 | T0.1 | Chrome 中选目录后能列出/读写文件 |
-| T0.4 ✅ 2026-10-13 | TauriFS：plugin-fs 实现同一接口 | T0.1 | `pnpm tauri dev` 中读写 vault 正常 |
+| T0.4 ✅ 2026-10-13 | 当时验收桌面 FS 适配同一接口（plugin-fs，宿主已替换）。现行：`packages/fs-electron` 经 IPC 调主进程 | T0.1 | 当时读写 vault 通过。现行入口 `pnpm electron:dev` |
 | T0.5 ✅ 2026-10-13 | SearchBackend：接入 `@vane-rs/web`（WASM + OPFS/IDB 持久化），upsert/search/close；BM25-only 跑通 | T0.1 | 浏览器中建索引 + 搜索返回 snippet |
-| T0.6 ✅ 2026-10-13 | GitBackend：Tauri shell 实现（init/status/diff/commit/pull/push/remote/clone/resolve，迁移现有 `git.ts` 逻辑）；Browser 降级实现（git UI 显示不可用） | T0.1 | Tauri 下 git 全套单测通过（mock shell） |
-| T0.7 ✅ 2026-10-13 | SecretsStore：Tauri keychain + 浏览器 AES seal（修复硬编码密钥问题：用机器随机密钥存 keychain/IDB） | T0.1 | key 写入/读取/掩码回显 |
+| T0.6 ✅ 2026-10-13 | 当时验收桌面 GitBackend 调系统 git（init/status/diff/commit/pull/push/remote/clone/resolve），浏览器降级为 Git 不可用（宿主已替换）。现行：`packages/git-electron` 的 `ShellGitBackend` 经 `execGit` IPC；`packages/git-web` 返回 `unavailableGit()` | T0.1 | 当时桌面端 git 单测通过。现行包是 `git-electron` |
+| T0.7 ✅ 2026-10-13 | 当时验收桌面 keychain + 浏览器 AES seal（Tauri keychain，宿主已替换）。现行：`packages/secrets-electron` 用 safeStorage/keychain 保存 AES seal key；`packages/secrets-web` 在存储里做 AES seal。掩码 `••••xxxx` | T0.1 | key 写入/读取/掩码回显 |
 | T0.8 ✅ 2026-10-13 | Chrome dev 全链路：`pnpm dev` 纯浏览器跑通 打开vault→新建笔记→编辑保存→BM25 搜索 | T0.2-0.6 | 手工走查 + `/csi` 驱动验证 |
-| T0.9 ✅ 2026-10-13 | 设计系统基座：CSS 变量（light/dark）、基础组件（Button/Input/Menu/Modal/Tooltip/Toast/Popover）、Phosphor 图标、四栏布局骨架 | — | Storybook 或 `/dev/components` 预览页 |
+| T0.9 ✅ 2026-10-13 | 设计系统基座：CSS 变量（light/dark）、基础组件（Button/Input/Menu/Modal/Tooltip/Toast/Popover）、四栏布局骨架。当时图标是 Phosphor，已替换为 lucide-react | — | Storybook 或 `/dev/components` 预览页 |
 | T0.10 ✅ 2026-10-13 | inspect daemon 适配 Chrome（保留现有实现，确认在浏览器模式可用）+ Playwright 浏览器 e2e 骨架 | T0.8 | 一条 e2e：开库→建笔记→断言无 console error |
 
 ## Phase 1 — Vault 与笔记模型
 
 | ID | 任务 | 依赖 | 验收 |
 |---|---|---|---|
-| T1.1 ✅ 2026-10-13 | Vault 打开/新建流程：系统目录选择器（Tauri dialog / Browser showDirectoryPicker）、`.stride/vault.json` 标记、种子类型文档 | T0.3/0.4 | 新建 vault 后侧边栏出现默认类型 |
-| T1.2 ✅ 2026-10-13 | vault 注册表（浏览器 localStorage `stride:vaults` + IndexedDB 句柄；Tauri 用目录路径作 label）+ 启动恢复上次 vault + 状态栏切换器 | T1.1 | 重启恢复现场 |
+| T1.1 ✅ 2026-10-13 | Vault 打开/新建：当时系统目录选择器（Tauri dialog，宿主已替换）与浏览器 `showDirectoryPicker`。现行 Electron 用主进程 `dialog:pickDirectory`。`.stride/vault.json` 标记与种子类型文档仍在 | T0.3/0.4 | 新建 vault 后侧边栏出现默认类型 |
+| T1.2 ✅ 2026-10-13 | vault 注册表：当时 Tauri 用目录路径作 label（宿主已替换）。现行两端都用 localStorage `stride:vaults`；浏览器另存 IndexedDB 句柄；Electron `userData` 存窗口状态、最近项目和 seal key。不是 `vaults.json`。启动恢复上次 vault + 状态栏切换器 | T1.1 | 重启恢复现场 |
 | T1.3 ✅ 2026-10-13 | Onboarding 欢迎页（新建/打开/克隆示例三选一） | T1.1 | 首次启动进入欢迎页 |
 | T1.4 ✅ 2026-10-13 | 笔记模型完善：H1 即标题、写 H1 自动重命名文件（可关）、`untitled-*` 命名 | T0.2 | 单测 + UI 验证 |
 | T1.5 ✅ 2026-10-13 | Type 系统 UI：侧边栏类型分组（icon/color/折叠/可见性）、类型文档 Instances 列表、新建笔记应用 template | T1.4 | 建类型 → 建实例 → 分组正确 |
@@ -133,7 +133,7 @@
 
 | ID | 任务 | 依赖 | 验收 |
 |---|---|---|---|
-| T8.1 ✅ 2026-10-16 | 接入 tauri-plugin-updater：latest.json endpoint + minisign 签名密钥 | T0.4 | 本地模拟更新检查通过 |
+| T8.1 ✅ 2026-10-16 | 当时接入 tauri-plugin-updater（latest.json + minisign，已替换）。现行：electron-updater，发布 `latest-mac.yml` / `latest-linux.yml` / `latest.yml`。自定义 http(s) URL 仍可指向静态 manifest | T0.4 | 当时本地模拟更新检查通过。现行检查走 electron-updater |
 | T8.2 ✅ 2026-10-16 | UpdateBanner：release notes + 后台下载进度 + 重启按钮（复用现有 UI 改造） | T8.1 | 全流程演示环境验证 |
 | T8.3 ✅ 2026-10-16 | 启动自动检查 + 手动检查入口 + 通道设置 | T8.1 | 开关生效 |
 | T8.4 ✅ 2026-10-16 | GitHub Actions 发布流水线：macOS arm64/x64 + Linux x64 + Windows x64 构建、签名、生成 latest.json 发 Release | T8.1 | tag 触发自动发版 |
@@ -151,7 +151,7 @@
 | T9.4 | 图谱视图（可选增量） | T9.3 | 力导向图可交互 |
 | T9.5 | PDF 导出 / 数学公式 / 只读预览 | T2.11 | 按需 |
 | T9.6 | AI 模式命令面板 / AI workspace 弹出窗 | T4.5 | 按需 |
-| T9.7 | Windows/Linux 适配走查（TauriFS/GitBackend 路径处理） | T8.4 | 三平台冒烟 |
+| T9.7 | Windows/Linux 适配走查（`packages/fs-electron` 与 `packages/git-electron` 的路径处理；当时的 TauriFS / plugin-fs 已替换） | T8.4 | 三平台冒烟 |
 
 ---
 
