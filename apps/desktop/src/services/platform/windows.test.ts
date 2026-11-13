@@ -1,4 +1,3 @@
-import { clearMocks, mockIPC, mockWindows } from '@tauri-apps/api/mocks'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import {
   applyWindowIntent,
@@ -14,15 +13,37 @@ import {
   type WindowHost,
 } from './windows'
 
-const calls: { cmd: string; args?: Record<string, unknown> }[] = []
+const calls: { cmd: string; args?: unknown }[] = []
+const listeners = new Map<string, Set<(payload: unknown) => void>>()
 
-function installTauri(reply?: (cmd: string) => unknown) {
+function installDesktop(reply?: (cmd: string, args?: unknown) => unknown) {
   calls.length = 0
-  mockWindows('main')
-  mockIPC((cmd, args) => {
-    calls.push({ cmd, args: args as Record<string, unknown> | undefined })
-    return reply?.(cmd)
-  }, { shouldMockEvents: true })
+  listeners.clear()
+  ;(window as unknown as { __STRIDE_ELECTRON__?: unknown }).__STRIDE_ELECTRON__ = {
+    invoke(channel: string, args?: unknown) {
+      calls.push({ cmd: channel, args })
+      try {
+        return Promise.resolve(reply?.(channel, args))
+      } catch (error) {
+        return Promise.reject(error)
+      }
+    },
+    on(channel: string, listener: (payload: unknown) => void) {
+      let set = listeners.get(channel)
+      if (!set) {
+        set = new Set()
+        listeners.set(channel, set)
+      }
+      set.add(listener)
+      return () => {
+        set.delete(listener)
+      }
+    },
+  }
+}
+
+function emit(channel: string, payload: unknown) {
+  for (const listener of listeners.get(channel) ?? []) listener(payload)
 }
 
 function commands(name: string) {
@@ -30,8 +51,8 @@ function commands(name: string) {
 }
 
 function setBrowser() {
-  clearMocks()
-  delete (window as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__
+  delete (window as unknown as { __STRIDE_ELECTRON__?: unknown }).__STRIDE_ELECTRON__
+  listeners.clear()
 }
 
 function host(partial: Partial<WindowHost> = {}): WindowHost & { calls: string[] } {
@@ -79,35 +100,34 @@ describe('window intents', () => {
 
   it('prefers the query over the host intent and restores when the host payload is invalid', async () => {
     window.history.replaceState(null, '', '/?window=fresh')
-    installTauri(() => ({ kind: 'pick-open' }))
+    installDesktop(() => ({ kind: 'pick-open' }))
     await expect(readStartupIntent()).resolves.toEqual({ kind: 'fresh' })
-    expect(commands('window_intent')).toHaveLength(0)
+    expect(commands('window:intent')).toHaveLength(0)
 
     window.history.replaceState(null, '', '/')
-    installTauri((cmd) => (cmd === 'window_intent' ? { kind: 'open', path: '/Users/notes' } : null))
+    installDesktop((cmd) => (cmd === 'window:intent' ? { kind: 'open', path: '/Users/notes' } : null))
     await expect(readStartupIntent()).resolves.toEqual({ kind: 'open', path: '/Users/notes' })
 
-    installTauri(() => ({ kind: 'later' }))
+    installDesktop(() => ({ kind: 'later' }))
     await expect(readStartupIntent()).resolves.toEqual({ kind: 'restore' })
-    installTauri(() => { throw new Error('missing') })
+    installDesktop(() => { throw new Error('missing') })
     await expect(readStartupIntent()).resolves.toEqual({ kind: 'restore' })
   })
 
   it('applies an intent once and reports an empty window only when it stays a chooser', async () => {
-    installTauri()
+    installDesktop()
     const ready = host()
     ready.openVaultPath = vi.fn(async () => {
       ready.phase = 'ready'
     })
     await applyWindowIntent(ready, { kind: 'open', path: '/Users/notes' })
     expect(ready.openVaultPath).toHaveBeenCalledWith('/Users/notes')
-    expect(commands('window_set_project')).toHaveLength(0)
+    expect(commands('window:setProject')).toHaveLength(0)
 
     const fresh = host()
     await applyWindowIntent(fresh, { kind: 'fresh' })
     expect(fresh.calls).toEqual([])
-    await vi.waitFor(() => expect(commands('window_set_project')).toEqual([{ cmd: 'window_set_project', args: { path: null } }]))
-    expect(commands('plugin:window|set_title')[0]?.args).toMatchObject({ value: 'Stride' })
+    await vi.waitFor(() => expect(commands('window:setProject')).toEqual([{ cmd: 'window:setProject', args: { path: null } }]))
   })
 
   it('opens a browser window for a fresh chooser and asks the host on the desktop', async () => {
@@ -115,34 +135,33 @@ describe('window intents', () => {
     requestNewWindow()
     expect(open).toHaveBeenCalledWith(freshWindowUrl())
 
-    installTauri()
+    installDesktop()
     requestNewWindow()
     requestNewProject()
     requestOpenProject()
     await vi.waitFor(() => {
-      expect(commands('menu_new_window')).toHaveLength(1)
-      expect(commands('menu_new_project')).toHaveLength(1)
-      expect(commands('menu_open_project')).toHaveLength(1)
+      expect(commands('window:new')).toHaveLength(1)
+      expect(commands('window:newProject')).toHaveLength(1)
+      expect(commands('window:openProject')).toHaveLength(1)
     })
   })
 
-  it('titles an open project from the folder name', async () => {
-    installTauri()
+  it('reports an open project path so the host can title the window', async () => {
+    installDesktop()
     reportOpenProject('/Users/a/notes')
     await vi.waitFor(() => {
-      expect(commands('window_set_project')).toEqual([{ cmd: 'window_set_project', args: { path: '/Users/a/notes' } }])
-      expect(commands('plugin:window|set_title')[0]?.args).toMatchObject({ value: 'notes — Stride' })
+      expect(commands('window:setProject')).toEqual([{ cmd: 'window:setProject', args: { path: '/Users/a/notes' } }])
     })
   })
 
   it('delivers a later intent to the running window and replaces the recent list', async () => {
-    installTauri()
+    installDesktop()
     const vault = host()
     installDesktopWindowBridge(vault)
-    const { emit } = await import('@tauri-apps/api/event')
-    await emit('stride://window-intent', { kind: 'pick-create' })
+    await vi.waitFor(() => expect(listeners.get('window:intent')?.size).toBe(1))
+    emit('window:intent', { kind: 'pick-create' })
     await vi.waitFor(() => expect(vault.createNewVault).toHaveBeenCalled())
-    await emit('stride://recent-replaced', [
+    emit('window:recent', [
       { id: 'v1', path: '/Users/notes', title: 'notes', lastOpened: '2026-01-01T00:00:00.000Z' },
     ])
     expect(vault.replaceRecentProjects).toHaveBeenCalledWith([
@@ -153,12 +172,12 @@ describe('window intents', () => {
   it('does not publish menus from a memory fixture or a browser', () => {
     publishDesktopMenusFromStorage()
     expect(calls).toHaveLength(0)
-    installTauri()
+    installDesktop()
     window.history.replaceState(null, '', '/?fixture=memory')
     localStorage.setItem('stride:vaults', JSON.stringify([
       { id: 'v1', label: '/Users/notes', color: '', icon: '', lastOpened: '2026-01-01T00:00:00.000Z' },
     ]))
     publishDesktopMenusFromStorage()
-    expect(commands('sync_recent_projects')).toHaveLength(0)
+    expect(commands('window:syncRecent')).toHaveLength(0)
   })
 })

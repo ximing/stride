@@ -1,43 +1,51 @@
+import type { WindowStateSnapshot } from '@stride/electron-api'
 import { Minus, Plus, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
-import { isTauriRuntime } from '../../services/platform/deep-link'
+import { isDesktopRuntime } from '../../services/platform/runtime'
 import { Mark } from '../primitives/icon'
 import { Tip } from '../primitives/tooltip'
 
 type WindowAction = 'close' | 'minimize' | 'zoom'
 
+function isWindowState(value: unknown): value is WindowStateSnapshot {
+  if (!value || typeof value !== 'object') return false
+  const state = value as WindowStateSnapshot
+  return typeof state.maximized === 'boolean'
+    && typeof state.minimized === 'boolean'
+    && typeof state.fullscreen === 'boolean'
+}
+
 function runWindow(action: WindowAction) {
-  void import('@tauri-apps/api/window')
-    .then(({ getCurrentWindow }) => {
-      const win = getCurrentWindow()
-      if (action === 'close') return win.close()
-      if (action === 'minimize') return win.minimize()
-      return win.toggleMaximize()
-    })
+  const mapped = action === 'zoom' ? 'toggleMaximize' : action
+  void import('@stride/electron-api')
+    .then(({ electronBridge }) => electronBridge().invoke('window:control', { action: mapped }))
     .catch((error: unknown) => {
       console.error('[window]', error)
     })
 }
 
 /**
- * Marks a Tauri window and drops the corner radius when it fills the screen.
+ * Marks a desktop window and drops the corner radius when it fills the screen.
  * index.html sets `data-desktop` before the bundle so the plate is already
- * rounded; this only keeps the filled-window override in step.
+ * rounded; this keeps the filled-window override in step.
  * A maximized or fullscreen window must stay square, or the corners show the desktop.
  */
 export function bindDesktopWindowFrame(): void {
-  if (!isTauriRuntime()) return
-  if (document.documentElement.dataset.desktop === 'tauri') return
-  document.documentElement.dataset.desktop = 'tauri'
-  void import('@tauri-apps/api/window')
-    .then(async ({ getCurrentWindow }) => {
-      const win = getCurrentWindow()
-      const sync = async () => {
-        const fill = (await win.isFullscreen()) || (await win.isMaximized())
+  if (!isDesktopRuntime()) return
+  document.documentElement.dataset.desktop = 'electron'
+  void import('@stride/electron-api')
+    .then(({ electronBridge }) => {
+      const ipc = electronBridge()
+      const sync = (state: WindowStateSnapshot) => {
+        const fill = state.fullscreen || state.maximized
         document.documentElement.toggleAttribute('data-window-fill', fill)
       }
-      await sync()
-      await win.onResized(() => { void sync() })
+      ipc.on('window:state', (payload) => {
+        if (isWindowState(payload)) sync(payload)
+      })
+      return ipc.invoke('window:state').then((payload) => {
+        if (isWindowState(payload)) sync(payload)
+      })
     })
     .catch((error: unknown) => {
       console.error('[window]', error)
@@ -56,7 +64,7 @@ const CONTROLS: { action: WindowAction; label: 'window.close' | 'window.minimize
  */
 export function WindowControls() {
   const { t } = useTranslation()
-  if (!isTauriRuntime()) return null
+  if (!isDesktopRuntime()) return null
   return (
     <div className="window-controls" role="group" aria-label={t('window.controls')} data-testid="window-controls">
       {CONTROLS.map((control) => (

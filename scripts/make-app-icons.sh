@@ -13,7 +13,7 @@ set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
 src=${1:-"$root/logo.png"}
-icons="$root/apps/desktop/src-tauri/icons"
+icons="$root/apps/desktop/build"
 public="$root/apps/desktop/public"
 work=$(mktemp -d)
 trap 'rm -rf "$work"' EXIT
@@ -63,20 +63,15 @@ cp "$work/logo-dark.png" "$public/logo-dark.png"
 magick "$work/logo-light.png" -filter Lanczos -resize 64x64 -strip "PNG32:$public/favicon-light.png"
 magick "$work/logo-dark.png" -filter Lanczos -resize 64x64 -strip "PNG32:$public/favicon-dark.png"
 
-# Bundle sizes named the way tauri.conf.json expects them.
-# Tauri rejects icons that are not RGBA. PNG32 alone still quantizes a flat
-# 16px tile down to a palette, so color type 6 forces truecolor alpha.
+# electron-builder reads icon.icns, icon.ico, and icon.png from apps/desktop/build.
+# PNG32 alone still quantizes a flat tile down to a palette, so color type 6
+# forces truecolor alpha.
 dock_png() {
   local size=$1 out=$2
   magick "$work/dock.png" -filter Lanczos -resize "$size" -strip \
     -define png:color-type=6 "PNG32:$out"
 }
 
-dock_png 16x16 "$icons/16x16.png"
-dock_png 32x32 "$icons/32x32.png"
-dock_png 128x128 "$icons/128x128.png"
-dock_png 256x256 "$icons/128x128@2x.png"
-dock_png 256x256 "$icons/256x256.png"
 dock_png 1024x1024 "$icons/icon.png"
 
 iconset=$work/icon.iconset

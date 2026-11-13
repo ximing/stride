@@ -8,27 +8,16 @@ import { VAULT_REGISTRY_KEY, VaultService } from './vault.service'
 
 const homeMock = vi.hoisted(() => ({ value: '/Users/ximing' }))
 
-vi.mock('@stride/fs-tauri', () => ({
-  tauriHostPaths: () => ({
+vi.mock('@stride/fs-electron', () => ({
+  electronHostPaths: () => ({
     homeDirectory: async () => homeMock.value,
   }),
 }))
 
 function setDesktop(on: boolean) {
-  const win = window as unknown as {
-    __TAURI_INTERNALS__?: {
-      invoke: () => Promise<void>
-      metadata: { currentWindow: { label: string } }
-    }
-  }
-  if (on) {
-    win.__TAURI_INTERNALS__ = {
-      invoke: async () => undefined,
-      metadata: { currentWindow: { label: 'main' } },
-    }
-  } else {
-    delete win.__TAURI_INTERNALS__
-  }
+  const win = window as unknown as { __STRIDE_ELECTRON__?: Record<string, unknown> }
+  if (on) win.__STRIDE_ELECTRON__ = {}
+  else delete win.__STRIDE_ELECTRON__
 }
 
 function useMemoryFixture() {
@@ -67,7 +56,7 @@ describe('vault home directory', () => {
     expect(home).not.toBe('/Users/ximing')
   })
 
-  it('uses the desktop home from the Tauri adapter', async () => {
+  it('uses the desktop home from the Electron adapter', async () => {
     setDesktop(true)
     homeMock.value = '/Users/ximing'
     await expect(hostHomeDirectory()).resolves.toBe('/Users/ximing')

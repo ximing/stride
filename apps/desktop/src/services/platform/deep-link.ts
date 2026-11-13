@@ -1,9 +1,8 @@
-// T8.6: `stride://` deep link plumbing.
+// `stride://` deep link plumbing.
 //
-// Scope for this phase: register the scheme (Rust plugin + tauri.conf.json),
-// receive deep link events, log them and re-broadcast on the DOM so future
-// phases can react. Opening a specific vault from `stride://open?vault=...`
-// is deliberately left to Phase 9.
+// The desktop host registers the scheme and forwards each URL on `deep-link:open`.
+// This module parses it and re-broadcasts a DOM event. Opening a vault from
+// `stride://open?vault=...` stays a later phase.
 
 export const DEEP_LINK_SCHEME = 'stride'
 export const DEEP_LINK_EVENT = 'stride:deep-link'
@@ -38,14 +37,12 @@ export function describeDeepLink(link: DeepLink): string {
   return vault ? `deep link ${link.action} (vault=${vault})` : `deep link ${link.action}`
 }
 
-/** Minimal surface of the Tauri deep link plugin the listener needs. */
+/** Listener surface. Tests inject this; the desktop host adapts `deep-link:open` onto it. */
 export interface DeepLinkApi {
   onOpenUrl(handler: (urls: string[]) => void): Promise<() => void>
 }
 
-import { isTauriRuntime } from './runtime'
-
-export { isTauriRuntime }
+import { isDesktopRuntime } from './runtime'
 
 export interface DeepLinkListenerOptions {
   /** Injectable for tests. Returning null disables the listener. */
@@ -66,8 +63,7 @@ function defaultOnReceive(link: DeepLink): void {
 
 /**
  * Subscribe to `stride://` deep link events. In a plain browser (dev server,
- * vitest) this is a graceful no-op: the Tauri deep link plugin simply does not
- * exist there.
+ * vitest) this is a graceful no-op.
  *
  * Returns a disposer that unsubscribes (safe to call more than once).
  */
@@ -79,11 +75,17 @@ export function startDeepLinkListener(options: DeepLinkListenerOptions = {}): ()
   const resolveApi = (): Promise<DeepLinkApi | null> => {
     try {
       if (getApi) return Promise.resolve(getApi())
-      if (!isTauriRuntime()) return Promise.resolve(null)
-      // Lazy import keeps the plugin out of plain-browser bundles.
-      return import('@tauri-apps/plugin-deep-link').then(
-        ({ onOpenUrl }) => ({ onOpenUrl }) as DeepLinkApi,
-      )
+      if (!isDesktopRuntime()) return Promise.resolve(null)
+      return import('@stride/electron-api').then(({ electronBridge }) => ({
+        onOpenUrl(handler) {
+          const dispose = electronBridge().on('deep-link:open', (payload: unknown) => {
+            if (!payload || typeof payload !== 'object') return
+            const url = (payload as { url?: unknown }).url
+            if (typeof url === 'string') handler([url])
+          })
+          return Promise.resolve(dispose)
+        },
+      }))
     } catch (error) {
       return Promise.reject(error)
     }

@@ -6,8 +6,8 @@
 
 - `packages/core`：笔记、图谱、搜索编排、Git 状态、Agent 工具。纯 TypeScript，不碰宿主 API。
 - `packages/platform`：文件系统、Git、搜索、密钥、更新的端口与内存替身。
-- `packages/fs-*`、`git-*`、`search-web`、`secrets-*`、`appdata-*`：Tauri 与浏览器适配器。只实现端口，不写界面规则。
-- `apps/desktop`：React 工作台，同时是 Tauri 宿主和纯浏览器入口。更细的目录地图在 `apps/desktop/AGENTS.md`。
+- `packages/fs-*`、`git-*`、`search-web`、`secrets-*`、`appdata-*`：Electron 与浏览器适配器。只实现端口，不写界面规则。
+- `apps/desktop`：React 工作台，同时是 Electron 宿主和纯浏览器入口。主进程在 `apps/desktop/electron/`。更细的目录地图在 `apps/desktop/AGENTS.md`。
 
 ## 依赖方向
 

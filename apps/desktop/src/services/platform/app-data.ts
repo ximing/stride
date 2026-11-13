@@ -38,8 +38,8 @@ export function resolveAppDataStore(): Promise<AppDataResolution> {
 async function openAppDataStore(): Promise<AppDataResolution> {
   if (isMemoryFixture()) return { store: new MemoryAppDataStore(), persistent: false }
   if (isDesktopRuntime()) {
-    const { tauriAppDataStore } = await import('@stride/appdata-tauri')
-    return { store: await tauriAppDataStore(), persistent: true }
+    const { electronAppDataStore } = await import('@stride/appdata-electron')
+    return { store: await electronAppDataStore(), persistent: true }
   }
   const { webAppDataStore } = await import('@stride/appdata-web')
   return webAppDataStore()

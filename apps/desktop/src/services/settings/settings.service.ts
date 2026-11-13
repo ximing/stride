@@ -777,8 +777,8 @@ export class SettingsService extends Service {
     // A desktop WebView has IndexedDB too. The host chooses the store, not that API.
     try {
       if (isDesktopRuntime()) {
-        const { tauriSecretsStore } = await import('@stride/secrets-tauri')
-        return await tauriSecretsStore()
+        const { electronSecretsStore } = await import('@stride/secrets-electron')
+        return await electronSecretsStore()
       }
       if (typeof globalThis.indexedDB === 'undefined' || !globalThis.indexedDB) return null
       return await webSecretsStore()

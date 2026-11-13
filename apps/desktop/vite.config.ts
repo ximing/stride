@@ -51,6 +51,7 @@ function llmProxyPlugin(): Plugin {
 }
 
 export default defineConfig({
+  base: './',
   plugins: [react(), llmProxyPlugin()],
   // esbuild prebundling rewrites import.meta.url, so the vane worker 404s and vault open never finishes.
   optimizeDeps: {

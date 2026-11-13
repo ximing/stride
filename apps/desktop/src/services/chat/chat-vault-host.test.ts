@@ -26,7 +26,6 @@ vi.mock('../platform/runtime', async (importOriginal) => {
   return {
     ...actual,
     isDesktopRuntime: () => shellGate.desktop,
-    isTauriRuntime: () => shellGate.desktop,
   }
 })
 

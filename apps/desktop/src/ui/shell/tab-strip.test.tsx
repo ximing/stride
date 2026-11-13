@@ -29,7 +29,7 @@ describe('TabStrip close hint', () => {
     vault.notes = []
     vault.activeId = ''
     vault.activeVaultId = ''
-    delete (window as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__
+    delete (window as { __STRIDE_ELECTRON__?: unknown }).__STRIDE_ELECTRON__
   })
 
   async function renderStrip() {
@@ -67,7 +67,10 @@ describe('TabStrip close hint', () => {
   })
 
   it('omits the close chord on the desktop runtime', async () => {
-    ;(window as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ = {}
+    ;(window as { __STRIDE_ELECTRON__?: unknown }).__STRIDE_ELECTRON__ = {
+      invoke: () => Promise.resolve(undefined),
+      on: () => () => {},
+    }
     await renderStrip()
     const name = commandTitle('tab.close', 'Close tab')
     expect(closeLabel()).toBe(name)

@@ -6,7 +6,7 @@ Local-first notes. A folder is the vault. Each note is a TipTap document on disk
 pnpm install
 pnpm dev
 pnpm test
-pnpm tauri dev
+pnpm electron:dev
 ```
 
 Notes are `*.stride.json` files. Keys live in app settings (`~/.stride/settings.json`), sealed, never inside the vault.

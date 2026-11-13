@@ -3,7 +3,7 @@ import type { AppDataStore } from './index.ts'
 
 /**
  * Shared behavior contract for every AppDataStore implementation. Registered
- * once per adapter (memory double, tauri fake-plugin, web fake-IDB) so all
+ * once per adapter (memory double, electron, web fake-IDB) so all
  * three provably agree on semantics.
  */
 export function registerAppDataStoreContract(

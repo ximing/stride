@@ -9,7 +9,7 @@
     <script>
       (function () {
         var root = document.documentElement
-        if (window.__TAURI_INTERNALS__) root.setAttribute('data-desktop', 'tauri')
+        if (window.__STRIDE_ELECTRON__) root.setAttribute('data-desktop', 'electron')
         try {
           var mode = localStorage.getItem('stride:theme')
           if (mode === 'light' || mode === 'dark') root.setAttribute('data-theme', mode)
@@ -17,13 +17,13 @@
       })()
     </script>
     <style>
-      html[data-desktop='tauri'],
-      html[data-desktop='tauri'] body {
+      html[data-desktop='electron'],
+      html[data-desktop='electron'] body {
         height: 100%;
         margin: 0;
         background: transparent;
       }
-      html[data-desktop='tauri'] #root {
+      html[data-desktop='electron'] #root {
         box-sizing: border-box;
         height: 100%;
         margin: 0;
@@ -33,19 +33,19 @@
         border-radius: 12px;
         overflow: hidden;
       }
-      html[data-desktop='tauri'][data-theme='dark'] #root {
+      html[data-desktop='electron'][data-theme='dark'] #root {
         background: #171a18;
         color: #edf0eb;
         border-color: #353c36;
       }
       @media (prefers-color-scheme: dark) {
-        html[data-desktop='tauri']:not([data-theme='light']) #root {
+        html[data-desktop='electron']:not([data-theme='light']) #root {
           background: #171a18;
           color: #edf0eb;
           border-color: #353c36;
         }
       }
-      html[data-desktop='tauri'][data-window-fill] #root {
+      html[data-desktop='electron'][data-window-fill] #root {
         border-radius: 0;
         border-width: 0;
       }

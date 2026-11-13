@@ -8,7 +8,7 @@ let desktopShell: ShellBackend | null = null
 export async function resolveShellBackend(): Promise<ShellBackend> {
   if (isDesktopRuntime()) {
     if (!desktopShell) {
-      const { shellBackend } = await import('@stride/shell-tauri')
+      const { shellBackend } = await import('@stride/shell-electron')
       desktopShell = shellBackend({ reviewer: desktopShellReviewer })
     }
     return desktopShell

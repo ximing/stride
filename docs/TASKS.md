@@ -1,5 +1,6 @@
 # Stride Task 清单
 
+> 当前桌面宿主是 Electron（`pnpm electron:dev`）。下面已完成条目里的旧宿主名称是当时的验收记录。
 > 对应 `docs/FEATURES.md`。原则：**先把"Chrome 里可全功能调试"的基座打牢，再逐模块补齐功能**。
 > 每个任务给出：依赖、产出、验收标准。Phase 内可并行，Phase 间有先后。
 
@@ -14,7 +15,7 @@
 - 现有 `server/desk.ts` 的逻辑（git/updater/agent 编排细节）迁移进 core，server 目录退役。
 - LLM 调用直连：webview → provider HTTPS（CORS 由 Tauri webview 自定义协议规避；Chrome dev 用 vite proxy 规避）。
 
-**AD-2：升级用 tauri-plugin-updater + 静态 latest.json**（比现状自实现的进程 handoff 更稳，与 tolaria 一致）。
+**AD-2：升级用 electron-updater，发布 GitHub Releases 上的平台 metadata**（`latest-mac.yml`、`latest-linux.yml`、`latest.yml`）。
 
 **AD-3：UI 不引入重型组件库**，CSS 变量 + 少量 Radix 原语 + Phosphor 图标，参考 tolaria 的 Bear 风四栏。
 

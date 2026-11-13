@@ -8,9 +8,11 @@
     "build": "pnpm --filter @stride/desktop build",
     "test": "pnpm -r --if-present test",
     "typecheck": "pnpm -r --if-present typecheck",
-    "tauri": "pnpm --filter @stride/desktop tauri"
+    "electron": "pnpm --filter @stride/desktop electron",
+    "electron:dev": "pnpm --filter @stride/desktop electron:dev",
+    "electron:build": "pnpm --filter @stride/desktop electron:build"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["esbuild"]
+    "onlyBuiltDependencies": ["esbuild", "electron", "app-builder-bin"]
   }
 }

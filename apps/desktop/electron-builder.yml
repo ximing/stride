@@ -1,0 +1,37 @@
+# Risk: files keeps electron-builder's default production-dependency walk.
+# @stride/* is workspace:* and the renderer deps are already inside dist/.
+# pnpm's symlink layout can make that walk fail or pull unused packages.
+# Do not exclude node_modules here — electron-updater is a runtime dependency.
+appId: app.stride.desktop
+productName: Stride
+asar: true
+npmRebuild: false
+directories:
+  output: release
+files:
+  - package.json
+  - dist/**/*
+  - electron-dist/**/*
+  - node_modules/**/*
+mac:
+  category: public.app-category.productivity
+  icon: build/icon.icns
+  target:
+    - dmg
+    - zip
+win:
+  icon: build/icon.ico
+  target:
+    - nsis
+linux:
+  icon: build/icon.png
+  target:
+    - AppImage
+protocols:
+  - name: Stride
+    schemes:
+      - stride
+publish:
+  provider: github
+  owner: ximing
+  repo: stride

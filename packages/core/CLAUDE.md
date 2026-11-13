@@ -15,7 +15,7 @@
 - **应该放这里**：跨环境复用的纯领域模型、算法、状态机、端口编排逻辑及对应的单元测试（`*.test.ts`）。
 - **不应该放这里**：
   - 严禁引入任何 `node:*` 模块（如 `node:fs`、`node:path`、`node:child_process`）。
-  - 严禁引入 React、DOM API、`window`/`localStorage`、Tauri 插件（`@tauri-apps/*`）或浏览器专属 Web API（如 `showDirectoryPicker`）。
+  - 严禁引入 React、DOM API、`window`/`localStorage`、Electron、宿主插件或浏览器专属 Web API（如 `showDirectoryPicker`）。
   - 具体平台实现必须放在 `packages/fs-*`、`packages/git-*`、`packages/shell-*`、`packages/search-web`、`packages/secrets-*`。
 
 ## 开发偏好

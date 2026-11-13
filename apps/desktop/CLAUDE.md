@@ -2,7 +2,7 @@
 
 ## 这个目录负责什么
 
-`apps/desktop` 是 Stride 的前端工作台与 Tauri 宿主工程，同时支持**纯浏览器模式（`pnpm dev`）**与**Tauri 桌面应用模式（`pnpm tauri dev`）**：
+`apps/desktop` 是 Stride 的前端工作台与 Electron 宿主工程，同时支持**纯浏览器模式（`pnpm dev`）**与**Electron 桌面应用模式（`pnpm electron:dev`）**：
 
 - `src/main.tsx` & `src/app.tsx`：应用启动、主题同步初始化、`@rabjs/react` Service 容器注册、欢迎页（Chooser）与工作台主壳层挂载。
 - `src/services/`：按业务域分目录的响应式服务（`vault/`、`notes/`、`layout/`、`views/`、`search/`、`commands/`、`git/`、`chat/`、`settings/`、`update/`、`appearance/`、`platform/`）。放置规则见 `src/services/CLAUDE.md`。
@@ -13,7 +13,8 @@
 - `src/dev/`：组件预览画布（访问 `/dev/components` 渲染）。
 - `inspect/` & `src/inspect-*.ts`：供自动化与调试代理使用的页面检查与操控通道。
 - `e2e/`：Playwright 浏览器端到端测试。
-- `src-tauri/`：Tauri 2 Rust 宿主配置、权限声明（`capabilities/`）、打包图标与插件初始化。
+- `electron/`：Electron 主进程、preload、窗口、菜单与更新。Node I/O 只放在这里。
+- `electron-builder.yml` 与 `build/`：安装包目标和应用图标。
 
 目录和依赖方向的地图在 `AGENTS.md`。
 
@@ -24,11 +25,11 @@
 - **不应该放这里**：
   - 纯粹的领域算法与数据格式解析（如双链图计算、笔记 JSON 迁移、重命名事务、Git porcelain 解析）应下沉到 `packages/core`，保持可独立单测。
   - 在 `src/ui/primitives/` 中不要耦合具体某个业务面板的私有状态，也不要引用 `src/services/` 里的业务 Service。
-  - 不要在 `src-tauri/` 写笔记、Git 或密钥逻辑。Rust 侧只注册插件、权限和打包配置。
+  - 不要在渲染进程写 Node I/O。笔记、Git 与密钥规则留在 `packages/core` 和平台端口；主进程只做窗口、进程和密钥密封。
 
 ## 开发偏好
 
-1. **双模运行兼容**：任何新增功能必须考虑 Tauri 与纯浏览器双环境。调用 `@tauri-apps/*` API 前需确认环境可用或提供浏览器端回退（参考 `services/vault/vault.service.ts`、`services/platform/deep-link.ts`、`services/update/update-check.ts`）。
+1. **双模运行兼容**：任何新增功能必须考虑 Electron 与纯浏览器双环境。宿主能力走平台端口，浏览器端提供回退（参考 `services/vault/vault.service.ts`、`services/platform/deep-link.ts`、`services/update/update-check.ts`）。
 2. **命令驱动交互**：新增全局可触发操作或快捷键时，先在 `src/appCommandManifest.json` 注册，再由 `services/commands/command.service.ts` 与 `services/commands/commands.ts` 绑定实现，并确保通过 `services/commands/command-matrix.test.ts`。
 3. **遵循设计系统**：UI 修改必须使用 `src/ui/tokens.css` 中的 `--sd-*` 语义变量和 `src/ui/primitives/` 下的封装组件，严禁硬编码色值或调用原生 `window.alert/confirm/prompt`。样式入口文件只保留 `@import`。
 4. **保持四栏布局契约**：右侧面板（属性、TOC、Git、Chat）互斥切换，当前面板记在 `LayoutService.rightPanelTab`。栏宽和折叠由 `services/layout/layout.service.ts` 的 `LayoutService` 管。Git、Chat、Settings、Update 各自一个 Service，不要再合成一个文件。

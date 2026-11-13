@@ -79,15 +79,32 @@
   align-self: stretch;
   min-width: 12px;
   min-height: 12px;
+  -webkit-app-region: drag;
 }
 
-/* Undecorated Tauri windows are square. The document paints the plate before
+/* Electron ignores data-tauri-drag-region. Interactive controls inside or beside
+   the drag strip must opt out or clicks never reach them. */
+.rail-drag button,
+.rail-drag input,
+.rail-drag select,
+.rail-drag textarea,
+.rail-drag [contenteditable],
+.window-controls,
+.window-control,
+button,
+input,
+select,
+textarea,
+[contenteditable] {
+  -webkit-app-region: no-drag;
+}
+
+/* Undecorated desktop windows are square. The document paints the plate before
    the app bundle: transparent page, 12px radius, and a hairline on #root.
    index.html inlines the same plate so the first paint does not wait on JS.
-   A maximized or fullscreen window goes edge to edge. The shadow is the
-   native window shadow, rebuilt from Rust once this plate has pixels. */
-html[data-desktop='tauri'],
-html[data-desktop='tauri'] body {
+   A maximized or fullscreen window goes edge to edge. */
+html[data-desktop='electron'],
+html[data-desktop='electron'] body {
   height: 100%;
   margin: 0;
   background: transparent;
@@ -95,7 +112,7 @@ html[data-desktop='tauri'] body {
 
 /* `body #root` beats the equal-specificity boot rule inlined in index.html,
    so token colors take over as soon as this sheet loads. */
-html[data-desktop='tauri'] body #root {
+html[data-desktop='electron'] body #root {
   box-sizing: border-box;
   height: 100%;
   margin: 0;
@@ -106,21 +123,21 @@ html[data-desktop='tauri'] body #root {
   overflow: hidden;
 }
 
-html[data-desktop='tauri'] .shell,
-html[data-desktop='tauri'] .chooser {
+html[data-desktop='electron'] .shell,
+html[data-desktop='electron'] .chooser {
   height: 100%;
   min-height: 0;
   border-radius: inherit;
   overflow: hidden;
 }
 
-html[data-desktop='tauri'][data-window-fill] body #root {
+html[data-desktop='electron'][data-window-fill] body #root {
   border-radius: 0;
   border-width: 0;
 }
 
-html[data-desktop='tauri'][data-window-fill] .shell,
-html[data-desktop='tauri'][data-window-fill] .chooser {
+html[data-desktop='electron'][data-window-fill] .shell,
+html[data-desktop='electron'][data-window-fill] .chooser {
   border-radius: 0;
 }
 

@@ -1,11 +1,8 @@
-/** Host runtime probes. The only production `'__TAURI_INTERNALS__'` literal lives here. */
+/** Host runtime probes. Desktop detection is the Electron bridge on `window`. */
 
 export function isDesktopRuntime(): boolean {
-  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
+  return typeof window !== 'undefined' && '__STRIDE_ELECTRON__' in window
 }
-
-/** Existing public name. Same probe as `isDesktopRuntime`. */
-export const isTauriRuntime = isDesktopRuntime
 
 export function isMemoryFixture(): boolean {
   if (typeof window === 'undefined') return false

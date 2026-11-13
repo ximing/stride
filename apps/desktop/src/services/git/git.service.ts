@@ -102,7 +102,7 @@ async function resolveGitBackend(): Promise<GitBackend> {
   if (testGitBackendSet && testGitBackend) return testGitBackend
   if (isDesktopRuntime()) {
     if (!shellGitBackend) {
-      const { ShellGitBackend } = await import('@stride/git-tauri')
+      const { ShellGitBackend } = await import('@stride/git-electron')
       shellGitBackend = new ShellGitBackend()
     }
     return shellGitBackend
@@ -590,13 +590,13 @@ export class GitService extends Service {
       if (cloneDestForTests) {
         await assertCloneDestEmpty(cloneDestForTests)
       } else if (isDesktopRuntime()) {
-        await this.assertTauriCloneDestEmpty(dest)
+        await this.assertDesktopCloneDestEmpty(dest)
       }
       await gitClone(backend, url, dest, home)
       this.vault.openedClonePath = dest
       if (!isDesktopRuntime()) return
-      const { TauriFileSystem } = await import('@stride/fs-tauri')
-      await this.vault.openClonedVault(new TauriFileSystem(dest))
+      const { ElectronFileSystem } = await import('@stride/fs-electron')
+      await this.vault.openClonedVault(new ElectronFileSystem(dest))
     } catch (error) {
       this.cloneError = error instanceof Error ? error.message : String(error)
     }
@@ -659,10 +659,10 @@ export class GitService extends Service {
     return result?.message.trim() || 'Checkpoint'
   }
 
-  private async assertTauriCloneDestEmpty(dest: string): Promise<void> {
-    const { TauriFileSystem } = await import('@stride/fs-tauri')
+  private async assertDesktopCloneDestEmpty(dest: string): Promise<void> {
+    const { ElectronFileSystem } = await import('@stride/fs-electron')
     try {
-      await assertCloneDestEmpty(new TauriFileSystem(dest))
+      await assertCloneDestEmpty(new ElectronFileSystem(dest))
     } catch (error) {
       // A missing folder is an empty clone destination.
       if (error instanceof PlatformError && error.code === 'not-found') return

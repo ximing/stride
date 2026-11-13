@@ -114,12 +114,12 @@
 
 | # | 功能 | 说明 | 优先级 |
 |---|---|---|---|
-| 7.1 | tauri-plugin-updater | `latest.json` 静态 endpoint（GitHub Releases/Pages）+ minisign 签名 | P0 |
+| 7.1 | electron-updater | GitHub Releases 上的 `latest-mac.yml` / `latest-linux.yml` / `latest.yml` | P0 |
 | 7.2 | 启动自动检查 | 启动 3s 后静默检查（可关）；网络错误静默 | P0 |
 | 7.3 | UpdateBanner | release notes + 后台下载进度条 + "立即重启" | P0 |
 | 7.4 | 双通道 | stable / alpha 通道设置项 | P2 |
 | 7.5 | 手动检查 | 状态栏/菜单 "Check for Updates" | P1 |
-| 7.6 | 发布流水线 | GitHub Actions：macOS arm64/x64 构建 + 签名 + 生成 latest.json 发 Release | P0 |
+| 7.6 | 发布流水线 | GitHub Actions：Electron builder 构建 macOS arm64/x64、Linux x64、Windows x64，并上传安装包与 updater metadata | P0 |
 
 ## 8. UI 框架与交互
 

@@ -147,7 +147,7 @@ describe('UpdateService', () => {
     expect(updates.error).toBe('')
   })
 
-  it('downloads with progress and confirms with install plus relaunch', async () => {
+  it('downloads with progress and confirms with install without relaunch', async () => {
     const updates = freshUpdates()
     const update = new FakeUpdate('0.2.0', '0.1.0')
     update.events = [
@@ -173,7 +173,8 @@ describe('UpdateService', () => {
 
     await updates.confirm()
     expect(update.installed).toBe(true)
-    expect(driver.calls).toEqual(['check', 'relaunch'])
+    expect(driver.calls).toEqual(['check'])
+    expect(driver.calls).not.toContain('relaunch')
   })
 
   it('tracks fractional progress from chunk events', async () => {

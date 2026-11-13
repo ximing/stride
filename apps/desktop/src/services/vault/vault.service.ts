@@ -193,15 +193,17 @@ async function sameDirectory(left: FileSystemDirectoryHandle, right: FileSystemD
   return left.isSameEntry(right)
 }
 
+function directoryPickCancelled(): DOMException {
+  return new DOMException('The user aborted a request.', 'AbortError')
+}
+
 export async function pickVaultBackend(): Promise<FileSystemBackend> {
   if (!isDesktopRuntime()) return pickVaultDirectory()
-  const dialog = await import('@tauri-apps/plugin-dialog')
-  const selected = await dialog.open({ directory: true, multiple: false })
-  if (typeof selected !== 'string' || selected === '') {
-    throw new Error('The user aborted a request.')
-  }
-  const { TauriFileSystem } = await import('@stride/fs-tauri')
-  return new TauriFileSystem(selected)
+  const { pickDirectory } = await import('@stride/electron-api')
+  const selected = await pickDirectory()
+  if (typeof selected !== 'string' || selected === '') throw directoryPickCancelled()
+  const { ElectronFileSystem } = await import('@stride/fs-electron')
+  return new ElectronFileSystem(selected)
 }
 
 export class VaultService extends Service {
@@ -427,8 +429,8 @@ export class VaultService extends Service {
     this.error = ''
     try {
       await this.commitHeadingRename()
-      const { TauriFileSystem } = await import('@stride/fs-tauri')
-      await this.openBackend(new TauriFileSystem(path))
+      const { ElectronFileSystem } = await import('@stride/fs-electron')
+      await this.openBackend(new ElectronFileSystem(path))
     } catch (error) {
       this.error = errorText(error)
     }
@@ -441,8 +443,8 @@ export class VaultService extends Service {
     if (!last) return
     try {
       if (isDesktopRuntime()) {
-        const { TauriFileSystem } = await import('@stride/fs-tauri')
-        await this.openBackend(new TauriFileSystem(last.label))
+        const { ElectronFileSystem } = await import('@stride/fs-electron')
+        await this.openBackend(new ElectronFileSystem(last.label))
         return
       }
       const restored = await restoreVaultById(last.id)
@@ -547,8 +549,8 @@ export class VaultService extends Service {
         return
       }
       if (isDesktopRuntime()) {
-        const { TauriFileSystem } = await import('@stride/fs-tauri')
-        await openTarget(new TauriFileSystem(entry.label))
+        const { ElectronFileSystem } = await import('@stride/fs-electron')
+        await openTarget(new ElectronFileSystem(entry.label))
         return
       }
       const restored = await restoreVaultById(id)

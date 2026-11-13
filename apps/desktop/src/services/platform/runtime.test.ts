@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { isDesktopRuntime, isMemoryFixture, isTauriRuntime } from './runtime'
+import { isDesktopRuntime, isMemoryFixture } from './runtime'
 
 const SRC_ROOT = join(__dirname, '../..')
 
@@ -21,19 +21,30 @@ function walkSource(dir: string, out: string[] = []): string[] {
 }
 
 describe('runtime probes', () => {
-  it('aliases isTauriRuntime to isDesktopRuntime', () => {
-    expect(isTauriRuntime).toBe(isDesktopRuntime)
+  it('detects only the Electron bridge', () => {
+    const win = window as unknown as Record<string, unknown>
+    delete win.__STRIDE_ELECTRON__
+    win.__STRIDE_OTHER__ = {}
+    expect(isDesktopRuntime()).toBe(false)
+    delete win.__STRIDE_OTHER__
+    win.__STRIDE_ELECTRON__ = {
+      invoke: () => Promise.resolve(undefined),
+      on: () => () => {},
+    }
+    expect(isDesktopRuntime()).toBe(true)
+    delete win.__STRIDE_ELECTRON__
+    expect(isDesktopRuntime()).toBe(false)
   })
 
   it('treats a missing window as not a memory fixture', () => {
     expect(isMemoryFixture()).toBe(false)
   })
 
-  it('keeps the Tauri internals literal only in runtime.ts', () => {
+  it('keeps the Electron bridge literal only in runtime.ts', () => {
     const hits: string[] = []
     for (const file of walkSource(SRC_ROOT)) {
       const text = readFileSync(file, 'utf8')
-      if (!text.includes("'__TAURI_INTERNALS__'") && !text.includes('"__TAURI_INTERNALS__"')) continue
+      if (!text.includes("'__STRIDE_ELECTRON__'") && !text.includes('"__STRIDE_ELECTRON__"')) continue
       hits.push(relative(SRC_ROOT, file).replaceAll('\\', '/'))
     }
     expect(hits).toEqual(['services/platform/runtime.ts'])

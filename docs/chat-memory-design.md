@@ -1,7 +1,7 @@
 # 助手会话持久化与记忆系统技术方案
 
 > 状态：v2（2026-11-06，已并入独立审阅意见：修正 system 消息固化、vault-key 取值、appdata 实现路径、History 元信息、并发写等 7 处必须修正项与 10 处建议项）
-> 范围：`apps/desktop`、`packages/core`、`packages/platform`、新增 `packages/appdata-tauri` / `packages/appdata-web`
+> 范围：`apps/desktop`、`packages/core`、`packages/platform`、`packages/appdata-electron` / `packages/appdata-web`
 
 ## 1. 背景与目标
 
@@ -33,7 +33,7 @@
 - **Transcript**：`pi-agent-core` 的 `AgentMessage[]` 中 **role 为 user / assistant / toolResult 的部分**（**不含 system 消息**，原因见 §4.4），是「继续对话」的上下文来源。已验证 `AgentMessage` 为纯 JSON 可序列化结构（timestamp 为 number）。
 - **UI 投影（messages）**：渲染用的精简结构（text / thinking / 工具调用摘要），由 transcript 派生但独立持久化，避免回放时才重建。
 - **vault-key**：分项目目录名，基于 **`VaultService.activeVaultId`**（vault 注册表 id，`createVaultId()` 生成），**不是** rootLabel——fs-web 的 rootLabel 只是目录名字（`packages/fs-web/src/browser-fs.ts:91`），同名 vault 会撞 key。派生方式见 §3.5。
-- 约束沿用根 CLAUDE.md：密钥不进 vault、不写入记忆；业务逻辑零 Node 依赖，I/O 全部走平台端口；**不在 src-tauri 写业务逻辑**（apps/desktop/CLAUDE.md），appdata 桌面端纯 JS 实现（见 §3.2）。
+- 约束沿用根 CLAUDE.md：密钥不进 vault、不写入记忆；渲染进程业务逻辑零 Node 依赖，I/O 全部走平台端口。Node I/O 只在 Electron 主进程。appdata 桌面端见 §3.2。
 
 ## 3. 存储层：`AppDataStore` 端口
 
@@ -58,12 +58,11 @@ export interface AppDataStore {
 
 逻辑路径统一形如 `chats/<vault-key>/<session-id>.json`，**禁止 `..` 与绝对路径**，两端适配器各自校验（复用 platform 已有的 `normalizeRelativePath`）。`list` 实现侧负责过滤崩溃残留的 `*.tmp`。
 
-### 3.2 桌面实现（`packages/appdata-tauri`）
+### 3.2 桌面实现（`packages/appdata-electron`）
 
-- **纯 JS 实现，不新增 Rust 命令**：复用 `@tauri-apps/plugin-fs`（与 `packages/fs-tauri/src/fs.ts` 同一机制），根目录 `${home}/.stride`。home 经现有 `HostPaths` 端口（`packages/platform/src/host.ts`，tauri 实现 `packages/fs-tauri/src/home.ts` 用 `@tauri-apps/api/path.homeDir()`）解析。
-- capability 已放开 `fs:scope: **`（`capabilities/default.json:77-79`），**无需改权限配置**。
+- 通过 Electron 主进程读写，根目录 `${home}/.stride`。home 经 `HostPaths`（`packages/platform/src/host.ts`，Electron 实现解析用户主目录）。
 - 选址与现状一致：`~/.stride/settings.json` 已是既有应用数据文件（`settings.ts` `defaultSettingsPath`）。
-- 写文件：`write(tmp) → rename`，崩溃最多损失最后一个 tmp 文件；路径白名单与 root 校验在 TS 层做（对齐 fs-tauri 的 `rejectSymlinks`/root 校验模式）。
+- 写文件：`write(tmp) → rename`，崩溃最多损失最后一个 tmp 文件；路径白名单与 root 校验在适配器层做。
 
 ### 3.3 Web 实现（`packages/appdata-web`）
 

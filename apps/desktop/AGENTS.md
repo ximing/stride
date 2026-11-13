@@ -11,6 +11,7 @@
 - `i18n/`：英文和中文界面文案。行为约束在 `.claude/rules/i18n.md`。
 - `dev/`：`/dev/components` 组件画布。
 - `inspect-*.ts` 与仓库里的 `inspect/`：调试代理通道。
+- `electron/`：主进程、preload、窗口、菜单与自动更新。渲染进程不直接读这里的 Node API。
 
 样式入口顺序（`main.tsx`）就是层叠顺序：`ui/tokens.css`、`styles.css`、`ui/primitives.css`、`ui/shell.css`、`ui/panels.css`、`ui/overlays.css`、`editor/chrome.css`。
 

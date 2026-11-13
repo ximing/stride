@@ -1,30 +1,17 @@
-# Release pipeline (T8.4, multi-platform extension 2026-10-21): tag push v* ->
-# macOS arm64/x64 + Linux x64 + Windows x64 builds -> signed updater artifacts
-# -> latest.json -> GitHub Release.
+# Release pipeline: tag push v* -> Electron builds for macOS arm64 and x64,
+# Linux x64, and Windows x64 -> GitHub Release.
 #
-# Flow: four build jobs produce the per-platform updater artifacts + `.sig`
-# (minisign, key from repo secrets), the release job assembles the static
-# `latest.json` via scripts/make-latest-json.mjs and attaches everything to the
-# Release for the pushed tag. The app's version is injected from the tag by
-# scripts/set-version.mjs, so the tag is the single source of the version.
+# scripts/set-version.mjs writes the tag into apps/desktop/package.json before
+# electron-builder. That file is the only version source. electron-updater
+# reads the metadata electron-builder emits next to the installers:
+#   macOS    zip + latest-mac.yml   (one job builds arm64 and x64 so the
+#            metadata lists both archives)
+#   Linux    AppImage + latest-linux.yml
+#   Windows  NSIS + latest.yml
 #
-# Updater artifact shapes (tauri v2 bundler, createUpdaterArtifacts):
-#   darwin-aarch64  Stride_aarch64.app.tar.gz       (+ .sig)
-#   darwin-x86_64   Stride_x64.app.tar.gz           (+ .sig)
-#   linux-x86_64    Stride_x86_64.AppImage          (+ .sig, raw AppImage —
-#                   tauri v2 does NOT tar.gz-wrap Linux updater artifacts)
-#   windows-x86_64  Stride_x86_64-setup.exe         (+ .sig, raw NSIS installer —
-#                   tauri v2 does NOT zip-wrap Windows updater artifacts)
-# make-latest-json.mjs requires all four platforms to be present.
-#
-# Security posture: tag-push-only trigger (no PR / fork paths reach the
-# secrets), top-level `permissions` limited to `contents: write` (creating
-# the Release and uploading assets), signing secrets referenced only as env
-# of the single build step, actions pinned to major versions.
-# APPLE_SIGNING_IDENTITY='-' ad-hoc signs the mac builds so Apple Silicon
-# DMGs show "unidentified developer" instead of "damaged" — unless the
-# APPLE_CERTIFICATE secrets are set, in which case the stable development
-# identity from tauri.conf.json > bundle.macOS.signingIdentity is used.
+# Tag-push only. contents: write is limited to creating the Release.
+# No code signing is required. CSC_LINK is passed through when the secret
+# exists; otherwise the artifacts are unsigned.
 
 name: Release
 
@@ -38,58 +25,41 @@ permissions:
 
 defaults:
   run:
-    # Windows runners default to PowerShell; every step below is written in
-    # portable POSIX shell, so pin bash everywhere.
     shell: bash
 
 jobs:
   build:
-    name: build ${{ matrix.rust-target }}
+    name: build ${{ matrix.name }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
         include:
-          - os: macos-latest # arm64 runner
-            rust-target: aarch64-apple-darwin
-            token: aarch64
-            artifact: updater-macos-aarch64
-          - os: macos-15-intel # x64 runner
-            rust-target: x86_64-apple-darwin
-            token: x64
-            artifact: updater-macos-x64
-          - os: ubuntu-22.04 # oldest supported runner => lowest glibc baseline
-            rust-target: x86_64-unknown-linux-gnu
-            token: x86_64
-            artifact: updater-linux-x86_64
+          - os: macos-latest
+            name: macos-arm64-x64
+            artifact: desktop-macos
+            builder: --mac --arm64 --x64
+          - os: ubuntu-22.04
+            name: linux-x64
+            artifact: desktop-linux
+            builder: --linux --x64
           - os: windows-latest
-            rust-target: x86_64-pc-windows-msvc
-            token: x86_64
-            artifact: updater-windows-x86_64
+            name: windows-x64
+            artifact: desktop-windows
+            builder: --win --x64
     steps:
       - uses: actions/checkout@v5
 
-      - name: Install Linux webkit/gtk build deps
+      - name: Install Linux AppImage dependencies
         if: matrix.os == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf xdg-utils
+        run: sudo apt-get update && sudo apt-get install -y libfuse2
 
-      - uses: pnpm/action-setup@v4 # reads packageManager from package.json
+      - uses: pnpm/action-setup@v4
 
       - uses: actions/setup-node@v5
         with:
           node-version: 22
           cache: pnpm
-
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.rust-target }}
-
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: apps/desktop/src-tauri
-          key: ${{ matrix.rust-target }}
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -97,117 +67,58 @@ jobs:
       - name: Set app version from tag
         run: node scripts/set-version.mjs "${GITHUB_REF_NAME}"
 
-      - name: Build and sign updater artifacts
-        run: pnpm tauri build --target ${{ matrix.rust-target }}
+      - name: Build the renderer
+        run: pnpm --filter @stride/desktop build
+
+      - name: Bundle and package
+        run: node apps/desktop/scripts/build-electron.mjs ${{ matrix.builder }}
         env:
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          # When APPLE_CERTIFICATE (base64 .p12) + password secrets exist, mac
-          # builds sign with the same stable development identity used for
-          # local builds, so Keychain authorization survives auto-updates.
-          # Falls back to ad-hoc ('-') when the secrets are not set. The CLI
-          # imports the .p12 into a temporary keychain itself.
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: "${{ secrets.APPLE_CERTIFICATE != '' && 'Apple Development: 铭 席 (G2TX5T765Q)' || '-' }}"
+          CSC_LINK: ${{ secrets.CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.CSC_KEY_PASSWORD }}
 
-      - name: Verify built version matches tag
-        if: runner.os == 'macOS'
+      - name: Verify package version matches the tag
         run: |
-          APP="apps/desktop/src-tauri/target/${{ matrix.rust-target }}/release/bundle/macos/Stride.app"
-          BUILT="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")"
-          WANT="${GITHUB_REF_NAME#v}"
-          if [ "$BUILT" != "$WANT" ]; then
-            echo "built app version $BUILT does not match tag $WANT" >&2
-            exit 1
-          fi
-          echo "built app version: $BUILT"
-
-      # Stage the updater artifact (+ .sig) under a stable, platform-tokened
-      # name; tauri's raw names embed the version, latest.json needs stable
-      # ones. Bundle dir layout differs per OS, hence the per-OS branches.
-      - name: Stage updater artifacts (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          SRC="apps/desktop/src-tauri/target/${{ matrix.rust-target }}/release/bundle/macos"
-          mkdir dist-release
-          cp "$SRC/Stride.app.tar.gz" "dist-release/Stride_${{ matrix.token }}.app.tar.gz"
-          cp "$SRC/Stride.app.tar.gz.sig" "dist-release/Stride_${{ matrix.token }}.app.tar.gz.sig"
-
-      - name: Stage updater artifacts (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          BUNDLE="apps/desktop/src-tauri/target/${{ matrix.rust-target }}/release/bundle"
-          mkdir dist-release
-          # find (not a fixed dir) because the bundler may emit the updater
-          # archive into `appimage/` or `appimage-updater/`
-          cp "$(find "$BUNDLE" -name 'Stride_*.AppImage')" "dist-release/Stride_x86_64.AppImage"
-          cp "$(find "$BUNDLE" -name 'Stride_*.AppImage.sig')" "dist-release/Stride_x86_64.AppImage.sig"
-
-      - name: Stage updater artifacts (Windows)
-        if: runner.os == 'Windows'
-        run: |
-          BUNDLE="apps/desktop/src-tauri/target/${{ matrix.rust-target }}/release/bundle"
-          mkdir dist-release
-          # find (not a fixed dir) because the bundler may emit the NSIS
-          # installer into `nsis/` or `nsis-updater/`. tauri v2 ships the raw
-          # installer as the updater artifact (no zip wrapper); the plugin
-          # runs it directly.
-          cp "$(find "$BUNDLE" -name 'Stride_*-setup.exe')" "dist-release/Stride_x86_64-setup.exe"
-          cp "$(find "$BUNDLE" -name 'Stride_*-setup.exe.sig')" "dist-release/Stride_x86_64-setup.exe.sig"
+          node --input-type=module -e "
+            import { readFileSync } from 'node:fs'
+            const version = JSON.parse(readFileSync('apps/desktop/package.json', 'utf8')).version
+            const want = process.env.GITHUB_REF_NAME.replace(/^v/, '')
+            if (version !== want) {
+              console.error('package version ' + version + ' does not match tag ' + want)
+              process.exit(1)
+            }
+            console.log('package version: ' + version)
+          "
 
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact }}
-          path: dist-release/
+          path: apps/desktop/release/
           if-no-files-found: error
 
   release:
-    name: publish latest.json + release assets
+    name: publish installers and updater metadata
     needs: build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 22
-          # This job never installs pnpm (the manifest script is plain node);
-          # setup-node v5 auto-caches the detected package manager and would
-          # fail looking for the pnpm binary the lockfile implies.
-          package-manager-cache: false
-
       - uses: actions/download-artifact@v4
         with:
-          pattern: updater-*
+          pattern: desktop-*
           path: dist-release
           merge-multiple: true
 
-      - name: Generate latest.json
-        run: |
-          # Annotated-tag body becomes the release notes shown in the in-app
-          # update banner (empty for lightweight tags).
-          NOTES="$(git tag -l --format='%(contents:body)' "${GITHUB_REF_NAME}")"
-          node scripts/make-latest-json.mjs \
-            --artifacts dist-release \
-            --tag "${GITHUB_REF_NAME}" \
-            --repo "${GITHUB_REPOSITORY}" \
-            --notes "${NOTES}" \
-            --out dist-release/latest.json
-
-      - name: Create release with updater assets
+      - name: Create release with installers and updater metadata
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
           generate_release_notes: true
           fail_on_unmatched_files: true
           files: |
-            dist-release/latest.json
-            dist-release/Stride_aarch64.app.tar.gz
-            dist-release/Stride_aarch64.app.tar.gz.sig
-            dist-release/Stride_x64.app.tar.gz
-            dist-release/Stride_x64.app.tar.gz.sig
-            dist-release/Stride_x86_64.AppImage
-            dist-release/Stride_x86_64.AppImage.sig
-            dist-release/Stride_x86_64-setup.exe
-            dist-release/Stride_x86_64-setup.exe.sig
+            dist-release/*.dmg
+            dist-release/*.zip
+            dist-release/*.zip.blockmap
+            dist-release/latest-mac.yml
+            dist-release/*.AppImage
+            dist-release/latest-linux.yml
+            dist-release/*.exe
+            dist-release/*.exe.blockmap
+            dist-release/latest.yml

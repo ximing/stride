@@ -3,12 +3,12 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { resetSecretsStore, SETTINGS_STORAGE_KEY, SettingsService } from './settings.service'
 
 const factories = vi.hoisted(() => ({
-  tauri: vi.fn(),
+  electron: vi.fn(),
   web: vi.fn(),
 }))
 
-vi.mock('@stride/secrets-tauri', () => ({
-  tauriSecretsStore: factories.tauri,
+vi.mock('@stride/secrets-electron', () => ({
+  electronSecretsStore: factories.electron,
 }))
 
 vi.mock('@stride/secrets-web', () => ({
@@ -28,9 +28,9 @@ function passthrough() {
 }
 
 function setDesktop(on: boolean) {
-  const win = window as unknown as { __TAURI_INTERNALS__?: { invoke: () => Promise<void> } }
-  if (on) win.__TAURI_INTERNALS__ = { invoke: async () => undefined }
-  else delete win.__TAURI_INTERNALS__
+  const win = window as unknown as { __STRIDE_ELECTRON__?: Record<string, unknown> }
+  if (on) win.__STRIDE_ELECTRON__ = {}
+  else delete win.__STRIDE_ELECTRON__
 }
 
 describe('settings secret host', () => {
@@ -39,20 +39,20 @@ describe('settings secret host', () => {
     vi.unstubAllGlobals()
     localStorage.removeItem(SETTINGS_STORAGE_KEY)
     resetSecretsStore()
-    factories.tauri.mockReset()
+    factories.electron.mockReset()
     factories.web.mockReset()
   })
 
-  it('uses the tauri store on the desktop runtime even when IndexedDB exists', async () => {
+  it('uses the electron store on the desktop runtime even when IndexedDB exists', async () => {
     setDesktop(true)
     const idbOpen = vi.fn(() => {
       throw new Error('indexedDB.open')
     })
     vi.stubGlobal('indexedDB', { open: idbOpen })
-    factories.tauri.mockResolvedValue(passthrough())
+    factories.electron.mockResolvedValue(passthrough())
     register(SettingsService)
     await resolve(SettingsService).load()
-    expect(factories.tauri).toHaveBeenCalledTimes(1)
+    expect(factories.electron).toHaveBeenCalledTimes(1)
     expect(factories.web).not.toHaveBeenCalled()
     expect(idbOpen).not.toHaveBeenCalled()
   })
@@ -68,7 +68,7 @@ describe('settings secret host', () => {
     const settings = resolve(SettingsService)
     await settings.load()
     expect(factories.web).toHaveBeenCalledTimes(1)
-    expect(factories.tauri).not.toHaveBeenCalled()
+    expect(factories.electron).not.toHaveBeenCalled()
     expect(settings.form.embedding.keyMask).toBe('••••-key')
     expect(settings.notice).toBe('')
   })
@@ -79,7 +79,7 @@ describe('settings secret host', () => {
     register(SettingsService)
     const settings = resolve(SettingsService)
     await settings.load()
-    expect(factories.tauri).not.toHaveBeenCalled()
+    expect(factories.electron).not.toHaveBeenCalled()
     expect(factories.web).not.toHaveBeenCalled()
     expect(settings.notice).toBe('')
   })
@@ -88,7 +88,7 @@ describe('settings secret host', () => {
     setDesktop(true)
     const saved = '{"embedding":{"keySeal":"keep-me"}}'
     localStorage.setItem(SETTINGS_STORAGE_KEY, saved)
-    factories.tauri.mockRejectedValue(new Error('Failed to move the seal key into the keychain'))
+    factories.electron.mockRejectedValue(new Error('Failed to move the seal key into the keychain'))
     register(SettingsService)
     const settings = resolve(SettingsService)
     await settings.load()

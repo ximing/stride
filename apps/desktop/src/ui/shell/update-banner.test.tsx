@@ -238,7 +238,7 @@ describe('UpdateBanner', () => {
         restart.click()
       })
       expect(update.installed).toBe(true)
-      expect(driver.calls).toEqual(['check', 'relaunch'])
+      expect(driver.calls).toEqual(['check'])
     } finally {
       await unmount(element, root)
     }

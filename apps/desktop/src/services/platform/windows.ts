@@ -1,11 +1,10 @@
 import { t } from '../../i18n'
 import {
-  folderTitle,
   readStoredVaults,
   recentProjectsFromRecords,
   type RecentProject,
 } from '../vault/vault-registry'
-import { isMemoryFixture, isTauriRuntime } from './runtime'
+import { isDesktopRuntime, isMemoryFixture } from './runtime'
 
 export type WindowIntent =
   | { kind: 'restore' }
@@ -79,17 +78,17 @@ function isRecentProject(value: unknown): value is RecentProject {
     && typeof project.lastOpened === 'string'
 }
 
-async function tauriInvoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
-  const { invoke } = await import('@tauri-apps/api/core')
-  return invoke<T>(command, args)
+async function desktopInvoke<T>(channel: 'window:intent' | 'window:setProject' | 'window:new' | 'window:newProject' | 'window:openProject' | 'window:syncRecent', args?: unknown): Promise<T> {
+  const { electronBridge } = await import('@stride/electron-api')
+  return electronBridge().invoke<T>(channel, args)
 }
 
 export async function readStartupIntent(href = window.location.href): Promise<WindowIntent> {
   const fromLocation = intentFromLocation(href)
   if (fromLocation) return fromLocation
-  if (!isTauriRuntime()) return { kind: 'restore' }
+  if (!isDesktopRuntime()) return { kind: 'restore' }
   try {
-    return parseIntent(await tauriInvoke('window_intent')) ?? { kind: 'restore' }
+    return parseIntent(await desktopInvoke('window:intent')) ?? { kind: 'restore' }
   } catch {
     return { kind: 'restore' }
   }
@@ -107,39 +106,31 @@ export async function applyWindowIntent(vault: WindowHost, intent: WindowIntent)
 }
 
 export function reportOpenProject(path: string | null): void {
-  if (!isTauriRuntime()) return
-  const title = path ? `${folderTitle(path)} — Stride` : 'Stride'
-  void (async () => {
-    try {
-      await tauriInvoke('window_set_project', { path })
-      const { getCurrentWindow } = await import('@tauri-apps/api/window')
-      await getCurrentWindow().setTitle(title)
-    } catch (error) {
-      logWindow(error)
-    }
-  })()
+  if (!isDesktopRuntime()) return
+  // `window:setProject` also sets the native title from the folder name.
+  void desktopInvoke('window:setProject', { path }).catch(logWindow)
 }
 
 export function requestNewWindow(): void {
-  if (isTauriRuntime()) {
-    void tauriInvoke('menu_new_window').catch(logWindow)
+  if (isDesktopRuntime()) {
+    void desktopInvoke('window:new').catch(logWindow)
     return
   }
   window.open(freshWindowUrl())
 }
 
 export function requestNewProject(): void {
-  if (!isTauriRuntime()) return
-  void tauriInvoke('menu_new_project').catch(logWindow)
+  if (!isDesktopRuntime()) return
+  void desktopInvoke('window:newProject').catch(logWindow)
 }
 
 export function requestOpenProject(): void {
-  if (!isTauriRuntime()) return
-  void tauriInvoke('menu_open_project').catch(logWindow)
+  if (!isDesktopRuntime()) return
+  void desktopInvoke('window:openProject').catch(logWindow)
 }
 
 export function syncRecentProjects(projects: readonly RecentProject[]): void {
-  if (!isTauriRuntime() || isMemoryFixture()) return
+  if (!isDesktopRuntime() || isMemoryFixture()) return
   const copy = {
     file: t('menu.file'),
     newWindow: t('menu.newWindow'),
@@ -150,26 +141,42 @@ export function syncRecentProjects(projects: readonly RecentProject[]): void {
     closeWindow: t('menu.closeWindow'),
     emptyRecent: t('menu.emptyRecent'),
   }
-  void tauriInvoke('sync_recent_projects', { projects, copy }).catch(logWindow)
+  void desktopInvoke('window:syncRecent', { projects: [...projects], copy }).catch(logWindow)
 }
 
 export function publishDesktopMenusFromStorage(): void {
-  if (!isTauriRuntime() || isMemoryFixture()) return
+  if (!isDesktopRuntime() || isMemoryFixture()) return
   syncRecentProjects(recentProjectsFromRecords(readStoredVaults()))
 }
 
-export function installDesktopWindowBridge(vault: WindowHost): void {
-  if (!isTauriRuntime()) return
-  void import('@tauri-apps/api/event')
-    .then(({ listen }) => Promise.all([
-      listen<unknown>('stride://window-intent', (event) => {
-        const intent = parseIntent(event.payload)
+/** Subscribe to later window intents and recent-list replacements. Safe to dispose more than once. */
+export function installDesktopWindowBridge(vault: WindowHost): () => void {
+  if (!isDesktopRuntime()) return () => {}
+  let disposed = false
+  const stops: Array<() => void> = []
+  const stop = () => {
+    if (disposed) return
+    disposed = true
+    for (const dispose of stops.splice(0)) dispose()
+  }
+  void import('@stride/electron-api')
+    .then(({ electronBridge }) => {
+      if (disposed) return
+      const ipc = electronBridge()
+      stops.push(ipc.on('window:intent', (payload) => {
+        const intent = parseIntent(payload)
         if (intent) void applyWindowIntent(vault, intent)
-      }),
-      listen<unknown>('stride://recent-replaced', (event) => {
-        if (isMemoryFixture() || !Array.isArray(event.payload)) return
-        vault.replaceRecentProjects(event.payload.filter(isRecentProject))
-      }),
-    ]))
-    .catch(logWindow)
+      }))
+      stops.push(ipc.on('window:recent', (payload) => {
+        if (isMemoryFixture() || !Array.isArray(payload)) return
+        vault.replaceRecentProjects(payload.filter(isRecentProject))
+      }))
+      if (disposed) {
+        for (const dispose of stops.splice(0)) dispose()
+      }
+    })
+    .catch((error: unknown) => {
+      if (!disposed) logWindow(error)
+    })
+  return stop
 }

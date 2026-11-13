@@ -58,7 +58,7 @@ describe('TabsService', () => {
     tabs.activeTabId = ''
     tabs.vaultKey = ''
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
-    delete (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__
+    delete (window as unknown as Record<string, unknown>).__STRIDE_ELECTRON__
   })
 
   it('opens one tab per note and focuses an already-open tab', async () => {
@@ -239,8 +239,11 @@ describe('TabsService', () => {
     expect(tabs.tabs.map((tab) => tab.noteId)).toEqual(['a'])
     expect(vault.activeId).toBe('a')
 
-    // Under Tauri the OS menu owns Mod+W (window close); the binding is inert.
-    ;(window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {}
+    // On the desktop the OS menu owns Mod+W (window close); the binding is inert.
+    ;(window as unknown as Record<string, unknown>).__STRIDE_ELECTRON__ = {
+      invoke: () => Promise.resolve(undefined),
+      on: () => () => {},
+    }
     expect(pressShortcut('Mod+W')).toBe(false)
     expect(tabs.tabs.map((tab) => tab.noteId)).toEqual(['a'])
     expect(vault.activeId).toBe('a')

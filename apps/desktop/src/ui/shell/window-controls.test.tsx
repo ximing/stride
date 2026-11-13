@@ -13,7 +13,7 @@ describe('WindowControls', () => {
     host?.remove()
     root = null
     host = null
-    delete (window as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__
+    delete (window as { __STRIDE_ELECTRON__?: unknown }).__STRIDE_ELECTRON__
   })
 
   function render() {
@@ -31,7 +31,10 @@ describe('WindowControls', () => {
   })
 
   it('draws close, minimize, and zoom in the desktop shell', () => {
-    ;(window as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ = {}
+    ;(window as { __STRIDE_ELECTRON__?: unknown }).__STRIDE_ELECTRON__ = {
+      invoke: () => Promise.resolve(undefined),
+      on: () => () => {},
+    }
     render()
     expect(host?.querySelector('[data-testid="window-close"]')).not.toBeNull()
     expect(host?.querySelector('[data-testid="window-minimize"]')).not.toBeNull()

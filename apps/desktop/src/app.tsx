@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { NoteEditor } from './editor'
 import { LayoutService } from './services/layout/layout.service'
-import { isTauriRuntime } from './services/platform/deep-link'
+import { isDesktopRuntime } from './services/platform/runtime'
 import { GitService } from './services/git/git.service'
 import { SettingsService } from './services/settings/settings.service'
 import { VaultService } from './services/vault/vault.service'
@@ -39,7 +39,7 @@ const Chooser = observer(function Chooser() {
   const { t } = useTranslation()
   const vault = useService(VaultService)
   const git = useService(GitService)
-  const desktop = isTauriRuntime()
+  const desktop = isDesktopRuntime()
   return (
     <section className="chooser" data-testid="vault-surface">
       {desktop ? (
@@ -52,8 +52,8 @@ const Chooser = observer(function Chooser() {
         <div className="chooser-copy">
           <div className="chooser-brand">
             <span className="chooser-brand-mark" aria-hidden="true">
-              <img className="chooser-brand-mark-light" src="/logo-light.png" alt="" />
-              <img className="chooser-brand-mark-dark" src="/logo-dark.png" alt="" />
+              <img className="chooser-brand-mark-light" src={`${import.meta.env.BASE_URL}logo-light.png`} alt="" />
+              <img className="chooser-brand-mark-dark" src={`${import.meta.env.BASE_URL}logo-dark.png`} alt="" />
             </span>
             <h1>Stride</h1>
           </div>

@@ -1,14 +1,10 @@
 #!/usr/bin/env node
-// Single source of truth for the release version (T8.4).
-//
-// The repo carries the version in two places that must never drift apart:
-//   - apps/desktop/package.json            (npm face of the desktop app)
-//   - apps/desktop/src-tauri/tauri.conf.json (what the built .app, its
-//     updater artifacts and latest.json all report as their version)
+// Single source of truth for the release version.
 //
 // The release workflow calls this with the pushed tag (e.g. `v0.1.1`) before
-// `tauri build`, so the tag is the only place a human types a version. Local
-// use: `node scripts/set-version.mjs 0.1.1` (or v0.1.1).
+// electron-builder. It writes only apps/desktop/package.json. electron-builder
+// and electron-updater read that version. Local use:
+// `node scripts/set-version.mjs 0.1.1` (or v0.1.1).
 
 import { readFileSync, writeFileSync } from 'node:fs'
 import process from 'node:process'
@@ -17,10 +13,7 @@ import { fileURLToPath } from 'node:url'
 
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 
-const FILES = [
-  'apps/desktop/package.json',
-  'apps/desktop/src-tauri/tauri.conf.json',
-]
+const FILES = ['apps/desktop/package.json']
 
 function usageAndExit(code) {
   console.error('usage: node scripts/set-version.mjs <version>   (e.g. 0.1.1 or v0.1.1)')

@@ -191,7 +191,7 @@ describe('command palette', () => {
     root = null
     host = null
     vi.restoreAllMocks()
-    delete (window as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__
+    delete (window as { __STRIDE_ELECTRON__?: unknown }).__STRIDE_ELECTRON__
   })
 
   async function mount(notes: StrideNote[], phase: 'chooser' | 'ready' = 'ready') {
@@ -275,7 +275,10 @@ describe('command palette', () => {
 
     root?.unmount()
     host?.remove()
-    ;(window as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ = {}
+    ;(window as { __STRIDE_ELECTRON__?: unknown }).__STRIDE_ELECTRON__ = {
+      invoke: () => Promise.resolve(undefined),
+      on: () => () => {},
+    }
     await mount([note('alpha', 'Alpha')])
     await act(async () => {
       resolve(CommandPaletteService).show()

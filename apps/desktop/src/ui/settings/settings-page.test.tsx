@@ -35,7 +35,7 @@ describe('settings dialog', () => {
     root = null
     host = null
     settingsTrigger = null
-    delete (window as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__
+    delete (window as { __STRIDE_ELECTRON__?: unknown }).__STRIDE_ELECTRON__
   })
 
   async function mount() {
@@ -201,7 +201,10 @@ describe('settings dialog', () => {
       expect(row.querySelector('kbd')?.textContent).toBe(formatShortcut(command.shortcut!))
     }
 
-    ;(window as { __TAURI_INTERNALS__?: unknown }).__TAURI_INTERNALS__ = {}
+    ;(window as { __STRIDE_ELECTRON__?: unknown }).__STRIDE_ELECTRON__ = {
+      invoke: () => Promise.resolve(undefined),
+      on: () => () => {},
+    }
     await act(async () => {
       service.show('appearance')
     })

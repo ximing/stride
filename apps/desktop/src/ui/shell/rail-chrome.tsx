@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next'
 import { CommandService } from '../../services/commands/command.service'
 import { commandShortcut } from '../../services/commands/commands'
 import { LayoutService } from '../../services/layout/layout.service'
-import { isTauriRuntime } from '../../services/platform/deep-link'
+import { isDesktopRuntime } from '../../services/platform/runtime'
 import { VaultService } from '../../services/vault/vault.service'
 import { vaultDisplayName } from '../../services/vault/vault-registry'
 import { Button, IconButton } from '../primitives/button'
@@ -198,7 +198,7 @@ export const RailSearchField = observer(function RailSearchField() {
 
 /** Window buttons, vault switcher, and the sidebar toggle. One 40px row. */
 export const RailChrome = observer(function RailChrome() {
-  const desktop = isTauriRuntime()
+  const desktop = isDesktopRuntime()
   return (
     <div className="rail-chrome" data-tauri-drag-region="deep">
       {desktop ? <WindowControls /> : null}
@@ -214,7 +214,7 @@ export const RailMini = observer(function RailMini() {
   const { t } = useTranslation()
   const vault = useService(VaultService)
   const { commands, degraded, title } = useSearchHint()
-  const desktop = isTauriRuntime()
+  const desktop = isDesktopRuntime()
   return (
     <aside className="rail-mini" data-tauri-drag-region="deep">
       {desktop ? <WindowControls /> : null}
