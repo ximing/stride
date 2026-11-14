@@ -42,6 +42,8 @@ export const WRITE_VAULT_TOOLS = [
   'remove_block',
   'create_note',
   'set_note',
+  'delete_note',
+  'move_note',
   'undo_note',
   'set_property',
   'rename_property',
@@ -58,10 +60,10 @@ export const WRITE_VAULT_TOOLS = [
 export const VAULT_ASSISTANT_PROMPT = [
   'You are Stride, a local vault assistant. Use the vault tools before answering.',
   'Safe mode can read. Power mode can also change the vault and run bash in the vault directory.',
-  'Do not delete notes or rename note files. Edit note documents with the note tools. Do not rewrite *.stride.json from the shell.',
+  'Edit note documents with the note tools. Do not rewrite *.stride.json from the shell.',
   'Notes stay TipTap JSON. Edit content by node. Never replace a document with a plain-text paragraph.',
-  'Notes: list_notes, search_vault, read_note, read_active_note, create_note, set_note. set_note changes title, type, or archived. The note id stays the same.',
-  'Content: append_to_note, write_note, insert_block, remove_block, undo_note. undo_note restores the last snapshot of that note.',
+  'Notes: list_notes, search_vault, read_note, read_active_note, create_note, set_note, delete_note, move_note. set_note changes title, type, or archived. The note id stays the same. delete_note removes a note. move_note moves a note into a folder. An empty destFolder is the vault root.',
+  'Content: append_to_note, write_note, insert_block, remove_block, undo_note. undo_note deletes a note created this turn, restores the last write of a note that already existed, or restores a note deleted this turn.',
   'Properties: set_property, rename_property, remove_property. Kinds are string, number, boolean, list, and date (YYYY-MM-DD).',
   'Relationships: get_relations, get_backlinks, link_relation, unlink_relation. Kinds are belongs_to and related_to. Do not store those keys with set_property.',
   'Types: list_types, create_type, update_type. A type is a note whose type is Type. Renaming a type updates instances and saved views that filter on it.',
@@ -89,6 +91,8 @@ export interface VaultToolHost {
   loadNotes(): Promise<StrideNote[]> | StrideNote[]
   activeNoteId?: string
   views?: VaultViewStore
+  deleteNote?(id: string): Promise<void> | void
+  moveNote?(id: string, destFolder: string): Promise<{ id: string }> | { id: string }
   /** Power-mode bash. Omitted only in hosts that have no shell port. */
   shell?: {
     exec(command: string, options?: { timeout?: number; signal?: AbortSignal }): Promise<ShellOutput> | ShellOutput
@@ -192,6 +196,42 @@ function firstText(value: NoteProperty | undefined): string {
 
 function isTypeDocument(note: StrideNote): boolean {
   return note.type === 'Type'
+}
+
+/** Per-turn undo state. Tools read `holder.current` when they run, not when the tool list is built. */
+export interface VaultTurnState {
+  snapshots: Map<string, string>
+  /** Ids created this turn that did not exist before create_note. */
+  created: Set<string>
+  tombstones: Map<string, string>
+  /** move_note argument ids and returned ids, so a later shell undo can skip both. */
+  moved: Set<string>
+}
+
+export interface VaultTurnHolder {
+  current: VaultTurnState | null
+}
+
+export function emptyVaultTurn(): VaultTurnState {
+  return {
+    snapshots: new Map(),
+    created: new Set(),
+    tombstones: new Map(),
+    moved: new Set(),
+  }
+}
+
+function assertDestFolder(destFolder: string): void {
+  if (destFolder === '') return
+  if (
+    destFolder.includes('\\')
+    || destFolder.includes('..')
+    || destFolder.startsWith('/')
+    || /^[A-Za-z]:/.test(destFolder)
+    || destFolder.split('/').some((part) => part === '')
+  ) {
+    throw new Error('Invalid folder')
+  }
 }
 
 export function applyWrite(node: TipTapNode, path: number[], replacement: TipTapNode): TipTapNode {
@@ -337,12 +377,18 @@ function typePayload(note: StrideNote) {
   }
 }
 
-export function vaultTools(host: VaultToolHost): AgentTool[] {
-  const snapshots = new Map<string, string>()
+export function vaultTools(host: VaultToolHost, turns?: VaultTurnHolder): AgentTool[] {
+  const holder: VaultTurnHolder = turns ?? { current: emptyVaultTurn() }
+  const turn = (): VaultTurnState => {
+    const current = holder.current
+    if (!current) throw new Error('No vault turn')
+    return current
+  }
 
   const commit = async (note: StrideNote): Promise<StrideNote> => {
     const saved = noteForSave(note)
-    snapshots.set(saved.id, serializeNote(await host.readNote(saved.id)))
+    const state = turn()
+    state.snapshots.set(saved.id, serializeNote(await host.readNote(saved.id)))
     await host.writeSerialized(saved.id, serializeNote(saved))
     return saved
   }
@@ -471,7 +517,9 @@ export function vaultTools(host: VaultToolHost): AgentTool[] {
       if (!title) throw new Error('Title is required')
       const typeName = record.type?.trim() ?? ''
       if (typeName === 'Type') throw new Error('Use create_type for type documents')
+      const before = new Set((await host.loadNotes()).map((item) => item.id))
       let note = await host.createNote(title)
+      if (!before.has(note.id)) turn().created.add(note.id)
       if (typeName) {
         const typeDoc = (await host.loadNotes()).find((item) => isTypeDocument(item) && item.title === typeName)
         const body = templateBody(typeDoc?.properties.template)
@@ -521,6 +569,44 @@ export function vaultTools(host: VaultToolHost): AgentTool[] {
     },
   }
 
+  const deleteNote: AgentTool = {
+    name: 'delete_note',
+    label: 'Delete note',
+    description: 'Delete a note. Type documents cannot be deleted. undo_note in this turn can restore it.',
+    parameters: Type.Object({ id: Type.String({ minLength: 1 }) }),
+    execute: async (_toolCallId, params) => {
+      const id = (params as { id: string }).id
+      const note = await host.readNote(id)
+      if (isTypeDocument(note)) throw new Error('Cannot delete a type document')
+      if (!host.deleteNote) throw new Error('Cannot delete notes')
+      const state = turn()
+      state.tombstones.set(id, serializeNote(note))
+      await host.deleteNote(id)
+      return toolText(`deleted ${id}`, { id })
+    },
+  }
+
+  const moveNoteTool: AgentTool = {
+    name: 'move_note',
+    label: 'Move note',
+    description: 'Move a note into a folder. destFolder is a relative path. An empty destFolder is the vault root. Does not create folders.',
+    parameters: Type.Object({
+      id: Type.String({ minLength: 1 }),
+      destFolder: Type.String(),
+    }),
+    execute: async (_toolCallId, params) => {
+      const record = params as { id: string; destFolder?: string }
+      if (typeof record.destFolder !== 'string') throw new Error('Invalid folder')
+      assertDestFolder(record.destFolder)
+      if (!host.moveNote) throw new Error('Cannot move notes')
+      const moved = await host.moveNote(record.id, record.destFolder)
+      const state = turn()
+      state.moved.add(record.id)
+      state.moved.add(moved.id)
+      return toolText(JSON.stringify({ id: moved.id, from: record.id }), { id: moved.id, from: record.id })
+    },
+  }
+
   const append: AgentTool = {
     name: 'append_to_note',
     label: 'Append to note',
@@ -530,7 +616,7 @@ export function vaultTools(host: VaultToolHost): AgentTool[] {
       const record = params as { id: string; node: unknown }
       const block = asNode(record.node)
       const note = await host.readNote(record.id)
-      snapshots.set(record.id, serializeNote(note))
+      turn().snapshots.set(record.id, serializeNote(note))
       const doc: TipTapNode = { ...note.doc, content: [...(note.doc.content ?? []), block] }
       await host.writeSerialized(record.id, serializeNote({ ...note, doc }))
       return toolText(`appended to ${record.id}`, { id: record.id })
@@ -551,7 +637,7 @@ export function vaultTools(host: VaultToolHost): AgentTool[] {
       const path = asPath(record.path)
       const replacement = asNode(record.node)
       const note = await host.readNote(record.id)
-      snapshots.set(record.id, serializeNote(note))
+      turn().snapshots.set(record.id, serializeNote(note))
       const doc = applyWrite(note.doc, path, replacement)
       await host.writeSerialized(record.id, serializeNote({ ...note, doc }))
       return toolText(`updated ${record.id} at ${path.join('.')}`, { id: record.id, path })
@@ -572,7 +658,7 @@ export function vaultTools(host: VaultToolHost): AgentTool[] {
       if (typeof record.index !== 'number') throw new Error('index out of range')
       const block = asNode(record.node)
       const note = await host.readNote(record.id)
-      snapshots.set(record.id, serializeNote(note))
+      turn().snapshots.set(record.id, serializeNote(note))
       const doc = insertBlock(note.doc, record.index, block)
       await host.writeSerialized(record.id, serializeNote({ ...note, doc }))
       return toolText(`inserted into ${record.id} at ${record.index}`, { id: record.id, index: record.index })
@@ -591,7 +677,7 @@ export function vaultTools(host: VaultToolHost): AgentTool[] {
       const record = params as { id: string; path: unknown }
       const path = asPath(record.path)
       const note = await host.readNote(record.id)
-      snapshots.set(record.id, serializeNote(note))
+      turn().snapshots.set(record.id, serializeNote(note))
       const doc = removeBlock(note.doc, path)
       await host.writeSerialized(record.id, serializeNote({ ...note, doc }))
       return toolText(`removed ${record.id} at ${path.join('.')}`, { id: record.id, path })
@@ -601,15 +687,32 @@ export function vaultTools(host: VaultToolHost): AgentTool[] {
   const undo: AgentTool = {
     name: 'undo_note',
     label: 'Undo note write',
-    description: 'Restore the note to the snapshot taken before the latest write in this turn. Does not delete a created note.',
+    description: 'Delete a note created this turn, restore the last write of a note that already existed, or restore a note deleted this turn.',
     parameters: Type.Object({ id: Type.String({ minLength: 1 }) }),
     execute: async (_toolCallId, params) => {
       const id = (params as { id: string }).id
-      const snapshot = snapshots.get(id)
-      if (!snapshot) throw new Error('No snapshot')
-      await host.writeSerialized(id, snapshot)
-      snapshots.delete(id)
-      return toolText(`restored ${id}`, { id })
+      const state = turn()
+      if (state.created.has(id)) {
+        if (!host.deleteNote) throw new Error('Cannot delete notes')
+        await host.deleteNote(id)
+        state.snapshots.delete(id)
+        state.tombstones.delete(id)
+        state.created.delete(id)
+        return toolText(`deleted ${id}`, { id })
+      }
+      const snapshot = state.snapshots.get(id)
+      if (snapshot !== undefined) {
+        await host.writeSerialized(id, snapshot)
+        state.snapshots.delete(id)
+        return toolText(`restored ${id}`, { id })
+      }
+      const tombstone = state.tombstones.get(id)
+      if (tombstone !== undefined) {
+        await host.writeSerialized(id, tombstone)
+        state.tombstones.delete(id)
+        return toolText(`restored ${id}`, { id })
+      }
+      throw new Error('No snapshot')
     },
   }
 
@@ -967,6 +1070,8 @@ export function vaultTools(host: VaultToolHost): AgentTool[] {
     listViews,
     create,
     setNote,
+    deleteNote,
+    moveNoteTool,
     append,
     write,
     insert,

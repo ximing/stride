@@ -1,6 +1,13 @@
 import type { AgentMessage, AgentTool, StreamFn } from '@earendil-works/pi-agent-core'
 import type { Api, Model } from '@earendil-works/pi-ai'
-import { AGENT_MAX_TURNS_DEFAULT, normalizeAgentMaxTurns, runAgentLoop, type AgentUsage } from '@stride/core'
+import {
+  AGENT_MAX_TURNS_DEFAULT,
+  normalizeAgentMaxTurns,
+  runAgentLoop,
+  type AgentUsage,
+  type ChatExternalSlots,
+  type ExternalCliMode,
+} from '@stride/core'
 
 export interface ChatToolCall {
   id: string
@@ -40,6 +47,10 @@ export interface ChatSession {
   transcript: AgentMessage[]
   memory: ChatSessionMemory
   usage: AgentUsage
+  /** CLI resume handles. Same shape as the session file. Absent when no mode has a slot. */
+  external?: ChatExternalSlots
+  /** Modes whose stored slot was illegal and dropped on read. Not written back. */
+  externalDropped?: ExternalCliMode[]
 }
 
 export function emptyChatUsage(): AgentUsage {

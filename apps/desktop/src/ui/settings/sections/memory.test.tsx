@@ -44,7 +44,7 @@ function defaultForm() {
     autoGitBlurSeconds: 0,
     appearance: { noteWidth: 'standard' as const, fontSize: 15, fontFamily: '' },
     editor: { autosaveDebounceMs: 350 },
-    agent: { maxTurns: 200, memoryEnabled: true, memoryModelId: '' },
+    agent: { maxTurns: 200, memoryEnabled: true, memoryModelId: '', executables: { grok: null, claude: null, codex: null } },
     updates: { channel: 'stable' as const, autoCheck: true },
     privacy: { telemetryEnabled: false },
   }

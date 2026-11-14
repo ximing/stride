@@ -132,6 +132,9 @@ export const SaveStatus = observer(function SaveStatus() {
     return () => clearTimeout(timer)
   }, [vault.saveStatus])
   const status = vault.saveStatus
+  const heldId = vault.pendingId || vault.activeId
+  // The banner owns this state. pending/saving here means the write was refused.
+  const conflictHeld = heldId !== '' && vault.diskConflicts.some((item) => item.id === heldId)
   if (status === 'error') {
     return (
       <>
@@ -152,10 +155,10 @@ export const SaveStatus = observer(function SaveStatus() {
   }
   return (
     <span
-      className={status === 'pending' || status === 'saving' ? 'statusbar-item save-status is-saving' : 'statusbar-item save-status is-saved'}
+      className={!conflictHeld && (status === 'pending' || status === 'saving') ? 'statusbar-item save-status is-saving' : 'statusbar-item save-status is-saved'}
       data-testid="save-status"
     >
-      {status === 'pending' || status === 'saving' ? t('shell.saving') : showSaved ? t('shell.saved') : ''}
+      {!conflictHeld && (status === 'pending' || status === 'saving') ? t('shell.saving') : showSaved ? t('shell.saved') : ''}
     </span>
   )
 })

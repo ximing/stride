@@ -95,4 +95,27 @@ describe('status bar commit gate', () => {
     expect(chat.draft).toContain('Do not commit or push')
     expect(chat.error).toContain('Settings')
   })
+
+  it('does not say Saving while a disk conflict holds the draft', async () => {
+    services()
+    const vault = resolve(VaultService)
+    vault.activeId = 'moss'
+    vault.pendingId = 'moss'
+    vault.saveStatus = 'pending'
+    vault.diskConflicts = [{ id: 'moss', mtimeMs: 1, size: 4, note: null, undoable: false }]
+    await renderBar()
+    const status = host?.querySelector('[data-testid="save-status"]')
+    expect(status?.textContent).toBe('')
+    expect(status?.className).not.toContain('is-saving')
+  })
+
+  it('still says Saving for an ordinary pending draft', async () => {
+    services()
+    const vault = resolve(VaultService)
+    vault.diskConflicts = []
+    vault.pendingId = 'moss'
+    vault.saveStatus = 'pending'
+    await renderBar()
+    expect(host?.querySelector('[data-testid="save-status"]')?.textContent).toBe('Saving')
+  })
 })

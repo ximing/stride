@@ -34,12 +34,24 @@ export const AGENT_MAX_TURNS_DEFAULT = 200
 export const AGENT_MAX_TURNS_MIN = 1
 export const AGENT_MAX_TURNS_MAX = 2000
 
+/**
+ * Absolute path to a local agent CLI.
+ * `null` means the user has never set it, so detection may fill it in.
+ * `''` means the user cleared it: run the bare name on PATH and do not detect again.
+ */
+export interface AgentExecutables {
+  grok: string | null
+  claude: string | null
+  codex: string | null
+}
+
 export interface AgentSettings {
   maxTurns: number
   /** Master switch for long-term memory: tools, index injection, and distillation. */
   memoryEnabled: boolean
   /** LLM config id for memory distillation/curation; '' follows the chat default model. */
   memoryModelId: string
+  executables: AgentExecutables
 }
 
 export type UpdateChannel = 'stable' | 'beta'
@@ -119,7 +131,7 @@ interface ParsedSettings {
   autoGitBlurSeconds?: unknown
   appearance?: { noteWidth?: unknown; fontSize?: unknown; fontFamily?: unknown }
   editor?: { autosaveDebounceMs?: unknown }
-  agent?: { maxTurns?: unknown; memoryEnabled?: unknown; memoryModelId?: unknown }
+  agent?: { maxTurns?: unknown; memoryEnabled?: unknown; memoryModelId?: unknown; executables?: unknown }
   updates?: { channel?: unknown; autoCheck?: unknown }
   privacy?: { telemetryEnabled?: unknown }
 }
@@ -156,8 +168,36 @@ export function defaultEditorSettings(): EditorSettings {
   return { autosaveDebounceMs: 350 }
 }
 
+export function defaultAgentExecutables(): AgentExecutables {
+  return { grok: null, claude: null, codex: null }
+}
+
 export function defaultAgentSettings(): AgentSettings {
-  return { maxTurns: AGENT_MAX_TURNS_DEFAULT, memoryEnabled: true, memoryModelId: '' }
+  return {
+    maxTurns: AGENT_MAX_TURNS_DEFAULT,
+    memoryEnabled: true,
+    memoryModelId: '',
+    executables: defaultAgentExecutables(),
+  }
+}
+
+/** A missing or non-string value stays unset. A string is kept, including ''. */
+export function normalizeAgentExecutable(value: unknown): string | null {
+  if (typeof value !== 'string') return null
+  const trimmed = value.trim()
+  if (trimmed.length > 4096 || trimmed.includes('\0')) return null
+  return trimmed
+}
+
+export function normalizeAgentExecutables(value: unknown): AgentExecutables {
+  const record = value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : {}
+  return {
+    grok: normalizeAgentExecutable(record.grok),
+    claude: normalizeAgentExecutable(record.claude),
+    codex: normalizeAgentExecutable(record.codex),
+  }
 }
 
 /** Missing or non-integer values use the default. Values above the cap clamp to it. */
@@ -238,6 +278,7 @@ function readAgent(parsed: ParsedSettings['agent'], configs: readonly { id: stri
     maxTurns: normalizeAgentMaxTurns(parsed?.maxTurns),
     memoryEnabled: normalizeMemoryEnabled(parsed?.memoryEnabled),
     memoryModelId: normalizeMemoryModelId(parsed?.memoryModelId, configs),
+    executables: normalizeAgentExecutables(parsed?.executables),
   }
 }
 
@@ -376,6 +417,7 @@ async function sealAll(secrets: SecretsStore, settings: AppSettings): Promise<Se
       maxTurns: normalizeAgentMaxTurns(settings.agent?.maxTurns),
       memoryEnabled: normalizeMemoryEnabled(settings.agent?.memoryEnabled),
       memoryModelId: normalizeMemoryModelId(settings.agent?.memoryModelId, llmConfigs),
+      executables: normalizeAgentExecutables(settings.agent?.executables),
     },
     updates: {
       channel: normalizeUpdateChannel(settings.updates?.channel),
@@ -432,6 +474,7 @@ export function publicSettings(settings: AppSettings): {
       maxTurns: normalizeAgentMaxTurns(settings.agent?.maxTurns),
       memoryEnabled: normalizeMemoryEnabled(settings.agent?.memoryEnabled),
       memoryModelId: normalizeMemoryModelId(settings.agent?.memoryModelId, settings.llmConfigs),
+      executables: normalizeAgentExecutables(settings.agent?.executables),
     },
     updates: {
       channel: normalizeUpdateChannel(settings.updates?.channel),

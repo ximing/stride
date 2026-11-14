@@ -1,9 +1,12 @@
 import type { AgentMessage } from '@earendil-works/pi-agent-core'
 import { describe, expect, it } from 'vitest'
 import {
+  buildResumePreface,
   newSessionId,
+  parseExternalSlots,
   parseSession,
   parseSessionMeta,
+  RESUME_PREFACE_PREFIX,
   serializeSession,
   serializeSessionMeta,
   sessionTitleFromText,
@@ -154,6 +157,82 @@ describe('session file serialization', () => {
     file.transcript = [systemMessage(), userMessage('hi')]
     const parsed = parseSession(serializeSession(file))
     expect(parsed?.transcript.map((message) => message.role)).toEqual(['user'])
+  })
+
+  it('round-trips external slots and drops an illegal slot without rejecting the file', () => {
+    const file = fileFixture()
+    file.external = {
+      claude: { handle: 'sess_1.A:b', cwd: '/vault' },
+      codex: { handle: 'thr/ead+id=', cwd: '/vault' },
+      grok: { handle: `g${'x'.repeat(1023)}`, cwd: 'C:\\notes' },
+    }
+    expect(parseSession(serializeSession(file))).toEqual(file)
+
+    const raw = {
+      format: 1,
+      id: 'ses_1',
+      messages: [{ role: 'user', text: 'hi' }],
+      external: {
+        claude: { handle: 'bad id', cwd: '/vault' },
+        codex: { handle: 'ok/+=', cwd: 'relative' },
+        grok: { handle: `g\0h`, cwd: '/vault' },
+        extra: { handle: 'nope', cwd: '/vault' },
+      },
+    }
+    const parsed = parseSession(JSON.stringify(raw))
+    expect(parsed?.id).toBe('ses_1')
+    expect(parsed?.messages).toEqual([{ id: '', role: 'user', text: 'hi', thinking: '', ts: '', tools: [] }])
+    expect(parsed?.external).toBeUndefined()
+    expect(parseExternalSlots(raw.external).dropped).toEqual(['grok', 'claude', 'codex'])
+
+    const mixed = {
+      format: 1,
+      id: 'ses_1',
+      messages: [],
+      external: {
+        claude: { handle: 'a'.repeat(128), cwd: `/${'p'.repeat(4095)}` },
+        codex: { handle: 'id with spaces/+', cwd: '/vault' },
+        grok: { handle: 'z'.repeat(1025), cwd: '/vault' },
+      },
+    }
+    const kept = parseSession(JSON.stringify(mixed))
+    expect(kept?.external).toEqual({
+      claude: { handle: 'a'.repeat(128), cwd: `/${'p'.repeat(4095)}` },
+      codex: { handle: 'id with spaces/+', cwd: '/vault' },
+    })
+    expect(parseExternalSlots(mixed.external).dropped).toEqual(['grok'])
+    expect(parseSession(JSON.stringify({ ...mixed, external: { claude: { handle: 'a'.repeat(129), cwd: '/vault' } } }))?.external).toBeUndefined()
+  })
+})
+
+describe('resume preface', () => {
+  it('uses the fixed prefix, tool names only, and the newest messages', () => {
+    expect(RESUME_PREFACE_PREFIX).toBe(
+      'The previous CLI session could not be resumed. The following Stride chat is context, not the CLI\'s own memory.',
+    )
+    const messages = Array.from({ length: 10 }, (_, index) => ({
+      role: index % 2 === 0 ? 'user' as const : 'assistant' as const,
+      text: `m${index}-${'x'.repeat(500)}`,
+      tools: index === 9 ? [{ name: 'read_note' }] : [],
+    }))
+    const preface = buildResumePreface(messages, [])
+    expect(preface.startsWith(`${RESUME_PREFACE_PREFIX}\n\n`)).toBe(true)
+    expect(preface).toContain('m9-')
+    expect(preface).toContain('tools: read_note')
+    expect(preface).not.toContain('m0-')
+    expect(preface).not.toContain('m2-')
+    expect(preface).not.toContain('resultSummary')
+    const body = preface.slice(RESUME_PREFACE_PREFIX.length).trim()
+    expect(body.length).toBeLessThanOrEqual(4000)
+  })
+
+  it('redacts secrets longest-first before truncating a message', () => {
+    const secret = 'sk-abc-xyz'
+    const text = `${'a'.repeat(496)}${secret}${'b'.repeat(40)}`
+    const preface = buildResumePreface([{ role: 'user', text, tools: [{ name: secret }] }], ['sk-abc', secret])
+    expect(preface).not.toContain('sk-')
+    expect(preface).toContain('••••')
+    expect(preface).toContain('tools: ••••')
   })
 })
 

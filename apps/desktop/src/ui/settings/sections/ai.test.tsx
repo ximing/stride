@@ -23,7 +23,7 @@ function defaultForm() {
     autoGitBlurSeconds: 0,
     appearance: { noteWidth: 'standard' as const, fontSize: 15, fontFamily: '' },
     editor: { autosaveDebounceMs: 350 },
-    agent: { maxTurns: 200, memoryEnabled: true, memoryModelId: '' },
+    agent: { maxTurns: 200, memoryEnabled: true, memoryModelId: '', executables: { grok: null, claude: null, codex: null } },
     updates: { channel: 'stable' as const, autoCheck: true },
     privacy: { telemetryEnabled: false },
   }
@@ -441,5 +441,53 @@ describe('ai settings section', () => {
     })
     expect(settings.form.agent.maxTurns).toBe(40)
     expect(localStorage.getItem(SETTINGS_STORAGE_KEY) ?? '').toContain('"maxTurns": 40')
+  })
+
+  it('shows executable paths and saves an edit without refilling a cleared field', async () => {
+    const settings = resolve(SettingsService)
+    settings.form = {
+      ...settings.form,
+      agent: {
+        ...settings.form.agent,
+        executables: { grok: '/Users/me/.grok/bin/grok', claude: null, codex: '' },
+      },
+    }
+    await mount()
+    expect(field('agent-exec-grok').value).toBe('/Users/me/.grok/bin/grok')
+    expect(field('agent-exec-claude').value).toBe('')
+    expect(field('agent-exec-claude').placeholder).toBe('claude')
+    expect(field('agent-exec-codex').value).toBe('')
+    expect(document.querySelector('[data-testid="agent-exec-hint"]')?.textContent).toContain('PATH')
+
+    await act(async () => {
+      setInputValue(field('agent-exec-claude'), '/opt/claude')
+    })
+    await act(async () => {
+      for (let index = 0; index < 200 && settings.$model.save.loading; index += 1) {
+        await new Promise((resolvePromise) => setTimeout(resolvePromise, 10))
+      }
+    })
+    const saved = JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY) ?? '{}') as {
+      agent?: { executables?: { grok?: string; claude?: string | null; codex?: string } }
+    }
+    expect(saved.agent?.executables).toEqual({
+      grok: '/Users/me/.grok/bin/grok',
+      claude: '/opt/claude',
+      codex: '',
+    })
+
+    await act(async () => {
+      setInputValue(field('agent-exec-claude'), '')
+    })
+    await act(async () => {
+      for (let index = 0; index < 200 && settings.$model.save.loading; index += 1) {
+        await new Promise((resolvePromise) => setTimeout(resolvePromise, 10))
+      }
+    })
+    const cleared = JSON.parse(localStorage.getItem(SETTINGS_STORAGE_KEY) ?? '{}') as {
+      agent?: { executables?: { claude?: string } }
+    }
+    expect(cleared.agent?.executables?.claude).toBe('')
+    expect(settings.form.agent.executables.grok).toBe('/Users/me/.grok/bin/grok')
   })
 })

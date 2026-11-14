@@ -10,6 +10,21 @@
   max-width: 100%;
 }
 
+.settings-ai-exec {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.settings-ai-exec-field {
+  width: min(100%, 640px);
+}
+
+.settings-ai-exec-field .sd-field {
+  width: 100%;
+  min-width: 0;
+}
+
 .settings-ai-agent-field .sd-field {
   width: 100%;
   min-width: 0;

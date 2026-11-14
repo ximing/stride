@@ -126,6 +126,19 @@
   white-space: normal;
 }
 
+.chat-undo {
+  display: flex;
+  align-items: center;
+  gap: var(--sd-space-2);
+  margin-top: var(--sd-space-2);
+}
+
+.chat-undo-skipped {
+  color: var(--sd-muted);
+  font-size: 12px;
+  line-height: 16px;
+}
+
 .chat-message-role {
   display: block;
   margin-bottom: 4px;

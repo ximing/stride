@@ -1,5 +1,6 @@
 import { History, MessageCircle, Plus, Send, Square, Trash2, Wrench, X } from 'lucide-react'
 import { normalizeAgentMaxTurns, type ChatSessionMeta, type PublicLlmConfig } from '@stride/core'
+import { agentExecutableCommand } from '@stride/platform'
 import { observer, useService } from '@rabjs/react'
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -11,6 +12,7 @@ import { VaultService } from '../../services/vault/vault.service'
 import { ChatMarkdown } from './chat-markdown'
 import { Button, IconButton } from '../primitives/button'
 import { EmptyState } from '../primitives/empty-state'
+import { isAgentMode, isExternalAgentMode } from '@stride/core'
 import { Mark } from '../primitives/icon'
 import { Select } from '../primitives/select'
 
@@ -20,9 +22,22 @@ function chatErrorText(
   turns: number,
 ): string {
   if (error === 'Add a model provider, base URL, model, and key in Settings') return translate('chat.needProvider')
+  if (error === 'external-agent-unavailable') return translate('chat.externalUnavailable')
+  if (error === 'external-agent-missing') return translate('chat.externalMissing')
+  if (error === 'external-agent-handshake') return translate('chat.externalHandshake')
+  if (error === 'external-agent-aborted') return translate('chat.externalAborted')
+  if (error === 'external-agent-stopped') return translate('chat.externalStopped')
+  if (error === 'external-agent-stopped-resume') return translate('chat.externalStoppedResume')
+  if (error === 'external-agent-failed') return translate('chat.externalFailed')
+  if (error === 'external-agent-resume-failed') return translate('chat.externalResumeFailed')
   if (error === CHAT_TURN_LIMIT_ERROR) return translate('chat.turnLimit', { count: turns })
   if (error === CHAT_HISTORY_LOAD_ERROR) return translate('chat.historyLoadFailed')
   return error
+}
+
+function executableBaseName(path: string): string {
+  const cut = Math.max(path.lastIndexOf('/'), path.lastIndexOf('\\'))
+  return cut >= 0 ? path.slice(cut + 1) : path
 }
 
 function relativeTime(
@@ -200,14 +215,34 @@ export const ChatPanel = observer(function ChatPanel() {
   const models = settings.form.llmConfigs
   const modelId = chat.activeModelId
   const title = session.messages.length === 0 ? t('chat.new') : session.title
+  const external = isExternalAgentMode(vault.agentMode)
+  const externalOk = chat.externalAgentsAvailable
+  const externalCommand = isExternalAgentMode(vault.agentMode)
+    ? agentExecutableCommand(vault.agentMode, settings.form.agent?.executables?.[vault.agentMode])
+    : ''
+  const knownExec = chat.externalExec
+    && chat.externalExec.mode === vault.agentMode
+    && chat.externalExec.command === externalCommand
+    ? chat.externalExec
+    : null
+  const externalExecLabel = !knownExec
+    ? t('chat.externalExecChecking')
+    : knownExec.found
+      ? t('chat.externalExecFound', { name: executableBaseName(knownExec.resolved), path: knownExec.resolved })
+      : t('chat.externalExecMissing')
   // A recalled session locked to another model keeps using it; say so.
-  const lockedModel = session.modelId && session.modelId !== modelId
+  const lockedModel = !external && session.modelId && session.modelId !== modelId
     ? models.find((config) => config.id === session.modelId) ?? null
     : null
 
   useEffect(() => {
     void chat.ensureLoaded()
   }, [chat, vault.activeVaultId])
+
+  useEffect(() => {
+    if (!external || !externalOk) return
+    void chat.refreshExternalExec()
+  }, [chat, external, externalOk, vault.agentMode, externalCommand])
 
   return (
     <div className="chat-panel" data-testid="chat-panel">
@@ -279,6 +314,22 @@ export const ChatPanel = observer(function ChatPanel() {
               <ChatTools tools={message.tools} />
             ) : null}
             {message.role === 'assistant' ? <ChatMarkdown text={message.text} /> : <p>{message.text}</p>}
+            {message.role === 'assistant' && message.id && chat.undoableTurnIds.includes(message.id) ? (
+              <div className="chat-undo">
+                <Button
+                  tone="secondary"
+                  size="sm"
+                  data-testid="chat-undo-turn"
+                  disabled={chat.running}
+                  onClick={() => { void chat.undoTurn(message.id!) }}
+                >
+                  {t('chat.undoTurn')}
+                </Button>
+                {chat.undoSkippedTurnIds.includes(message.id) ? (
+                  <span className="chat-undo-skipped" data-testid="chat-undo-skipped">{t('chat.undoSkipped')}</span>
+                ) : null}
+              </div>
+            ) : null}
           </div>
         ))}
       </div>
@@ -296,7 +347,18 @@ export const ChatPanel = observer(function ChatPanel() {
           placeholder={t('chat.placeholder')}
         />
         <div className="chat-compose-bar">
-          {models.length > 0 && modelId ? (
+          {external ? (
+            <div className="chat-model-empty">
+              <p className="chat-model-empty" data-testid="chat-external-model">
+                {externalOk ? t('chat.externalModel') : t('chat.externalUnavailable')}
+              </p>
+              {externalOk ? (
+                <p data-testid="chat-external-exec" className="chat-model-empty">
+                  {externalExecLabel}
+                </p>
+              ) : null}
+            </div>
+          ) : models.length > 0 && modelId ? (
             <Select
               className="chat-model"
               aria-label={t('chat.model')}
@@ -316,9 +378,14 @@ export const ChatPanel = observer(function ChatPanel() {
             options={[
               { value: 'safe', label: t('chat.safe'), testId: 'chat-mode-safe' },
               { value: 'power', label: t('chat.power'), testId: 'chat-mode-power' },
+              { value: 'grok', label: t('chat.grok'), testId: 'chat-mode-grok', disabled: !externalOk },
+              { value: 'claude', label: t('chat.claude'), testId: 'chat-mode-claude', disabled: !externalOk },
+              { value: 'codex', label: t('chat.codex'), testId: 'chat-mode-codex', disabled: !externalOk },
             ]}
             onValueChange={(mode) => {
-              if (mode === 'safe' || mode === 'power') void vault.setAgentMode(mode)
+              if (!isAgentMode(mode)) return
+              if (isExternalAgentMode(mode) && !chat.externalAgentsAvailable) return
+              void vault.setAgentMode(mode)
             }}
           />
           <span className="chat-compose-spacer" />
@@ -327,7 +394,7 @@ export const ChatPanel = observer(function ChatPanel() {
             tone="primary"
             icon={<Mark icon={Send} size={14} />}
             data-testid="chat-send"
-            disabled={chat.running}
+            disabled={chat.running || chat.externalSendBlocked}
             onClick={() => { void chat.send() }}
           >
             {t('chat.send')}

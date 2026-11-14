@@ -1,4 +1,6 @@
-import type { FileSystemBackend } from '@stride/platform'
+import { isExternalAgentMode, type ExternalAgentMode, type FileSystemBackend } from '@stride/platform'
+
+export { isExternalAgentMode }
 import { TYPE_COLOR_KEYS } from './types.ts'
 import { VAULT_MARKER } from './vault.ts'
 
@@ -54,7 +56,16 @@ export async function writeAdvanceInbox(fs: FileSystemBackend, enabled: boolean)
   await fs.writeText(VAULT_MARKER, `${JSON.stringify(next, null, 2)}\n`)
 }
 
-export type AgentMode = 'safe' | 'power'
+export type AgentMode = 'safe' | 'power' | ExternalAgentMode
+
+export function isAgentMode(value: string): value is AgentMode {
+  return value === 'safe' || value === 'power' || isExternalAgentMode(value)
+}
+
+/** Unknown marker values stay on Safe. */
+export function sanitizeAgentMode(value: unknown): AgentMode {
+  return typeof value === 'string' && isAgentMode(value) ? value : 'safe'
+}
 
 export async function readAgentMode(fs: FileSystemBackend): Promise<AgentMode> {
   try {
@@ -62,7 +73,7 @@ export async function readAgentMode(fs: FileSystemBackend): Promise<AgentMode> {
     if (!stat || stat.kind !== 'file') return 'safe'
     const parsed = JSON.parse(await fs.readText(VAULT_MARKER)) as { agentMode?: unknown }
     if (!parsed || typeof parsed !== 'object') return 'safe'
-    return parsed.agentMode === 'power' || parsed.agentMode === 'safe' ? parsed.agentMode : 'safe'
+    return sanitizeAgentMode(parsed.agentMode)
   } catch {
     return 'safe'
   }
@@ -187,7 +198,7 @@ export interface VaultOpenState {
 /** One marker read for the flags an open publishes together. Defaults match the individual readers. */
 export async function readVaultOpenState(fs: FileSystemBackend): Promise<VaultOpenState> {
   const marker = await readMarker(fs)
-  const agentMode = marker?.agentMode === 'power' || marker?.agentMode === 'safe' ? marker.agentMode : 'safe'
+  const agentMode = sanitizeAgentMode(marker?.agentMode)
   return {
     renameFromHeading: typeof marker?.renameFromHeading === 'boolean' ? marker.renameFromHeading : true,
     advanceInbox: typeof marker?.advanceInbox === 'boolean' ? marker.advanceInbox : true,

@@ -47,6 +47,7 @@ import {
   VIEW_FILTER_PREFIX,
   writeAdvanceInbox,
   writeAgentMode,
+  type AgentMode,
   writeGitSetupPreference,
   writeRenameFromHeading,
   writeSampleNotes,
@@ -84,7 +85,18 @@ import { applyStageZoom } from '../layout/stage-zoom'
 import { ViewsService } from '../views/views.service'
 import { applyNoteIdChanges, FOLDER_FILTER_PREFIX } from './note-identity'
 import { liveDocStash } from './live-doc'
-import { refreshVaultFromDisk, refreshVaultPaths, type RefreshBaseline } from './vault-refresh'
+import {
+  clearDiskConflicts,
+  forgetDiskNote,
+  gatePendingWrite,
+  hasDiskConflict,
+  refreshVaultFromDisk,
+  refreshVaultPaths,
+  retargetDiskNote,
+  stampNoteMtime,
+  type DiskConflict,
+  type RefreshBaseline,
+} from './vault-refresh'
 import { bindVaultRefresh, unbindVaultRefresh } from './vault-watch'
 import * as vaultOpen from './vault-open'
 import * as propertyEditor from './vault-properties'
@@ -229,7 +241,7 @@ export class VaultService extends Service {
   /** True while a user-initiated disk refresh is queued or running. */
   refreshing = false
   renameFromHeading = true
-  agentMode: 'safe' | 'power' = 'safe'
+  agentMode: AgentMode = 'safe'
   advanceInbox = true
   // Per-vault settings (T7.3), all persisted in .stride/vault.json.
   zoom = 1
@@ -246,7 +258,10 @@ export class VaultService extends Service {
   vaults: VaultRecord[] = []
   activeVaultId = ''
   // File mtimes keyed by note id. Derived for the note list's relative dates.
+  // Only real fs.stat mtimeMs values. A missing key means the next save has no external baseline.
   noteMtimes: Record<string, number> = {}
+  /** Unresolved disk changes that blocked a save. At most one record per note id. */
+  diskConflicts: DiskConflict[] = []
   // Signature passed to the last successful opener.open. Save compares against this.
   indexSignature: IndexSignature = { endpoint: '', model: '', dim: 0, active: false }
   index: NoteIndex | null = null
@@ -735,8 +750,13 @@ export class VaultService extends Service {
     }
   }
 
-  async setAgentMode(mode: 'safe' | 'power') {
+  async setAgentMode(mode: AgentMode) {
+    const previous = this.agentMode
     this.agentMode = mode
+    if (previous !== mode) {
+      const { ChatService } = await import('../chat/chat.service')
+      if (has(ChatService)) this.resolve(ChatService).dropExternalAgent()
+    }
     if (!this.fs) return
     try {
       await writeAgentMode(this.fs, mode)
@@ -840,6 +860,7 @@ export class VaultService extends Service {
         remapped[change.toId] = remapped[change.fromId]!
         delete remapped[change.fromId]
       }
+      retargetDiskNote(this, change.fromId, change.toId)
     }
     this.noteMtimes = remapped
     const docs = []
@@ -1065,6 +1086,8 @@ export class VaultService extends Service {
       await fs.writeText(path, raw)
       if (this.session !== session) throw new Error('Vault session changed')
       if (this.saveGeneration !== generation) throw new Error('Note changed while writing; retry')
+      await stampNoteMtime(this, fs, id)
+      forgetDiskNote(this, id)
     })
     if (this.session !== session) throw new Error('Vault session changed')
     if (this.notes.some((item) => item.id === note.id)) this.replace(note)
@@ -1080,12 +1103,14 @@ export class VaultService extends Service {
     const session = this.session
     await this.flush()
     if (this.session !== session || !this.fs) throw new Error('Vault session changed')
+    if (hasDiskConflict(this, id)) return
     const fs = this.fs
     const path = notePath(id)
     const seen = this.saveGeneration
     await this.enqueueWrite(async () => {
       if (this.session !== session) throw new Error('Vault session changed')
       if (this.saveGeneration !== seen) throw new Error('Note changed while writing; retry')
+      if (hasDiskConflict(this, id)) return
       this.saveGeneration += 1
       const generation = this.saveGeneration
       await fs.writeText(path, serialized)
@@ -1095,7 +1120,7 @@ export class VaultService extends Service {
       if (this.notes.some((item) => item.id === note.id)) this.replace(note)
       else this.notes = [note, ...this.notes]
       if (this.activeId === note.id) this.docEpoch += 1
-      this.noteMtimes = { ...this.noteMtimes, [note.id]: Date.now() }
+      await stampNoteMtime(this, fs, note.id)
       this.error = ''
       if (this.pendingId === note.id) {
         this.pendingId = ''
@@ -1125,12 +1150,33 @@ export class VaultService extends Service {
     const live = liveDocStash(this).get(id)
     const pending = live ? { ...note, doc: live } : note
     const fs = this.fs
+    // A known conflict already refused this draft. Do not flash "Saving" on the retry.
+    if (hasDiskConflict(this, id)) {
+      this.holdConflictedDraft(id)
+      return
+    }
     this.saveStatus = 'saving'
     await this.enqueueWrite(async () => {
       if (session !== this.session) return
       if (generation !== this.saveGeneration) {
         if (this.pendingId) this.saveStatus = 'pending'
         else if (this.saveStatus === 'saving') this.saveStatus = 'idle'
+        return
+      }
+      if (hasDiskConflict(this, id)) {
+        this.holdConflictedDraft(id)
+        return
+      }
+      // Compare the file's real mtime with the last stat, not Date.now(), before saveNote.
+      const allowed = await gatePendingWrite(this, fs, id)
+      if (session !== this.session) return
+      if (generation !== this.saveGeneration) {
+        if (this.pendingId) this.saveStatus = 'pending'
+        else if (this.saveStatus === 'saving') this.saveStatus = 'idle'
+        return
+      }
+      if (!allowed) {
+        this.holdConflictedDraft(id)
         return
       }
       let saved: StrideNote
@@ -1154,7 +1200,8 @@ export class VaultService extends Service {
       }
       // The open moved on. The file landed on the captured vault; leave the new session alone.
       if (session !== this.session) return
-      // A newer edit landed while the file write was in flight.
+      // The bytes just written are the baseline, including when a newer keystroke is already pending.
+      await stampNoteMtime(this, fs, saved.id)
       if (generation !== this.saveGeneration) {
         if (this.pendingId) this.saveStatus = 'pending'
         else if (this.saveStatus === 'saving') this.saveStatus = 'idle'
@@ -1166,7 +1213,6 @@ export class VaultService extends Service {
       this.error = ''
       liveDocStash(this).delete(id)
       this.replace(saved)
-      this.noteMtimes = { ...this.noteMtimes, [saved.id]: Date.now() }
       await this.upsertIndexed(saved)
     })
   }
@@ -1207,10 +1253,17 @@ export class VaultService extends Service {
     }
   }
 
-  private diskRefreshBaseline(): RefreshBaseline {
+  /** In-memory body or title that is not the last saved file. Conflicts are separate. */
+  unsavedNoteIds(): ReadonlySet<string> {
     const dirty = new Set<string>(liveDocStash(this).keys())
     if (this.pendingId) dirty.add(this.pendingId)
     for (const id of this.titleBaseline.keys()) dirty.add(id)
+    return dirty
+  }
+
+  private diskRefreshBaseline(): RefreshBaseline {
+    const dirty = new Set<string>(this.unsavedNoteIds())
+    for (const conflict of this.diskConflicts) dirty.add(conflict.id)
     return { dirty, generation: this.saveGeneration }
   }
 
@@ -1253,6 +1306,8 @@ export class VaultService extends Service {
   async refreshMtimes(epoch: number, notes: StrideNote[]) {
     const fs = this.fs
     if (!fs) return
+    if (epoch !== this.rebuildEpoch) return
+    clearDiskConflicts(this)
     const entries = await Promise.all(
       notes.map(async (note) => {
         try {
@@ -1516,10 +1571,17 @@ export class VaultService extends Service {
     this.notes = raw(this.notes).map((item) => (item.id === note.id ? note : item))
   }
 
+  /** Keep the draft, but do not report an in-flight save the conflict already refused. */
+  private holdConflictedDraft(id: string) {
+    this.pendingId = id
+    if (this.saveStatus === 'pending' || this.saveStatus === 'saving') this.saveStatus = 'idle'
+  }
+
   schedule(id: string) {
     this.pendingId = id
     this.saveGeneration += 1
-    this.saveStatus = 'pending'
+    if (hasDiskConflict(this, id)) this.holdConflictedDraft(id)
+    else this.saveStatus = 'pending'
     if (this.docTimer) clearTimeout(this.docTimer)
     // The callback's return value is not awaited by fake timers. Keep the promise.
     this.docTimer = setTimeout(() => {
@@ -1599,21 +1661,23 @@ export class VaultService extends Service {
     const fs = this.fs
     if (!fs || ids.length === 0) return
     const wanted = new Set(ids)
+    const session = this.session
     try {
       await this.flush()
-      const saved: StrideNote[] = []
-      for (const note of this.notes) {
-        if (!wanted.has(note.id)) continue
-        saved.push(await saveNote(fs, noteForSave(mutate(note))))
-      }
-      if (saved.length === 0) return
-      const byId = new Map(saved.map((note) => [note.id, note]))
-      this.notes = this.notes.map((note) => byId.get(note.id) ?? note)
-      const now = Date.now()
-      const mtimes = { ...this.noteMtimes }
-      for (const note of saved) mtimes[note.id] = now
-      this.noteMtimes = mtimes
-      this.docEpoch += 1
+      await this.enqueueWrite(async () => {
+        if (this.session !== session || !this.fs) return
+        const notes = raw(this.notes) as readonly StrideNote[]
+        let changed = false
+        for (const note of notes) {
+          if (!wanted.has(note.id) || hasDiskConflict(this, note.id)) continue
+          const saved = await saveNote(fs, noteForSave(mutate(note)))
+          this.replace(saved)
+          await stampNoteMtime(this, fs, saved.id)
+          changed = true
+        }
+        if (!changed || hasDiskConflict(this, this.activeId)) return
+        this.docEpoch += 1
+      })
     } catch (error) {
       this.error = errorText(error)
     }
@@ -1636,7 +1700,10 @@ export class VaultService extends Service {
       await this.removeIndexed(removed)
       this.notes = this.notes.filter((note) => !wanted.has(note.id))
       const mtimes = { ...this.noteMtimes }
-      for (const id of removed) delete mtimes[id]
+      for (const id of removed) {
+        delete mtimes[id]
+        forgetDiskNote(this, id)
+      }
       this.noteMtimes = mtimes
       if (wanted.has(this.activeId)) {
         this.activeId = this.visibleNotes[0]?.id ?? ''

@@ -18,6 +18,7 @@ import { TableContextMenu } from './table/table-menu'
 import { EditorFind } from './find/find-bar'
 import { EditorToolbar } from './toolbar/toolbar'
 import { resolveWikilinkClick } from './wikilink/wikilink'
+import { DiskConflictBanner } from './disk-conflict'
 
 const emptyDoc = { type: 'doc', content: [{ type: 'paragraph' }] }
 
@@ -145,6 +146,7 @@ export const NoteEditor = observer(function NoteEditor() {
 
   return (
     <div data-testid="editor" className="editor" onContextMenu={editorMenu.onContextMenu}>
+      <DiskConflictBanner />
       <EditorFind editor={editor} />
       <EditorToolbar editor={editor} openLinkRef={openLinkRef} getFs={() => fsRef.current} />
       <div className="editor-scroll" ref={scrollRef}>

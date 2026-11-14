@@ -7,14 +7,25 @@ import {
   type ShellBackend,
   type ShellExecOptions,
 } from '@stride/platform'
-import type { StrideNote } from '@stride/core'
+import { createNote, saveNote, type StrideNote } from '@stride/core'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { chatSystemPrompt, chatVaultHost } from './chat-vault-host'
+import { TabsService } from '../notes/tabs.service'
 import { SettingsService } from '../settings/settings.service'
+import { FolderService } from '../vault/folder.service'
 import { VaultService } from '../vault/vault.service'
 
 const shortKey = 'sk-short'
 const longKey = 'sk-short-and-more'
+
+function writableHost(vault: VaultService) {
+  const host = chatVaultHost(vault)
+  if (!host.deleteNote || !host.moveNote) throw new Error('Vault host is missing write tools')
+  return host as typeof host & {
+    deleteNote: NonNullable<(typeof host)['deleteNote']>
+    moveNote: NonNullable<(typeof host)['moveNote']>
+  }
+}
 
 const shellGate = vi.hoisted(() => ({
   desktop: false,
@@ -140,6 +151,10 @@ describe('chatVaultHost', () => {
     expect(prompt).toContain('list_types')
     expect(prompt).toContain('save_view')
     expect(prompt).toContain('bash')
+    expect(prompt).toContain('delete_note')
+    expect(prompt).toContain('move_note')
+    expect(prompt).toContain('Do not rewrite *.stride.json from the shell.')
+    expect(prompt).not.toContain('Do not delete notes')
     expect(prompt).toContain('memory_read')
     expect(prompt).toContain('memory_write')
     expect(prompt).not.toContain('apiKey')
@@ -168,6 +183,106 @@ describe('chatVaultHost', () => {
       currentVaultLabel: '',
     } as unknown as VaultService
     expect(chatSystemPrompt(vault)).toContain('No note is open')
+  })
+
+  it('passes TabsService tabs, capped at 20, instead of only the active note', () => {
+    if (!has(TabsService)) register(TabsService)
+    const tabs = resolve(TabsService)
+    const previous = tabs.tabs
+    const notes = Array.from({ length: 21 }, (_, index) => ({
+      ...note,
+      id: `n${index}`,
+      title: `Tab ${index}`,
+    }))
+    tabs.tabs = notes.map((item, index) => ({
+      id: `tab-${index}`,
+      noteId: item.id,
+      back: [],
+      forward: [],
+    }))
+    const vault = {
+      active: notes[0],
+      notes,
+      currentVaultLabel: 'Field',
+    } as unknown as VaultService
+    try {
+      const prompt = chatSystemPrompt(vault)
+      expect(prompt).toContain('Open tabs show 20 of 21.')
+      expect(prompt).toContain('"tabsShown": 20')
+      expect(prompt).toContain('"tabsTruncated": true')
+      expect(prompt).toContain('"title": "Tab 19"')
+      expect(prompt).not.toContain('"title": "Tab 20"')
+      expect(prompt).not.toContain('Vault titles show')
+      const openTabs = prompt.slice(prompt.indexOf('"openTabs"'), prompt.indexOf('"tabsShown"'))
+      expect(openTabs).toContain('"id": "n0"')
+      expect(openTabs).not.toContain('only-the-active-note')
+    } finally {
+      tabs.tabs = previous
+    }
+  })
+
+  it('deletes a note through VaultService.deleteNotes', async () => {
+    const calls: string[][] = []
+    const vault = {
+      fs: { rootLabel: '/vault' },
+      error: '',
+      deleteNotes: async (ids: string[]) => {
+        calls.push([...ids])
+      },
+    } as unknown as VaultService
+    await writableHost(vault).deleteNote('n1')
+    expect(calls).toEqual([['n1']])
+    const failing = {
+      fs: { rootLabel: '/vault' },
+      error: '',
+      deleteNotes: async () => {
+        failing.error = 'disk full'
+      },
+    } as unknown as VaultService & { error: string }
+    await expect(writableHost(failing).deleteNote('n1')).rejects.toThrow('disk full')
+  })
+
+  it('moves a note through FolderService and does not create the destination', async () => {
+    if (!has(VaultService)) register(VaultService)
+    if (!has(FolderService)) register(FolderService)
+    const vault = resolve(VaultService)
+    const fs = new MemoryFileSystem('/tmp/stride-chat-move')
+    const moving = createNote('alpha', 'Alpha')
+    await saveNote(fs, moving)
+    await fs.mkdir('box')
+    const previous = {
+      fs: vault.fs,
+      notes: vault.notes,
+      activeId: vault.activeId,
+      error: vault.error,
+      docEpoch: vault.docEpoch,
+    }
+    vault.fs = fs
+    vault.notes = [moving]
+    vault.activeId = moving.id
+    vault.error = ''
+    try {
+      await expect(writableHost(vault).moveNote('alpha', 'missing')).rejects.toThrow('Folder not found')
+      expect(await fs.stat('missing')).toBeNull()
+      expect(await fs.stat('alpha.stride.json')).not.toBeNull()
+      expect(await writableHost(vault).moveNote('alpha', 'box')).toEqual({ id: 'box/alpha' })
+      expect(vault.notes.map((item) => item.id)).toEqual(['box/alpha'])
+      expect(vault.error).toBe('')
+      expect(await writableHost(vault).moveNote('box/alpha', '')).toEqual({ id: 'alpha' })
+      expect(await fs.stat('alpha.stride.json')).not.toBeNull()
+    } finally {
+      vault.fs = previous.fs
+      vault.notes = previous.notes
+      vault.activeId = previous.activeId
+      vault.error = previous.error
+      vault.docEpoch = previous.docEpoch
+    }
+  })
+
+  it('refuses to delete or move when no vault is open', async () => {
+    const vault = { fs: null, notes: [], error: '' } as unknown as VaultService
+    await expect(writableHost(vault).deleteNote('n1')).rejects.toThrow('Open a vault first')
+    await expect(writableHost(vault).moveNote('n1', 'box')).rejects.toThrow('Open a vault first')
   })
 
   it('refuses to create a note when no vault is open', async () => {

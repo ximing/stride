@@ -110,10 +110,14 @@ export class FolderService extends Service {
     }
   }
 
-  async moveNote(fromId: string, destFolder: string) {
+  async moveNote(fromId: string, destFolder: string): Promise<string> {
     const fs = this.vault.fs
-    if (!fs) return
+    if (!fs) return fromId
     try {
+      if (destFolder !== '') {
+        const stat = await fs.stat(destFolder)
+        if (!stat || stat.kind !== 'directory') throw new Error('Folder not found')
+      }
       const toId = await moveNotePath(fs, fromId, destFolder)
       if (toId !== fromId) {
         await applyNoteIdChanges(this.vault, [{ fromId, toId }])
@@ -121,8 +125,10 @@ export class FolderService extends Service {
       this.vault.docEpoch += 1
       this.vault.error = ''
       await this.loadFolders()
+      return toId
     } catch (error) {
       this.vault.error = errorText(error)
+      return fromId
     }
   }
 }

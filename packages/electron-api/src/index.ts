@@ -26,6 +26,11 @@ export const ELECTRON_REQUEST_CHANNELS = Object.freeze([
   'secrets:getOrCreateKey',
   'shell:spawn',
   'shell:cancel',
+  'agent:spawn',
+  'agent:write',
+  'agent:kill',
+  'agent:which',
+  'agent:probe',
   'window:intent',
   'window:setProject',
   'window:new',
@@ -44,6 +49,7 @@ export const ELECTRON_EVENT_CHANNELS = Object.freeze([
   'fs:event',
   'host:fetch:event',
   'shell:event',
+  'agent:event',
   'window:intent',
   'window:recent',
   'window:state',
@@ -236,6 +242,7 @@ export type {
 export { execGit, type GitExecResult } from './git.ts'
 export { getOrCreateSealKey, type SealKeyRequest } from './secrets.ts'
 export { cancelShell, onShellEvent, spawnShell, type ShellEvent, type ShellSpawnRequest } from './shell.ts'
+export { killAgent, onAgentEvent, probeAgent, spawnAgent, whichAgents, writeAgent, type AgentEvent, type AgentExecutablePaths, type AgentSpawnRequest } from './agent-process.ts'
 export { hostFetch } from './host-fetch.ts'
 export type { HostFetchEvent, HostFetchHead, HostFetchRequest } from './host-fetch.ts'
 export { listSystemFonts } from './fonts.ts'

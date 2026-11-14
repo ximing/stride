@@ -331,6 +331,35 @@ function runProbe(session: ShellSession, interpreter: string, cwd: string): Prom
   })
 }
 
+/** Login-shell PATH so a GUI-launched app can see user-installed CLIs. */
+export async function loginPathFor(cwd: string): Promise<string | undefined> {
+  const session: ShellSession = {
+    id: 'path-probe',
+    sender: {
+      getURL: () => '',
+      send() {},
+      on() {},
+      isDestroyed: () => false,
+    },
+    child: null,
+    pid: null,
+    bytes: 0,
+    reason: 'exit',
+    truncated: false,
+    ended: false,
+    stopping: false,
+    timer: null,
+    stdout: new StringDecoder('utf8'),
+    stderr: new StringDecoder('utf8'),
+    probe: null,
+    killed: false,
+    decodersFlushed: false,
+    probeRelease: null,
+    closeFallback: null,
+  }
+  return resolveCommandPath(session, cwd)
+}
+
 async function resolveCommandPath(session: ShellSession, cwd: string): Promise<string | undefined> {
   const cached = await cachedLoginPath()
   if (cached) return cached

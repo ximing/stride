@@ -1,22 +1,33 @@
 import { register, resolve } from '@rabjs/react'
 import { act, type ReactNode } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
-import { MemoryAppDataStore } from '@stride/platform'
+import { MemoryAppDataStore, MemoryFileSystem } from '@stride/platform'
 import {
+  markDedicatedVault,
   newSessionId,
+  readAgentMode,
   serializeSession,
   serializeSessionMeta,
   vaultStorageKey,
   type ChatSessionFile,
   type ChatSessionMeta,
 } from '@stride/core'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { CHAT_TURN_LIMIT_ERROR, ChatService } from '../../services/chat/chat.service'
-import { blankChatSession } from '../../services/chat/chat-turn'
+import { blankChatSession, playChatTurn } from '../../services/chat/chat-turn'
+import { setAgentProcessHostForTests } from '../../services/platform/agent-process'
+import { createPeerHost } from '../../services/chat/external-agent-harness'
 import { resetAppDataStore, setAppDataStore } from '../../services/platform/app-data'
 import { SettingsService } from '../../services/settings/settings.service'
 import { VaultService } from '../../services/vault/vault.service'
 import { ChatPanel } from './chat-panel'
+
+vi.mock('../../services/chat/chat-turn', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../../services/chat/chat-turn')>()
+  return { ...actual, playChatTurn: vi.fn() }
+})
+
+const mockedTurn = vi.mocked(playChatTurn)
 
 function host(): { host: HTMLDivElement; root: Root } {
   const element = document.createElement('div')
@@ -49,6 +60,8 @@ async function unmount(element: HTMLDivElement, root: Root) {
 
 function resetChat() {
   const chat = resolve(ChatService)
+  chat.dropExternalAgent()
+  setAgentProcessHostForTests(null)
   chat.modelId = ''
   chat.draft = ''
   chat.error = ''
@@ -60,6 +73,9 @@ function resetChat() {
   chat.storagePersistent = null
   chat.memoryBusy = false
   chat.memoryError = ''
+  chat.externalExec = null
+  chat.undoableTurnIds = []
+  chat.undoSkippedTurnIds = []
   chat.resetMemoryWork()
   Object.assign(chat, { vaultKeyLoaded: null })
   const settings = resolve(SettingsService)
@@ -67,7 +83,18 @@ function resetChat() {
   const vault = resolve(VaultService)
   vault.agentMode = 'safe'
   vault.activeVaultId = ''
+  vault.fs = null
   resetAppDataStore()
+}
+
+async function openMode(trigger: Element) {
+  await act(async () => {
+    trigger.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+  })
+}
+
+function modeItem(testId: string): Element | null {
+  return document.querySelector(`[data-testid="${testId}"]`)
 }
 
 function storedMeta(overrides: Partial<ChatSessionMeta> = {}): ChatSessionMeta {
@@ -129,6 +156,15 @@ describe('ChatPanel', () => {
       const power = document.querySelector('[data-testid="chat-mode-power"]')
       expect(power).not.toBeNull()
       expect(document.querySelector('[data-testid="chat-mode-safe"]')).not.toBeNull()
+      for (const [testId, label] of [
+        ['chat-mode-grok', 'Grok'],
+        ['chat-mode-claude', 'Claude Code'],
+        ['chat-mode-codex', 'Codex'],
+      ] as const) {
+        const item = modeItem(testId)
+        expect(item?.textContent).toContain(label)
+        expect(item?.hasAttribute('data-disabled')).toBe(true)
+      }
       await act(async () => {
         power!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
       })
@@ -402,6 +438,181 @@ describe('ChatPanel', () => {
       })
       expect(element.querySelector('[data-testid="chat-memory-busy"]')).toBeNull()
       expect(element.querySelector('[data-testid="chat-memory-error"]')?.textContent).toContain('failed')
+    } finally {
+      await unmount(element, root)
+    }
+  })
+
+  it('persists Grok, Claude Code, and Codex and locks the model control', async () => {
+    register(VaultService)
+    register(SettingsService)
+    register(ChatService)
+    const peer = createPeerHost()
+    setAgentProcessHostForTests(peer)
+    const vault = resolve(VaultService)
+    const fs = new MemoryFileSystem('/field-notes')
+    await markDedicatedVault(fs)
+    vault.fs = fs
+    const settings = resolve(SettingsService)
+    settings.form = {
+      ...settings.form,
+      llmConfigs: [
+        { id: 'a', name: 'Primary', provider: 'openai', model: 'gpt-4o-mini', baseUrl: '', keyMask: '', isDefault: true },
+        { id: 'b', name: 'Backup', provider: 'deepseek', model: 'deepseek-chat', baseUrl: '', keyMask: '', isDefault: false },
+      ],
+    }
+    const chat = resolve(ChatService)
+    const { host: element, root } = host()
+    try {
+      await render(root, <ChatPanel />)
+      const trigger = element.querySelector('[data-testid="chat-mode"]')!
+      for (const [mode, testId, label] of [
+        ['grok', 'chat-mode-grok', 'Grok'],
+        ['claude', 'chat-mode-claude', 'Claude Code'],
+        ['codex', 'chat-mode-codex', 'Codex'],
+      ] as const) {
+        await openMode(trigger)
+        const option = modeItem(testId)
+        expect(option?.textContent).toContain(label)
+        expect(option?.hasAttribute('data-disabled')).toBe(false)
+        await act(async () => {
+          option!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+        })
+        await vi.waitUntil(async () => (await readAgentMode(fs)) === mode, { timeout: 2000 })
+        expect(vault.agentMode).toBe(mode)
+        expect(element.querySelector('[data-testid="chat-model"]')).toBeNull()
+        expect(element.querySelector('[data-testid="chat-external-model"]')?.textContent).toContain('default model')
+        await act(async () => {
+          chat.setModel('b')
+        })
+        expect(chat.modelId).toBe('')
+      }
+
+      await openMode(trigger)
+      await act(async () => {
+        modeItem('chat-mode-safe')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      })
+      await vi.waitUntil(async () => (await readAgentMode(fs)) === 'safe', { timeout: 2000 })
+      expect(element.querySelector('[data-testid="chat-model"]')).not.toBeNull()
+      await act(async () => {
+        chat.setModel('b')
+      })
+      expect(chat.modelId).toBe('b')
+      expect(element.querySelector('[data-testid="chat-model"]')?.textContent).toContain('Backup')
+
+      const draft = element.querySelector('[data-testid="chat-draft"]') as HTMLTextAreaElement
+      await openMode(trigger)
+      await act(async () => {
+        modeItem('chat-mode-grok')!.dispatchEvent(new MouseEvent('click', { bubbles: true }))
+      })
+      await vi.waitUntil(() => vault.agentMode === 'grok')
+      await act(async () => {
+        const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')?.set
+        setter?.call(draft, 'hello from the composer')
+        draft.dispatchEvent(new Event('input', { bubbles: true }))
+      })
+      mockedTurn.mockClear()
+      await act(async () => {
+        ;(element.querySelector('[data-testid="chat-send"]') as HTMLButtonElement).click()
+      })
+      await vi.waitUntil(() => chat.session.messages.some((message) => message.text === 'alpha'), { timeout: 5000 })
+      expect(chat.error).toBe('')
+      expect(element.querySelector('[data-testid="chat-error"]')).toBeNull()
+      expect(mockedTurn).not.toHaveBeenCalled()
+      expect(chat.session.modelId).toBe('')
+    } finally {
+      chat.dropExternalAgent()
+      await peer.killAll()
+      await unmount(element, root)
+    }
+  })
+
+  it('shows a persisted external mode as unavailable in the browser', async () => {
+    register(VaultService)
+    register(SettingsService)
+    register(ChatService)
+    resolve(VaultService).agentMode = 'claude'
+    const { host: element, root } = host()
+    try {
+      await render(root, <ChatPanel />)
+      expect(element.querySelector('[data-testid="chat-model"]')).toBeNull()
+      expect(element.querySelector('[data-testid="chat-external-model"]')?.textContent).toBe(
+        'This agent runs only in the desktop app.',
+      )
+      expect(element.querySelector('[data-testid="chat-external-exec"]')).toBeNull()
+      await openMode(element.querySelector('[data-testid="chat-mode"]')!)
+      expect(modeItem('chat-mode-claude')?.hasAttribute('data-disabled')).toBe(true)
+    } finally {
+      await unmount(element, root)
+    }
+  })
+
+  it('shows the resolved executable and disables send when it is missing', async () => {
+    register(VaultService)
+    register(SettingsService)
+    register(ChatService)
+    setAgentProcessHostForTests({
+      available: true,
+      spawn: () => Promise.reject(new Error('unused')),
+    })
+    delete (window as { __STRIDE_ELECTRON__?: unknown }).__STRIDE_ELECTRON__
+    const vault = resolve(VaultService)
+    const chat = resolve(ChatService)
+    const settings = resolve(SettingsService)
+    settings.form = {
+      ...settings.form,
+      agent: {
+        ...settings.form.agent,
+        executables: { grok: null, claude: null, codex: null },
+      },
+    }
+    vault.agentMode = 'claude'
+    chat.externalExec = null
+    const { host: element, root } = host()
+    try {
+      await render(root, <ChatPanel />)
+      expect(element.querySelector('[data-testid="chat-external-exec"]')?.textContent).toBe('Checking the executable…')
+      expect((element.querySelector('[data-testid="chat-send"]') as HTMLButtonElement).disabled).toBe(false)
+
+      await act(async () => {
+        chat.externalExec = { mode: 'claude', found: false, resolved: '', command: 'claude' }
+      })
+      expect(element.querySelector('[data-testid="chat-external-exec"]')?.textContent).toBe(
+        'That executable was not found.',
+      )
+      expect((element.querySelector('[data-testid="chat-send"]') as HTMLButtonElement).disabled).toBe(true)
+
+      await act(async () => {
+        chat.externalExec = { mode: 'claude', found: true, resolved: '/opt/bin/claude', command: 'claude' }
+      })
+      const text = element.querySelector('[data-testid="chat-external-exec"]')?.textContent ?? ''
+      expect(text).toContain('claude')
+      expect(text).toContain('/opt/bin/claude')
+      expect((element.querySelector('[data-testid="chat-send"]') as HTMLButtonElement).disabled).toBe(false)
+    } finally {
+      setAgentProcessHostForTests(null)
+      await unmount(element, root)
+    }
+  })
+
+  it('renders undo when the assistant message is marked undoable', async () => {
+    register(VaultService)
+    register(SettingsService)
+    register(ChatService)
+    const chat = resolve(ChatService)
+    chat.session = blankChatSession('ses_undo')
+    chat.session.messages = [
+      { id: 'user-1', role: 'user', text: 'hi', thinking: '', tools: [] },
+      { id: 'asst-1', role: 'assistant', text: 'done', thinking: '', tools: [] },
+    ]
+    chat.undoableTurnIds = ['asst-1']
+    chat.undoSkippedTurnIds = ['asst-1']
+    const { host: element, root } = host()
+    try {
+      await render(root, <ChatPanel />)
+      expect(element.querySelectorAll('[data-testid="chat-undo-turn"]')).toHaveLength(1)
+      expect(element.querySelector('[data-testid="chat-undo-turn"]')?.textContent).toBe('Undo turn')
+      expect(element.querySelector('[data-testid="chat-undo-skipped"]')?.textContent).toBe('Skipped')
     } finally {
       await unmount(element, root)
     }

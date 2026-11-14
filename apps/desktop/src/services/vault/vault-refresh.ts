@@ -6,12 +6,179 @@ import {
   listNoteFiles,
   NOTE_READ_CONCURRENCY,
   noteIdFromPath,
+  notePath,
+  parseNote,
   readNoteFile,
   serializeNote,
   type StrideNote,
 } from '@stride/core'
+import type { FileSystemBackend } from '@stride/platform'
+import { liveDocStash } from './live-doc'
 import { removeIndexed, upsertIndexed } from './vault-search-session'
 import type { VaultService } from './vault.service'
+
+/** Bytes of a changed note we will keep so Load disk can restore them. Larger files are id and size only. */
+const CONFLICT_BODY_LIMIT = 128 * 1024
+const MAX_DISK_CONFLICTS = 8
+
+/**
+ * One external change that blocked a save. `mtimeMs` is null when the file was already gone.
+ * `note` is the parsed body only when the file was small enough to read.
+ */
+export interface DiskConflict {
+  id: string
+  mtimeMs: number | null
+  size: number | null
+  note: StrideNote | null
+  undoable: boolean
+}
+
+const rewriteAllows = new WeakMap<object, Set<string>>()
+
+function rewriteAllow(vault: object): Set<string> {
+  const key = raw(vault) as object
+  let set = rewriteAllows.get(key)
+  if (!set) {
+    set = new Set()
+    rewriteAllows.set(key, set)
+  }
+  return set
+}
+
+function hasRewriteAllow(vault: object, id: string): boolean {
+  return rewriteAllows.get(raw(vault) as object)?.has(id) ?? false
+}
+
+function clearRewriteAllow(vault: object, id: string): void {
+  rewriteAllows.get(raw(vault) as object)?.delete(id)
+}
+
+export function hasDiskConflict(vault: VaultService, id: string): boolean {
+  return id !== '' && vault.diskConflicts.some((item) => item.id === id)
+}
+
+/** Drop the oldest record when the list is full, but never the unresolved one for the current pending note. */
+export function rememberDiskConflict(vault: VaultService, conflict: DiskConflict): void {
+  const pending = vault.pendingId
+  const current = vault.diskConflicts
+  const index = current.findIndex((item) => item.id === conflict.id)
+  let next = index === -1 ? [...current, conflict] : current.map((item, itemIndex) => (itemIndex === index ? conflict : item))
+  while (next.length > MAX_DISK_CONFLICTS) {
+    const evict = next.findIndex((item) => item.id !== pending)
+    if (evict === -1) break
+    next = next.filter((_, itemIndex) => itemIndex !== evict)
+  }
+  vault.diskConflicts = next
+}
+
+export function clearDiskConflicts(vault: VaultService): void {
+  rewriteAllows.delete(raw(vault) as object)
+  if (vault.diskConflicts.length > 0) vault.diskConflicts = []
+}
+
+export function forgetDiskNote(vault: VaultService, id: string): void {
+  clearRewriteAllow(vault, id)
+  if (!vault.diskConflicts.some((item) => item.id === id)) return
+  vault.diskConflicts = vault.diskConflicts.filter((item) => item.id !== id)
+}
+
+export function retargetDiskNote(vault: VaultService, fromId: string, toId: string): void {
+  if (fromId === toId) return
+  const allow = rewriteAllows.get(raw(vault) as object)
+  if (allow?.has(fromId)) {
+    allow.delete(fromId)
+    allow.add(toId)
+  }
+  if (!vault.diskConflicts.some((item) => item.id === fromId)) return
+  const next = vault.diskConflicts
+    .filter((item) => item.id !== toId)
+    .map((item) => {
+      if (item.id !== fromId) return item
+      return { ...item, id: toId, note: item.note ? { ...item.note, id: toId } : null }
+    })
+  vault.diskConflicts = next
+}
+
+/**
+ * Stat `id` before saveNote. No stored mtime means there is no external baseline, so the save is allowed.
+ * A one-shot allow only recreates a file that is still missing; a present file is still compared.
+ */
+export async function gatePendingWrite(vault: VaultService, fs: FileSystemBackend, id: string): Promise<boolean> {
+  if (hasDiskConflict(vault, id)) return false
+  const info = await fs.stat(notePath(id))
+  const file = info && info.kind === 'file' ? info : null
+  const stored = vault.noteMtimes[id]
+  const hasBaseline = typeof stored === 'number' && Number.isFinite(stored)
+  if (!file && hasRewriteAllow(vault, id)) return true
+  if (!hasBaseline) return true
+  if (file && file.mtimeMs === stored) return true
+  const conflict = file ? await conflictFromFile(fs, id, file) : { id, mtimeMs: null, size: null, note: null, undoable: false }
+  rememberDiskConflict(vault, conflict)
+  return false
+}
+
+async function conflictFromFile(
+  fs: FileSystemBackend,
+  id: string,
+  info: { size: number; mtimeMs: number },
+): Promise<DiskConflict> {
+  if (info.size > CONFLICT_BODY_LIMIT) {
+    return { id, mtimeMs: info.mtimeMs, size: info.size, note: null, undoable: false }
+  }
+  try {
+    const bytes = await fs.readBytes(notePath(id))
+    if (bytes.byteLength > CONFLICT_BODY_LIMIT) {
+      return { id, mtimeMs: info.mtimeMs, size: info.size, note: null, undoable: false }
+    }
+    const note = parseNote(new TextDecoder().decode(bytes), id)
+    return { id, mtimeMs: info.mtimeMs, size: info.size, note, undoable: true }
+  } catch {
+    return { id, mtimeMs: info.mtimeMs, size: info.size, note: null, undoable: false }
+  }
+}
+
+/** Post-write baseline. A missing file leaves any one-shot recreate allow in place. */
+export async function stampNoteMtime(vault: VaultService, fs: FileSystemBackend, id: string): Promise<void> {
+  let info: { kind: string; mtimeMs: number } | null = null
+  try {
+    info = await fs.stat(notePath(id))
+  } catch {
+    return
+  }
+  if (!info || info.kind !== 'file') return
+  clearRewriteAllow(vault, id)
+  if (vault.noteMtimes[id] === info.mtimeMs) return
+  vault.noteMtimes = { ...vault.noteMtimes, [id]: info.mtimeMs }
+}
+
+/** Arm the next save with the mtime the conflict observed, then write the pending draft if it is still this note. */
+export async function keepDraftConflict(vault: VaultService, id: string): Promise<void> {
+  const conflict = vault.diskConflicts.find((item) => item.id === id)
+  if (!conflict) return
+  if (conflict.mtimeMs === null) {
+    rewriteAllow(vault).add(id)
+  } else {
+    clearRewriteAllow(vault, id)
+    vault.noteMtimes = { ...vault.noteMtimes, [id]: conflict.mtimeMs }
+  }
+  vault.diskConflicts = vault.diskConflicts.filter((item) => item.id !== id)
+  if (vault.pendingId === id) await vault.flush()
+}
+
+/** Replace the in-memory note with the captured disk body. Does not write the file. */
+export function loadDiskConflict(vault: VaultService, id: string): void {
+  const conflict = vault.diskConflicts.find((item) => item.id === id)
+  if (!conflict?.note) return
+  const notes = raw(vault.notes) as readonly StrideNote[]
+  if (notes.some((item) => item.id === id)) vault.replace(conflict.note)
+  else vault.notes = [conflict.note, ...notes]
+  liveDocStash(vault).delete(id)
+  if (vault.pendingId === id) vault.cancelPending()
+  clearRewriteAllow(vault, id)
+  vault.diskConflicts = vault.diskConflicts.filter((item) => item.id !== id)
+  if (conflict.mtimeMs !== null) vault.noteMtimes = { ...vault.noteMtimes, [id]: conflict.mtimeMs }
+  vault.docEpoch += 1
+}
 
 /** Ids whose in-memory edits must win over the disk snapshot, plus the save generation that produced them. */
 export interface RefreshBaseline {
@@ -344,7 +511,8 @@ async function applyDiskSnapshot(
   const activeId = vault.activeId
   const beforeActive = previous.find((note) => note.id === activeId)
   const afterActive = merged.find((note) => note.id === activeId)
-  if (beforeActive && afterActive && beforeActive !== afterActive) {
+  // Load disk is the path that bumps docEpoch for a note with an unresolved conflict.
+  if (beforeActive && afterActive && beforeActive !== afterActive && !hasDiskConflict(vault, activeId)) {
     const docChanged = JSON.stringify(beforeActive.doc) !== JSON.stringify(afterActive.doc)
     if (beforeActive.title !== afterActive.title || docChanged) vault.docEpoch += 1
   }

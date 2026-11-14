@@ -14,9 +14,23 @@ import {
 } from '@stride/core'
 import { ShellAbortError, ShellTimeoutError, type ShellOutput } from '@stride/platform'
 import { resolveShellBackend } from '../platform/shell'
+import { TabsService } from '../notes/tabs.service'
 import { SettingsService } from '../settings/settings.service'
+import { FolderService } from '../vault/folder.service'
 import { VaultService } from '../vault/vault.service'
 import { ViewsService } from '../views/views.service'
+
+function openTabsFor(vault: VaultService): { id: string; title: string }[] {
+  if (!has(TabsService)) {
+    const active = vault.active
+    return active ? [{ id: active.id, title: active.title }] : []
+  }
+  const notes = vault.notes
+  return resolve(TabsService).tabs.map((tab) => ({
+    id: tab.noteId,
+    title: notes.find((note) => note.id === tab.noteId)?.title ?? tab.noteId,
+  }))
+}
 
 export function chatSystemPrompt(vault: VaultService, memorySection = '', memoryPrompt = true): string {
   const active = vault.active
@@ -30,7 +44,7 @@ export function chatSystemPrompt(vault: VaultService, memorySection = '', memory
           text: plainText(active.doc),
         }
       : null,
-    openTabs: active ? [{ id: active.id, title: active.title }] : [],
+    openTabs: openTabsFor(vault),
     vault: {
       label: vault.currentVaultLabel,
       noteCount: vault.notes.length,
@@ -98,6 +112,20 @@ export function chatVaultHost(vault: VaultService): VaultToolHost {
       const created = vault.notes.find((note) => !before.has(note.id))
       if (!created) throw new Error('Could not create the note')
       return created
+    },
+    async deleteNote(id) {
+      if (!vault.fs) throw new Error('Open a vault first')
+      vault.error = ''
+      await vault.deleteNotes([id])
+      if (vault.error) throw new Error(vault.error)
+    },
+    async moveNote(id, destFolder) {
+      if (!vault.fs) throw new Error('Open a vault first')
+      if (!has(FolderService)) throw new Error('Folders are not available')
+      vault.error = ''
+      const toId = await resolve(FolderService).moveNote(id, destFolder)
+      if (vault.error) throw new Error(vault.error)
+      return { id: toId }
     },
     views: {
       async list() {

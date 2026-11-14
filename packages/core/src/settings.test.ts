@@ -13,7 +13,12 @@ describe('settings page sections schema (T7.1)', () => {
     const defaults = defaultSettings()
     expect(defaults.appearance).toEqual({ noteWidth: 'standard', fontSize: 16, fontFamily: '' })
     expect(defaults.editor).toEqual({ autosaveDebounceMs: 350 })
-    expect(defaults.agent).toEqual({ maxTurns: 200, memoryEnabled: true, memoryModelId: '' })
+    expect(defaults.agent).toEqual({
+      maxTurns: 200,
+      memoryEnabled: true,
+      memoryModelId: '',
+      executables: { grok: null, claude: null, codex: null },
+    })
     expect(defaults.updates).toEqual({ channel: 'stable', autoCheck: true })
     expect(defaults.privacy).toEqual({ telemetryEnabled: false })
   })
@@ -41,14 +46,24 @@ describe('settings page sections schema (T7.1)', () => {
     const settings = defaultSettings()
     settings.appearance = { noteWidth: 'wide', fontSize: 18, fontFamily: 'Songti SC' }
     settings.editor = { autosaveDebounceMs: 800 }
-    settings.agent = { maxTurns: 40, memoryEnabled: false, memoryModelId: '' }
+    settings.agent = {
+      maxTurns: 40,
+      memoryEnabled: false,
+      memoryModelId: '',
+      executables: { grok: '/opt/grok', claude: '', codex: null },
+    }
     settings.updates = { channel: 'beta', autoCheck: false }
     settings.privacy = { telemetryEnabled: true }
     await writeSettings(files, 'roundtrip.json', settings, secrets)
     const raw = JSON.parse(await files.readText('roundtrip.json'))
     expect(raw.appearance).toEqual({ noteWidth: 'wide', fontSize: 18, fontFamily: 'Songti SC' })
     expect(raw.editor).toEqual({ autosaveDebounceMs: 800 })
-    expect(raw.agent).toEqual({ maxTurns: 40, memoryEnabled: false, memoryModelId: '' })
+    expect(raw.agent).toEqual({
+      maxTurns: 40,
+      memoryEnabled: false,
+      memoryModelId: '',
+      executables: { grok: '/opt/grok', claude: '', codex: null },
+    })
     expect(raw.updates).toEqual({ channel: 'beta', autoCheck: false })
     expect(raw.privacy).toEqual({ telemetryEnabled: true })
     const loaded = await readSettings(files, 'roundtrip.json', secrets)
@@ -72,14 +87,19 @@ describe('settings page sections schema (T7.1)', () => {
     await files.writeText('bad.json', JSON.stringify({
       appearance: { noteWidth: 'huge', fontSize: -3, fontFamily: 'Bad;Font' },
       editor: { autosaveDebounceMs: 'fast' },
-      agent: { maxTurns: 'lots', memoryEnabled: 'no', memoryModelId: 7 },
+      agent: { maxTurns: 'lots', memoryEnabled: 'no', memoryModelId: 7, executables: 'nope' },
       updates: { channel: 'nightly', autoCheck: 'yes' },
       privacy: { telemetryEnabled: 'no' },
     }))
     const loaded = await readSettings(files, 'bad.json', secrets)
     expect(loaded.appearance).toEqual({ noteWidth: 'standard', fontSize: 16, fontFamily: '' })
     expect(loaded.editor).toEqual({ autosaveDebounceMs: 350 })
-    expect(loaded.agent).toEqual({ maxTurns: 200, memoryEnabled: true, memoryModelId: '' })
+    expect(loaded.agent).toEqual({
+      maxTurns: 200,
+      memoryEnabled: true,
+      memoryModelId: '',
+      executables: { grok: null, claude: null, codex: null },
+    })
     expect(loaded.updates).toEqual({ channel: 'stable', autoCheck: true })
     expect(loaded.privacy).toEqual({ telemetryEnabled: false })
   })
@@ -106,12 +126,27 @@ describe('agent memory settings', () => {
       { id: 'cfg-a', name: 'A', provider: 'openai', model: 'gpt-4o-mini', baseUrl: '', apiKey: '', isDefault: true },
       { id: 'cfg-b', name: 'B', provider: 'openai', model: 'gpt-4o', baseUrl: '', apiKey: '', isDefault: false },
     ]
-    settings.agent = { maxTurns: 100, memoryEnabled: false, memoryModelId: 'cfg-b' }
+    settings.agent = {
+      maxTurns: 100,
+      memoryEnabled: false,
+      memoryModelId: 'cfg-b',
+      executables: { grok: null, claude: null, codex: null },
+    }
     await writeSettings(files, 'memory.json', settings, secrets)
     const raw = JSON.parse(await files.readText('memory.json'))
-    expect(raw.agent).toEqual({ maxTurns: 100, memoryEnabled: false, memoryModelId: 'cfg-b' })
+    expect(raw.agent).toEqual({
+      maxTurns: 100,
+      memoryEnabled: false,
+      memoryModelId: 'cfg-b',
+      executables: { grok: null, claude: null, codex: null },
+    })
     const loaded = await readSettings(files, 'memory.json', secrets)
-    expect(loaded.agent).toEqual({ maxTurns: 100, memoryEnabled: false, memoryModelId: 'cfg-b' })
+    expect(loaded.agent).toEqual({
+      maxTurns: 100,
+      memoryEnabled: false,
+      memoryModelId: 'cfg-b',
+      executables: { grok: null, claude: null, codex: null },
+    })
     expect(publicSettings(loaded).agent).toEqual(loaded.agent)
   })
 
@@ -125,7 +160,12 @@ describe('agent memory settings', () => {
       agent: { maxTurns: 50, memoryEnabled: true, memoryModelId: 'cfg-gone' },
     }))
     const loaded = await readSettings(files, 'dangling.json', secrets)
-    expect(loaded.agent).toEqual({ maxTurns: 50, memoryEnabled: true, memoryModelId: '' })
+    expect(loaded.agent).toEqual({
+      maxTurns: 50,
+      memoryEnabled: true,
+      memoryModelId: '',
+      executables: { grok: null, claude: null, codex: null },
+    })
     // Writing the normalized settings keeps the fallback stable.
     await writeSettings(files, 'dangling.json', loaded, secrets)
     expect(JSON.parse(await files.readText('dangling.json')).agent.memoryModelId).toBe('')
@@ -138,10 +178,36 @@ describe('agent memory settings', () => {
     settings.llmConfigs = [
       { id: 'cfg-a', name: 'A', provider: 'openai', model: 'gpt-4o-mini', baseUrl: '', apiKey: '', isDefault: true },
     ]
-    settings.agent = { maxTurns: 200, memoryEnabled: true, memoryModelId: 'cfg-deleted' }
+    settings.agent = {
+      maxTurns: 200,
+      memoryEnabled: true,
+      memoryModelId: 'cfg-deleted',
+      executables: { grok: null, claude: null, codex: null },
+    }
     expect(publicSettings(settings).agent.memoryModelId).toBe('')
     await writeSettings(files, 'sealed.json', settings, secrets)
     expect(JSON.parse(await files.readText('sealed.json')).agent.memoryModelId).toBe('')
+  })
+
+  it('keeps a cleared executable empty and trims a stored path', async () => {
+    const files = new MemoryFileSystem('/virtual/settings')
+    const secrets = new MemorySecretsStore()
+    await files.writeText('paths.json', JSON.stringify({
+      agent: {
+        maxTurns: 20,
+        executables: { grok: '', claude: '  /usr/local/bin/claude  ', codex: null, extra: '/bin/nope' },
+      },
+    }))
+    const loaded = await readSettings(files, 'paths.json', secrets)
+    expect(loaded.agent.executables).toEqual({
+      grok: '',
+      claude: '/usr/local/bin/claude',
+      codex: null,
+    })
+    await writeSettings(files, 'paths.json', loaded, secrets)
+    const raw = JSON.parse(await files.readText('paths.json'))
+    expect(raw.agent.executables).toEqual(loaded.agent.executables)
+    expect(raw.agent.executables.extra).toBeUndefined()
   })
 })
 

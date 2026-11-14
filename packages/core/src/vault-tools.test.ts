@@ -2,9 +2,18 @@ import { MemoryFileSystem, ShellAbortError, ShellDeniedError, ShellTimeoutError 
 import { describe, expect, it } from 'vitest'
 import type { AgentTool } from '@earendil-works/pi-agent-core'
 import { createVaultNote, loadNotes, notePath, readNoteFile, saveNote } from './vault.ts'
+import { moveNotePath } from './folders.ts'
 import { noteForSave, plainText, type StrideNote, type TipTapNode } from './note.ts'
 import { applyViewsOrder, deleteVaultView, listViews, readViewsOrder, saveVaultView } from './views.ts'
-import { toolsForAgentMode, vaultTools, WRITE_VAULT_TOOLS, type VaultToolHost } from './vault-tools.ts'
+import {
+  emptyVaultTurn,
+  toolsForAgentMode,
+  VAULT_ASSISTANT_PROMPT,
+  vaultTools,
+  WRITE_VAULT_TOOLS,
+  type VaultToolHost,
+  type VaultTurnHolder,
+} from './vault-tools.ts'
 
 function text(value: string): TipTapNode {
   return { type: 'text', text: value }
@@ -65,6 +74,16 @@ function memoryHost(fs: MemoryFileSystem, extra: Partial<VaultToolHost> = {}): V
     searchVault: async () => [],
     createNote: (title) => createVaultNote(fs, title),
     loadNotes: () => loadNotes(fs),
+    async deleteNote(id) {
+      await fs.remove(notePath(id))
+    },
+    async moveNote(id, destFolder) {
+      if (destFolder !== '') {
+        const stat = await fs.stat(destFolder)
+        if (!stat || stat.kind !== 'directory') throw new Error('Folder not found')
+      }
+      return { id: await moveNotePath(fs, id, destFolder) }
+    },
     views: {
       list: async () => applyViewsOrder(await listViews(fs), await readViewsOrder(fs)),
       save: (input) => saveVaultView(fs, input),
@@ -214,6 +233,13 @@ describe('vault tools', () => {
 
   it('creates a type, retypes a note, and renames the type through instances and views', async () => {
     const fs = new MemoryFileSystem('/tmp/stride-vault-types')
+    await saveNote(fs, {
+      id: 'kept',
+      title: 'Kept',
+      type: 'Project',
+      properties: {},
+      doc: { type: 'doc', content: [paragraph('stay')] },
+    })
     const tools = vaultTools(memoryHost(fs))
     const created = JSON.parse(await call(tools, 'create_type', { title: 'Project', color: 'blue', icon: 'briefcase' })) as { id: string }
     expect(created.id).toBeTruthy()
@@ -238,8 +264,10 @@ describe('vault tools', () => {
     expect(await call(tools, 'list_views', {})).toBe('[]')
     const types = await call(tools, 'list_types', {})
     expect(types).toContain('Effort')
+    await call(tools, 'undo_note', { id: 'kept' })
+    expect((await readNoteFile(fs, notePath('kept'), 'kept')).type).toBe('Project')
     await call(tools, 'undo_note', { id: note.id })
-    expect((await readNoteFile(fs, notePath(note.id), note.id)).type).toBe('Project')
+    expect(await fs.stat(notePath(note.id))).toBeNull()
   })
 
   it('runs bash only in power mode and reports the exit code', async () => {
@@ -328,5 +356,139 @@ describe('vault tools', () => {
     expect(body).not.toContain('(no output)')
     expect(denied?.details).toEqual({ denied: true })
     console.log(body)
+  })
+
+  it('lets power delete and move, and tells the model not to rewrite note files from the shell', () => {
+    const fs = new MemoryFileSystem('/tmp/stride-vault-delete-move-mode')
+    const tools = vaultTools(memoryHost(fs))
+    const safe = toolsForAgentMode(tools, 'safe').map((tool) => tool.name)
+    expect(safe).not.toContain('delete_note')
+    expect(safe).not.toContain('move_note')
+    expect(toolsForAgentMode(tools, 'power').map((tool) => tool.name)).toEqual(expect.arrayContaining(['delete_note', 'move_note']))
+    expect(VAULT_ASSISTANT_PROMPT).toContain('delete_note')
+    expect(VAULT_ASSISTANT_PROMPT).toContain('move_note')
+    expect(VAULT_ASSISTANT_PROMPT).toContain('Do not rewrite *.stride.json from the shell.')
+    expect(VAULT_ASSISTANT_PROMPT).not.toContain('Do not delete notes')
+    expect(VAULT_ASSISTANT_PROMPT).toContain('created this turn')
+    const undo = tools.find((tool) => tool.name === 'undo_note')
+    expect(undo?.description).toContain('created this turn')
+    expect(undo?.description).not.toContain('Does not delete')
+  })
+
+  it('undo deletes a note created this turn, including a typed create that later committed', async () => {
+    const fs = new MemoryFileSystem('/tmp/stride-vault-undo-created')
+    const tools = vaultTools(memoryHost(fs))
+    const bare = JSON.parse(await call(tools, 'create_note', { title: 'Fresh page' })) as { id: string }
+    await call(tools, 'undo_note', { id: bare.id })
+    expect(await fs.stat(notePath(bare.id))).toBeNull()
+
+    await call(tools, 'create_type', { title: 'Project', color: 'blue' })
+    const typed = JSON.parse(await call(tools, 'create_note', { title: 'Bridge', type: 'Project' })) as { id: string; type: string }
+    expect(typed.type).toBe('Project')
+    await call(tools, 'set_note', { id: typed.id, archived: true })
+    expect((await readNoteFile(fs, notePath(typed.id), typed.id)).properties.archived).toBe(true)
+    await call(tools, 'undo_note', { id: typed.id })
+    expect(await fs.stat(notePath(typed.id))).toBeNull()
+  })
+
+  it('does not treat an id that already existed as created, and restores its last write', async () => {
+    const fs = new MemoryFileSystem('/tmp/stride-vault-undo-existing')
+    await saveNote(fs, {
+      id: 'bridge',
+      title: 'Bridge',
+      type: 'note',
+      properties: {},
+      doc: { type: 'doc', content: [paragraph('old')] },
+    })
+    const tools = vaultTools(memoryHost(fs, {
+      createNote: async () => readNoteFile(fs, notePath('bridge'), 'bridge'),
+    }))
+    const typed = JSON.parse(await call(tools, 'create_note', { title: 'Bridge', type: 'Project' })) as { id: string; type: string }
+    expect(typed).toMatchObject({ id: 'bridge', type: 'Project' })
+    await call(tools, 'undo_note', { id: 'bridge' })
+    const restored = await readNoteFile(fs, notePath('bridge'), 'bridge')
+    expect(restored.type).toBe('note')
+    expect(plainText(restored.doc)).toBe('old')
+  })
+
+  it('restores a deleted note from its tombstone and refuses to delete a type document', async () => {
+    const fs = new MemoryFileSystem('/tmp/stride-vault-tombstone')
+    await saveNote(fs, { id: 'page', title: 'Page', type: 'note', properties: {}, doc: { type: 'doc', content: [paragraph('keep')] } })
+    await saveNote(fs, { id: 'kind', title: 'Kind', type: 'Type', properties: {}, doc: { type: 'doc', content: [paragraph('type')] } })
+    const before = await fs.readText(notePath('page'))
+    const tools = vaultTools(memoryHost(fs))
+    await expect(call(tools, 'delete_note', { id: 'kind' })).rejects.toThrow('Cannot delete a type document')
+    expect(await fs.stat(notePath('kind'))).not.toBeNull()
+    await call(tools, 'delete_note', { id: 'page' })
+    expect(await fs.stat(notePath('page'))).toBeNull()
+    await call(tools, 'undo_note', { id: 'page' })
+    expect(await fs.readText(notePath('page'))).toBe(before)
+    await expect(call(tools, 'undo_note', { id: 'page' })).rejects.toThrow('No snapshot')
+  })
+
+  it('prefers a write snapshot over a later tombstone for a note that already existed', async () => {
+    const fs = new MemoryFileSystem('/tmp/stride-vault-snapshot-before-tomb')
+    await saveNote(fs, { id: 'page', title: 'Page', type: 'note', properties: {}, doc: { type: 'doc', content: [paragraph('OLD')] } })
+    const before = await fs.readText(notePath('page'))
+    const tools = vaultTools(memoryHost(fs))
+    await call(tools, 'append_to_note', { id: 'page', node: paragraph('MORE') })
+    await call(tools, 'delete_note', { id: 'page' })
+    expect(await fs.stat(notePath('page'))).toBeNull()
+    await call(tools, 'undo_note', { id: 'page' })
+    expect(await fs.readText(notePath('page'))).toBe(before)
+  })
+
+  it('rejects unsafe move paths, does not create a folder, and records both ids', async () => {
+    const fs = new MemoryFileSystem('/tmp/stride-vault-move')
+    await saveNote(fs, { id: 'alpha', title: 'Alpha', type: 'note', properties: {}, doc: { type: 'doc', content: [paragraph('a')] } })
+    await fs.mkdir('box')
+    const seen: string[] = []
+    const turns: VaultTurnHolder = { current: emptyVaultTurn() }
+    const tools = vaultTools(memoryHost(fs, {
+      moveNote: async (id, destFolder) => {
+        seen.push(destFolder)
+        if (destFolder !== '') {
+          const stat = await fs.stat(destFolder)
+          if (!stat || stat.kind !== 'directory') throw new Error('Folder not found')
+        }
+        return { id: await moveNotePath(fs, id, destFolder) }
+      },
+    }), turns)
+    for (const destFolder of ['/tmp', 'C:/vault', '..', 'a/../b', 'a\\b', 'a//b', 'a/', '/']) {
+      await expect(call(tools, 'move_note', { id: 'alpha', destFolder })).rejects.toThrow('Invalid folder')
+    }
+    expect(seen).toEqual([])
+    await expect(call(tools, 'move_note', { id: 'alpha', destFolder: 'missing' })).rejects.toThrow('Folder not found')
+    expect(await fs.stat('missing')).toBeNull()
+    expect(await fs.stat(notePath('alpha'))).not.toBeNull()
+    expect(turns.current?.moved.size).toBe(0)
+
+    const moved = JSON.parse(await call(tools, 'move_note', { id: 'alpha', destFolder: 'box' })) as { id: string; from: string }
+    expect(moved).toEqual({ id: 'box/alpha', from: 'alpha' })
+    expect(await fs.stat(notePath('alpha'))).toBeNull()
+    expect(await fs.stat(notePath('box/alpha'))).not.toBeNull()
+    expect([...(turns.current?.moved ?? [])].sort()).toEqual(['alpha', 'box/alpha'])
+
+    turns.current = emptyVaultTurn()
+    const rooted = JSON.parse(await call(tools, 'move_note', { id: 'box/alpha', destFolder: '' })) as { id: string }
+    expect(rooted.id).toBe('alpha')
+    expect([...(turns.current?.moved ?? [])].sort()).toEqual(['alpha', 'box/alpha'])
+  })
+
+  it('reads replacement turn maps at call time, including a clear of the same maps', async () => {
+    const fs = new MemoryFileSystem('/tmp/stride-vault-turn-holder')
+    await saveNote(fs, { id: 'page', title: 'Page', type: 'note', properties: {}, doc: { type: 'doc', content: [paragraph('OLD')] } })
+    const turns: VaultTurnHolder = { current: emptyVaultTurn() }
+    const tools = vaultTools(memoryHost(fs), turns)
+    await call(tools, 'append_to_note', { id: 'page', node: paragraph('MORE') })
+    expect(turns.current?.snapshots.has('page')).toBe(true)
+    turns.current = emptyVaultTurn()
+    await expect(call(tools, 'undo_note', { id: 'page' })).rejects.toThrow('No snapshot')
+    await call(tools, 'append_to_note', { id: 'page', node: paragraph('AGAIN') })
+    turns.current?.snapshots.clear()
+    turns.current?.created.clear()
+    turns.current?.tombstones.clear()
+    turns.current?.moved.clear()
+    await expect(call(tools, 'undo_note', { id: 'page' })).rejects.toThrow('No snapshot')
   })
 })

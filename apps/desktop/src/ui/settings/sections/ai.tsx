@@ -5,9 +5,9 @@
 // it, a mask-shaped draft keeps it, anything else replaces it.
 
 import { observer, useService } from '@rabjs/react'
-import { AGENT_MAX_TURNS_DEFAULT, AGENT_MAX_TURNS_MAX, AGENT_MAX_TURNS_MIN, catalogBaseUrl, catalogModelSuggestions, LLM_PROVIDERS, llmProviderInfo, type PublicLlmConfig } from '@stride/core'
+import { AGENT_MAX_TURNS_DEFAULT, AGENT_MAX_TURNS_MAX, AGENT_MAX_TURNS_MIN, defaultAgentExecutables, catalogBaseUrl, catalogModelSuggestions, LLM_PROVIDERS, llmProviderInfo, type AgentExecutables, type PublicLlmConfig } from '@stride/core'
 import { CircleAlert, CircleCheck, LoaderCircle, Plus, Star, Trash2 } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { t } from '../../../i18n'
 import { SettingsService } from '../../../services/settings/settings.service'
@@ -117,6 +117,57 @@ const AgentTurnField = observer(function AgentTurnField() {
   )
 })
 
+const EXECUTABLE_FIELDS = [
+  { mode: 'grok', label: 'settings.ai.execGrok', testId: 'agent-exec-grok' },
+  { mode: 'claude', label: 'settings.ai.execClaude', testId: 'agent-exec-claude' },
+  { mode: 'codex', label: 'settings.ai.execCodex', testId: 'agent-exec-codex' },
+] as const
+
+const AgentExecutableFields = observer(function AgentExecutableFields() {
+  const { t } = useTranslation()
+  const settings = useService(SettingsService)
+  const [drafts, setDrafts] = useState<Partial<Record<keyof AgentExecutables, string>>>({})
+
+  useEffect(() => {
+    void settings.fillDetectedExecutables()
+  }, [settings])
+
+  const onChange = (mode: keyof AgentExecutables, text: string) => {
+    setDrafts((current) => ({ ...current, [mode]: text }))
+    const stored = settings.form.agent?.executables ?? defaultAgentExecutables()
+    if (text === (stored[mode] ?? '')) return
+    settings.form = {
+      ...settings.form,
+      agent: {
+        ...settings.form.agent,
+        executables: { ...stored, [mode]: text },
+      },
+    }
+    void settings.save()
+  }
+
+  const stored = settings.form.agent?.executables ?? defaultAgentExecutables()
+  return (
+    <div className="settings-ai-exec">
+      {EXECUTABLE_FIELDS.map((field) => (
+        <div className="settings-ai-exec-field" key={field.mode}>
+          <Input
+            label={t(field.label)}
+            className="settings-ai-input"
+            data-testid={field.testId}
+            value={drafts[field.mode] ?? stored[field.mode] ?? ''}
+            placeholder={field.mode}
+            spellCheck={false}
+            autoCapitalize="off"
+            onChange={(event) => onChange(field.mode, event.target.value)}
+          />
+        </div>
+      ))}
+      <p className="settings-ai-meta" data-testid="agent-exec-hint">{t('settings.ai.execHint')}</p>
+    </div>
+  )
+})
+
 export const AiSection = observer(function AiSection() {
   const { t } = useTranslation()
   const settings = useService(SettingsService)
@@ -137,6 +188,7 @@ export const AiSection = observer(function AiSection() {
   return (
     <div className="settings-ai" data-testid="settings-section-ai">
       <AgentTurnField />
+      <AgentExecutableFields />
       {configs.length === 0 ? (
         <p className="settings-ai-empty" data-testid="llm-empty">
           {t('settings.ai.empty')}

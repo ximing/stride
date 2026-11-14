@@ -1,5 +1,6 @@
 import type { AgentMessage } from '@earendil-works/pi-agent-core'
 import type { AgentUsage } from './agent-loop.ts'
+import { redactSecret } from './llm.ts'
 import { sha256HexSync } from './sha256.ts'
 
 /** Tool-call summary kept in the persisted UI projection (same fields as the panel's ChatToolCall). */
@@ -46,6 +47,21 @@ export interface ChatSessionMemoryCursor {
   lastDistillAt: string
 }
 
+export type ExternalCliMode = 'grok' | 'claude' | 'codex'
+
+/** One CLI's resume handle. `cwd` is the vault root the handle was created in. */
+export interface ExternalCliHandle {
+  handle: string
+  cwd: string
+}
+
+/** Per-mode slots. Switching CLI does not overwrite the others. */
+export interface ChatExternalSlots {
+  grok?: ExternalCliHandle
+  claude?: ExternalCliHandle
+  codex?: ExternalCliHandle
+}
+
 export interface ChatSessionFile {
   format: 1
   id: string
@@ -53,6 +69,24 @@ export interface ChatSessionFile {
   /** Model transcript without system messages; the system prompt is rebuilt every turn. */
   transcript: AgentMessage[]
   memory: ChatSessionMemoryCursor
+  /** Optional CLI handles. Absent on sessions written before resume existed. */
+  external?: ChatExternalSlots
+}
+
+/** Claude `--resume` value: one argv element, same charset the main process allowlists. */
+const CLAUDE_CLI_HANDLE = /^[A-Za-z0-9._:-]{1,128}$/
+const JSON_HANDLE_MAX = 1024
+const CWD_MAX = 4096
+
+export const RESUME_PREFACE_PREFIX =
+  'The previous CLI session could not be resumed. The following Stride chat is context, not the CLI\'s own memory.'
+
+const PREFACE_MESSAGES = 8
+const PREFACE_MESSAGE_CHARS = 500
+const PREFACE_TOTAL_CHARS = 4000
+
+export function isClaudeCliHandle(value: string): boolean {
+  return CLAUDE_CLI_HANDLE.test(value)
 }
 
 export const TRUNCATED_MARK = '[truncated]'
@@ -144,12 +178,56 @@ export function serializeSession(file: ChatSessionFile): string {
   return JSON.stringify(file)
 }
 
+function hasNul(value: string): boolean {
+  return value.includes('\0')
+}
+
+function isAbsoluteSlotCwd(value: string): boolean {
+  return value.startsWith('/') || value.startsWith('\\\\') || /^[A-Za-z]:[\\/]/.test(value)
+}
+
+function parseHandle(mode: ExternalCliMode, value: unknown): string | null {
+  if (typeof value !== 'string' || value.length < 1 || hasNul(value)) return null
+  if (mode === 'claude') return isClaudeCliHandle(value) ? value : null
+  return value.length <= JSON_HANDLE_MAX ? value : null
+}
+
+function parseSlotCwd(value: unknown): string | null {
+  if (typeof value !== 'string' || value.length < 1 || value.length > CWD_MAX || hasNul(value)) return null
+  return isAbsoluteSlotCwd(value) ? value : null
+}
+
+/**
+ * Keeps legal slots and lists modes whose slot was present but illegal.
+ * An illegal slot does not reject the session file.
+ */
+export function parseExternalSlots(value: unknown): { external?: ChatExternalSlots; dropped: ExternalCliMode[] } {
+  const dropped: ExternalCliMode[] = []
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return { dropped }
+  const raw = value as Record<string, unknown>
+  const external: ChatExternalSlots = {}
+  for (const mode of ['grok', 'claude', 'codex'] as const) {
+    if (!Object.prototype.hasOwnProperty.call(raw, mode)) continue
+    const slot = raw[mode]
+    const record = slot && typeof slot === 'object' && !Array.isArray(slot) ? slot as { handle?: unknown; cwd?: unknown } : null
+    const handle = record ? parseHandle(mode, record.handle) : null
+    const cwd = record ? parseSlotCwd(record.cwd) : null
+    if (!handle || !cwd) {
+      dropped.push(mode)
+      continue
+    }
+    external[mode] = { handle, cwd }
+  }
+  return { external: Object.keys(external).length > 0 ? external : undefined, dropped }
+}
+
 export function parseSession(text: string): ChatSessionFile | null {
   try {
     const raw = JSON.parse(text) as Partial<ChatSessionFile> | null
     if (!raw || typeof raw !== 'object' || raw.format !== 1) return null
     if (typeof raw.id !== 'string' || raw.id === '') return null
     const memory = (raw.memory && typeof raw.memory === 'object' ? raw.memory : {}) as Partial<ChatSessionMemoryCursor>
+    const external = parseExternalSlots(raw.external).external
     return {
       format: 1,
       id: raw.id,
@@ -162,10 +240,46 @@ export function parseSession(text: string): ChatSessionFile | null {
         distilledUpTo: count(memory.distilledUpTo),
         lastDistillAt: str(memory.lastDistillAt),
       },
+      ...(external ? { external } : {}),
     }
   } catch {
     return null
   }
+}
+
+export interface ResumePrefaceMessage {
+  role: 'user' | 'assistant'
+  text: string
+  tools?: ReadonlyArray<{ name: string }>
+}
+
+function redactPreface(text: string, secrets: readonly string[]): string {
+  let out = text
+  for (const secret of secrets) out = redactSecret(out, secret)
+  return out
+}
+
+/** Prior Stride turns shown to a fresh CLI. Not the CLI's own transcript. Newest messages win. */
+export function buildResumePreface(messages: readonly ResumePrefaceMessage[], secrets: readonly string[]): string {
+  const ordered = [...secrets].filter((secret) => secret !== '').sort((left, right) => right.length - left.length)
+  const recent = messages
+    .filter((message) => message.role === 'user' || message.role === 'assistant')
+    .slice(-PREFACE_MESSAGES)
+  const blocks: string[] = []
+  for (const message of recent) {
+    const text = redactPreface(message.text, ordered).slice(0, PREFACE_MESSAGE_CHARS)
+    const names = (message.tools ?? [])
+      .map((tool) => redactPreface(tool.name, ordered))
+      .filter((name) => name !== '')
+    if (!text && names.length === 0) continue
+    const lines = [`${message.role}: ${text}`]
+    if (names.length > 0) lines.push(`tools: ${names.join(', ')}`)
+    blocks.push(lines.join('\n'))
+  }
+  while (blocks.length > 1 && blocks.join('\n\n').length > PREFACE_TOTAL_CHARS) blocks.shift()
+  let body = blocks.join('\n\n')
+  if (body.length > PREFACE_TOTAL_CHARS) body = body.slice(0, PREFACE_TOTAL_CHARS)
+  return body ? `${RESUME_PREFACE_PREFIX}\n\n${body}` : RESUME_PREFACE_PREFIX
 }
 
 /** System messages are rebuilt per turn; they must never enter a persisted transcript or history seed. */

@@ -104,6 +104,13 @@ describe('agentMode vault flag', () => {
     expect(restored.renameFromHeading).toBe(false)
     expect(restored.agentMode).toBe('safe')
     expect(await readAgentMode(fs)).toBe('safe')
+
+    for (const mode of ['grok', 'claude', 'codex'] as const) {
+      await writeAgentMode(fs, mode)
+      expect(await readAgentMode(fs)).toBe(mode)
+      expect((await readVaultOpenState(fs)).agentMode).toBe(mode)
+    }
+    await writeAgentMode(fs, 'safe')
   })
 })
 

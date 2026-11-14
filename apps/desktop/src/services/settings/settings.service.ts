@@ -10,6 +10,8 @@ import {
   emptyTokenUsage,
   localDateKey,
   maskSecret,
+  defaultAgentSettings,
+  normalizeAgentExecutables,
   normalizeAgentMaxTurns,
   normalizeMemoryModelId,
   parseTokenUsage,
@@ -57,7 +59,7 @@ const emptySettings = (): PublicSettings => ({
   autoGitBlurSeconds: 0,
   appearance: { noteWidth: 'standard', fontSize: 15, fontFamily: '' },
   editor: { autosaveDebounceMs: 350 },
-  agent: { maxTurns: 200, memoryEnabled: true, memoryModelId: '' },
+  agent: defaultAgentSettings(),
   updates: { channel: 'stable', autoCheck: true },
   privacy: { telemetryEnabled: false },
 })
@@ -247,6 +249,8 @@ export class SettingsService extends Service {
   private memoryLlmKeys: Record<string, string> = {}
   private loadTask: Promise<void> | null = null
   private loaded = false
+  private detectAfterLoad = false
+  private detectTask: Promise<void> | null = null
   // load and save share this so an older snapshot cannot land after a newer partition.
   private ioChain: Promise<void> = Promise.resolve()
   // Last form read or written. A save captured before that must not put defaults back.
@@ -517,6 +521,10 @@ export class SettingsService extends Service {
     const task = this.enqueue(() => this.loadBody()).finally(() => {
       if (this.loadTask === task) this.loadTask = null
       this.loaded = true
+      if (this.detectAfterLoad) {
+        this.detectAfterLoad = false
+        void this.fillDetectedExecutables()
+      }
     })
     this.loadTask = task
     return task
@@ -532,10 +540,63 @@ export class SettingsService extends Service {
     return this.loadTask !== null
   }
 
+  /**
+   * When a desktop executable path is still unset, ask the main process once
+   * and store whatever it finds. A path the user typed, including '', stays.
+   */
+  fillDetectedExecutables(): Promise<void> {
+    if (!isDesktopRuntime()) return Promise.resolve()
+    if (this.detectTask) return this.detectTask
+    const task = this.detectExecutables().finally(() => {
+      if (this.detectTask === task) this.detectTask = null
+    })
+    this.detectTask = task
+    return task
+  }
+
+  private async detectExecutables(): Promise<void> {
+    if (!this.loaded) await this.waitUntilLoaded()
+    if (!isDesktopRuntime()) return
+    const current = this.form.agent?.executables
+    if (!current) return
+    if (current.grok !== null && current.claude !== null && current.codex !== null) return
+    let found: { grok: string | null; claude: string | null; codex: string | null }
+    try {
+      const api = await import('@stride/electron-api')
+      found = await api.whichAgents()
+    } catch {
+      return
+    }
+    const latest = this.form.agent?.executables
+    if (!latest) return
+    const next = {
+      grok: latest.grok === null ? found.grok : latest.grok,
+      claude: latest.claude === null ? found.claude : latest.claude,
+      codex: latest.codex === null ? found.codex : latest.codex,
+    }
+    if (next.grok === latest.grok && next.claude === latest.claude && next.codex === latest.codex) return
+    this.form = { ...this.form, agent: { ...this.form.agent, executables: next } }
+    await this.save()
+  }
+
   async save(): Promise<void> {
     const shot = this.captureShot()
     const after = await this.enqueue(() => this.persistShot(shot))
     if (after) await this.syncVault(after)
+  }
+
+  /**
+   * The settings file is already written. Drop a held CLI only when its own
+   * command changed. A failure here must not surface as a failed save.
+   */
+  private async releaseHeldExternalAgent(): Promise<void> {
+    try {
+      const { ChatService } = await import('../chat/chat.service')
+      if (!has(ChatService)) return
+      this.resolve(ChatService).onExecutableSettingsSaved()
+    } catch {
+      // The write landed. Losing the process drop must not look like a save error.
+    }
   }
 
   private captureShot(): SettingsShot {
@@ -593,6 +654,7 @@ export class SettingsService extends Service {
           maxTurns: normalizeAgentMaxTurns(form.agent?.maxTurns),
           memoryEnabled: form.agent?.memoryEnabled !== false,
           memoryModelId: normalizeMemoryModelId(form.agent?.memoryModelId, form.llmConfigs),
+          executables: normalizeAgentExecutables(form.agent?.executables),
         },
         updates: { ...form.updates },
         privacy: { ...form.privacy },
@@ -647,6 +709,7 @@ export class SettingsService extends Service {
       this.committedForm = savedForm
       this.form = mergePartitions(this.form, shot.form, savedForm)
       this.notice = ''
+      await this.releaseHeldExternalAgent()
       return this.savedRuntime(settings, embeddingKey)
     } catch (error) {
       this.notice = errorText(error)
@@ -719,6 +782,7 @@ export class SettingsService extends Service {
   }
 
   private async loadBody() {
+    this.detectAfterLoad = false
     const secrets = await this.openSecrets()
     if (!secrets) return
     try {
@@ -760,6 +824,7 @@ export class SettingsService extends Service {
       }
       this.committedForm = this.form
       this.notice = ''
+      this.detectAfterLoad = true
     } catch (error) {
       this.notice = errorText(error)
     }

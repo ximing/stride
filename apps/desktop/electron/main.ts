@@ -19,6 +19,7 @@ import {
   resolveRendererTrust,
   type RendererTrust,
 } from './security.ts'
+import { disposeAllAgentProcesses, disposeAgentSender, registerHostAgent } from './agent-process.ts'
 import { disposeAllShellSessions, disposeShellSender, registerHostShell } from './shell.ts'
 import { registerHostUpdater } from './updater.ts'
 import { deliverDeepLink, registerWindowHost, type WindowHost } from './windows.ts'
@@ -146,6 +147,13 @@ function registerIpc(): void {
     getTrust: rendererTrust,
   })
 
+  registerHostAgent({
+    handle: (channel, listener) => {
+      ipcMain.handle(channel, listener)
+    },
+    getTrust: rendererTrust,
+  })
+
   registerHostFetch({
     handle: (channel, listener) => {
       ipcMain.handle(channel, listener)
@@ -228,6 +236,7 @@ function registerIpc(): void {
       window.webContents.on('did-start-navigation', (_event, _url, isInPlace, isMainFrame) => {
         if (!isMainFrame || isInPlace) return
         disposeShellSender(window.webContents)
+        disposeAgentSender(window.webContents)
       })
     },
     applyMenu: (projects, copy) => menu.apply(projects, copy),
@@ -289,6 +298,7 @@ app.on('window-all-closed', () => {
 
 app.on('before-quit', () => {
   disposeAllShellSessions()
+  disposeAllAgentProcesses()
   disposeHostFetches()
 })
 }

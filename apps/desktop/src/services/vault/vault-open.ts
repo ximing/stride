@@ -9,6 +9,7 @@ import {
   readVaultOpenState,
   recoverRename,
   SearchDiskCache,
+  type AgentMode,
   type NoteIndex,
 } from '@stride/core'
 import { MemoryFileSystem, type FileSystemBackend, type SearchBackend } from '@stride/platform'
@@ -30,6 +31,11 @@ function isTypeDocument(note: { type: string }): boolean {
 async function closeBackend(backend: SearchBackend | null | undefined) {
   if (!backend) return
   await backend.close().catch(() => undefined)
+}
+
+/** Disk restore. Assigns the mode, does not write `.stride/vault.json`, and does not drop a CLI. */
+export function adoptAgentMode(vault: VaultService, mode: AgentMode): void {
+  vault.agentMode = mode
 }
 
 async function resumeRetiredRebuild(
@@ -161,7 +167,7 @@ export async function openBackendBody(vault: VaultService, backend: FileSystemBa
     vault.searchDegraded = runtime.intended && !runtime.active
     vault.listFilterService.clear()
     vault.renameFromHeading = state.renameFromHeading
-    vault.agentMode = state.agentMode
+    adoptAgentMode(vault, state.agentMode)
     vault.advanceInbox = state.advanceInbox
     vault.zoom = state.zoom
     vault.viewMode = state.viewMode
