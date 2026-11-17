@@ -664,6 +664,7 @@ export const zh: DeepString<Catalog> = {
     emptyBody: '可以询问当前笔记，或仓库里的任何内容。',
     mode: '助手模式',
     placeholder: '询问当前笔记',
+    draftHint: '回车发送，⌘↩ 换行。',
     thinking: '思考',
     turnLimit: '已达到 {{count}} 轮上限并停止。',
     failed: '失败',

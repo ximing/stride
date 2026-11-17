@@ -2,7 +2,7 @@ import { History, MessageCircle, Plus, Send, Square, Trash2, Wrench, X } from 'l
 import { normalizeAgentMaxTurns, type ChatSessionMeta, type PublicLlmConfig } from '@stride/core'
 import { agentExecutableCommand } from '@stride/platform'
 import { observer, useService } from '@rabjs/react'
-import { useEffect, useState } from 'react'
+import { useEffect, useLayoutEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import { CHAT_HISTORY_LOAD_ERROR, CHAT_TURN_LIMIT_ERROR, ChatService } from '../../services/chat/chat.service'
 import type { ChatToolCall } from '../../services/chat/chat-turn'
@@ -101,6 +101,29 @@ function ChatTools({ tools }: { tools: ChatToolCall[] }) {
       {open ? tools.map((tool) => <ChatTool key={tool.id} tool={tool} />) : null}
     </div>
   )
+}
+
+/** Enter sends. Command+Enter inserts a line break at the caret. Shift+Enter keeps the browser break. */
+function draftEnterAction(event: {
+  key: string
+  keyCode: number
+  metaKey: boolean
+  ctrlKey: boolean
+  altKey: boolean
+  shiftKey: boolean
+  repeat: boolean
+  isComposing: boolean
+}): 'send' | 'newline' | 'ignore' {
+  if (event.key !== 'Enter') return 'ignore'
+  // IME confirm uses Enter to commit a candidate. keyCode 229 is the composition key.
+  if (event.isComposing || event.keyCode === 229) return 'ignore'
+  if (event.metaKey && !event.ctrlKey && !event.altKey && !event.shiftKey) return 'newline'
+  if (event.shiftKey || event.ctrlKey || event.altKey || event.repeat) return 'ignore'
+  return 'send'
+}
+
+function insertNewline(value: string, start: number, end: number): { value: string; caret: number } {
+  return { value: `${value.slice(0, start)}\n${value.slice(end)}`, caret: start + 1 }
 }
 
 function modelOptionLabel(config: PublicLlmConfig): string {
@@ -209,6 +232,8 @@ const ChatHistory = observer(function ChatHistory() {
 export const ChatPanel = observer(function ChatPanel() {
   const { t } = useTranslation()
   const chat = useService(ChatService)
+  const draftRef = useRef<HTMLTextAreaElement>(null)
+  const newlineCaret = useRef<number | null>(null)
   const settings = useService(SettingsService)
   const vault = useService(VaultService)
   const session = chat.session
@@ -243,6 +268,40 @@ export const ChatPanel = observer(function ChatPanel() {
     if (!external || !externalOk) return
     void chat.refreshExternalExec()
   }, [chat, external, externalOk, vault.agentMode, externalCommand])
+
+  useLayoutEffect(() => {
+    const caret = newlineCaret.current
+    const field = draftRef.current
+    if (caret == null || !field || field.value.length < caret) return
+    newlineCaret.current = null
+    field.selectionStart = caret
+    field.selectionEnd = caret
+  })
+
+  function onDraftKeyDown(event: KeyboardEvent<HTMLTextAreaElement>) {
+    const action = draftEnterAction({
+      key: event.key,
+      keyCode: event.keyCode,
+      metaKey: event.metaKey,
+      ctrlKey: event.ctrlKey,
+      altKey: event.altKey,
+      shiftKey: event.shiftKey,
+      repeat: event.repeat,
+      isComposing: event.nativeEvent.isComposing,
+    })
+    if (action === 'ignore') return
+    event.preventDefault()
+    if (action === 'send') {
+      void chat.send()
+      return
+    }
+    const field = event.currentTarget
+    const start = field.selectionStart ?? field.value.length
+    const end = field.selectionEnd ?? start
+    const inserted = insertNewline(field.value, start, end)
+    newlineCaret.current = inserted.caret
+    chat.setDraft(inserted.value)
+  }
 
   return (
     <div className="chat-panel" data-testid="chat-panel">
@@ -340,10 +399,13 @@ export const ChatPanel = observer(function ChatPanel() {
       )}
       <div className="chat-compose">
         <textarea
+          ref={draftRef}
           className="chat-draft"
           data-testid="chat-draft"
           value={chat.draft}
+          title={t('chat.draftHint')}
           onChange={(event) => chat.setDraft(event.target.value)}
+          onKeyDown={(event) => onDraftKeyDown(event)}
           placeholder={t('chat.placeholder')}
         />
         <div className="chat-compose-bar">

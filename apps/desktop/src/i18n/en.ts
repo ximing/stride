@@ -658,6 +658,7 @@ export const en = {
     emptyBody: 'Ask about the open note, or anything in your vault.',
     mode: 'Agent mode',
     placeholder: 'Ask about the open note',
+    draftHint: 'Enter to send. ⌘↩ for a new line.',
     thinking: 'Thinking',
     turnLimit: 'Reached the {{count}}-turn limit and stopped.',
     failed: 'failed',

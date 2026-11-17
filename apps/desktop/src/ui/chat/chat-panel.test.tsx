@@ -617,4 +617,73 @@ describe('ChatPanel', () => {
       await unmount(element, root)
     }
   })
+
+  it('sends on Enter and inserts a newline on Command-Enter', async () => {
+    register(VaultService)
+    register(SettingsService)
+    register(ChatService)
+    const chat = resolve(ChatService)
+    const send = vi.spyOn(chat, 'send').mockResolvedValue()
+    chat.draft = 'hello'
+    const { host: element, root } = host()
+    try {
+      await render(root, <ChatPanel />)
+      const draft = element.querySelector('[data-testid="chat-draft"]') as HTMLTextAreaElement
+      expect(draft.title).toBe('Enter to send. ⌘↩ for a new line.')
+      draft.focus()
+      draft.setSelectionRange(5, 5)
+
+      const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+      await act(async () => {
+        draft.dispatchEvent(enter)
+      })
+      expect(enter.defaultPrevented).toBe(true)
+      expect(send).toHaveBeenCalledTimes(1)
+      expect(chat.draft).toBe('hello')
+
+      send.mockClear()
+      const held = new KeyboardEvent('keydown', { key: 'Enter', repeat: true, bubbles: true, cancelable: true })
+      await act(async () => {
+        draft.dispatchEvent(held)
+      })
+      expect(held.defaultPrevented).toBe(false)
+      expect(send).not.toHaveBeenCalled()
+
+      const shifted = new KeyboardEvent('keydown', { key: 'Enter', shiftKey: true, bubbles: true, cancelable: true })
+      await act(async () => {
+        draft.dispatchEvent(shifted)
+      })
+      expect(shifted.defaultPrevented).toBe(false)
+      expect(send).not.toHaveBeenCalled()
+      expect(chat.draft).toBe('hello')
+
+      draft.setSelectionRange(2, 4)
+      const commandEnter = new KeyboardEvent('keydown', {
+        key: 'Enter',
+        metaKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+      await act(async () => {
+        draft.dispatchEvent(commandEnter)
+      })
+      expect(commandEnter.defaultPrevented).toBe(true)
+      expect(send).not.toHaveBeenCalled()
+      expect(chat.draft).toBe('he\no')
+      expect(draft.selectionStart).toBe(3)
+      expect(draft.selectionEnd).toBe(3)
+
+      const composing = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+      Object.defineProperty(composing, 'isComposing', { value: true })
+      await act(async () => {
+        draft.dispatchEvent(composing)
+      })
+      expect(composing.defaultPrevented).toBe(false)
+      expect(send).not.toHaveBeenCalled()
+      expect(chat.draft).toBe('he\no')
+    } finally {
+      send.mockRestore()
+      await unmount(element, root)
+    }
+  })
 })
