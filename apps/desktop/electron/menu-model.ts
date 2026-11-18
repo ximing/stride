@@ -53,7 +53,7 @@ export function buildMenuModel(
       { type: 'separator' },
       { id: ID_OPEN_RECENT, label: copy.openRecent, type: 'submenu', submenu: recentItems },
       { type: 'separator' },
-      { id: ID_CLOSE_WINDOW, label: copy.closeWindow, accelerator: 'CmdOrCtrl+W', enabled: true },
+      { id: ID_CLOSE_WINDOW, label: copy.closeWindow, accelerator: 'CmdOrCtrl+Shift+W', enabled: true },
     ],
   }
   if (platform !== 'darwin') file.submenu?.push({ role: 'quit' })

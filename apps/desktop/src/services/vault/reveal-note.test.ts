@@ -1,7 +1,7 @@
 import { resolve } from '@rabjs/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LayoutService } from '../layout/layout.service'
-import { folderChain, folderNotesToShow, parentFolder, showFolder, showNoteInFolder } from './reveal-note'
+import { folderChain, folderNotesToShow, followNoteParentFolder, parentFolder, showFolder, showNoteInFolder } from './reveal-note'
 
 describe('parentFolder / folderChain', () => {
   it('splits a note id into its folder chain', () => {
@@ -43,7 +43,7 @@ describe('showNoteInFolder', () => {
     const layout = resolve(LayoutService)
     layout.setSidebarCollapsed(false)
     layout.setRailSectionCollapsed('notes', false)
-    layout.foldersCollapsed = {}
+    layout.foldersExpanded = {}
     layout.revealedNoteId = ''
     layout.revealedFolderPath = ''
     layout.revealSeq = 0
@@ -72,6 +72,29 @@ describe('showNoteInFolder', () => {
     showNoteInFolder(vault, 'root-note')
     expect(vault.setFilter).not.toHaveBeenCalled()
     expect(resolve(LayoutService).revealedNoteId).toBe('root-note')
+  })
+
+  it('follows the opened note parent only while a folder is selected', () => {
+    const vault = { listFilter: 'folder:docs', setFilter: vi.fn() }
+    followNoteParentFolder(vault, 'docs/guide/intro')
+    expect(vault.setFilter).toHaveBeenCalledWith('folder:docs/guide')
+
+    vault.setFilter.mockClear()
+    vault.listFilter = 'folder:docs/guide'
+    followNoteParentFolder(vault, 'docs/guide/intro')
+    expect(vault.setFilter).not.toHaveBeenCalled()
+
+    followNoteParentFolder(vault, 'root-note')
+    expect(vault.setFilter).toHaveBeenCalledWith('all')
+
+    vault.setFilter.mockClear()
+    vault.listFilter = 'all'
+    followNoteParentFolder(vault, 'docs/guide/intro')
+    expect(vault.setFilter).not.toHaveBeenCalled()
+
+    vault.listFilter = 'Project'
+    followNoteParentFolder(vault, 'docs/guide/intro')
+    expect(vault.setFilter).not.toHaveBeenCalled()
   })
 
   it('scopes the list to the folder row that was clicked', () => {

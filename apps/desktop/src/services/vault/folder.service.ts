@@ -1,4 +1,4 @@
-import { Service } from '@rabjs/react'
+import { has, Service } from '@rabjs/react'
 import {
   createFolder as createFolderOnDisk,
   deleteFolder as deleteFolderOnDisk,
@@ -7,6 +7,8 @@ import {
   renameFolder as renameFolderOnDisk,
 } from '@stride/core'
 import { applyNoteIdChanges, FOLDER_FILTER_PREFIX } from './note-identity'
+import { LayoutService } from '../layout/layout.service'
+import { folderChain } from './reveal-note'
 import { VaultService } from './vault.service'
 
 function errorText(error: unknown): string {
@@ -15,6 +17,7 @@ function errorText(error: unknown): string {
 
 export class FolderService extends Service {
   folders: string[] = []
+  private loadGeneration = 0
 
   private get vault() {
     return this.resolve(VaultService)
@@ -28,15 +31,17 @@ export class FolderService extends Service {
   }
 
   async loadFolders() {
+    const generation = ++this.loadGeneration
     const fs = this.vault.fs
     if (!fs) {
       this.folders = []
       return
     }
     try {
-      this.folders = await listFolders(fs)
+      const folders = await listFolders(fs)
+      if (generation === this.loadGeneration && this.vault.fs === fs) this.folders = folders
     } catch (error) {
-      this.vault.error = errorText(error)
+      if (generation === this.loadGeneration && this.vault.fs === fs) this.vault.error = errorText(error)
     }
   }
 
@@ -48,6 +53,7 @@ export class FolderService extends Service {
       this.vault.error = ''
       this.vault.docEpoch += 1
       await this.loadFolders()
+      if (has(LayoutService)) this.resolve(LayoutService).showInTree(folderChain(path), { folderPath: path })
     } catch (error) {
       this.vault.error = errorText(error)
     }
@@ -64,6 +70,7 @@ export class FolderService extends Service {
         .map((note) => ({ fromId: note.id, toId: nextId(note.id) }))
         .filter((change) => change.fromId !== change.toId)
       await applyNoteIdChanges(this.vault, changes, { remapFolderFilter: nextId })
+      if (has(LayoutService)) this.resolve(LayoutService).remapFolder(from, to)
       this.vault.docEpoch += 1
       this.vault.error = ''
       await this.loadFolders()
@@ -82,6 +89,7 @@ export class FolderService extends Service {
         this.vault.notes.map((note) => note.id),
       )
       this.vault.error = ''
+      if (has(LayoutService)) this.resolve(LayoutService).forgetFolder(path)
       // Deleting the scoped folder (or one of its ancestors) drops the scope.
       const filterPath = this.folderFilterPath()
       if (filterPath === path || filterPath.startsWith(`${path}/`)) this.vault.listFilter = 'all'
@@ -104,7 +112,8 @@ export class FolderService extends Service {
     await this.vault.createNote()
     const id = this.vault.activeId
     if (!id || !path) return
-    await this.moveNote(id, path)
+    const movedId = await this.moveNote(id, path)
+    if (!this.vault.error && has(LayoutService)) this.resolve(LayoutService).showInTree(folderChain(path), { noteId: movedId })
     if (filterPath && (path === filterPath || path.startsWith(`${filterPath}/`))) {
       this.vault.listFilter = `${FOLDER_FILTER_PREFIX}${filterPath}`
     }

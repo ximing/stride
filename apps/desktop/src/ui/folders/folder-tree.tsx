@@ -1,6 +1,6 @@
-import { ChevronDown, ChevronRight, FilePlus, FileText, Folder, FolderPlus, RefreshCw } from 'lucide-react'
+import { ChevronDown, ChevronRight, ChevronsDownUp, FilePlus, FileText, Folder, FolderPlus, RefreshCw } from 'lucide-react'
 import { observer, raw, useService } from '@rabjs/react'
-import { useEffect, useMemo, useState, type DragEvent } from 'react'
+import { useEffect, useRef, useState, type DragEvent } from 'react'
 import { useTranslation } from 'react-i18next'
 import type { StrideNote } from '@stride/core/note'
 import {
@@ -11,10 +11,9 @@ import {
 } from '../../services/commands/context-menu'
 import { CommandService } from '../../services/commands/command.service'
 import { FolderService } from '../../services/vault/folder.service'
-import { folderNotesToShow, parentFolder, showFolder, showNoteInFolder } from '../../services/vault/reveal-note'
+import { folderNotesToShow, parentFolder, releaseListFilters, showFolder, showNoteInFolder } from '../../services/vault/reveal-note'
 import { FOLDER_FILTER_PREFIX, VaultService } from '../../services/vault/vault.service'
 import { LayoutService } from '../../services/layout/layout.service'
-import { ListFilterService } from '../../services/search/list-filter.service'
 import { NoteListService } from '../../services/notes/note-list.service'
 import { TabsService } from '../../services/notes/tabs.service'
 import { focusNoteTitle } from '../note-list/note-list'
@@ -25,6 +24,7 @@ import { EmptyState } from '../primitives/empty-state'
 import { Mark } from '../primitives/icon'
 import { Input } from '../primitives/input'
 import { Modal, ModalClose, ModalContent } from '../primitives/modal'
+import { useTreeNavigation } from './tree-navigation'
 import { RailGroupHeader } from '../shell/rail-group'
 
 // A vault-scale folder can hold thousands of notes; the tree renders at most
@@ -73,6 +73,12 @@ function NoteLink({
   return (
     <button
       type="button"
+      role="treeitem"
+      aria-selected={active}
+      aria-level={note.id.split('/').length}
+      tabIndex={-1}
+      data-tree-key={`note:${note.id}`}
+      data-tree-parent={parentFolder(note.id)}
       data-testid="note-link"
       data-note-id={note.id}
       draggable
@@ -227,7 +233,7 @@ interface FolderBlockProps {
   draft: string
   creatingIn: string
   createDraft: string
-  foldersCollapsed: Record<string, boolean>
+  foldersExpanded: Record<string, boolean>
   onSelect: (id: string) => void
   onSelectFolder: (path: string) => void
   onNewNote: (path: string) => void
@@ -255,7 +261,7 @@ function FolderBlock({
   draft,
   creatingIn,
   createDraft,
-  foldersCollapsed,
+  foldersExpanded,
   onSelect,
   onSelectFolder,
   onNewNote,
@@ -276,15 +282,38 @@ function FolderBlock({
   const renameLabel = `${t('folders.rename')} ${label}`
   const insideLabel = t('folders.newInside', { name: label })
   const selected = selectedFolder === path
-  const collapsed = foldersCollapsed[path] === true
+  const collapsed = foldersExpanded[path] !== true
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  function cancelHover() {
+    if (hoverTimer.current !== null) clearTimeout(hoverTimer.current)
+    hoverTimer.current = null
+  }
+  useEffect(() => cancelHover, [path, collapsed])
   return (
     <div
       className={selected ? 'folder-row is-active' : 'folder-row'}
+      role="treeitem"
+      tabIndex={-1}
+      aria-label={label}
+      aria-expanded={!collapsed}
+      aria-selected={selected}
+      aria-level={path.split('/').length}
+      data-tree-key={`folder:${path}`}
+      data-tree-parent={parentFolder(path)}
       data-testid="folder-row"
       data-path={path}
       data-collapsed={collapsed || undefined}
-      onDragOver={allowDrop}
-      onDrop={(event) => onDrop(event, path)}
+      onDragOver={(event) => {
+        allowDrop(event)
+        event.stopPropagation()
+        if (collapsed && hoverTimer.current === null && event.dataTransfer.types.includes('text/plain')) {
+          hoverTimer.current = setTimeout(() => { hoverTimer.current = null; onToggleFolder(path) }, 600)
+        }
+      }}
+      onDragLeave={(event) => {
+        if (!(event.relatedTarget instanceof Node) || !event.currentTarget.contains(event.relatedTarget)) cancelHover()
+      }}
+      onDrop={(event) => { cancelHover(); onDrop(event, path) }}
       onContextMenu={(event) => {
         event.preventDefault()
         event.stopPropagation()
@@ -292,11 +321,9 @@ function FolderBlock({
       }}
     >
       <div className="folder-row-main">
-        {/* The toggle borrows the folder icon's slot: it shows the folder
-            glyph at rest, a chevron on hover/focus, and a chevron at all
-            times while collapsed — no layout shift, no extra indent. */}
         <button
           type="button"
+          tabIndex={-1}
           className="folder-toggle"
           data-testid="folder-toggle"
           data-path={path}
@@ -308,7 +335,6 @@ function FolderBlock({
             onToggleFolder(path)
           }}
         >
-          <span className="folder-toggle-icon"><Mark icon={Folder} size={14} /></span>
           <span className="folder-toggle-chevron"><Mark icon={collapsed ? ChevronRight : ChevronDown} size={14} /></span>
         </button>
         {renaming === path ? (
@@ -330,8 +356,9 @@ function FolderBlock({
             data-testid="folder-label"
             aria-current={selected ? 'page' : undefined}
             onClick={() => onSelectFolder(path)}
-            onDoubleClick={() => onStartRename(path)}
+            tabIndex={-1}
           >
+            <Mark icon={Folder} size={14} />
             <span className="folder-label-text">{label}</span>
           </button>
           </Tip>
@@ -339,6 +366,7 @@ function FolderBlock({
         {renaming !== path && (
           <div className="folder-row-actions">
             <IconButton
+              tabIndex={-1}
               data-testid="folder-new-note"
               icon={FilePlus}
               label={t('folders.newNoteHere')}
@@ -349,7 +377,7 @@ function FolderBlock({
         )}
       </div>
       {!collapsed && (
-        <div className="folder-children">
+        <div className="folder-children" role="group">
           {creatingIn === path && (
             <GhostRow
               label={insideLabel}
@@ -373,7 +401,7 @@ function FolderBlock({
               draft={draft}
               creatingIn={creatingIn}
               createDraft={createDraft}
-              foldersCollapsed={foldersCollapsed}
+              foldersExpanded={foldersExpanded}
               onSelect={onSelect}
               onSelectFolder={onSelectFolder}
               onNewNote={onNewNote}
@@ -408,7 +436,6 @@ export const FolderTree = observer(function FolderTree() {
   const { t } = useTranslation()
   const vault = useService(VaultService)
   const folderService = useService(FolderService)
-  const listFilter = useService(ListFilterService)
   const tabs = useService(TabsService)
   const noteList = useService(NoteListService)
   const layout = useService(LayoutService)
@@ -421,6 +448,15 @@ export const FolderTree = observer(function FolderTree() {
   const [createDraft, setCreateDraft] = useState('')
   const [deleting, setDeleting] = useState('')
   const [menu, setMenu] = useState<TreeMenuState | null>(null)
+  const navigation = useTreeNavigation({ toggle: path => layout.toggleFolder(path), rename: startRename })
+
+  useEffect(() => {
+    setCreating(false)
+    setCreatingIn('')
+    setRenaming('')
+    setDeleting('')
+    setMenu(null)
+  }, [layout.treeVaultId])
 
   useEffect(() => {
     void folderService.loadFolders()
@@ -485,11 +521,12 @@ export const FolderTree = observer(function FolderTree() {
     if (!vault.error) setRenaming('')
   }
 
-  // Click scopes the note list to the folder's subtree; clicking the active
-  // folder again releases the scope back to All.
+  // Selecting a folder is idempotent; only the chevron collapses it.
   function selectFolder(path: string) {
     const key = `${FOLDER_FILTER_PREFIX}${path}`
-    vault.setFilter(vault.listFilter === key ? 'all' : key)
+    vault.setFilter(key)
+    releaseListFilters(vault)
+    layout.setFolderCollapsed(path, false)
   }
 
   // Right-click menus. Note rows reuse the note-list selection so the shared
@@ -557,28 +594,19 @@ export const FolderTree = observer(function FolderTree() {
     })
   }
 
-  // Memoized: re-filtering 10k notes per keystroke is only paid when the
-  // query or the underlying notes actually change, not on unrelated renders.
-  // A folder scope narrows the note-list column only — the tree keeps showing
-  // the full vault (search hits still narrow it, as before).
-  const notes = useMemo(
-    () => {
-      const searching = vault.searchHits.length > 0 && vault.searchQuery.trim() !== ''
-      const scoped = vault.listFilter.startsWith(FOLDER_FILTER_PREFIX)
-      // raw(): the getter result is re-proxied on access, and iterating that
-      // proxy registers a reaction key per note on large vaults.
-      return listFilter.apply(raw(searching || !scoped ? vault.visibleNotes : vault.listedNotes))
-    },
-    [vault.notes, vault.searchHits, vault.searchQuery, vault.listFilter, listFilter.query],
-  )
+  // The tree is the vault's spatial map, independent of list/search filters.
+  const notes = raw(vault.listedNotes)
   const paths = folderService.folders
   const revealedNoteId = layout.revealedNoteId
   const revealedFolderPath = layout.revealedFolderPath
   const revealSeq = layout.revealSeq
+  const scrolledReveal = useRef('')
   const treeEmpty = paths.length === 0 && notes.length === 0
 
   useEffect(() => {
-    if (revealSeq === 0) return
+    const request = `${layout.treeVaultId}:${revealSeq}`
+    if (revealSeq === 0) { scrolledReveal.current = ''; return }
+    if (scrolledReveal.current === request) return
     const selector = revealedNoteId
       ? `[data-testid="note-link"][data-note-id="${cssAttr(revealedNoteId)}"]`
       : revealedFolderPath
@@ -586,8 +614,12 @@ export const FolderTree = observer(function FolderTree() {
         : ''
     if (!selector) return
     const node = document.querySelector<HTMLElement>(selector)
-    if (typeof node?.scrollIntoView === 'function') node.scrollIntoView({ block: 'nearest' })
-  }, [revealSeq, revealedNoteId, revealedFolderPath])
+    if (node) {
+      const line = node.querySelector<HTMLElement>(':scope > .folder-row-main') ?? node
+      line.scrollIntoView?.({ block: 'nearest' })
+      scrolledReveal.current = request
+    }
+  }, [revealSeq, revealedNoteId, revealedFolderPath, paths, notes, layout.treeVaultId])
   const deletingLabel = deleting.split('/').pop() ?? deleting
 
   return (
@@ -608,6 +640,14 @@ export const FolderTree = observer(function FolderTree() {
         testId="rail-group-notes"
         action={
           <>
+            <IconButton
+              icon={ChevronsDownUp}
+              label={t('commands.tree.collapseAll')}
+              size="sm"
+              iconSize={14}
+              data-testid="collapse-all-folders"
+              onClick={() => commands.execute('tree.collapseAll')}
+            />
             <IconButton
               icon={RefreshCw}
               label={t('commands.file.refresh')}
@@ -638,11 +678,11 @@ export const FolderTree = observer(function FolderTree() {
         }
       />
       {!layout.railCollapsed.notes && (
-        <div className="rail-group-body">
+        <div className="rail-group-body" role="tree" aria-label={t('shell.notes')} {...navigation}>
           {treeEmpty && !creating && (
             <EmptyState
               compact
-              title={listFilter.query.trim() !== '' || vault.searchQuery.trim() !== '' ? t('folders.emptyFilter') : t('folders.empty')}
+              title={t('folders.empty')}
               testId="folder-tree-empty"
             />
           )}
@@ -669,7 +709,7 @@ export const FolderTree = observer(function FolderTree() {
               draft={draft}
               creatingIn={creatingIn}
               createDraft={createDraft}
-              foldersCollapsed={layout.foldersCollapsed}
+              foldersExpanded={layout.foldersExpanded}
               onSelect={(id) => tabs.openNote(id)}
               onSelectFolder={selectFolder}
               onNewNote={(folder) => {

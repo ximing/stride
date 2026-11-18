@@ -107,7 +107,7 @@ export class QuickOpenService extends Service {
   }
 
   choose(id: string) {
-    this.tabs.openNote(id)
+    this.tabs.openNote(id, { reveal: true })
     this.close()
   }
 }

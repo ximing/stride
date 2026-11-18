@@ -11,6 +11,7 @@ import {
   type ResizableColumn,
   type RightPanelTab,
 } from './layout'
+import { readFolderTreeState, writeFolderTreeState } from './folder-tree-state'
 
 function layoutStorage(): LayoutStorage | null {
   try {
@@ -28,7 +29,8 @@ export class LayoutService extends Service {
   rightPanelCollapsed = DEFAULT_LAYOUT_STATE.rightPanelCollapsed
   rightPanelTab: RightPanelTab = DEFAULT_LAYOUT_STATE.rightPanelTab
   railCollapsed: RailCollapsed = { ...DEFAULT_LAYOUT_STATE.railCollapsed }
-  foldersCollapsed: Record<string, boolean> = {}
+  foldersExpanded: Record<string, boolean> = {}
+  treeVaultId = ''
   /** Note the folder tree should scroll to. Transient; not persisted. */
   revealedNoteId = ''
   /** Folder row the tree should scroll to when no note is targeted. */
@@ -46,7 +48,6 @@ export class LayoutService extends Service {
     this.rightPanelCollapsed = stored.rightPanelCollapsed
     this.rightPanelTab = stored.rightPanelTab
     this.railCollapsed = stored.railCollapsed
-    this.foldersCollapsed = stored.foldersCollapsed
   }
 
   setColumnWidth(column: ResizableColumn, width: number) {
@@ -92,55 +93,76 @@ export class LayoutService extends Service {
     this.setRailSectionCollapsed(section, !this.railCollapsed[section])
   }
 
-  /** Folder collapse in the notes tree. UI state, kept out of the vault. */
-  isFolderCollapsed(path: string) {
-    return this.foldersCollapsed[path] === true
+  /** Switch only once the vault identity has been committed by the open pipeline. */
+  setTreeVault(vaultId: string) {
+    if (this.treeVaultId === vaultId) return
+    this.treeVaultId = vaultId
+    this.foldersExpanded = readFolderTreeState(layoutStorage(), vaultId)
+    this.revealedNoteId = ''
+    this.revealedFolderPath = ''
+    this.revealSeq = 0
   }
 
-  /** Expanded folders are pruned from the record, so storage stays clean. */
+  isFolderCollapsed(path: string) {
+    return this.foldersExpanded[path] !== true
+  }
+
   setFolderCollapsed(path: string, collapsed: boolean) {
-    const next = { ...this.foldersCollapsed }
-    if (collapsed) next[path] = true
-    else delete next[path]
-    this.foldersCollapsed = next
-    this.persist()
+    const next = { ...this.foldersExpanded, [path]: true }
+    if (collapsed) delete next[path]
+    this.foldersExpanded = next
+    this.persistTree()
   }
 
   toggleFolder(path: string) {
     this.setFolderCollapsed(path, !this.isFolderCollapsed(path))
   }
 
-  /**
-   * Open the sidebar, the notes group, and each folder in `folders` so a
-   * context-menu reveal can scroll the target into view. One persist.
-   */
-  showInTree(folders: readonly string[], target: { noteId: string } | { folderPath: string }) {
-    const next = { ...this.foldersCollapsed }
-    let folderChanged = false
-    for (const path of folders) {
-      if (!next[path]) continue
-      delete next[path]
-      folderChanged = true
-    }
-    if (folderChanged) this.foldersCollapsed = next
-    let changed = folderChanged
-    if (this.sidebarCollapsed) {
+  collapseAllFolders() {
+    this.foldersExpanded = {}
+    this.revealedNoteId = ''
+    this.revealedFolderPath = ''
+    this.persistTree()
+  }
+
+  expandFolders(paths: readonly string[]) {
+    this.foldersExpanded = { ...this.foldersExpanded, ...Object.fromEntries(paths.map(path => [path, true])) }
+    this.persistTree()
+  }
+
+  /** Rename/move a complete subtree, including hidden descendants. */
+  remapFolder(from: string, to: string) {
+    const remap = (path: string) => path === from || path.startsWith(`${from}/`) ? to + path.slice(from.length) : path
+    this.foldersExpanded = Object.fromEntries(Object.entries(this.foldersExpanded).map(([path, flag]) => [remap(path), flag]))
+    this.revealedFolderPath = remap(this.revealedFolderPath)
+    this.revealedNoteId = remap(this.revealedNoteId)
+    this.persistTree()
+  }
+
+  forgetFolder(path: string) {
+    const inside = (value: string) => value === path || value.startsWith(`${path}/`)
+    this.foldersExpanded = Object.fromEntries(Object.entries(this.foldersExpanded).filter(([key]) => !inside(key)))
+    if (inside(this.revealedNoteId)) this.revealedNoteId = ''
+    if (inside(this.revealedFolderPath)) this.revealedFolderPath = ''
+    this.persistTree()
+  }
+
+  /** Explicit reveal opens the sidebar; navigation reveal respects hidden panels. */
+  showInTree(folders: readonly string[], target: { noteId: string } | { folderPath: string }, explicit = true) {
+    if (!explicit && (this.sidebarCollapsed || this.railCollapsed.notes)) return
+    this.expandFolders(folders)
+    if (explicit) {
       this.sidebarCollapsed = false
-      changed = true
-    }
-    if (this.railCollapsed.notes) {
       this.railCollapsed = { ...this.railCollapsed, notes: false }
-      changed = true
+      this.persist()
     }
-    if ('noteId' in target) {
-      this.revealedNoteId = target.noteId
-      this.revealedFolderPath = ''
-    } else {
-      this.revealedNoteId = ''
-      this.revealedFolderPath = target.folderPath
-    }
+    this.revealedNoteId = 'noteId' in target ? target.noteId : ''
+    this.revealedFolderPath = 'folderPath' in target ? target.folderPath : ''
     this.revealSeq += 1
-    if (changed) this.persist()
+  }
+
+  private persistTree() {
+    writeFolderTreeState(layoutStorage(), this.treeVaultId, this.foldersExpanded)
   }
 
   private snapshot(): LayoutState {
@@ -152,7 +174,6 @@ export class LayoutService extends Service {
       rightPanelCollapsed: this.rightPanelCollapsed,
       rightPanelTab: this.rightPanelTab,
       railCollapsed: this.railCollapsed,
-      foldersCollapsed: this.foldersCollapsed,
     }
   }
 

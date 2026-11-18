@@ -1,6 +1,6 @@
 import { has, register, resolve } from '@rabjs/react'
 import { createNote, noteForSave, type StrideNote } from '@stride/core/note'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { saveNote } from '../../../../../packages/core/src/vault'
 import { CommandService } from '../commands/command.service'
 import { shortcutToKeyEventInit } from '../commands/commands'
@@ -59,6 +59,30 @@ describe('TabsService', () => {
     tabs.vaultKey = ''
     // eslint-disable-next-line @typescript-eslint/no-dynamic-delete
     delete (window as unknown as Record<string, unknown>).__STRIDE_ELECTRON__
+  })
+
+  it('points a folder list at the opened note parent', async () => {
+    const { vault, tabs } = await openVaultWithNotes(['docs/guide/intro', 'other/note', 'docs/readme', 'root'])
+    vault.listFilter = 'folder:docs'
+    tabs.openNote('docs/guide/intro')
+    expect(vault.listFilter).toBe('folder:docs/guide')
+    expect(vault.activeId).toBe('docs/guide/intro')
+
+    tabs.openNote('other/note')
+    expect(vault.listFilter).toBe('folder:other')
+
+    tabs.followLink('docs/readme')
+    expect(vault.listFilter).toBe('folder:docs')
+    tabs.goBack()
+    expect(vault.activeId).toBe('other/note')
+    expect(vault.listFilter).toBe('folder:other')
+
+    tabs.openNote('root')
+    expect(vault.listFilter).toBe('all')
+
+    vault.listFilter = 'Project'
+    tabs.openNote('docs/guide/intro')
+    expect(vault.listFilter).toBe('Project')
   })
 
   it('opens one tab per note and focuses an already-open tab', async () => {
@@ -231,7 +255,7 @@ describe('TabsService', () => {
     expect(pressShortcut('Mod+[')).toBe(false)
   })
 
-  it('closes the active tab via Mod+W in the browser but not on the desktop runtime', async () => {
+  it('closes the active tab via Mod+W, and the desktop window only when none remain', async () => {
     const { vault, tabs } = await openVaultWithNotes(['a', 'b'])
     tabs.openNote('a')
     tabs.openNote('b')
@@ -239,14 +263,23 @@ describe('TabsService', () => {
     expect(tabs.tabs.map((tab) => tab.noteId)).toEqual(['a'])
     expect(vault.activeId).toBe('a')
 
-    // On the desktop the OS menu owns Mod+W (window close); the binding is inert.
+    const invokes: Array<{ channel: string; args?: unknown }> = []
     ;(window as unknown as Record<string, unknown>).__STRIDE_ELECTRON__ = {
-      invoke: () => Promise.resolve(undefined),
+      invoke: (channel: string, args?: unknown) => {
+        invokes.push({ channel, args })
+        return Promise.resolve(undefined)
+      },
       on: () => () => {},
     }
-    expect(pressShortcut('Mod+W')).toBe(false)
-    expect(tabs.tabs.map((tab) => tab.noteId)).toEqual(['a'])
-    expect(vault.activeId).toBe('a')
+    expect(pressShortcut('Mod+W')).toBe(true)
+    expect(tabs.tabs).toEqual([])
+    expect(vault.activeId).toBe('')
+    expect(invokes).toEqual([])
+
+    expect(pressShortcut('Mod+W')).toBe(true)
+    await vi.waitFor(() => {
+      expect(invokes).toEqual([{ channel: 'window:control', args: { action: 'close' } }])
+    })
   })
 
   it('converges when vault internals select a note directly (createNote gets a tab)', async () => {

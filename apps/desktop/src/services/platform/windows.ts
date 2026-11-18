@@ -129,6 +129,14 @@ export function requestOpenProject(): void {
   void desktopInvoke('window:openProject').catch(logWindow)
 }
 
+/** Close this desktop window. No-op in the browser, where the host owns Cmd+W. */
+export function requestCloseWindow(): void {
+  if (!isDesktopRuntime()) return
+  void import('@stride/electron-api')
+    .then(({ electronBridge }) => electronBridge().invoke('window:control', { action: 'close' }))
+    .catch(logWindow)
+}
+
 export function syncRecentProjects(projects: readonly RecentProject[]): void {
   if (!isDesktopRuntime() || isMemoryFixture()) return
   const copy = {

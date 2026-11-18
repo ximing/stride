@@ -51,8 +51,28 @@ interface FolderRevealVault {
   setFilter(filter: string): void
 }
 
+interface FolderScopeVault {
+  listFilter: string
+  setFilter(filter: string): void
+}
+
+/**
+ * While the note list is scoped to a folder, point it at the folder that
+ * contains `noteId`. A root note releases that scope back to All. All, inbox,
+ * type, and view filters stay as they are — only a stale directory selection
+ * follows the opened note.
+ */
+export function followNoteParentFolder(vault: FolderScopeVault, noteId: string) {
+  if (!noteId || !vault.listFilter.startsWith(FOLDER_FILTER_PREFIX)) return
+  const parent = parentFolder(noteId)
+  const next = parent ? `${FOLDER_FILTER_PREFIX}${parent}` : 'all'
+  if (vault.listFilter === next) return
+  vault.setFilter(next)
+  if (has(NoteListService)) resolve(NoteListService).requestScrollTo(noteId)
+}
+
 /** Drop search and the inline list query so the folder's own notes are visible. */
-function releaseListFilters(vault: FolderRevealVault) {
+export function releaseListFilters(vault: FolderRevealVault) {
   vault.clearSearch()
   if (has(ListFilterService)) resolve(ListFilterService).clear()
   if (has(SearchPanelService)) resolve(SearchPanelService).close()

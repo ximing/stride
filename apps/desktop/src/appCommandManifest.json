@@ -105,6 +105,13 @@
       "keywords": ["bm25", "全库", "搜索"]
     },
     {
+      "id": "tree.collapseAll",
+      "title": "Collapse All Folders",
+      "section": "View",
+      "enabledWhen": "vaultReady",
+      "keywords": ["tree", "folders", "收起", "目录"]
+    },
+    {
       "id": "view.toggleSidebar",
       "title": "Toggle Sidebar",
       "section": "View",

@@ -233,6 +233,7 @@ export const zh: DeepString<Catalog> = {
     },
   },
   commands: {
+    tree: { collapseAll: '收起所有目录' },
     file: {
       newWindow: '新建窗口',
       newProject: '新建项目…',

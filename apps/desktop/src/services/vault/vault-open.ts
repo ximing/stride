@@ -15,6 +15,7 @@ import {
 import { MemoryFileSystem, type FileSystemBackend, type SearchBackend } from '@stride/platform'
 import { hostHomeDirectory } from '../platform/home'
 import { isMemoryFixture } from '../platform/runtime'
+import { LayoutService } from '../layout/layout.service'
 import { applyStageZoom } from '../layout/stage-zoom'
 import { NoteListService } from '../notes/note-list.service'
 import { TabsService } from '../notes/tabs.service'
@@ -192,6 +193,7 @@ export async function openBackendBody(vault: VaultService, backend: FileSystemBa
     await vault.rememberVault(backend)
     // activeVaultId is final only after rememberVault. Publishing activeId earlier
     // lets the tab reaction write the new note into the previous vault's stride:tabs.
+    if (has(LayoutService)) vault.resolve(LayoutService).setTreeVault(vault.activeVaultId)
     vault.activeId = notes.find((note) => !isTypeDocument(note))?.id ?? ''
     if (has(TabsService)) vault.resolve(TabsService).onVaultOpened()
     // Same handover for the list: load this vault's persisted sort and drop any

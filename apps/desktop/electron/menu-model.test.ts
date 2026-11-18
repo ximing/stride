@@ -25,7 +25,7 @@ describe('menu model', () => {
     expect(file?.submenu?.map((item) => item.accelerator).filter(Boolean)).toEqual([
       'CmdOrCtrl+N',
       'CmdOrCtrl+O',
-      'CmdOrCtrl+W',
+      'CmdOrCtrl+Shift+W',
     ])
     const recent = file?.submenu?.find((item) => item.id === 'file.open-recent')
     expect(recent?.submenu?.[0]).toMatchObject({ id: 'file.recent-empty', label: 'No Recent Projects', enabled: false })

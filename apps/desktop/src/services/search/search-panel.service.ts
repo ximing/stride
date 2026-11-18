@@ -79,7 +79,7 @@ export class SearchPanelService extends Service {
 
   private chooseHit(hit: RankedHit) {
     const title = this.vault.notes.find((note) => note.id === hit.id)?.title ?? ''
-    this.tabs.openNote(hit.id)
+    this.tabs.openNote(hit.id, { reveal: true })
     this.close()
     if (hit.source === 'title') {
       const start = hit.offset

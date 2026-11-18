@@ -87,7 +87,7 @@ export class CommandPaletteService extends Service {
     }
     if (item.kind === 'note') {
       this.close()
-      this.resolve(TabsService).openNote(item.noteId)
+      this.resolve(TabsService).openNote(item.noteId, { reveal: true })
       return
     }
     // AI placeholder: hand the query to the chat panel as a draft.

@@ -227,6 +227,7 @@ export const en = {
     },
   },
   commands: {
+    tree: { collapseAll: 'Collapse All Folders' },
     file: {
       newWindow: 'New Window',
       newProject: 'New Project…',

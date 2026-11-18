@@ -13,6 +13,8 @@ import {
   type TabState,
   type TabsStorage,
 } from './tabs'
+import { LayoutService } from '../layout/layout.service'
+import { folderChain, parentFolder, followNoteParentFolder } from '../vault/reveal-note'
 import { VaultService } from '../vault/vault.service'
 
 let tabSeq = 0
@@ -93,24 +95,26 @@ export class TabsService extends Service {
   }
 
   /** Explicit open from a browsing surface: focus the existing tab or append one. */
-  openNote(noteId: string) {
+  openNote(noteId: string, options?: { reveal?: boolean }) {
     const vault = this.vault
     if (!noteId || !vault) return
+    if (options?.reveal) this.revealNavigation(noteId)
     // Unconditional select on purpose: vault.select no-ops on a same-id select,
     // and callers (and tests) rely on the call happening exactly like before tabs.
     if (this.activeTab?.noteId === noteId) {
-      vault.select(noteId)
+      this.selectNavigated(noteId)
       return
     }
     const result = openOrFocus(this.tabs, noteId, nextTabId)
     this.tabs = result.tabs
     if (result.tab.id !== this.activeTabId) this.activeTabId = result.tab.id
     this.persist()
-    vault.select(noteId)
+    this.selectNavigated(noteId)
   }
 
   /** Wikilink-style jump: navigate inside the active tab and record history. */
   followLink(noteId: string) {
+    this.revealNavigation(noteId)
     const vault = this.vault
     if (!noteId || !vault) return
     const active = this.activeTab
@@ -122,7 +126,7 @@ export class TabsService extends Service {
     const next = pushHistory(active, noteId)
     this.tabs = this.tabs.map((tab) => (tab.id === active.id ? next : tab))
     this.persist()
-    vault.select(noteId)
+    this.selectNavigated(noteId)
   }
 
   activateTab(tabId: string) {
@@ -130,8 +134,7 @@ export class TabsService extends Service {
     if (!tab || tab.id === this.activeTabId) return
     this.activeTabId = tab.id
     this.persist()
-    const vault = this.vault
-    if (vault) vault.select(tab.noteId)
+    this.selectNavigated(tab.noteId)
   }
 
   closeTab(tabId: string) {
@@ -143,9 +146,7 @@ export class TabsService extends Service {
     this.activeTabId = result.activeTabId
     this.persist()
     if (!wasActive) return
-    const vault = this.vault
-    if (!vault) return
-    vault.select(this.activeTab?.noteId ?? '')
+    this.selectNavigated(this.activeTab?.noteId ?? '')
   }
 
   closeActiveTab() {
@@ -208,7 +209,22 @@ export class TabsService extends Service {
     if (!next) return
     this.tabs = this.tabs.map((item) => (item.id === tab.id ? next : item))
     this.persist()
-    vault.select(next.noteId)
+    this.selectNavigated(next.noteId)
+  }
+
+  /**
+   * User navigation onto a note. A folder-scoped list follows that note's
+   * parent directory instead of keeping the previously selected folder.
+   */
+  private selectNavigated(noteId: string) {
+    const vault = this.vault
+    if (!vault) return
+    if (noteId) followNoteParentFolder(vault, noteId)
+    vault.select(noteId)
+  }
+
+  private revealNavigation(noteId: string) {
+    if (noteId && has(LayoutService)) this.resolve(LayoutService).showInTree(folderChain(parentFolder(noteId)), { noteId }, false)
   }
 
   private isAlive(noteId: string): boolean {

@@ -20,8 +20,6 @@ export interface LayoutState {
   rightPanelCollapsed: boolean
   rightPanelTab: RightPanelTab
   railCollapsed: RailCollapsed
-  /** Collapsed folder paths in the notes tree; only `true` entries are kept. */
-  foldersCollapsed: Record<string, boolean>
 }
 
 export const LAYOUT_STORAGE_KEY = 'stride:layout'
@@ -44,7 +42,6 @@ export const DEFAULT_LAYOUT_STATE: LayoutState = {
   rightPanelCollapsed: false,
   rightPanelTab: 'properties',
   railCollapsed: { views: false, types: false, notes: false },
-  foldersCollapsed: {},
 }
 
 export function clampColumnWidth(column: ResizableColumn, width: number): number {
@@ -70,23 +67,12 @@ function sanitizeRailCollapsed(value: unknown): RailCollapsed {
   }
 }
 
-/** Keep only string keys mapped to true; expanded folders leave no trace. */
-function sanitizeFoldersCollapsed(value: unknown): Record<string, boolean> {
-  if (!value || typeof value !== 'object') return {}
-  const out: Record<string, boolean> = {}
-  for (const [key, flag] of Object.entries(value as Record<string, unknown>)) {
-    if (flag === true) out[key] = true
-  }
-  return out
-}
-
 /** Merge arbitrary stored JSON onto the defaults. Unknown/garbage fields fall back. */
 export function sanitizeLayoutState(value: unknown): LayoutState {
   if (!value || typeof value !== 'object') {
     return {
       ...DEFAULT_LAYOUT_STATE,
       railCollapsed: { ...DEFAULT_LAYOUT_STATE.railCollapsed },
-      foldersCollapsed: {},
     }
   }
   const raw = value as Record<string, unknown>
@@ -98,7 +84,6 @@ export function sanitizeLayoutState(value: unknown): LayoutState {
     rightPanelCollapsed: raw.rightPanelCollapsed === true,
     rightPanelTab: isRightPanelTab(raw.rightPanelTab) ? raw.rightPanelTab : DEFAULT_LAYOUT_STATE.rightPanelTab,
     railCollapsed: sanitizeRailCollapsed(raw.railCollapsed),
-    foldersCollapsed: sanitizeFoldersCollapsed(raw.foldersCollapsed),
   }
 }
 

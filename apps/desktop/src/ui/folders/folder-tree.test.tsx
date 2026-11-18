@@ -8,7 +8,11 @@ import { Rail } from '../../app'
 import { FOLDER_NOTE_RENDER_CAP } from './folder-tree'
 import { FolderService } from '../../services/vault/folder.service'
 import { ListFilterService } from '../../services/search/list-filter.service'
+import { LayoutService } from '../../services/layout/layout.service'
+import { TabsService } from '../../services/notes/tabs.service'
 import { VaultService } from '../../services/vault/vault.service'
+
+globalThis.IS_REACT_ACT_ENVIRONMENT = true
 
 let root: Root | undefined
 
@@ -76,6 +80,7 @@ async function mountRail(): Promise<{ host: HTMLElement; vault: VaultService }> 
   vi.stubGlobal('showDirectoryPicker', vi.fn())
   register(VaultService)
   register(FolderService)
+  register(LayoutService)
   resetListFilter()
   const vault = resolve(VaultService)
   vault.cancelPending()
@@ -154,7 +159,7 @@ describe('folder tree', () => {
     expect(host.querySelector<HTMLElement>('[data-testid="note-link"]')?.dataset.noteId).toBe(`box/${basename}`)
   })
 
-  it('filters visible notes by title or property as the query is typed', async () => {
+  it('keeps the tree stable while list and search filters change', async () => {
     const { host, vault } = await mountRail()
     await act(async () => {
       await vault.openFromDraft()
@@ -170,48 +175,20 @@ describe('folder tree', () => {
       vault.notes = [meeting, other]
     })
 
-    // The filter input lives in the note list header (T6.1); the tree keeps
-    // applying the shared ListFilterService query.
     const listFilter = resolve(ListFilterService)
-    expect(noteTitles(host)).toEqual(['会议纪要', 'Shopping'])
-
+    for (const query of ['纪要', '进行', '12', '待办', 'FALSE', 'secret']) {
+      await act(async () => listFilter.setQuery(query))
+      expect(noteTitles(host)).toEqual(['会议纪要', 'Shopping'])
+    }
     await act(async () => {
-      listFilter.setQuery('纪要')
-    })
-    expect(noteTitles(host)).toEqual(['会议纪要'])
-
-    await act(async () => {
-      listFilter.setQuery('进行')
-    })
-    expect(noteTitles(host)).toEqual(['会议纪要'])
-
-    await act(async () => {
-      listFilter.setQuery('12')
-    })
-    expect(noteTitles(host)).toEqual(['会议纪要'])
-
-    await act(async () => {
-      listFilter.setQuery('待办')
-    })
-    expect(noteTitles(host)).toEqual(['会议纪要'])
-
-    await act(async () => {
-      listFilter.setQuery('FALSE')
-    })
-    expect(noteTitles(host)).toEqual(['Shopping'])
-
-    await act(async () => {
-      listFilter.setQuery('secret')
-    })
-    expect(noteTitles(host)).toEqual([])
-
-    await act(async () => {
-      listFilter.clear()
+      vault.listFilter = 'Missing type'
+      vault.searchQuery = '会议'
+      vault.searchHits = [{ id: 'meeting' }] as typeof vault.searchHits
     })
     expect(noteTitles(host)).toEqual(['会议纪要', 'Shopping'])
   })
 
-  it('scopes the note list to the clicked folder and toggles back to all', async () => {
+  it('selects and expands a folder idempotently', async () => {
     const { host, vault } = await mountRail()
     await act(async () => {
       await vault.openFromDraft()
@@ -234,7 +211,7 @@ describe('folder tree', () => {
     // stays rendered while the folder scope is active.
     expect(host.querySelector(`[data-testid="note-link"][data-note-id="${rootId}"]`)).not.toBeNull()
 
-    // A note created under the scope appears; a second click releases it.
+    // A note created under the scope appears; repeated selection keeps the scope.
     await act(async () => {
       await resolve(FolderService).createNoteInFolder('box')
     })
@@ -244,8 +221,47 @@ describe('folder tree', () => {
     expect(host.querySelector(`[data-testid="note-link"][data-note-id="${vault.activeId}"]`)).not.toBeNull()
 
     await act(async () => label!.click())
-    expect(vault.listFilter).toBe('all')
-    expect(vault.visibleNotes.length).toBe(2)
+    expect(vault.listFilter).toBe('folder:box')
+    expect(vault.visibleNotes.length).toBe(1)
+  })
+
+  it('scopes the note list to the parent of a clicked note', async () => {
+    const { host, vault } = await mountRail()
+    const folders = resolve(FolderService)
+    await act(async () => {
+      await vault.openFromDraft()
+      await folders.createFolder('docs')
+      await folders.createFolder('docs/guide')
+      await folders.createFolder('other')
+      await folders.createNoteInFolder('docs')
+    })
+    const docsId = vault.activeId
+    await act(async () => {
+      await folders.createNoteInFolder('docs/guide')
+    })
+    const guideId = vault.activeId
+    await act(async () => {
+      await folders.createNoteInFolder('other')
+      vault.setFilter('folder:docs')
+    })
+    const otherId = vault.activeId
+
+    const clickNote = (id: string) => {
+      host.querySelector<HTMLButtonElement>(`[data-testid="note-link"][data-note-id="${id}"]`)!.click()
+    }
+    await act(async () => clickNote(guideId))
+    expect(vault.activeId).toBe(guideId)
+    expect(vault.listFilter).toBe('folder:docs/guide')
+    expect(vault.visibleNotes.map((note) => note.id)).toEqual([guideId])
+    expect(host.querySelector('[data-testid="folder-row"][data-path="docs/guide"] [data-testid="folder-label"]')?.getAttribute('aria-current')).toBe('page')
+
+    await act(async () => clickNote(otherId))
+    expect(vault.listFilter).toBe('folder:other')
+    expect(vault.visibleNotes.map((note) => note.id)).toEqual([otherId])
+    expect(vault.visibleNotes.map((note) => note.id)).not.toContain(docsId)
+
+    await act(async () => clickNote(docsId))
+    expect(vault.listFilter).toBe('folder:docs')
   })
 
   it('commits an inline rename on Enter and cancels on Escape', async () => {
@@ -257,7 +273,7 @@ describe('folder tree', () => {
     const folderLabel = () =>
       host.querySelector<HTMLElement>('[data-testid="folder-row"][data-path="box"] [data-testid="folder-label"]')
     await act(async () => {
-      folderLabel()!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }))
+      folderLabel()!.dispatchEvent(new KeyboardEvent('keydown', { key: 'F2', bubbles: true, cancelable: true }))
     })
     const input = host.querySelector<HTMLInputElement>('input.folder-rename-input')
     expect(input).not.toBeNull()
@@ -272,7 +288,7 @@ describe('folder tree', () => {
 
     // Enter commits the rename.
     await act(async () => {
-      folderLabel()!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true }))
+      folderLabel()!.dispatchEvent(new KeyboardEvent('keydown', { key: 'F2', bubbles: true, cancelable: true }))
     })
     const again = host.querySelector<HTMLInputElement>('input.folder-rename-input')
     await act(async () => {
@@ -319,7 +335,139 @@ describe('folder tree', () => {
     })
     await vi.waitFor(() => {
       expect(host.querySelector('[data-testid="folder-row"][data-path="inbox-box"]')).not.toBeNull()
-      expect(host.querySelector('[data-testid="note-link"]')?.textContent).toContain('Fresh from disk')
+      expect(host.querySelector('[data-testid="folder-row"][data-path="inbox-box"]')?.getAttribute('aria-expanded')).toBe('false')
     })
   })
+
+  it('starts folded and preserves descendants when a parent closes', async () => {
+    const { host, vault } = await mountRail()
+    await act(async () => {
+      await vault.openFromDraft()
+      await vault.fs!.mkdir('docs/guide')
+      await resolve(FolderService).loadFolders()
+    })
+    const layout = resolve(LayoutService)
+    const toggle = (path: string) => host.querySelector<HTMLButtonElement>(`[data-testid="folder-toggle"][data-path="${path}"]`)!
+    expect(toggle('docs').getAttribute('aria-expanded')).toBe('false')
+    expect(toggle('docs/guide')).toBeNull()
+    await act(async () => toggle('docs').click())
+    expect(toggle('docs/guide').getAttribute('aria-expanded')).toBe('false')
+    await act(async () => toggle('docs/guide').click())
+    await act(async () => toggle('docs').click())
+    await act(async () => toggle('docs').click())
+    expect(toggle('docs/guide').getAttribute('aria-expanded')).toBe('true')
+    expect(vault.listFilter).toBe('all')
+    await act(async () => host.querySelector<HTMLButtonElement>('[data-testid="collapse-all-folders"]')!.click())
+    expect(layout.isFolderCollapsed('docs/guide')).toBe(true)
+    expect(vault.listFilter).toBe('all')
+  })
+
+  it('uses arrows to navigate without selecting and F2 only inside the tree', async () => {
+    const { host, vault } = await mountRail()
+    await act(async () => {
+      await vault.openFromDraft()
+      await vault.fs!.mkdir('docs/guide')
+      await resolve(FolderService).loadFolders()
+    })
+    const row = (path: string) => host.querySelector<HTMLElement>(`[data-testid="folder-row"][data-path="${path}"]`)!
+    const key = async (value: string) => act(async () => {
+      document.activeElement!.dispatchEvent(new KeyboardEvent('keydown', { key: value, bubbles: true, cancelable: true }))
+    })
+    row('docs').focus()
+    await key('ArrowRight')
+    expect(row('docs').getAttribute('aria-expanded')).toBe('true')
+    expect(document.activeElement).toBe(row('docs'))
+    await key('ArrowRight')
+    expect(document.activeElement).toBe(row('docs/guide'))
+    expect(vault.listFilter).toBe('all')
+    await key('ArrowLeft')
+    expect(document.activeElement).toBe(row('docs'))
+    await key('Enter')
+    expect(vault.listFilter).toBe('folder:docs')
+    await act(async () => row('docs').querySelector('[data-testid="folder-label"]')!.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })))
+    expect(host.querySelector('.folder-rename-input')).toBeNull()
+    expect(host.querySelectorAll('[role="treeitem"][tabindex="0"]').length).toBe(1)
+  })
+
+  it('does not reopen manually collapsed folders on tab activation or refresh', async () => {
+    const { host, vault } = await mountRail()
+    await act(async () => {
+      await vault.openFromDraft()
+      await resolve(FolderService).createFolder('docs')
+      await resolve(FolderService).createNoteInFolder('docs')
+    })
+    const nested = vault.activeId
+    const tabs = resolve(TabsService)
+    await act(async () => {
+      tabs.openNote(nested)
+      await vault.createNote()
+    })
+    const other = vault.activeId
+    await act(async () => {
+      tabs.openNote(other)
+      resolve(LayoutService).collapseAllFolders()
+      tabs.activateTab(tabs.tabs.find(tab => tab.noteId === nested)!.id)
+      await vault.refreshFromDisk()
+    })
+    expect(vault.activeId).toBe(nested)
+    expect(host.querySelector(`[data-note-id="${nested}"]`)).toBeNull()
+    expect(resolve(LayoutService).isFolderCollapsed('docs')).toBe(true)
+  })
+
+
+  it('opens a drag-hover target after a delay and cancels when leaving', async () => {
+    const { host, vault } = await mountRail()
+    await act(async () => {
+      await vault.openFromDraft()
+      await vault.fs!.mkdir('docs/guide')
+      await resolve(FolderService).loadFolders()
+    })
+    const row = host.querySelector<HTMLElement>('[data-testid="folder-row"][data-path="docs"]')!
+    const dataTransfer = new DataTransfer()
+    dataTransfer.setData('text/plain', 'note')
+    vi.useFakeTimers()
+    try {
+      await act(async () => row.dispatchEvent(new DragEvent('dragover', { bubbles: true, dataTransfer })))
+      await act(async () => vi.advanceTimersByTime(599))
+      expect(row.getAttribute('aria-expanded')).toBe('false')
+      await act(async () => row.dispatchEvent(new DragEvent('dragleave', { bubbles: true })))
+      await act(async () => vi.advanceTimersByTime(1000))
+      expect(row.getAttribute('aria-expanded')).toBe('false')
+      await act(async () => row.dispatchEvent(new DragEvent('dragover', { bubbles: true, dataTransfer })))
+      await act(async () => vi.advanceTimersByTime(600))
+      expect(row.getAttribute('aria-expanded')).toBe('true')
+      expect(vault.listFilter).toBe('all')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('keeps expansion on a real folder rename and isolates real vault switches', async () => {
+    const { host, vault } = await mountRail()
+    const folders = resolve(FolderService)
+    const layout = resolve(LayoutService)
+    await act(async () => {
+      await vault.openFromDraft()
+      await folders.createFolder('docs/guide')
+      layout.setFolderCollapsed('docs', true)
+      await folders.renameFolder('docs', 'work')
+    })
+    const first = vault.activeVaultId
+    expect(layout.isFolderCollapsed('work')).toBe(true)
+    expect(layout.isFolderCollapsed('work/guide')).toBe(false)
+    await act(async () => {
+      await vault.createNewVault()
+      await vault.fs!.mkdir('work/guide')
+      await folders.loadFolders()
+    })
+    const second = vault.activeVaultId
+    expect(second).not.toBe(first)
+    expect(layout.isFolderCollapsed('work/guide')).toBe(true)
+    await act(async () => vault.switchVault(first))
+    expect(layout.isFolderCollapsed('work')).toBe(true)
+    expect(layout.isFolderCollapsed('work/guide')).toBe(false)
+    await act(async () => host.querySelector<HTMLButtonElement>('[data-testid="folder-toggle"][data-path="work"]')!.click())
+    expect(host.querySelector('[data-path="work/guide"]')?.getAttribute('aria-expanded')).toBe('true')
+  })
+
 })

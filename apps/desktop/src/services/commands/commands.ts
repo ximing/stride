@@ -14,6 +14,8 @@
 //   - Every manifest shortcut carries Mod, so app commands fire globally —
 //     inside text inputs and the editor included. Typing is never hijacked
 //     because bare-key (modifier-less) shortcuts are policy-forbidden here.
+//   - Tree-local arrows/Enter/F2 are handled only while a tree item is focused.
+//     tree.collapseAll is a manifest command without a global shortcut.
 //   - The TipTap editor keymap owns editing chords (Mod+B, Mod+Alt+2, …).
 //     Those chords must never overlap a manifest chord; the dispatcher listens
 //     on window capture and wins any overlap, which would silently kill the

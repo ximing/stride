@@ -16,7 +16,7 @@ import { SettingsPageService } from '../settings/settings-page.service'
 import { TabsService } from '../notes/tabs.service'
 import { UpdateCheckService } from '../update/update-check'
 import { isDesktopRuntime } from '../platform/runtime'
-import { requestNewProject, requestNewWindow, requestOpenProject } from '../platform/windows'
+import { requestCloseWindow, requestNewProject, requestNewWindow, requestOpenProject } from '../platform/windows'
 import { VaultService } from '../vault/vault.service'
 import { ViewsService } from '../views/views.service'
 
@@ -32,10 +32,10 @@ function focusOverlayInput(selector: string) {
 }
 
 // On desktop the native File menu owns New Window and Open Project, so the
-// webview must not handle those chords as well. tab.close stays disabled
-// because the desktop app does not bind Cmd+W; the command stays runnable from
-// the palette, and tabs still close from the strip.
-export const DESKTOP_DISABLED_SHORTCUTS = new Set(['tab.close', 'file.newWindow', 'file.openProject'])
+// webview must not handle those chords as well. Cmd+W stays in the webview:
+// it closes the current article, and closes the window only when none remain.
+// Close Window in the native menu is Cmd+Shift+W.
+export const DESKTOP_DISABLED_SHORTCUTS = new Set(['file.newWindow', 'file.openProject'])
 
 /** Hint UI only. False on desktop for chords the webview does not dispatch. Manifest strings stay. */
 export function showsShortcutHint(commandId: string): boolean {
@@ -113,6 +113,14 @@ export class CommandService extends Service {
   dispatchKeydown(event: KeyboardEvent): boolean {
     if (event.repeat || event.defaultPrevented) return false
     const command = commandForKeyEvent(this.commands, event)
+    // Desktop Cmd+W is always live, including with no article open, so the
+    // last press can close the window. The browser keeps the hasActiveNote gate.
+    if (command?.id === 'tab.close' && isDesktopRuntime()) {
+      event.preventDefault()
+      event.stopPropagation()
+      this.closeTabOrWindow()
+      return true
+    }
     if (!command || !this.isRunnable(command)) return false
     // See DESKTOP_DISABLED_SHORTCUTS: the desktop app menu owns these chords.
     if (DESKTOP_DISABLED_SHORTCUTS.has(command.id) && isDesktopRuntime()) return false
@@ -120,6 +128,22 @@ export class CommandService extends Service {
     event.stopPropagation()
     this.execute(command.id)
     return true
+  }
+
+  /**
+   * Cmd+W. An open article closes first. The desktop window closes only when
+   * the tab strip is empty. The browser never closes its own tab from here.
+   */
+  private closeTabOrWindow() {
+    if (has(TabsService)) {
+      const tabs = this.resolve(TabsService)
+      if (tabs.tabs.length > 0) {
+        if (tabs.activeTabId) tabs.closeActiveTab()
+        else tabs.closeTab(tabs.tabs[0]!.id)
+        return
+      }
+    }
+    requestCloseWindow()
   }
 
   private registerBuiltinHandlers() {
@@ -154,6 +178,10 @@ export class CommandService extends Service {
       run: () => {
         void this.resolve(VaultService).flush()
       },
+    })
+    this.registerHandler('tree.collapseAll', {
+      available: () => has(LayoutService),
+      run: () => this.resolve(LayoutService).collapseAllFolders(),
     })
     this.registerHandler('file.refresh', {
       available: () => has(VaultService),
@@ -231,7 +259,7 @@ export class CommandService extends Service {
     }
     this.registerHandler('tab.close', {
       available: () => has(TabsService),
-      run: () => this.resolve(TabsService).closeActiveTab(),
+      run: () => this.closeTabOrWindow(),
     })
     // Batch list operations. Delete/retype open the same UI affordances the
     // batch bar drives (confirm modal / type menu), so the palette never
