@@ -312,6 +312,7 @@ describe('editor formats', () => {
       'toolbar-hr',
       'toolbar-math',
       'toolbar-mermaid',
+      'toolbar-mind-map',
       'toolbar-find',
       'toolbar-wikilink',
     ]
@@ -384,6 +385,12 @@ describe('editor formats', () => {
       editor.commands.insertContent({ type: 'wikilink', attrs: { target: 'Other note' } })
     })
     expect(hasMark(editor.getJSON(), 'wikilink')).toBe(true)
+
+    expect(document.querySelector('[data-testid="toolbar-mind-map"]')?.getAttribute('aria-label')).toBe('Mind map')
+    await act(async () => {
+      ;(document.querySelector('[data-testid="toolbar-mind-map"]') as HTMLButtonElement).click()
+    })
+    expect(JSON.stringify(editor.getJSON())).toContain('"type":"mindMap"')
   })
 })
 

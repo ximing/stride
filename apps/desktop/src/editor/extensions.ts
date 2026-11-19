@@ -16,6 +16,7 @@ import { externalLinkOpen } from './link/external-link-plugin'
 import { findHighlightExtension } from './find/find'
 import { createImageExtension, imageSlashCommand } from './image/image'
 import { createDocMathExtensions } from './math/math'
+import { mindMapNode, mindMapSlashCommand } from './mindmap/mindmap'
 import { MermaidBlock } from './mermaid/mermaid-block'
 import { mermaidBlockNodeView } from './mermaid/mermaid-block-view'
 import { insertMermaid } from './mermaid/mermaid-insert'
@@ -53,6 +54,7 @@ registerSlashCommand({
     insertMermaid(editor)
   },
 })
+registerSlashCommand(mindMapSlashCommand)
 
 // Mod-, is the app settings chord. These marks stay on the toolbar only.
 const DocSubscript = Subscript.extend({
@@ -148,6 +150,7 @@ export function createEditorExtensions(options: {
     codeBlockExtension,
     ...createDocMathExtensions(),
     mermaidBlock,
+    mindMapNode,
     externalLinkOpen,
     findHighlightExtension,
     createPasteExtension(getFs),

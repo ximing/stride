@@ -91,6 +91,29 @@ export function parseNote(raw: string, id: string): StrideNote {
   }
 }
 
+/**
+ * Non-empty topic labels in tree order. Search mapping must emit the same list.
+ * Nodes without an id, and later duplicates of an id, are dropped with their
+ * children — the same nodes the editor's normalizeMindMap refuses to draw.
+ */
+export function mindMapLabels(value: unknown): string[] {
+  const used = new Set<string>()
+  const walk = (node: unknown): string[] => {
+    if (!node || typeof node !== 'object') return []
+    const record = node as { id?: unknown; text?: unknown; children?: unknown }
+    const id = typeof record.id === 'string' ? record.id : ''
+    if (!id || used.has(id)) return []
+    used.add(id)
+    const labels: string[] = []
+    if (typeof record.text === 'string' && record.text.trim()) labels.push(record.text)
+    if (Array.isArray(record.children)) {
+      for (const child of record.children) labels.push(...walk(child))
+    }
+    return labels
+  }
+  return walk(value)
+}
+
 export function plainText(doc: TipTapNode): string {
   const parts: string[] = []
   const walk = (current: TipTapNode | undefined) => {
@@ -100,6 +123,7 @@ export function plainText(doc: TipTapNode): string {
       const target = current.attrs?.target
       if (typeof target === 'string' && target) parts.push(target)
     }
+    if (current.type === 'mindMap') parts.push(...mindMapLabels(current.attrs?.tree))
     current.content?.forEach(walk)
   }
   walk(doc)

@@ -1,0 +1,187 @@
+.editor .ProseMirror .mindmap {
+  margin: var(--sd-space-3) 0;
+  padding: var(--sd-space-2) 0;
+  color: var(--sd-fg);
+  border-radius: var(--sd-radius);
+}
+
+.editor .ProseMirror .mindmap.is-selected {
+  outline: 1px solid var(--sd-accent);
+  outline-offset: 2px;
+}
+
+.editor .ProseMirror .mindmap-frame {
+  position: relative;
+  overflow-x: auto;
+  /* overflow-x: auto also clips the cross axis. Padding keeps the pill stroke and focus ring inside that edge. */
+  padding: var(--sd-space-3) var(--sd-space-2);
+}
+
+.editor .ProseMirror .mindmap-links {
+  position: absolute;
+  top: 0;
+  left: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+
+.editor .ProseMirror .mindmap-links path {
+  fill: none;
+  stroke: var(--sd-muted);
+  stroke-width: 1.5px;
+  stroke-linecap: round;
+}
+
+.editor .ProseMirror .mindmap-tree {
+  position: relative;
+  z-index: 1;
+}
+
+.editor .ProseMirror .mindmap-node {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+}
+
+.editor .ProseMirror .mindmap-row {
+  position: relative;
+  display: flex;
+  flex: none;
+  align-items: center;
+}
+
+.editor .ProseMirror .mindmap-children {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: var(--sd-space-3);
+  margin-left: var(--sd-space-8);
+}
+
+.editor .ProseMirror .mindmap-pill {
+  display: flex;
+  flex: none;
+  align-items: center;
+  box-sizing: border-box;
+  min-width: 0;
+  max-width: 18em;
+  height: calc(var(--sd-space-8) + var(--sd-space-3));
+  padding: 0 var(--sd-space-4);
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-pill);
+  /* Paper is --sd-bg. The same fill makes the pill disappear into the note. */
+  background: var(--sd-bg-elevated);
+  background-clip: padding-box;
+  color: var(--sd-fg);
+  font-family: var(--sd-font-sans);
+  font-size: var(--sd-text-lg);
+  line-height: 1.25;
+}
+
+.editor .ProseMirror .mindmap-node.is-root > .mindmap-row > .mindmap-pill {
+  height: calc(var(--sd-space-8) + var(--sd-space-4));
+  padding: 0 var(--sd-space-5);
+  border-color: var(--sd-accent);
+  font-size: var(--sd-text-xl);
+}
+
+.editor .ProseMirror .mindmap-topic {
+  appearance: none;
+  display: block;
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: inherit;
+  font: inherit;
+  line-height: inherit;
+  text-align: center;
+}
+
+.editor .ProseMirror .mindmap-topic::placeholder {
+  color: var(--sd-muted);
+}
+
+.editor .ProseMirror .mindmap-topic:hover,
+.editor .ProseMirror .mindmap-topic:focus {
+  border-color: transparent;
+  background: transparent;
+  outline: none;
+}
+
+.editor .ProseMirror .mindmap-node.is-current > .mindmap-row > .mindmap-pill {
+  border-color: var(--sd-accent);
+  outline: 2px solid var(--sd-accent);
+  outline-offset: 2px;
+}
+
+.editor .ProseMirror .mindmap-topic[readonly] {
+  caret-color: transparent;
+  cursor: default;
+}
+
+.editor .ProseMirror .mindmap-node.is-editing > .mindmap-row > .mindmap-pill .mindmap-topic {
+  caret-color: var(--sd-fg);
+  cursor: text;
+}
+
+.editor .ProseMirror .mindmap-pill:has(.mindmap-topic:focus) {
+  border-color: var(--sd-accent);
+}
+
+.editor .ProseMirror .mindmap-pill:has(.mindmap-topic:focus-visible),
+.editor .ProseMirror .mindmap-delete:focus-visible {
+  outline: 2px solid var(--sd-accent);
+  outline-offset: 2px;
+}
+
+.editor .ProseMirror .mindmap-delete {
+  position: absolute;
+  top: calc(var(--sd-space-1) * -1);
+  right: calc(var(--sd-space-1) * -1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--sd-space-5);
+  height: var(--sd-space-5);
+  padding: 0;
+  border: 1px solid var(--sd-border);
+  border-radius: var(--sd-radius-pill);
+  background: var(--sd-bg-elevated);
+  color: var(--sd-muted);
+  opacity: 0;
+  pointer-events: none;
+}
+
+.editor .ProseMirror .mindmap-row:hover > .mindmap-delete,
+.editor .ProseMirror .mindmap-row:focus-within > .mindmap-delete,
+.editor .ProseMirror .mindmap-delete:focus-visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.editor .ProseMirror .mindmap-delete:hover:not(:disabled) {
+  border-color: var(--sd-accent);
+  color: var(--sd-fg);
+}
+
+.editor .ProseMirror .mindmap-delete-icon {
+  width: var(--sd-text-xs);
+  height: var(--sd-text-xs);
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .editor .ProseMirror .mindmap-delete {
+    transition: opacity 120ms linear;
+  }
+}

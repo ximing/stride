@@ -11,6 +11,8 @@ const copy: MenuCopy = {
   clearRecent: 'Clear Recently Opened',
   closeWindow: 'Close Window',
   emptyRecent: 'No Recent Projects',
+  undo: 'Undo',
+  redo: 'Redo',
 }
 
 function project(path: string, title: string): RecentProject {
@@ -35,14 +37,10 @@ describe('menu model', () => {
       'minimize',
       'zoom',
     ])
-    expect(model.find((item) => item.label === 'Edit')?.submenu?.map((item) => item.role).filter(Boolean)).toEqual([
-      'undo',
-      'redo',
-      'cut',
-      'copy',
-      'paste',
-      'selectAll',
-    ])
+    const edit = model.find((item) => item.label === 'Edit')?.submenu
+    expect(edit?.[0]).toMatchObject({ id: 'edit.undo', label: 'Undo', accelerator: 'CmdOrCtrl+Z' })
+    expect(edit?.[1]).toMatchObject({ id: 'edit.redo', label: 'Redo', accelerator: 'Shift+CmdOrCtrl+Z' })
+    expect(edit?.map((item) => item.role).filter(Boolean)).toEqual(['cut', 'copy', 'paste', 'selectAll'])
   })
 
   it('labels duplicate recent folders with their parent and skips the dock off mac', () => {

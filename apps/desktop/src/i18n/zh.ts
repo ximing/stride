@@ -533,6 +533,8 @@ export const zh: DeepString<Catalog> = {
     clearRecent: '清除最近打开的项目',
     closeWindow: '关闭窗口',
     emptyRecent: '没有最近的项目',
+    undo: '撤销',
+    redo: '重做',
     openLink: '打开链接',
     openInTab: '在新标签打开',
     createAndOpen: '创建并打开',
@@ -857,6 +859,7 @@ export const zh: DeepString<Catalog> = {
       image: '图片',
       math: '公式',
       mermaid: 'Mermaid',
+      mindMap: '脑图',
     },
     lang: {
       auto: '自动',
@@ -876,6 +879,11 @@ export const zh: DeepString<Catalog> = {
       splitHint: '左侧图形，右侧源码',
       drawing: '正在绘制…',
       failed: '这张图没有画出来',
+    },
+    mindMap: {
+      label: '脑图',
+      topic: '主题',
+      delete: '删除主题',
     },
     diskConflict: {
       changed: '磁盘上的这篇笔记已改变。未保存的草稿仍留在编辑器里。',

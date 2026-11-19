@@ -4,7 +4,7 @@ import { observer, useService } from '@rabjs/react'
 import { useTranslation } from 'react-i18next'
 import { VaultService } from '../../services/vault/vault.service'
 import { EmptyState } from '../primitives/empty-state'
-import { tocItems, type TocItem } from './toc'
+import { caretInBlock, tocItems, type TocItem } from './toc'
 
 function focusTitle() {
   document.querySelector<HTMLElement>('[data-testid="note-title"]')?.focus()
@@ -21,7 +21,9 @@ function editorOnSurface(): Editor | null {
 function openHeading(pos: number) {
   const editor = editorOnSurface()
   if (!editor) return
-  editor.chain().setTextSelection(pos).scrollIntoView().run()
+  const doc = editor.state.doc
+  const caret = caretInBlock(pos, (at) => doc.resolve(at).parent.inlineContent, doc.content.size)
+  editor.chain().setTextSelection(caret).scrollIntoView().run()
 }
 
 function openItem(item: TocItem) {

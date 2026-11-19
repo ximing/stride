@@ -27,6 +27,8 @@ export interface MenuCopy {
   clearRecent: string
   closeWindow: string
   emptyRecent: string
+  undo: string
+  redo: string
 }
 
 export interface SyncRecentRequest {

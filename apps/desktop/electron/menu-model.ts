@@ -62,8 +62,11 @@ export function buildMenuModel(
     label: 'Edit',
     type: 'submenu',
     submenu: [
-      { role: 'undo' },
-      { role: 'redo' },
+      // Not the native undo role. That role only notifies the page when the
+      // focused field has its own undo entry, and a prevented undo never
+      // fills the field's redo stack. The page handles a focused mind-map topic.
+      { id: 'edit.undo', label: copy.undo, accelerator: 'CmdOrCtrl+Z', enabled: true },
+      { id: 'edit.redo', label: copy.redo, accelerator: 'Shift+CmdOrCtrl+Z', enabled: true },
       { type: 'separator' },
       { role: 'cut' },
       { role: 'copy' },

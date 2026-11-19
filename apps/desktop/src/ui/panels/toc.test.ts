@@ -2,7 +2,7 @@ import { Editor } from '@tiptap/core'
 import { stripLeadingH1, type TipTapNode } from '@stride/core/note'
 import { describe, expect, it } from 'vitest'
 import { createEditorExtensions } from '../../editor/extensions'
-import { tocItems } from './toc'
+import { caretInBlock, tocItems } from './toc'
 
 function heading(level: number, text: string): TipTapNode {
   return { type: 'heading', attrs: { level }, content: [{ type: 'text', text }] }
@@ -68,6 +68,42 @@ describe('tocItems', () => {
         expect(node?.attrs.level).toBe(item.level)
         expect(node?.textContent).toBe(item.text)
       }
+    } finally {
+      editor.destroy()
+    }
+  })
+
+  it('points a heading after mind maps at the heading node', () => {
+    const doc: TipTapNode = {
+      type: 'doc',
+      content: [
+        { type: 'paragraph', content: [{ type: 'text', text: 'Hello' }] },
+        { type: 'mindMap', attrs: { tree: { id: 't1', text: 'Topic', children: [] } } },
+        { type: 'mindMap', attrs: { tree: { id: 't2', text: 'Other', children: [] } } },
+        heading(2, 'Hi'),
+      ],
+    }
+    const editor = new Editor({
+      extensions: createEditorExtensions(),
+      content: doc,
+    })
+    try {
+      const item = tocItems('Note', doc).find((entry) => entry.text === 'Hi')
+      expect(item).toBeTruthy()
+      const node = editor.state.doc.nodeAt(item!.pos)
+      expect(node?.type.name).toBe('heading')
+      expect(node?.textContent).toBe('Hi')
+      const caret = caretInBlock(
+        item!.pos,
+        (at) => editor.state.doc.resolve(at).parent.inlineContent,
+        editor.state.doc.content.size,
+      )
+      expect(editor.chain().setTextSelection(caret).run()).toBe(true)
+      const selection = editor.state.selection
+      expect(selection.$from.parent.type.name).toBe('heading')
+      expect(selection.$from.parent.textContent).toBe('Hi')
+      expect(selection.from).toBeGreaterThan(item!.pos)
+      expect(selection.to).toBeLessThan(item!.pos + node!.nodeSize)
     } finally {
       editor.destroy()
     }

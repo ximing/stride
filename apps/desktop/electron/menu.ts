@@ -1,4 +1,4 @@
-import { app, Menu, type MenuItemConstructorOptions } from 'electron'
+import { app, BrowserWindow, Menu, type MenuItemConstructorOptions } from 'electron'
 import type { MenuCopy, RecentProject, WindowIntent } from '@stride/electron-api'
 import { buildDockModel, buildMenuModel, type MenuNode } from './menu-model.ts'
 import { pathFromMenuId } from './recent.ts'
@@ -7,6 +7,24 @@ export interface MenuController {
   apply(projects: RecentProject[], copy: MenuCopy): void
   closeFocused(): void
   zoomFocused(): void
+}
+
+function dispatchEditHistory(kind: 'undo' | 'redo'): void {
+  const contents = BrowserWindow.getFocusedWindow()?.webContents
+  if (!contents || contents.isDestroyed()) return
+  const script = `typeof window.__strideMindMapHistory==="function"&&window.__strideMindMapHistory(${JSON.stringify(kind)})===true`
+  void contents
+    .executeJavaScript(script)
+    .then((handled: unknown) => {
+      if (handled === true || contents.isDestroyed()) return
+      if (kind === 'redo') contents.redo()
+      else contents.undo()
+    })
+    .catch(() => {
+      if (contents.isDestroyed()) return
+      if (kind === 'redo') contents.redo()
+      else contents.undo()
+    })
 }
 
 function toTemplate(nodes: readonly MenuNode[], onId: (id: string) => void): MenuItemConstructorOptions[] {
@@ -56,6 +74,14 @@ export function installApplicationMenu(actions: {
     }
     if (id === 'window.zoom') {
       actions.zoomFocused()
+      return
+    }
+    if (id === 'edit.undo') {
+      dispatchEditHistory('undo')
+      return
+    }
+    if (id === 'edit.redo') {
+      dispatchEditHistory('redo')
       return
     }
     const path = pathFromMenuId(id)

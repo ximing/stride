@@ -16,6 +16,7 @@ import {
   parseListInput,
   parseNote,
   parsePropertyInput,
+  mindMapLabels,
   plainText,
   plainWikilinks,
   splitWikilinkText,
@@ -432,5 +433,21 @@ describe('note codec', () => {
     expect(await nextSlugId(files, 'Status', 'box/inner/other')).toBe('box/inner/status')
     expect(await nextSlugId(files, 'Status', 'other')).toBe('status-2')
     expect(await nextSlugId(files, 'Status', 'crate/other')).toBe('crate/status')
+  })
+
+  it('reads mind-map labels in order and drops nodes the editor would not draw', () => {
+    const tree = {
+      id: 't1',
+      text: 'Root',
+      children: [
+        { id: 't2', text: 'Kept', children: [] },
+        { text: 'No id', children: [{ id: 't3', text: 'Hidden child', children: [] }] },
+        { id: 't2', text: 'Duplicate', children: [] },
+        { id: 't4', text: '   ', children: [{ id: 't5', text: 'After blank', children: [] }] },
+      ],
+    }
+    const doc: TipTapNode = { type: 'doc', content: [{ type: 'mindMap', attrs: { tree } }] }
+    expect(mindMapLabels(tree)).toEqual(['Root', 'Kept', 'After blank'])
+    expect(plainText(doc)).toBe('Root Kept After blank')
   })
 })

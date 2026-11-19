@@ -25,6 +25,7 @@ import {
   Superscript,
   Table as TableIcon,
   Undo2,
+  Waypoints,
   Workflow,
   type LucideIcon,
 } from 'lucide-react'
@@ -40,6 +41,7 @@ import { editorFindOpen, openEditorFind, subscribeEditorFind } from '../find/fin
 import { findSeedFromSelection } from '../find/find-hits'
 import { insertStoredImages, storeImageFiles } from '../image/image'
 import { insertMathLatex } from '../math/math'
+import { insertMindMap } from '../mindmap/mindmap-insert'
 import { insertMermaid } from '../mermaid/mermaid-insert'
 import { EditorPrompt } from '../prompt'
 import { ColorControl, EditorIcon } from './color-control'
@@ -338,6 +340,7 @@ export function EditorToolbar({
     known('hr')!,
     tool('math', translate('editor.tool.math'), Sigma, () => setMathOpen(true)),
     tool('mermaid', translate('editor.slash.mermaid'), Workflow, () => insertMermaid(editor)),
+    tool('mind-map', translate('editor.slash.mindMap'), Waypoints, () => insertMindMap(editor)),
     sepSlot('sep-find'),
     tool('find', translate('editor.tool.find'), Search, openFind, { pressed: findOpen }),
     sepSlot('sep-stride'),

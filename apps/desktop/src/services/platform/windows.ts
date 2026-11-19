@@ -148,6 +148,8 @@ export function syncRecentProjects(projects: readonly RecentProject[]): void {
     clearRecent: t('menu.clearRecent'),
     closeWindow: t('menu.closeWindow'),
     emptyRecent: t('menu.emptyRecent'),
+    undo: t('menu.undo'),
+    redo: t('menu.redo'),
   }
   void desktopInvoke('window:syncRecent', { projects: [...projects], copy }).catch(logWindow)
 }

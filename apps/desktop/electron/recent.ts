@@ -22,6 +22,8 @@ export function defaultMenuCopy(): MenuCopy {
     clearRecent: 'Clear Recently Opened',
     closeWindow: 'Close Window',
     emptyRecent: 'No Recent Projects',
+    undo: 'Undo',
+    redo: 'Redo',
   }
 }
 
@@ -116,6 +118,8 @@ export function menuSignature(projects: readonly RecentProject[], copy: MenuCopy
     copy.clearRecent,
     copy.closeWindow,
     copy.emptyRecent,
+    copy.undo,
+    copy.redo,
   ]
   for (const project of projects) {
     parts.push(project.path, project.title, project.id, project.lastOpened)
@@ -155,6 +159,8 @@ const COPY_FIELDS = [
   'clearRecent',
   'closeWindow',
   'emptyRecent',
+  'undo',
+  'redo',
 ] as const
 
 export function parseMenuCopy(value: unknown): MenuCopy {

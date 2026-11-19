@@ -47,6 +47,8 @@ export async function runE05aDriver(input: {
     clearRecent: 'Clear Recently Opened',
     closeWindow: 'Close Window',
     emptyRecent: 'No Recent Projects',
+    undo: 'Undo',
+    redo: 'Redo',
   }
   await invoke(pair[0]!.window, 'window:syncRecent', { projects, copy })
   const menu = Menu.getApplicationMenu()

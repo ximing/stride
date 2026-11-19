@@ -110,6 +110,19 @@ const mixed: JSONContent = {
     { type: 'image', attrs: { src: 'attachments/a.png' } },
     { type: 'callout', attrs: { kind: 'warning' }, content: [paragraph('careful')] },
     {
+      type: 'mindMap',
+      attrs: {
+        tree: {
+          id: 't1',
+          text: 'Map',
+          children: [
+            { id: 't2', text: 'Left', children: [{ id: 't4', text: 'Leaf', children: [] }] },
+            { id: 't3', text: 'Right', children: [] },
+          ],
+        },
+      },
+    },
+    {
       type: 'paragraph',
       content: [
         { type: 'wikilink', attrs: { target: 'Other note', alias: 'other' } },
@@ -126,7 +139,7 @@ describe('editor file round trip', () => {
     const editor = createEditor()
     const canonical = await roundTrip(editor, mixed)
     const blob = JSON.stringify(canonical)
-    for (const type of ['heading', 'bulletList', 'orderedList', 'taskList', 'taskItem', 'blockquote', 'codeBlock', 'horizontalRule', 'table', 'image', 'callout', 'wikilink', 'highlight']) {
+    for (const type of ['heading', 'bulletList', 'orderedList', 'taskList', 'taskItem', 'blockquote', 'codeBlock', 'horizontalRule', 'table', 'image', 'callout', 'wikilink', 'highlight', 'mindMap']) {
       expect(blob).toContain(`"${type}"`)
     }
     expect(blob).toContain('"checked":true')

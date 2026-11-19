@@ -1,3 +1,4 @@
+import { mindMapLabels } from '@stride/core/note'
 import type { Node as PmNode } from '@tiptap/pm/model'
 
 type CharPos = { pos: number; atom: boolean }
@@ -17,6 +18,11 @@ function pieces(doc: PmNode): { text: string; pos: number; atom: boolean }[] {
     if (node.type.name === 'wikilink') {
       const target = node.attrs.target
       if (typeof target === 'string' && target) list.push({ text: target, pos, atom: true })
+      return false
+    }
+    // One atom, same labels and order as plainText, so later text keeps its offset.
+    if (node.type.name === 'mindMap') {
+      for (const label of mindMapLabels(node.attrs.tree)) list.push({ text: label, pos, atom: true })
       return false
     }
     return true

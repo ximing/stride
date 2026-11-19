@@ -527,6 +527,8 @@ export const en = {
     clearRecent: 'Clear Recently Opened',
     closeWindow: 'Close Window',
     emptyRecent: 'No Recent Projects',
+    undo: 'Undo',
+    redo: 'Redo',
     openLink: 'Open link',
     openInTab: 'Open in new tab',
     createAndOpen: 'Create and open',
@@ -851,6 +853,7 @@ export const en = {
       image: 'Image',
       math: 'Math',
       mermaid: 'Mermaid',
+      mindMap: 'Mind map',
     },
     lang: {
       auto: 'Auto',
@@ -870,6 +873,11 @@ export const en = {
       splitHint: 'Diagram on the left, source on the right',
       drawing: 'Drawing…',
       failed: 'This diagram could not be drawn',
+    },
+    mindMap: {
+      label: 'Mind map',
+      topic: 'Topic',
+      delete: 'Delete topic',
     },
     diskConflict: {
       changed: 'This note changed on disk. Your unsaved draft is still in the editor.',

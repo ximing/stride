@@ -6,7 +6,7 @@ export type TocItem = {
   pos: number
 }
 
-const ATOM_TYPES = new Set(['hardBreak', 'horizontalRule', 'image', 'wikilink'])
+const ATOM_TYPES = new Set(['hardBreak', 'horizontalRule', 'image', 'wikilink', 'mindMap'])
 
 function nodeSize(node: TipTapNode): number {
   if (node.type === 'text') return node.text?.length ?? 0
@@ -29,6 +29,16 @@ function collect(node: TipTapNode, pos: number, items: TocItem[], isDoc: boolean
     collect(child, childPos, items, false)
     childPos += nodeSize(child)
   }
+}
+
+// A heading's stored position is the node itself. A text caret has to step
+// inside that node; the boundary before it is still the parent block.
+export function caretInBlock(pos: number, isInlineAt: (pos: number) => boolean, max: number): number {
+  const clamped = Math.max(0, Math.min(pos, max))
+  if (isInlineAt(clamped)) return clamped
+  const inside = Math.min(clamped + 1, max)
+  if (isInlineAt(inside)) return inside
+  return clamped
 }
 
 // Positions match the editor, which does not contain the title H1.
