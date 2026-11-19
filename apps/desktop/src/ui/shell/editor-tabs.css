@@ -51,8 +51,7 @@
 /* The .editor shell spans the full stage width; the paper constraint lives on
    the content itself, centered, so the title, toolbar, and body share one
    column axis. */
-.editor .ProseMirror,
-.editor .find-bar {
+.editor .ProseMirror {
   max-width: var(--sd-note-max-width);
   margin-inline: auto;
 }

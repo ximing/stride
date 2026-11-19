@@ -2,7 +2,7 @@ import type { Editor } from '@tiptap/core'
 import { bindServices, observer, useService } from '@rabjs/react'
 import { useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, ChevronUp, X } from 'lucide-react'
+import { CaseSensitive, ChevronDown, ChevronUp, X } from 'lucide-react'
 import { Tip } from '../../ui/primitives/tooltip'
 import { CommandService } from '../../services/commands/command.service'
 import { registerOverlayKeys } from '../../services/platform/overlay-keys'
@@ -149,6 +149,12 @@ const FindBar = observer(function FindBar({ editor }: { editor: Editor }) {
           if (imeBlocksEnterFromEvent(event)) return
           event.preventDefault()
           event.stopPropagation()
+          // Enter in the replace field replaces the current hit. Enter in the
+          // find field steps, matching the editor find widget.
+          if (target.closest('[data-testid="replace-input"]')) {
+            runAfterImeEnter(event, () => replaceCurrent())
+            return
+          }
           const backward = event.shiftKey
           runAfterImeEnter(event, () => step(backward ? -1 : 1))
           return
@@ -219,79 +225,98 @@ const FindBar = observer(function FindBar({ editor }: { editor: Editor }) {
 
   if (!service.open) return null
 
+  const missed = service.query.length > 0 && matches.length === 0
+  const canReplace = service.query.length > 0 && matches.length > 0
+
   return (
     <div className="find-bar" data-testid="find-bar" role="search">
-      <input
-        ref={inputRef}
-        className="find-input"
-        data-testid="find-input"
-        aria-label={t('editor.find.find')}
-        placeholder={t('editor.find.find')}
-        autoFocus
-        autoComplete="off"
-        spellCheck={false}
-        value={service.query}
-        onChange={(event) => revealQuery(event.target.value)}
-      />
-      <Tip content={t('editor.find.case')}>
-      <button
-        type="button"
-        className="find-case"
-        data-testid="find-case"
-        aria-label={t('editor.find.case')}
-        aria-pressed={caseSensitive}
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={toggleCase}
-      >
-        Aa
-      </button>
-      </Tip>
-      <span className="find-count" data-testid="find-count">{countLabel(matches.length, service.index)}</span>
-      <Tip content={t('editor.find.previous')}>
-      <button
-        type="button"
-        className="find-icon-button"
-        data-testid="find-prev"
-        aria-label={t('editor.find.previous')}
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={() => step(-1)}
-      >
-        <ChevronUp aria-hidden="true" size={14} strokeWidth={1.75} />
-      </button>
-      </Tip>
-      <Tip content={t('editor.find.next')}>
-      <button
-        type="button"
-        className="find-icon-button"
-        data-testid="find-next"
-        aria-label={t('editor.find.next')}
-        onMouseDown={(event) => event.preventDefault()}
-        onClick={() => step(1)}
-      >
-        <ChevronDown aria-hidden="true" size={14} strokeWidth={1.75} />
-      </button>
-      </Tip>
-      <input
-        className="replace-input"
-        data-testid="replace-input"
-        aria-label={t('editor.find.replaceWith')}
-        placeholder={t('editor.find.replaceWith')}
-        autoComplete="off"
-        spellCheck={false}
-        value={service.replacement}
-        onChange={(event) => service.setReplacement(event.target.value)}
-      />
-      <button type="button" className="find-action" data-testid="replace-one" aria-label={t('editor.find.replace')} onMouseDown={(event) => event.preventDefault()} onClick={replaceCurrent}>
-        {t('editor.find.replace')}
-      </button>
-      <button type="button" className="find-action" data-testid="replace-all" aria-label={t('editor.find.replaceAll')} onMouseDown={(event) => event.preventDefault()} onClick={replaceEvery}>
-        {t('editor.find.replaceAll')}
-      </button>
-      <Tip content={t('editor.find.close')}>
-      <button type="button" className="find-icon-button" aria-label={t('editor.find.close')} onMouseDown={(event) => event.preventDefault()} onClick={() => service.close()}>
-        <X aria-hidden="true" size={14} strokeWidth={1.75} />
-      </button>
-      </Tip>
+      <div className="find-row">
+        <div className={missed ? 'find-field is-miss' : 'find-field'}>
+          <input
+            ref={inputRef}
+            className="find-input"
+            data-testid="find-input"
+            aria-label={t('editor.find.find')}
+            placeholder={t('editor.find.find')}
+            autoFocus
+            autoComplete="off"
+            spellCheck={false}
+            value={service.query}
+            onChange={(event) => revealQuery(event.target.value)}
+          />
+          <Tip content={t('editor.find.case')}>
+          <button
+            type="button"
+            className="find-case"
+            data-testid="find-case"
+            aria-label={t('editor.find.case')}
+            aria-pressed={caseSensitive}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={toggleCase}
+          >
+            <CaseSensitive aria-hidden="true" size={14} strokeWidth={1.75} />
+          </button>
+          </Tip>
+          <span className="find-count" data-testid="find-count">{countLabel(matches.length, service.index)}</span>
+        </div>
+        <div className="find-actions">
+          <Tip content={t('editor.find.previous')}>
+          <button
+            type="button"
+            className="find-icon-button"
+            data-testid="find-prev"
+            aria-label={t('editor.find.previous')}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => step(-1)}
+          >
+            <ChevronUp aria-hidden="true" size={14} strokeWidth={1.75} />
+          </button>
+          </Tip>
+          <Tip content={t('editor.find.next')}>
+          <button
+            type="button"
+            className="find-icon-button"
+            data-testid="find-next"
+            aria-label={t('editor.find.next')}
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={() => step(1)}
+          >
+            <ChevronDown aria-hidden="true" size={14} strokeWidth={1.75} />
+          </button>
+          </Tip>
+          <Tip content={t('editor.find.close')}>
+          <button type="button" className="find-icon-button" aria-label={t('editor.find.close')} onMouseDown={(event) => event.preventDefault()} onClick={() => service.close()}>
+            <X aria-hidden="true" size={14} strokeWidth={1.75} />
+          </button>
+          </Tip>
+        </div>
+      </div>
+      <div className="find-row">
+        <div className="find-field">
+          <input
+            className="replace-input"
+            data-testid="replace-input"
+            aria-label={t('editor.find.replaceWith')}
+            placeholder={t('editor.find.replaceWith')}
+            autoComplete="off"
+            spellCheck={false}
+            value={service.replacement}
+            onChange={(event) => service.setReplacement(event.target.value)}
+          />
+        </div>
+        <div className="find-actions">
+          <Tip content={t('editor.find.replace')}>
+          <button type="button" className="find-text-button" data-testid="replace-one" aria-label={t('editor.find.replace')} disabled={!canReplace} onMouseDown={(event) => event.preventDefault()} onClick={replaceCurrent}>
+            {t('editor.find.replace')}
+          </button>
+          </Tip>
+          <Tip content={t('editor.find.replaceAll')}>
+          <button type="button" className="find-text-button" data-testid="replace-all" aria-label={t('editor.find.replaceAll')} disabled={!canReplace} onMouseDown={(event) => event.preventDefault()} onClick={replaceEvery}>
+            {t('editor.find.replaceAll')}
+          </button>
+          </Tip>
+        </div>
+      </div>
     </div>
   )
 })

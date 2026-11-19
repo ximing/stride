@@ -249,6 +249,10 @@ describe('find bar', () => {
       openEvent = press({ key: 'f', metaKey: true })
     })
     expect(openEvent.defaultPrevented).toBe(true)
+    const bar = host.querySelector('[data-testid="find-bar"]')
+    const toolbar = host.querySelector('[data-testid="editor-toolbar"]')
+    expect(bar?.parentElement?.classList.contains('editor-frame')).toBe(true)
+    expect(toolbar?.compareDocumentPosition(bar!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     const input = host.querySelector('[data-testid="find-input"]') as HTMLInputElement
     expect(input).not.toBeNull()
     expect(host.querySelector('[data-testid="find-count"]')?.textContent).toBe('0')
@@ -361,6 +365,26 @@ describe('find bar', () => {
       press({ key: 'Escape' })
     })
     expect(host.querySelector('[data-testid="find-bar"]')).toBeNull()
+  })
+
+  it('replaces the current match when Enter is pressed in the replace field', async () => {
+    const { host } = await mount('机器学习与机器学习')
+    await act(async () => {
+      press({ key: 'f', metaKey: true })
+    })
+    const findInput = host.querySelector('[data-testid="find-input"]') as HTMLInputElement
+    const replaceInput = host.querySelector('[data-testid="replace-input"]') as HTMLInputElement
+    await act(async () => {
+      setInput(findInput, '机器学习')
+      setInput(replaceInput, '深度学习')
+    })
+    const enter = new KeyboardEvent('keydown', { key: 'Enter', bubbles: true, cancelable: true })
+    await act(async () => {
+      replaceInput.dispatchEvent(enter)
+      await new Promise((resolve) => setTimeout(resolve, 0))
+    })
+    expect(enter.defaultPrevented).toBe(true)
+    expect(host.querySelector('.ProseMirror')?.textContent).toBe('深度学习与机器学习')
   })
 
   it('gives find-bar Enter to find when a panel is also open, and does not close settings', async () => {
